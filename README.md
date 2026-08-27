@@ -100,7 +100,8 @@ If Vercel shows vars like `DATABASE_URL_POSTGRES_URL`, `DATABASE_URL_DATABASE_UR
 4. **Deployments** → latest deployment → **⋯** → **Redeploy** (or push a commit to `main`)
 5. Watch build logs for `RUN_DB_SETUP_ON_DEPLOY=true — running prisma db push and seed`
 6. After a successful deploy, sign in at your production URL with breakglass credentials → `/admin`
-7. **Remove** `RUN_DB_SETUP_ON_DEPLOY` or set it to **`false`** so normal deploys do not re-run push/seed
+7. During **pilot testing**, it is safe to leave `RUN_DB_SETUP_ON_DEPLOY=true` for multiple deploys. Each build runs `prisma db push` (applies schema changes) and `seed` (ensures breakglass admin + default AppConfig). This does **not** wipe users, visits, heartbeats, or audit data unless a schema change is breaking (rare during pilot). Seed resets AppConfig defaults (hours target, SSIDs, registration toggle) on every run.
+8. When the pilot is stable, **remove** `RUN_DB_SETUP_ON_DEPLOY` or set it to **`false`** so normal deploys skip push/seed. Minor schema fixes (e.g. new columns) also run automatically at server startup via `src/instrumentation.ts`.
 
 This runs during `npm run build` on Vercel (which can reach Neon). Local `npm run db:push` / `db:seed` are unchanged for machines that can connect.
 

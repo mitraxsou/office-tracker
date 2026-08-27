@@ -120,8 +120,10 @@ export function AdminPilotControls({
           stop working; sign in again with breakglass credentials.
         </p>
         <p className="mb-4 text-sm text-muted">
-          For one-time production DB setup, use RUN_DB_SETUP_ON_DEPLOY=true on Vercel, then remove
-          or set it to false after the first successful deploy.
+          For production DB setup during pilot testing, set RUN_DB_SETUP_ON_DEPLOY=true on Vercel.
+          Safe to leave on for multiple deploys: each build runs schema push and seed without
+          wiping users or visits. Turn it off when the pilot is stable. Schema drift (e.g. missing
+          columns) is also fixed automatically at server startup.
         </p>
 
         <label className="mb-1 block text-sm text-muted">

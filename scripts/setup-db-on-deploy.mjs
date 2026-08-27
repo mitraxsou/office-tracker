@@ -55,5 +55,7 @@ runNpx(["tsx", "prisma/seed.ts"]);
 
 console.log("");
 console.log("Deploy DB setup complete (schema pushed, seed ran).");
-console.log("Unset RUN_DB_SETUP_ON_DEPLOY in Vercel after verifying login.");
+console.log(
+  "Safe to leave RUN_DB_SETUP_ON_DEPLOY=true during pilot testing; turn off when stable."
+);
 console.log("");
