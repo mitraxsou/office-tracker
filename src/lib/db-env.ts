@@ -10,6 +10,7 @@ function firstNonEmpty(...values: (string | undefined)[]): string {
 export function resolvePostgresEnv(): { prismaUrl: string; directUrl: string } {
   const prismaUrl = firstNonEmpty(
     process.env.POSTGRES_PRISMA_URL,
+    process.env.POSTGRES_URL,
     process.env.DATABASE_URL,
     process.env.DATABASE_URL_DATABASE_URL,
     process.env.DATABASE_URL_POSTGRES_URL,
@@ -32,6 +33,7 @@ export function hasPostgresEnv(): boolean {
   return Boolean(
     firstNonEmpty(
       process.env.POSTGRES_PRISMA_URL,
+      process.env.POSTGRES_URL,
       process.env.DATABASE_URL,
       process.env.DATABASE_URL_DATABASE_URL,
       process.env.DATABASE_URL_POSTGRES_URL,

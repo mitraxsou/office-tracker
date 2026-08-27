@@ -92,17 +92,44 @@ If Vercel shows vars like `DATABASE_URL_POSTGRES_URL`, `DATABASE_URL_DATABASE_UR
 
 ### 3. Initialize database
 
-From your machine, pull Vercel env and push schema:
+**Recommended (manual env copy — works when `vercel env pull` fails on PwC laptops):**
 
-```bash
-npx vercel env pull .env.vercel.local
-# Uses POSTGRES_URL_NON_POOLING from the pulled file for db push
-node scripts/ensure-postgres-env.mjs
-npx prisma db push
+1. In Vercel: **Storage** → your Postgres database → **`.env.local` tab**  
+   Copy `POSTGRES_PRISMA_URL` and `POSTGRES_URL_NON_POOLING`.  
+   *(Alternative: **Settings** → **Environment Variables** → copy all three `POSTGRES_*` values for Production.)*
+2. In the project root:
+
+```powershell
+Copy-Item .env.vercel.local.example .env.vercel.local
+# Edit .env.vercel.local — paste the two POSTGRES_* URLs (keep quotes)
+notepad .env.vercel.local
+```
+
+3. Push schema and seed:
+
+```powershell
+Remove-Item Env:VERCEL_TOKEN -ErrorAction SilentlyContinue   # if vercel pull failed earlier
+.\scripts\setup-prod-db.ps1
+```
+
+Or run the steps manually:
+
+```powershell
+npm run db:push
 npm run db:seed
 ```
 
-Or with a Neon connection string locally, set `DATABASE_URL` in `.env.local` (the ensure script maps it for Prisma).
+**Optional — Vercel CLI pull** (only if `vercel login` / token works):
+
+```powershell
+Remove-Item Env:VERCEL_TOKEN -ErrorAction SilentlyContinue
+npx vercel env pull .env.vercel.local
+.\scripts\setup-prod-db.ps1
+```
+
+If pull fails with `You defined "--token", but its contents are invalid`, a bad `VERCEL_TOKEN` is still set in PowerShell from an earlier attempt. Clear it with `Remove-Item Env:VERCEL_TOKEN -ErrorAction SilentlyContinue` and retry, or skip pull and use manual copy above.
+
+For local Neon dev, set `DATABASE_URL` or `POSTGRES_PRISMA_URL` in `.env.local` — `scripts/ensure-postgres-env.mjs` loads `.env`, `.env.local`, and `.env.vercel.local`, maps legacy names, and passes resolved vars to Prisma.
 
 ### 4. Set production URL
 
