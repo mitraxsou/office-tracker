@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { getAppConfig } from "@/lib/app-config";
+import { isRegistrationEnvLocked } from "@/lib/auth";
 import { AppNav } from "@/components/AppNav";
 import { AdminSettingsForm } from "@/components/AdminSettingsForm";
+import { AdminPilotControls } from "@/components/AdminPilotControls";
 import Link from "next/link";
 
 export default async function AdminSettingsPage() {
@@ -26,6 +28,10 @@ export default async function AdminSettingsPage() {
           hoursTarget={config.hoursTarget}
           officeSsids={config.officeSsids}
           maxDevicesPerUser={config.maxDevicesPerUser}
+        />
+        <AdminPilotControls
+          allowRegistration={config.allowRegistration}
+          registrationEnvLocked={isRegistrationEnvLocked()}
         />
       </main>
     </>

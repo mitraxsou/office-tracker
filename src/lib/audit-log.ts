@@ -5,7 +5,9 @@ export type AuditAction =
   | "visit_update"
   | "visit_delete"
   | "device_remove"
-  | "config_update";
+  | "config_update"
+  | "user_role_change"
+  | "db_reset";
 
 export async function logAuditEvent(params: {
   actorId: string;

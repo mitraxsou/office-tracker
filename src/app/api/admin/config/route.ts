@@ -4,6 +4,7 @@ import { getAppConfig, updateAppConfig } from "@/lib/app-config";
 import { validateSsids } from "@/lib/security";
 import { normalizeSsid } from "@/lib/constants";
 import { logAuditEvent } from "@/lib/audit-log";
+import { isRegistrationEnvLocked } from "@/lib/auth";
 
 export async function GET() {
   const admin = await requireAdmin();
@@ -12,7 +13,10 @@ export async function GET() {
   }
 
   const config = await getAppConfig();
-  return NextResponse.json({ config });
+  return NextResponse.json({
+    config,
+    registrationEnvLocked: isRegistrationEnvLocked(),
+  });
 }
 
 export async function PATCH(request: Request) {
@@ -21,7 +25,12 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  let body: { hoursTarget?: number; officeSsids?: string[]; maxDevicesPerUser?: number };
+  let body: {
+    hoursTarget?: number;
+    officeSsids?: string[];
+    maxDevicesPerUser?: number;
+    allowRegistration?: boolean;
+  };
 
   try {
     body = await request.json();
@@ -51,6 +60,19 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Invalid maxDevicesPerUser" }, { status: 400 });
     }
     update.maxDevicesPerUser = body.maxDevicesPerUser;
+  }
+
+  if (body.allowRegistration !== undefined) {
+    if (typeof body.allowRegistration !== "boolean") {
+      return NextResponse.json({ error: "Invalid allowRegistration" }, { status: 400 });
+    }
+    if (body.allowRegistration && isRegistrationEnvLocked()) {
+      return NextResponse.json(
+        { error: "Registration is locked off by ALLOW_REGISTRATION=false in environment" },
+        { status: 403 }
+      );
+    }
+    update.allowRegistration = body.allowRegistration;
   }
 
   const config = await updateAppConfig(update);

@@ -5,6 +5,7 @@ export type AppConfigData = {
   hoursTarget: number;
   officeSsids: string[];
   maxDevicesPerUser: number;
+  allowRegistration: boolean;
 };
 
 const CONFIG_ID = "global";
@@ -18,6 +19,7 @@ export async function ensureAppConfig(): Promise<AppConfigData> {
         hoursTarget: DEFAULT_HOURS_TARGET,
         officeSsids: JSON.stringify(DEFAULT_OFFICE_SSIDS),
         maxDevicesPerUser: 10,
+        allowRegistration: false,
       },
     });
   }
@@ -34,6 +36,7 @@ export async function updateAppConfig(data: Partial<AppConfigData>) {
   if (data.hoursTarget !== undefined) update.hoursTarget = data.hoursTarget;
   if (data.officeSsids !== undefined) update.officeSsids = JSON.stringify(data.officeSsids);
   if (data.maxDevicesPerUser !== undefined) update.maxDevicesPerUser = data.maxDevicesPerUser;
+  if (data.allowRegistration !== undefined) update.allowRegistration = data.allowRegistration;
 
   const config = await prisma.appConfig.update({
     where: { id: CONFIG_ID },
@@ -51,6 +54,7 @@ function parseConfig(config: {
   hoursTarget: number;
   officeSsids: string;
   maxDevicesPerUser: number;
+  allowRegistration: boolean;
 }): AppConfigData {
   let ssids: string[] = DEFAULT_OFFICE_SSIDS;
   try {
@@ -63,5 +67,6 @@ function parseConfig(config: {
     hoursTarget: config.hoursTarget,
     officeSsids: ssids,
     maxDevicesPerUser: config.maxDevicesPerUser,
+    allowRegistration: config.allowRegistration,
   };
 }

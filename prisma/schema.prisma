@@ -52,6 +52,7 @@ model AppConfig {
   hoursTarget       Float    @default(5.0)
   officeSsids       String   @default("[\"OfficeConnect\",\"ExternalConnect\"]")
   maxDevicesPerUser Int      @default(10)
+  allowRegistration Boolean  @default(false)
   updatedAt         DateTime @updatedAt
 }
 

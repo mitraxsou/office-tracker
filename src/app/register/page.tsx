@@ -18,7 +18,7 @@ async function RegisterForm({
 }) {
   const params = await searchParams;
 
-  if (!isRegistrationAllowed()) {
+  if (!(await isRegistrationAllowed())) {
     redirect("/login?error=Registration+is+disabled");
   }
 

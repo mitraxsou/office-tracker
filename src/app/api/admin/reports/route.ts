@@ -14,5 +14,9 @@ export async function GET() {
     getRecentAuditLogs(25),
   ]);
 
-  return NextResponse.json({ ...reports, auditLog });
+  return NextResponse.json({
+    ...reports,
+    auditLog,
+    actor: { id: admin.id, email: admin.email },
+  });
 }

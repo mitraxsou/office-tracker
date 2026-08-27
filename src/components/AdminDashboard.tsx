@@ -8,6 +8,7 @@ type UserRow = {
   id: string;
   email: string;
   name: string | null;
+  role: string;
   hoursTarget: number;
   devices: Array<{ id: string; serialNumber: string; lastSeenAt: string | null }>;
   today: {
@@ -40,6 +41,7 @@ type ReportsData = {
   statusBreakdown: { inOffice: number; notInOffice: number; noAgent: number };
   users: UserRow[];
   auditLog: AuditEntry[];
+  actor: { id: string; email: string };
 };
 
 function BarChart({
@@ -120,6 +122,8 @@ export function AdminDashboard() {
   const [data, setData] = useState<ReportsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [roleError, setRoleError] = useState<string | null>(null);
+  const [roleLoadingId, setRoleLoadingId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -139,6 +143,26 @@ export function AdminDashboard() {
   async function removeDevice(deviceId: string) {
     const res = await fetch(`/api/admin/devices/${deviceId}`, { method: "DELETE" });
     if (res.ok) load();
+  }
+
+  async function changeRole(userId: string, role: "admin" | "user") {
+    setRoleLoadingId(userId);
+    setRoleError(null);
+
+    const res = await fetch(`/api/admin/users/${userId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    });
+
+    setRoleLoadingId(null);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setRoleError(body.error ?? "Failed to update role");
+      return;
+    }
+
+    load();
   }
 
   if (loading) return <p className="text-muted">Loading reports...</p>;
@@ -182,11 +206,13 @@ export function AdminDashboard() {
 
       <section className="card p-6">
         <h2 className="mb-4 text-lg font-medium">All users</h2>
+        {roleError && <p className="mb-3 text-sm text-red-400">{roleError}</p>}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--border)] text-left text-muted">
                 <th className="py-2 pr-4">User</th>
+                <th className="py-2 pr-4">Role</th>
                 <th className="py-2 pr-4">Today</th>
                 <th className="py-2 pr-4">5h met</th>
                 <th className="py-2 pr-4">Agent</th>
@@ -195,11 +221,40 @@ export function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {data.users.map((u) => (
+              {data.users.map((u) => {
+                const isSelf = u.id === data.actor.id;
+                const isAdmin = u.role === "admin";
+                return (
                 <tr key={u.id} className="border-b border-[var(--border)]">
                   <td className="py-3 pr-4">
                     <div className="font-medium">{u.email}</div>
                     {u.name && <div className="text-xs text-muted">{u.name}</div>}
+                  </td>
+                  <td className="py-3 pr-4">
+                    <span
+                      className={`inline-block rounded px-2 py-0.5 text-xs ${
+                        isAdmin ? "bg-[var(--pwc-orange)]/20 text-accent" : "bg-[var(--border)] text-muted"
+                      }`}
+                    >
+                      {isAdmin ? "Admin" : "User"}
+                    </span>
+                    {!(isSelf && isAdmin) && (
+                      <button
+                        type="button"
+                        disabled={roleLoadingId === u.id}
+                        onClick={() => changeRole(u.id, isAdmin ? "user" : "admin")}
+                        className="ml-2 text-xs text-accent hover:underline disabled:opacity-50"
+                      >
+                        {roleLoadingId === u.id
+                          ? "..."
+                          : isAdmin
+                            ? "Remove admin"
+                            : "Make admin"}
+                      </button>
+                    )}
+                    {isSelf && isAdmin && (
+                      <span className="ml-2 text-xs text-muted">(you)</span>
+                    )}
                   </td>
                   <td className="py-3 pr-4">
                     {u.today.totalHours.toFixed(1)}h / {u.hoursTarget}h
@@ -236,7 +291,8 @@ export function AdminDashboard() {
                     )}
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>
