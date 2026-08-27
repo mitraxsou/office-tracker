@@ -213,11 +213,11 @@ export function AdminDashboard() {
                   <td className="py-3 pr-4 text-xs text-muted">
                     {u.today.lastHeartbeat
                       ? new Date(u.today.lastHeartbeat).toLocaleString("en-IN")
-                      : "—"}
+                      : "None"}
                   </td>
                   <td className="py-3">
                     {u.devices.length === 0 ? (
-                      <span className="text-muted">—</span>
+                      <span className="text-muted">None</span>
                     ) : (
                       <ul className="space-y-1">
                         {u.devices.map((d) => (

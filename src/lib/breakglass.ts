@@ -1,12 +1,18 @@
 import { prisma } from "./db";
 import { hashPassword, ensureAgentToken } from "./auth";
 
-export const BREAKGLASS_EMAIL = "admin@pwc.office";
-export const BREAKGLASS_PASSWORD = "OfficeTracker!2026";
+function getBreakglassCredentials(): { email: string; password: string } | null {
+  const email = process.env.BREAKGLASS_EMAIL?.toLowerCase().trim();
+  const password = process.env.BREAKGLASS_PASSWORD;
+  if (!email || !password) return null;
+  return { email, password };
+}
 
 export async function ensureBreakglassAdmin() {
-  const email = BREAKGLASS_EMAIL.toLowerCase();
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const creds = getBreakglassCredentials();
+  if (!creds) return null;
+
+  const existing = await prisma.user.findUnique({ where: { email: creds.email } });
 
   if (existing) {
     if (existing.role !== "admin") {
@@ -15,10 +21,10 @@ export async function ensureBreakglassAdmin() {
     return existing;
   }
 
-  const passwordHash = await hashPassword(BREAKGLASS_PASSWORD);
+  const passwordHash = await hashPassword(creds.password);
   const user = await prisma.user.create({
     data: {
-      email,
+      email: creds.email,
       passwordHash,
       role: "admin",
       name: "Breakglass Admin",

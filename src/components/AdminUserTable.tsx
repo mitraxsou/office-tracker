@@ -75,7 +75,7 @@ export function AdminUserTable() {
               <td className="py-3 pr-4">{u.today.inOfficeNow ? "Yes" : "No"}</td>
               <td className="py-3">
                 {u.devices.length === 0 ? (
-                  <span className="text-muted">—</span>
+                  <span className="text-muted">None</span>
                 ) : (
                   <ul className="space-y-1">
                     {u.devices.map((d) => (

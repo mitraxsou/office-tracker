@@ -16,8 +16,12 @@ async function main() {
     update: {},
   });
 
-  await ensureBreakglassAdmin();
-  console.log("Breakglass admin ensured: admin@pwc.office");
+  const breakglass = await ensureBreakglassAdmin();
+  if (breakglass) {
+    console.log(`Breakglass admin ensured: ${breakglass.email}`);
+  } else {
+    console.log("Breakglass admin skipped (set BREAKGLASS_EMAIL + BREAKGLASS_PASSWORD)");
+  }
 
   const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
   if (adminEmail) {

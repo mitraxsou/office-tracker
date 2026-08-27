@@ -74,8 +74,8 @@ export function AgentSetupPanel({
           Install {AGENT_PRODUCT_NAME}
         </h2>
         <p className="mb-4 text-sm text-muted">
-          Download the agent (no GitHub clone), extract the zip, then copy one install command and
-          run it in <strong>PowerShell</strong>.
+          Download the zip, extract it, copy the install command, and run it in{" "}
+          <strong>PowerShell</strong>.
         </p>
 
         <div className="flex flex-wrap gap-3">
@@ -100,7 +100,7 @@ export function AgentSetupPanel({
 
         <p className="mt-3 text-xs text-muted">
           Extract to <code>{AGENT_DOWNLOAD_FOLDER}</code>, then run the command. API URL:{" "}
-          <code>{appUrl}</code> (from deployment env, not hardcoded localhost on Vercel).
+          <code>{appUrl}</code> (from deployment env).
           {initialPlainToken && isLocalDev && localDevAgentPath && (
             <> Local dev path available for testing.</>
           )}

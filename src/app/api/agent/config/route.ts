@@ -4,10 +4,7 @@ import { getAppConfig, getUserHoursTarget } from "@/lib/app-config";
 import { API_VERSION, extractBearerToken } from "@/lib/security";
 
 export async function GET(request: Request) {
-  const token =
-    extractBearerToken(request) ??
-    new URL(request.url).searchParams.get("token")?.trim() ??
-    null;
+  const token = extractBearerToken(request);
 
   if (!token) {
     return NextResponse.json({ error: "Missing agent token" }, { status: 401 });

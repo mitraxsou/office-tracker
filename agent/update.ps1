@@ -1,4 +1,4 @@
-# Office Tracker agent updater — pulls latest scripts from GitHub clone, copies to install dir.
+# Office Tracker agent updater. Copies latest scripts from GitHub clone to install dir.
 # NO admin required.
 #
 # One-time setup: clone the repo once:
@@ -15,7 +15,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$TaskName = "OfficeTrackerHeartbeat"
+$TaskName = "PwCOfficePulse"
 $installDir = Join-Path $env:LOCALAPPDATA "OfficeTracker"
 
 Write-Host "Office Tracker agent updater"

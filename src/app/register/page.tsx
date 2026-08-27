@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createSession, registerUser } from "@/lib/auth";
-import { setWelcomeToken } from "@/lib/welcome-token";
+import { createSession, isRegistrationAllowed, registerUser } from "@/lib/auth";
+import { setWelcomeToken, setInstallToken } from "@/lib/welcome-token";
 
 export default function RegisterPage({
   searchParams,
@@ -18,6 +18,10 @@ async function RegisterForm({
 }) {
   const params = await searchParams;
 
+  if (!isRegistrationAllowed()) {
+    redirect("/login?error=Registration+is+disabled");
+  }
+
   async function register(formData: FormData) {
     "use server";
     const email = String(formData.get("email") ?? "");
@@ -32,6 +36,7 @@ async function RegisterForm({
       const { user, plainAgentToken } = await registerUser(email, password, name || undefined);
       await createSession(user.id);
       await setWelcomeToken(plainAgentToken);
+      await setInstallToken(plainAgentToken);
       redirect("/settings?welcome=1");
     } catch {
       redirect("/register?error=Email+already+registered");
@@ -45,7 +50,7 @@ async function RegisterForm({
           <span className="inline-block h-3 w-3 rounded-full bg-[var(--pwc-orange)]" />
           <h1 className="text-2xl font-semibold">Create account</h1>
         </div>
-        <p className="text-sm text-muted">Pilot access for colleagues tracking 5h office presence.</p>
+        <p className="text-sm text-muted">Pilot sign-up for colleagues tracking 5 office hours per day.</p>
         {params.error && (
           <p className="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
             {params.error}

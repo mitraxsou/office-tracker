@@ -9,74 +9,121 @@ GlobalProtect/VPN is logged for diagnostics only and **never** counts toward off
 
 The Windows agent is branded **PwC Office Pulse**.
 
+**Production:** https://github.com/mitraxsou/office-tracker → deploy on Vercel with Neon Postgres.
+
 ---
 
-## Breakglass admin (change before production)
+## Breakglass admin (production)
 
-A hardcoded admin account is always created on startup/seed:
+Set both env vars on Vercel (and locally):
 
-| Field | Value |
+| Variable | Example |
 |---|---|
-| Email | `admin@pwc.office` |
-| Password | `OfficeTracker!2026` |
+| `BREAKGLASS_EMAIL` | `admin@pwc.office` |
+| `BREAKGLASS_PASSWORD` | Strong password (change from default) |
 
-**Change this password before any production deploy.** Sign in at `/login`, then open `/admin` for reporting and user management.
+The account is created on app startup and seed. Sign in at `/login`, then `/admin`.
 
-Additional admins: set `ADMIN_EMAIL` in env to promote an existing user on seed.
+Also set `ALLOW_REGISTRATION=false` on production to block public sign-ups.
 
 ---
 
 ## Data persistence
 
-| Environment | Database | Notes |
-|---|---|---|
-| **Local dev** | SQLite file `prisma/dev.db` | Survives dev server restarts |
-| **Production (Vercel)** | Neon Postgres via `DATABASE_URL` | All user data, visits, tokens |
+| Environment | Database |
+|---|---|
+| **Local dev** | Neon Postgres (recommended) or local Postgres via `DATABASE_URL` |
+| **Production (Vercel)** | Neon Postgres via `DATABASE_URL` |
 
-User identity is **email + userId** in the database. Agent tokens are stored server-side (bcrypt). Visit history is never stored only on the laptop — a new laptop auto-registers via heartbeat with the same user account.
+User identity is **email + userId** in the database. Visit history lives in Postgres, not on the laptop.
+
+---
+
+## Deploy to Vercel (one-time)
+
+### 1. Neon Postgres
+
+1. Create a free project at [neon.tech](https://neon.tech)
+2. Copy the **PostgreSQL connection string** (with `?sslmode=require`)
+
+### 2. Import GitHub repo in Vercel
+
+1. Go to [vercel.com/new](https://vercel.com/new)
+2. Import **mitraxsou/office-tracker**
+3. Framework: **Next.js** (auto-detected)
+4. Add environment variables:
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | Neon connection string |
+| `AUTH_SECRET` | Random 32+ char string |
+| `NEXT_PUBLIC_APP_URL` | `https://YOUR-PROJECT.vercel.app` (update after first deploy) |
+| `BREAKGLASS_EMAIL` | `admin@pwc.office` |
+| `BREAKGLASS_PASSWORD` | Your secure password |
+| `ALLOW_REGISTRATION` | `false` |
+| `DEFAULT_OFFICE_SSIDS` | `OfficeConnect,ExternalConnect` |
+
+5. Deploy
+
+### 3. Initialize database
+
+From your machine (with Neon `DATABASE_URL` in env):
+
+```bash
+npx prisma db push
+npm run db:seed
+```
+
+Or set `DATABASE_URL` in Vercel, pull env, and run locally:
+
+```bash
+npx vercel env pull .env.vercel.local
+# set DATABASE_URL from pulled file, then:
+npx prisma db push
+npm run db:seed
+```
+
+### 4. Set production URL
+
+After first deploy, set `NEXT_PUBLIC_APP_URL` to your Vercel URL and **redeploy**.
+
+Agent install commands in Settings will then use the Vercel URL automatically.
 
 ---
 
 ## Quick start (colleagues)
 
-### 1. Web app
+1. Sign in at the **Vercel URL** → **Settings**
+2. **Download agent (.zip)** → extract to `%USERPROFILE%\Downloads\PwCOfficePulse`
+3. **Copy install command** → run in PowerShell
+4. Verify: `powershell -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\OfficeTracker\office-heartbeat.ps1" -DryRun`
 
-Sign in at your deployed Vercel URL → **Settings**.
+---
 
-### 2. Install PwC Office Pulse (no admin, no GitHub)
+## Local development
 
-1. Click **Download agent (.zip)** on Settings
-2. Extract to `%USERPROFILE%\Downloads\PwCOfficePulse`
-3. Click **Copy install command** (token + API URL baked in)
-4. Paste and run in **PowerShell** (not cmd.exe)
-
-On Vercel, the install command uses `NEXT_PUBLIC_APP_URL` automatically.
-
-### 3. Verify
-
-```powershell
-powershell -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\OfficeTracker\office-heartbeat.ps1" -DryRun
+```bash
+npm install
+cp .env.example .env.local
+# Edit .env.local: DATABASE_URL (Neon), AUTH_SECRET, NEXT_PUBLIC_APP_URL=http://localhost:3000
+npx prisma db push
+npm run db:seed
+npm run dev
 ```
 
-### 4. Uninstall
+Open [http://localhost:3000](http://localhost:3000).
 
-Use **Copy uninstall command** on Settings, or:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Downloads\PwCOfficePulse\uninstall.ps1"
+```bash
+npm test
+npm run build
 ```
-
-Removes scheduled task `PwCOfficePulse`, Startup shortcut, and `%LOCALAPPDATA%\OfficeTracker\`.
 
 ---
 
 ## Admin dashboard
 
 - **URL:** `/admin` (admin role required)
-- Summary cards: users, in office now, compliance %, avg hours
-- Charts: 7-day hours trend, compliance rate, user status breakdown
-- User table with devices and last heartbeat
-- Admin activity log (visit corrections, device removals)
+- Summary cards, 7-day charts, user table, activity log
 - Global settings: `/admin/settings`
 
 ---
@@ -86,46 +133,8 @@ Removes scheduled task `PwCOfficePulse`, Startup shortcut, and `%LOCALAPPDATA%\O
 | Item | Location |
 |---|---|
 | Install folder | `%LOCALAPPDATA%\OfficeTracker\` |
-| Scheduled task | `PwCOfficePulse` (runs hidden via VBS wrapper) |
-| Startup shortcut | `%APPDATA%\...\Startup\PwC Office Pulse.lnk` |
-
-The agent runs **hidden** — scheduled task uses `wscript.exe` + `run-heartbeat.vbs` (no PowerShell window flash).
-
----
-
-## Local development
-
-```bash
-npm install
-cp .env.example .env.local
-npx prisma db push
-npm run db:seed
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000). Breakglass admin: `admin@pwc.office` / `OfficeTracker!2026`.
-
-Optional local dev install path: set `AGENT_INSTALL_PATH` to your project's `agent` folder.
-
-### Tests
-
-```bash
-npm test
-npm run build
-```
-
----
-
-## Environment variables
-
-| Variable | Example |
-|---|---|
-| `DATABASE_URL` | `file:./prisma/dev.db` (local) or Neon Postgres URL |
-| `AUTH_SECRET` | Random 32+ char string |
-| `NEXT_PUBLIC_APP_URL` | `https://your-app.vercel.app` |
-| `DEFAULT_OFFICE_SSIDS` | `OfficeConnect,ExternalConnect` |
-| `ADMIN_EMAIL` | Optional extra admin promotion on seed |
-| `AGENT_INSTALL_PATH` | Optional full path to `agent` folder for local dev |
+| Scheduled task | `PwCOfficePulse` (hidden via VBS wrapper) |
+| Startup shortcut | `PwC Office Pulse.lnk` |
 
 ---
 

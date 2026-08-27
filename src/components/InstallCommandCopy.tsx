@@ -39,12 +39,12 @@ export function InstallCommandCopy({
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
-        <strong>Run in PowerShell</strong> (not cmd.exe). Paste the command below — no{" "}
-        <code>cd</code> needed; full paths included.
+        <strong>Run in PowerShell</strong> (not cmd.exe). Paste the command below. Full paths
+        included; no <code>cd</code> needed.
       </div>
 
       <p className="text-sm font-medium text-[var(--pwc-orange)]">
-        Step 1: Regenerate &amp; copy your token above · Step 2: Copy &amp; run one command below
+        Copy your token above, then copy and run an install command below.
       </p>
 
       {isLocalDev && (

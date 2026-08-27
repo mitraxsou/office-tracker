@@ -25,8 +25,7 @@ export function QuickOfficeToggle({ inOfficeNow }: { inOfficeNow: boolean }) {
   return (
     <div className="card p-4">
       <p className="text-sm text-muted">
-        Auto Wi-Fi detection blocked? Use manual check-in when you arrive and check-out when you
-        leave.
+        Wi-Fi detection not working? Check in when you arrive, check out when you leave.
       </p>
       {error && (
         <p className="mt-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>
@@ -42,8 +41,8 @@ export function QuickOfficeToggle({ inOfficeNow }: { inOfficeNow: boolean }) {
         {loading
           ? "Saving..."
           : inOfficeNow
-            ? "Check out (leaving office)"
-            : "I'm in office (check in)"}
+            ? "Check out"
+            : "Check in"}
       </button>
     </div>
   );

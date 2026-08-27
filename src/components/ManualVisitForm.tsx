@@ -39,7 +39,7 @@ export function ManualVisitForm({ timezone }: { timezone: string }) {
     <section className="card p-6">
       <h2 className="mb-2 text-lg font-medium">Manual visit</h2>
       <p className="mb-4 text-sm text-muted">
-        Use when on guest Wi-Fi, Ethernet, or the agent missed a session.
+        Use for guest Wi-Fi, Ethernet, or when the agent missed a session.
       </p>
       {error && (
         <p className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>

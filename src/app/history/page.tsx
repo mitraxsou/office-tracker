@@ -28,7 +28,7 @@ export default async function HistoryPage() {
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-8">
         <div>
           <h1 className="text-2xl font-semibold">History</h1>
-          <p className="text-sm text-muted">Last 50 visits — your data only</p>
+          <p className="text-sm text-muted">Last 50 visits (your data only)</p>
         </div>
         {Object.keys(grouped).length === 0 ? (
           <p className="text-muted">No visits yet.</p>

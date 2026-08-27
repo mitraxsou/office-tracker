@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, regenerateAgentToken } from "@/lib/auth";
+import { setInstallToken } from "@/lib/welcome-token";
 
 export async function POST() {
   const user = await getCurrentUser();
@@ -8,5 +9,6 @@ export async function POST() {
   }
 
   const { plainToken } = await regenerateAgentToken(user.id);
+  await setInstallToken(plainToken);
   return NextResponse.json({ token: plainToken });
 }

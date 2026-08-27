@@ -1,4 +1,4 @@
-# PwC Office Pulse installer — NO admin required by default.
+# PwC Office Pulse installer. No admin required by default.
 #
 # Installs to:  %LOCALAPPDATA%\OfficeTracker\
 # Scheduled:   PwCOfficePulse task every 2 minutes (hidden via VBS wrapper)
@@ -119,7 +119,7 @@ function Install-UserLevel {
     Register-HiddenTask -VbsPath $vbsPath -InstallDir $installDir
 
     Write-Host ""
-    Write-Host "=== PwC Office Pulse installed (no admin) ===" -ForegroundColor Green
+    Write-Host "PwC Office Pulse installed (user-level)" -ForegroundColor Green
     Write-Host "Install dir:     $installDir"
     Write-Host "Scheduled task:  $TaskName (hidden, every 2 min)"
     Write-Host "Startup shortcut: PwC Office Pulse.lnk"
@@ -158,7 +158,7 @@ function Install-AdminLevel {
     Register-HiddenTask -VbsPath $vbsPath -InstallDir $localConfigDir
 
     Write-Host ""
-    Write-Host "=== PwC Office Pulse installed (admin / Program Files) ===" -ForegroundColor Green
+    Write-Host "PwC Office Pulse installed (admin / Program Files)" -ForegroundColor Green
     Write-Host "Scripts:  $installDir"
     Write-Host "Config:   $(Join-Path $localConfigDir 'config.json')"
 }

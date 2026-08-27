@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
@@ -12,9 +13,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  experimental: {
-    instrumentationHook: true,
-  },
+  // Fix wrong workspace root when a parent package-lock.json exists (breaks CSS/static assets)
+  outputFileTracingRoot: path.join(__dirname),
   async headers() {
     return [
       {

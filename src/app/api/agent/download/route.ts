@@ -3,6 +3,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import JSZip from "jszip";
 import { AGENT_PRODUCT_NAME } from "@/lib/agent-branding";
+import { getCurrentUser } from "@/lib/auth";
 
 const AGENT_FILES = [
   "install.ps1",
@@ -12,6 +13,11 @@ const AGENT_FILES = [
 ];
 
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const agentDir = path.join(process.cwd(), "agent");
   const zip = new JSZip();
 
@@ -26,7 +32,7 @@ export async function GET() {
   );
 
   const buffer = await zip.generateAsync({ type: "nodebuffer" });
-  return new NextResponse(buffer, {
+  return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/zip",
       "Content-Disposition": 'attachment; filename="PwCOfficePulse-agent.zip"',

@@ -133,7 +133,15 @@ async function resolveRole(email: string) {
   return "user";
 }
 
+export function isRegistrationAllowed() {
+  return process.env.ALLOW_REGISTRATION !== "false";
+}
+
 export async function registerUser(email: string, password: string, name?: string) {
+  if (!isRegistrationAllowed()) {
+    throw new Error("Registration is disabled");
+  }
+
   const normalizedEmail = email.toLowerCase().trim();
   const role = await resolveRole(normalizedEmail);
   await ensureAppConfig();

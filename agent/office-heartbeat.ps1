@@ -1,6 +1,6 @@
 # Office Tracker heartbeat agent
 # Reads Wi-Fi SSID locally, fetches ALL config from server, POSTs heartbeat.
-# Server decides inOffice — nothing hardcoded on the laptop.
+# Server decides inOffice. Nothing hardcoded on the laptop.
 # GlobalProtect/VPN is diagnostic only and never counts toward hours.
 
 param(
@@ -35,7 +35,7 @@ function Get-LaptopSerial {
 }
 
 function Get-CurrentWifiSsid {
-    # Method 1: netsh (needs Location services — often blocked on corp laptops)
+    # Method 1: netsh (needs Location services; often blocked on corp laptops)
     try {
         $output = netsh wlan show interfaces 2>$null
         if ($output) {
@@ -188,16 +188,16 @@ $payload = @{
 } | ConvertTo-Json -Compress
 
 if ($DryRun) {
-    Write-Host "=== Office Tracker Heartbeat (Dry Run) ==="
+    Write-Host "=== Heartbeat dry run ==="
     Write-Host "Local config:  $configPath (apiUrl + token only)"
     Write-Host "API URL:       $apiUrl"
     Write-Host "Laptop serial: $(if ($serialNumber) { $serialNumber } else { '(unable to read)' })"
     Write-Host "SSID detected: $(if ($ssid) { $ssid } else { '(none)' }) via $ssidMethod"
     if (-not $ssid -and $ssidMethod -eq "none") {
         Write-Host ""
-        Write-Host "NOTE: Location may be admin-blocked on corp laptops."
-        Write-Host "      Agent tries Get-NetConnectionProfile as fallback."
-        Write-Host "      Use dashboard 'I'm in office' if SSID still missing."
+        Write-Host "Location may be blocked on corp laptops."
+        Write-Host "Agent also tries Get-NetConnectionProfile."
+        Write-Host "Use dashboard Check in if SSID is still missing."
     }
     Write-Host "VPN (diag):    $(if ($vpnGateway) { $vpnGateway } else { '(not connected)' })"
     Write-Host ""

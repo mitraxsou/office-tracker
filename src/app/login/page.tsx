@@ -37,7 +37,7 @@ async function LoginForm({
           <h1 className="text-2xl font-semibold">Office Tracker</h1>
         </div>
         <p className="text-sm text-muted">
-          Track your 5-hour office presence. Wi-Fi SSIDs are configured on the server — not on your laptop.
+          Track your 5-hour office presence. Office Wi-Fi SSIDs are set on the server, not on your laptop.
         </p>
         {params.error && (
           <p className="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">

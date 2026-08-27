@@ -1,4 +1,4 @@
-# PwC Office Pulse uninstaller — NO admin required for default user-level install.
+# PwC Office Pulse uninstaller. No admin for default user-level install.
 
 $ErrorActionPreference = "Stop"
 $LegacyTaskNames = @("OfficeTrackerHeartbeat", "PwCOfficePulse")
@@ -35,4 +35,4 @@ if ((Test-Path $programDir) -and ([Security.Principal.WindowsPrincipal][Security
 }
 
 Write-Host ""
-Write-Host "Uninstall complete. Your visit history remains in the web app." -ForegroundColor Green
+Write-Host "Done. Visit history stays in the web app." -ForegroundColor Green

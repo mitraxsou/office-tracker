@@ -88,14 +88,14 @@ export function UserSettingsForm({
     <form onSubmit={handleSave} className="space-y-6">
       {isWelcome && (
         <div className="rounded-lg bg-[var(--pwc-orange-muted)] px-4 py-3 text-sm">
-          Welcome! Download the PwC Office Pulse agent below, then click &quot;Copy install
-          command&quot; and run it in PowerShell.
+          Account created. Download the agent below, copy the install command, and run it in
+          PowerShell.
         </div>
       )}
 
       <section className="card p-6">
         <h2 className="mb-2 text-lg font-medium">Org settings (read-only)</h2>
-        <p className="text-sm text-muted">Managed by admin — applies to all users.</p>
+        <p className="text-sm text-muted">Set by admin. Applies to all users.</p>
         <dl className="mt-4 space-y-2 text-sm">
           <div>
             <dt className="text-muted">Daily hours target</dt>
@@ -124,7 +124,7 @@ export function UserSettingsForm({
       <section className="card p-6">
         <h2 className="mb-2 text-lg font-medium">Agent token</h2>
         <p className="mb-4 text-sm text-muted">
-          Bcrypt-hashed on server. Only <code>apiUrl</code> + token stored on laptop.
+          Stored as bcrypt hash on server. Laptop keeps <code>apiUrl</code> and token only.
         </p>
         {plainToken ? (
           <div className="flex flex-wrap items-center gap-2">
@@ -156,8 +156,7 @@ export function UserSettingsForm({
       <section className="card p-6">
         <h2 className="mb-2 text-lg font-medium">Registered laptops</h2>
         <p className="mb-4 text-sm text-muted">
-          Auto-registered on first heartbeat. Multiple laptops allowed. Contact admin to remove a
-          device.
+          Registered on first heartbeat. Contact admin to remove a device.
         </p>
         {devices.length === 0 ? (
           <p className="text-sm text-muted">No laptops registered yet.</p>

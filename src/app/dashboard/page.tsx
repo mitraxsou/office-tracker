@@ -32,7 +32,7 @@ export default async function DashboardPage() {
         <div>
           <h1 className="text-2xl font-semibold">Today</h1>
           <p className="text-sm text-muted">
-            {summary.dayKey} · Your personal hours (not an admin view)
+            {summary.dayKey} · Your hours only
           </p>
         </div>
 
@@ -98,13 +98,13 @@ export default async function DashboardPage() {
         {summary.lastHeartbeat && (
           <p className="text-xs text-muted">
             Last SSID: {summary.lastHeartbeat.ssid ?? "none"} · VPN (diagnostic only):{" "}
-            {summary.lastHeartbeat.vpnGateway ?? "n/a"} — VPN never counts toward hours.
+            {summary.lastHeartbeat.vpnGateway ?? "n/a"}. VPN does not count toward hours.
           </p>
         )}
 
         {!agentNeverConnected && !summary.agentHealthy && (
           <p className="text-sm text-muted">
-            Agent hasn&apos;t sent a heartbeat in 8+ minutes. Check Task Scheduler or re-run{" "}
+            Agent has not sent a heartbeat in 8+ minutes. Check Task Scheduler or re-run{" "}
             <Link href="/settings" className="text-accent hover:underline">
               install.ps1
             </Link>

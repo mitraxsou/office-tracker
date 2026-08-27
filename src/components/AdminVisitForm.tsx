@@ -60,7 +60,7 @@ export function AdminVisitForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <p className="text-sm text-muted">Add a manual visit for any user (e.g. to correct missing data).</p>
+      <p className="text-sm text-muted">Add a manual visit for any user to correct missing data.</p>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm">
           <span className="text-muted">User</span>
