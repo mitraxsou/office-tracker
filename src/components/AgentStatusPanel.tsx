@@ -46,8 +46,6 @@ export function AgentStatusPanel() {
 
   useEffect(() => {
     load();
-    const interval = setInterval(load, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   if (loading) {

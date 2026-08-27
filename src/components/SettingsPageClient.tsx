@@ -13,15 +13,31 @@ type Device = {
   createdAt: string;
 };
 
+type PendingToken = {
+  id: string;
+  label: string | null;
+  prefix: string;
+  plainToken: string;
+  installCommand: string;
+  createdAt: string;
+};
+
+type BoundToken = {
+  id: string;
+  label: string | null;
+  prefix: string;
+  boundSerialNumber: string | null;
+};
+
 type SettingsPageClientProps = {
   timezone: string;
   hoursTarget: number;
   officeSsids: string[];
-  maskedToken: string;
   appUrl: string;
-  initialPlainToken?: string | null;
   isWelcome?: boolean;
   devices: Device[];
+  pendingTokens: PendingToken[];
+  boundTokens: BoundToken[];
   localDevAgentPath?: string | null;
 };
 
@@ -29,14 +45,15 @@ export function SettingsPageClient({
   timezone,
   hoursTarget,
   officeSsids,
-  maskedToken,
   appUrl,
-  initialPlainToken,
   isWelcome,
-  devices,
+  devices: initialDevices,
+  pendingTokens,
+  boundTokens,
   localDevAgentPath,
 }: SettingsPageClientProps) {
-  const [plainToken, setPlainToken] = useState<string | null>(initialPlainToken ?? null);
+  const [devices, setDevices] = useState(initialDevices);
+  const selectedInstallCommand = pendingTokens[0]?.installCommand ?? null;
 
   return (
     <>
@@ -46,17 +63,17 @@ export function SettingsPageClient({
         timezone={timezone}
         hoursTarget={hoursTarget}
         officeSsids={officeSsids}
-        maskedToken={maskedToken}
         appUrl={appUrl}
-        plainToken={plainToken}
-        onPlainTokenChange={setPlainToken}
         isWelcome={isWelcome}
         devices={devices}
+        pendingTokens={pendingTokens}
+        boundTokens={boundTokens}
+        onDevicesChange={setDevices}
       />
 
       <AgentSetupPanel
         appUrl={appUrl}
-        plainToken={plainToken}
+        installCommand={selectedInstallCommand}
         localDevAgentPath={localDevAgentPath}
       />
     </>

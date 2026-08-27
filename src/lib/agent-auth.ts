@@ -48,7 +48,11 @@ export async function bindAgentTokenToSerial(agentTokenId: string, serialNumber:
   if (!agentToken.boundSerialNumber) {
     await prisma.agentToken.update({
       where: { id: agentTokenId },
-      data: { boundSerialNumber: serialNumber, lastUsedAt: new Date() },
+      data: {
+        boundSerialNumber: serialNumber,
+        lastUsedAt: new Date(),
+        pendingTokenEnc: null,
+      },
     });
   } else {
     await prisma.agentToken.update({

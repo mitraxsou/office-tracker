@@ -5,7 +5,7 @@ import { isRegistrationEnvLocked } from "@/lib/auth";
 import { AppNav } from "@/components/AppNav";
 import { AdminSettingsForm } from "@/components/AdminSettingsForm";
 import { AdminPilotControls } from "@/components/AdminPilotControls";
-import Link from "next/link";
+import { AdminSubNav } from "@/components/AdminSubNav";
 
 export default async function AdminSettingsPage() {
   const admin = await requireAdmin();
@@ -18,12 +18,10 @@ export default async function AdminSettingsPage() {
       <AppNav />
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-8">
         <div>
-          <Link href="/admin" className="text-sm text-accent hover:underline">
-            ← Admin dashboard
-          </Link>
-          <h1 className="mt-2 text-2xl font-semibold">Global settings</h1>
+          <h1 className="text-2xl font-semibold">Global settings</h1>
           <p className="text-sm text-muted">Hours target and office SSIDs for all users</p>
         </div>
+        <AdminSubNav active="settings" />
         <AdminSettingsForm
           hoursTarget={config.hoursTarget}
           officeSsids={config.officeSsids}

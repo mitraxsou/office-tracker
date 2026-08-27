@@ -12,36 +12,52 @@ type Device = {
   createdAt: string;
 };
 
+type PendingToken = {
+  id: string;
+  label: string | null;
+  prefix: string;
+  plainToken: string;
+  installCommand: string;
+  createdAt: string;
+};
+
+type BoundToken = {
+  id: string;
+  label: string | null;
+  prefix: string;
+  boundSerialNumber: string | null;
+};
+
 type UserSettingsFormProps = {
   timezone: string;
   hoursTarget: number;
   officeSsids: string[];
-  maskedToken: string;
   appUrl: string;
-  plainToken: string | null;
-  onPlainTokenChange: (token: string | null) => void;
   isWelcome?: boolean;
   devices: Device[];
+  pendingTokens: PendingToken[];
+  boundTokens: BoundToken[];
+  onDevicesChange: (devices: Device[]) => void;
 };
 
 export function UserSettingsForm({
   timezone,
   hoursTarget,
   officeSsids,
-  maskedToken,
   appUrl,
-  plainToken,
-  onPlainTokenChange,
   isWelcome,
   devices,
+  pendingTokens,
+  boundTokens,
+  onDevicesChange,
 }: UserSettingsFormProps) {
   const router = useRouter();
   const [tz, setTz] = useState(timezone);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [regenerating, setRegenerating] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -66,45 +82,43 @@ export function UserSettingsForm({
     router.refresh();
   }
 
-  async function regenerateToken() {
+  async function handleCopy(text: string, tokenId: string) {
+    const ok = await copyToClipboard(text);
+    if (!ok) {
+      setError("Could not copy. Select the text and press Ctrl+C.");
+      return;
+    }
+    setCopiedId(tokenId);
+    setTimeout(() => setCopiedId(null), 2000);
+  }
+
+  async function removeDevice(deviceId: string) {
     if (
       !confirm(
-        "Regenerating invalidates your current token on all laptops until you reinstall with a new install command. Continue?"
+        "Remove this laptop from your account? Uninstall the agent on that laptop if you are decommissioning it."
       )
     ) {
       return;
     }
 
-    setRegenerating(true);
+    setRemovingId(deviceId);
     setError(null);
-    const res = await fetch("/api/settings/regenerate-token", { method: "POST" });
-    setRegenerating(false);
+    const res = await fetch(`/api/settings/devices/${deviceId}`, { method: "DELETE" });
+    setRemovingId(null);
     if (!res.ok) {
-      setError("Failed to regenerate token");
+      setError("Failed to remove laptop");
       return;
     }
-    const data = await res.json();
-    onPlainTokenChange(data.token);
+    onDevicesChange(devices.filter((d) => d.id !== deviceId));
     router.refresh();
-  }
-
-  async function copyToken() {
-    if (!plainToken) return;
-    const ok = await copyToClipboard(plainToken);
-    if (!ok) {
-      setError("Could not copy token. Select it manually and press Ctrl+C.");
-      return;
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
     <form onSubmit={handleSave} className="space-y-6">
       {isWelcome && (
         <div className="rounded-lg bg-[var(--pwc-orange-muted)] px-4 py-3 text-sm">
-          Account created. Follow the numbered install steps below to set up the agent on your
-          laptop.
+          Account created. If your admin issued an install token, it appears below. Follow the
+          numbered install steps to set up the agent on your laptop.
         </div>
       )}
 
@@ -137,68 +151,102 @@ export function UserSettingsForm({
       </section>
 
       <section className="card p-6">
-        <h2 className="mb-2 text-lg font-medium">Agent token</h2>
+        <h2 className="mb-2 text-lg font-medium">Laptop install tokens</h2>
         <p className="mb-4 text-sm text-muted">
-          Stored as bcrypt hash on server. Your laptop keeps <code>apiUrl</code> and this token
-          only.
+          Tokens are issued by your admin — one per laptop. Copy the install command and run it
+          inside the extracted agent folder. After the first heartbeat, the token binds to that
+          laptop&apos;s serial number.
         </p>
-        {plainToken ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <code className="break-all rounded-lg border bg-[var(--background)] px-3 py-2 text-xs">
-              {plainToken}
-            </code>
-            <button type="button" onClick={copyToken} className="btn-secondary px-3 py-2 text-sm">
-              {copied ? "Copied!" : "Copy token"}
-            </button>
-          </div>
+
+        {pendingTokens.length === 0 && boundTokens.length === 0 ? (
+          <p className="text-sm text-muted">
+            No install tokens yet. Ask your admin to issue one from Admin → Users & tokens.
+          </p>
         ) : (
-          <div className="space-y-2">
-            <code className="block break-all rounded-lg border bg-[var(--background)] px-3 py-2 text-xs">
-              {maskedToken}
-            </code>
-            <button
-              type="button"
-              onClick={regenerateToken}
-              disabled={regenerating}
-              className="btn-secondary px-3 py-2 text-sm disabled:opacity-50"
-            >
-              {regenerating ? "Regenerating..." : "Regenerate token"}
-            </button>
+          <div className="space-y-4">
+            {pendingTokens.map((t) => (
+              <div
+                key={t.id}
+                className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 text-sm"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-medium text-amber-200">
+                    {t.label ?? "Pending laptop"} · waiting for install
+                  </span>
+                  <code className="text-xs text-muted">{t.prefix}</code>
+                </div>
+                <p className="mt-2 text-xs text-muted">
+                  Issued {new Date(t.createdAt).toLocaleString("en-IN")}
+                </p>
+                <pre className="mt-3 overflow-x-auto rounded border bg-[var(--background)] p-3 text-xs whitespace-pre-wrap">
+                  {t.installCommand}
+                </pre>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(t.installCommand, t.id)}
+                    className="btn-primary px-3 py-1 text-xs"
+                  >
+                    {copiedId === t.id ? "Copied!" : "Copy install command"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(t.plainToken, `${t.id}-token`)}
+                    className="btn-secondary px-3 py-1 text-xs"
+                  >
+                    {copiedId === `${t.id}-token` ? "Copied!" : "Copy token"}
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {boundTokens.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-medium text-muted">Already bound to a laptop</p>
+                <ul className="divide-y divide-[var(--border)] text-sm">
+                  {boundTokens.map((t) => (
+                    <li key={t.id} className="py-2">
+                      <span className="font-medium">{t.label ?? "Laptop"}</span>
+                      <code className="ml-2 text-xs text-muted">{t.prefix}••••</code>
+                      {t.boundSerialNumber && (
+                        <code className="ml-2 text-accent">{t.boundSerialNumber}</code>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
-        <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-3 text-xs text-muted">
-          <p className="mb-2 font-medium text-[var(--foreground)]">When to regenerate</p>
-          <ul className="list-disc space-y-1 pl-4">
-            <li>Admin issued a new laptop token and you need a fresh install command</li>
-            <li>Laptop was reimaged or replaced</li>
-            <li>You suspect the token was leaked or compromised</li>
-            <li>Admin removed your device and you need a fresh install</li>
-          </ul>
-          <p className="mt-2">
-            Regenerating revokes all active tokens and invalidates agents until you run a new
-            install command on each laptop.
-          </p>
-        </div>
-        <p className="mt-2 text-xs text-muted">API URL: {appUrl}</p>
+        <p className="mt-4 text-xs text-muted">API URL: {appUrl}</p>
       </section>
 
       <section className="card p-6">
         <h2 className="mb-2 text-lg font-medium">Registered laptops</h2>
         <p className="mb-4 text-sm text-muted">
-          Registered on first heartbeat. Contact admin to remove a device.
+          Registered on first heartbeat. Remove a laptop here when you change machines or
+          re-image — then ask admin for a new install token if needed.
         </p>
         {devices.length === 0 ? (
           <p className="text-sm text-muted">No laptops registered yet.</p>
         ) : (
           <ul className="divide-y divide-[var(--border)]">
             {devices.map((d) => (
-              <li key={d.id} className="py-3 text-sm">
+              <li key={d.id} className="flex flex-wrap items-center gap-3 py-3 text-sm">
                 <code className="text-accent">{d.serialNumber}</code>
                 {d.lastSeenAt && (
-                  <span className="ml-2 text-muted">
-                    · last seen {new Date(d.lastSeenAt).toLocaleString("en-IN")}
+                  <span className="text-muted">
+                    last seen {new Date(d.lastSeenAt).toLocaleString("en-IN")}
                   </span>
                 )}
+                <button
+                  type="button"
+                  disabled={removingId === d.id}
+                  onClick={() => removeDevice(d.id)}
+                  className="text-xs text-red-400 hover:underline disabled:opacity-50"
+                >
+                  {removingId === d.id ? "Removing..." : "Remove laptop"}
+                </button>
               </li>
             ))}
           </ul>

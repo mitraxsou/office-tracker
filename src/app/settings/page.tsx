@@ -1,10 +1,14 @@
 import { redirect } from "next/navigation";
-import { ensureAgentToken, getCurrentUser, maskAgentToken } from "@/lib/auth";
+import {
+  getCurrentUser,
+  getPendingInstallTokensForUser,
+  summarizeAgentTokens,
+} from "@/lib/auth";
 import { getAppConfig, getUserHoursTarget } from "@/lib/app-config";
-import { consumeWelcomeToken, peekInstallToken } from "@/lib/welcome-token";
 import { AppNav } from "@/components/AppNav";
 import { SettingsPageClient } from "@/components/SettingsPageClient";
 import { AGENT_PRODUCT_NAME } from "@/lib/agent-branding";
+
 export default async function SettingsPage({
   searchParams,
 }: {
@@ -14,14 +18,21 @@ export default async function SettingsPage({
   if (!user) redirect("/login");
 
   const params = await searchParams;
-  const welcomeToken = params.welcome === "1" ? await consumeWelcomeToken() : null;
-  const installToken = await peekInstallToken();
-  const { record, plainToken: newToken } = await ensureAgentToken(user.id);
-  const displayToken = welcomeToken ?? newToken ?? installToken;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const localDevAgentPath = process.env.AGENT_INSTALL_PATH || null;
   const globalConfig = await getAppConfig();
   const hoursTarget = await getUserHoursTarget(user);
+
+  const pendingTokens = await getPendingInstallTokensForUser(user.id, appUrl);
+  const tokenSummary = summarizeAgentTokens(user.agentTokens);
+  const boundTokens = tokenSummary
+    .filter((t) => t.status === "bound")
+    .map((t) => ({
+      id: t.id,
+      label: t.label,
+      prefix: t.prefix,
+      boundSerialNumber: t.boundSerialNumber,
+    }));
 
   return (
     <>
@@ -38,9 +49,7 @@ export default async function SettingsPage({
           timezone={user.timezone}
           hoursTarget={hoursTarget}
           officeSsids={globalConfig.officeSsids}
-          maskedToken={maskAgentToken(record.tokenPrefix)}
           appUrl={appUrl}
-          initialPlainToken={displayToken}
           isWelcome={params.welcome === "1"}
           devices={user.agentDevices.map((d) => ({
             id: d.id,
@@ -49,8 +58,11 @@ export default async function SettingsPage({
             lastSeenAt: d.lastSeenAt?.toISOString() ?? null,
             createdAt: d.createdAt.toISOString(),
           }))}
+          pendingTokens={pendingTokens}
+          boundTokens={boundTokens}
           localDevAgentPath={localDevAgentPath}
-        />      </main>
+        />
+      </main>
     </>
   );
 }

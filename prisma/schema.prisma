@@ -37,6 +37,7 @@ model AgentToken {
   revokedAt         DateTime?
   lastUsedAt        DateTime?
   issuedById        String?
+  pendingTokenEnc   String?
   createdAt         DateTime  @default(now())
   devices           AgentDevice[]
 

@@ -17,8 +17,8 @@ export default function HelpPage() {
             <li>Register with email and password. Each account gets a private <code>userId</code>.</li>
             <li>The dashboard uses an httpOnly session cookie. You only see your own visits and hours.</li>
             <li>
-              The Windows agent sends an <strong>agent token</strong>, not your email. One token per
-              user, bcrypt-hashed on the server.
+              The Windows agent sends an <strong>agent token</strong>, not your email. Admins issue
+              one token per laptop; tokens are bcrypt-hashed on the server.
             </li>
           </ul>
         </section>
@@ -41,7 +41,7 @@ export default function HelpPage() {
         <section className="card space-y-3 p-6">
           <h2 className="text-lg font-medium text-accent">Security</h2>
           <ul className="list-disc space-y-2 pl-5 text-sm text-muted">
-            <li>Agent tokens stored as bcrypt hashes. Plain token shown once after regenerate.</li>
+            <li>Agent tokens stored as bcrypt hashes. Pending install commands are visible in Settings until the laptop registers.</li>
             <li>Heartbeat rate limit: 1 request per 30 seconds per token</li>
             <li>Inputs validated (SSID length, timestamps, no injection characters)</li>
             <li>Session cookies: httpOnly, secure in production, sameSite=lax</li>

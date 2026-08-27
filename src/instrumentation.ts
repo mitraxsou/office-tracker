@@ -32,6 +32,9 @@ export async function register() {
       'ALTER TABLE "AgentToken" ADD COLUMN IF NOT EXISTS "issuedById" TEXT;'
     );
     await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AgentToken" ADD COLUMN IF NOT EXISTS "pendingTokenEnc" TEXT;'
+    );
+    await prisma.$executeRawUnsafe(
       'ALTER TABLE "AgentDevice" ADD COLUMN IF NOT EXISTS "agentTokenId" TEXT;'
     );
     await ensureAppConfig();

@@ -4,6 +4,8 @@ import { cookies } from "next/headers";
 import { prisma } from "./db";
 import { ensureAppConfig } from "./app-config";
 import crypto from "crypto";
+import { encryptPendingToken, decryptPendingToken } from "./token-crypto";
+import { buildInstallCommand } from "./agent-branding";
 
 const SESSION_COOKIE = "office-tracker-session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
@@ -92,6 +94,7 @@ export async function createAgentTokenRecord(
       tokenPrefix,
       label: opts?.label?.trim() || null,
       issuedById: opts?.issuedById ?? null,
+      pendingTokenEnc: encryptPendingToken(plainToken),
     },
   });
 }
@@ -119,13 +122,75 @@ export async function ensureAgentToken(userId: string) {
   return { record, plainToken };
 }
 
-/** Revoke all active tokens and issue one fresh token. */
+/** Revoke all active tokens and issue one fresh token (admin-only flow). */
 export async function regenerateAgentToken(userId: string) {
   await prisma.agentToken.updateMany({
     where: { userId, revokedAt: null },
-    data: { revokedAt: new Date() },
+    data: { revokedAt: new Date(), pendingTokenEnc: null },
   });
   return issueAgentToken(userId);
+}
+
+export async function revokeAgentToken(tokenId: string) {
+  const token = await prisma.agentToken.findUnique({ where: { id: tokenId } });
+  if (!token || token.revokedAt) return null;
+  return prisma.agentToken.update({
+    where: { id: tokenId },
+    data: { revokedAt: new Date(), pendingTokenEnc: null },
+  });
+}
+
+/** Revoke a pending token and issue a replacement with the same label. */
+export async function reissueAgentToken(
+  tokenId: string,
+  opts?: { issuedById?: string | null },
+) {
+  const old = await prisma.agentToken.findUnique({ where: { id: tokenId } });
+  if (!old || old.revokedAt) {
+    throw new Error("Token not found");
+  }
+  if (old.boundSerialNumber) {
+    throw new Error("Cannot reissue a token already bound to a laptop");
+  }
+
+  await prisma.agentToken.update({
+    where: { id: tokenId },
+    data: { revokedAt: new Date(), pendingTokenEnc: null },
+  });
+
+  return issueAgentToken(old.userId, {
+    label: old.label ?? undefined,
+    issuedById: opts?.issuedById ?? old.issuedById,
+  });
+}
+
+export function revealStoredPendingToken(
+  token: { pendingTokenEnc: string | null; boundSerialNumber: string | null; revokedAt: Date | null },
+) {
+  if (token.revokedAt || token.boundSerialNumber || !token.pendingTokenEnc) return null;
+  return decryptPendingToken(token.pendingTokenEnc);
+}
+
+export async function getPendingInstallTokensForUser(userId: string, appUrl: string) {
+  const tokens = await prisma.agentToken.findMany({
+    where: { userId, revokedAt: null, boundSerialNumber: null },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return tokens
+    .map((t) => {
+      const plain = revealStoredPendingToken(t);
+      if (!plain) return null;
+      return {
+        id: t.id,
+        label: t.label,
+        prefix: t.tokenPrefix,
+        plainToken: plain,
+        installCommand: buildInstallCommand(appUrl, plain),
+        createdAt: t.createdAt.toISOString(),
+      };
+    })
+    .filter((t): t is NonNullable<typeof t> => t !== null);
 }
 
 export async function resolveAgentTokenRecord(token: string) {
@@ -249,6 +314,7 @@ export function summarizeAgentTokens(
     label: string | null;
     boundSerialNumber: string | null;
     revokedAt: Date | null;
+    pendingTokenEnc: string | null;
     createdAt: Date;
     lastUsedAt: Date | null;
   }>,
@@ -261,6 +327,7 @@ export function summarizeAgentTokens(
       label: t.label,
       boundSerialNumber: t.boundSerialNumber,
       status: t.boundSerialNumber ? ("bound" as const) : ("pending" as const),
+      shareable: !t.boundSerialNumber && !!t.pendingTokenEnc,
       createdAt: t.createdAt.toISOString(),
       lastUsedAt: t.lastUsedAt?.toISOString() ?? null,
     }));

@@ -7,8 +7,6 @@ import {
   AGENT_PRODUCT_NAME,
   AGENT_TASK_NAME,
   AGENT_STARTUP_SHORTCUT,
-  buildInstallCommand,
-  buildInstallCommandWithPath,
   buildUninstallCommand,
   defaultInstallScriptDir,
 } from "@/lib/agent-branding";
@@ -16,13 +14,13 @@ import { copyToClipboard } from "@/lib/clipboard";
 
 type AgentSetupPanelProps = {
   appUrl: string;
-  plainToken?: string | null;
+  installCommand?: string | null;
   localDevAgentPath?: string | null;
 };
 
 export function AgentSetupPanel({
   appUrl,
-  plainToken,
+  installCommand,
   localDevAgentPath,
 }: AgentSetupPanelProps) {
   const [copied, setCopied] = useState<"install" | "uninstall" | null>(null);
@@ -32,15 +30,10 @@ export function AgentSetupPanel({
   const scriptDir = defaultInstallScriptDir(isLocalDev ? localDevAgentPath : null);
   const startupPath = `%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\${AGENT_STARTUP_SHORTCUT}`;
 
-  const installCommand = useMemo(() => {
-    if (!plainToken) return null;
-    if (isLocalDev && localDevAgentPath) {
-      return buildInstallCommandWithPath(appUrl, plainToken, scriptDir);
-    }
-    return buildInstallCommand(appUrl, plainToken);
-  }, [appUrl, plainToken, isLocalDev, localDevAgentPath, scriptDir]);
-
-  const uninstallCommand = buildUninstallCommand(isLocalDev ? scriptDir : undefined);
+  const uninstallCommand = useMemo(
+    () => buildUninstallCommand(isLocalDev ? scriptDir : undefined),
+    [isLocalDev, scriptDir],
+  );
 
   async function handleCopy(text: string, which: "install" | "uninstall") {
     setCopyError(null);
@@ -96,10 +89,10 @@ export function AgentSetupPanel({
           </li>
           <li>
             <span className="font-medium">Copy the install command</span>
-            {!plainToken && (
+            {!installCommand && (
               <p className="mt-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-                Token not visible. Ask admin for an install command, or click{" "}
-                <strong>Regenerate token</strong> above if your admin allows it.
+                No pending install token. Ask your admin to issue one — it will appear under{" "}
+                <strong>Laptop install tokens</strong> above.
               </p>
             )}
             <button
