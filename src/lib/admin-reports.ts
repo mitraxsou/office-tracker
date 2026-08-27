@@ -1,3 +1,4 @@
+import { summarizeAgentTokens } from "./auth";
 import { prisma } from "./db";
 import { getAppConfig, getUserHoursTarget } from "./app-config";
 import { getTodaySummary } from "./heartbeat-service";
@@ -45,7 +46,7 @@ export async function getAdminReports() {
   const users = await prisma.user.findMany({
     include: {
       agentDevices: { orderBy: { lastSeenAt: "desc" } },
-      agentToken: true,
+      agentTokens: { where: { revokedAt: null }, orderBy: { createdAt: "desc" } },
     },
     orderBy: { email: "asc" },
   });
@@ -65,6 +66,7 @@ export async function getAdminReports() {
           serialNumber: d.serialNumber,
           lastSeenAt: d.lastSeenAt?.toISOString() ?? null,
         })),
+        tokens: summarizeAgentTokens(user.agentTokens),
         today: {
           totalHours: summary.totalHours,
           metTarget: summary.metTarget,

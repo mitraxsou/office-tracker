@@ -18,7 +18,7 @@ model User {
   hoursTarget  Float?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
-  agentToken   AgentToken?
+  agentTokens  AgentToken[]
   agentDevices AgentDevice[]
   heartbeats   Heartbeat[]
   visits       Visit[]
@@ -27,22 +27,32 @@ model User {
 }
 
 model AgentToken {
-  id          String   @id @default(cuid())
-  tokenHash   String
-  tokenPrefix String   @unique
-  userId      String   @unique
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
+  id                String    @id @default(cuid())
+  tokenHash         String
+  tokenPrefix       String    @unique
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label             String?
+  boundSerialNumber String?
+  revokedAt         DateTime?
+  lastUsedAt        DateTime?
+  issuedById        String?
+  createdAt         DateTime  @default(now())
+  devices           AgentDevice[]
+
+  @@index([userId])
 }
 
 model AgentDevice {
-  id           String    @id @default(cuid())
+  id           String      @id @default(cuid())
   userId       String
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentTokenId String?
+  agentToken   AgentToken? @relation(fields: [agentTokenId], references: [id], onDelete: SetNull)
   serialNumber String
   label        String?
   lastSeenAt   DateTime?
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime    @default(now())
 
   @@unique([userId, serialNumber])
 }

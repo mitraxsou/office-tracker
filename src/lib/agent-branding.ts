@@ -24,10 +24,19 @@ export const AGENT_EXTRACT_FOLDER = "PwCOfficePulse";
 /** Human-readable extract location for UI copy */
 export const AGENT_DOWNLOAD_FOLDER = `%USERPROFILE%\\Downloads\\${AGENT_EXTRACT_FOLDER}`;
 
-/** PowerShell path for install/uninstall commands (run in PowerShell, not cmd.exe) */
+/** PowerShell path for local dev install scripts */
 export const AGENT_EXTRACT_PATH_PS = `$env:USERPROFILE\\Downloads\\${AGENT_EXTRACT_FOLDER}`;
 
-export function buildInstallCommand(appUrl: string, token: string, installScriptDir: string) {
+/**
+ * Install command when user has already cd'd into the extracted agent folder.
+ * Uses relative install.ps1 path (user is at that location).
+ */
+export function buildInstallCommand(appUrl: string, token: string) {
+  return `powershell -ExecutionPolicy Bypass -File "install.ps1" -ApiUrl "${appUrl}" -Token "${token}"`;
+}
+
+/** Full-path install command (legacy / local dev with explicit script dir) */
+export function buildInstallCommandWithPath(appUrl: string, token: string, installScriptDir: string) {
   const scriptPath = `${installScriptDir}\\install.ps1`.replace(/\\\\/g, "\\");
   return `powershell -ExecutionPolicy Bypass -File "${scriptPath}" -ApiUrl "${appUrl}" -Token "${token}"`;
 }
@@ -36,8 +45,10 @@ export function defaultInstallScriptDir(localDevPath?: string | null) {
   return localDevPath || AGENT_EXTRACT_PATH_PS;
 }
 
-export function buildUninstallCommand(installScriptDir: string) {
-  const scriptPath = `${installScriptDir}\\uninstall.ps1`.replace(/\\\\/g, "\\");
+export function buildUninstallCommand(installScriptDir?: string) {
+  const scriptPath = installScriptDir
+    ? `${installScriptDir}\\uninstall.ps1`.replace(/\\\\/g, "\\")
+    : "uninstall.ps1";
   return `powershell -ExecutionPolicy Bypass -File "${scriptPath}"`;
 }
 

@@ -169,14 +169,14 @@ export function UserSettingsForm({
         <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-3 text-xs text-muted">
           <p className="mb-2 font-medium text-[var(--foreground)]">When to regenerate</p>
           <ul className="list-disc space-y-1 pl-4">
+            <li>Admin issued a new laptop token and you need a fresh install command</li>
             <li>Laptop was reimaged or replaced</li>
             <li>You suspect the token was leaked or compromised</li>
-            <li>Reinstalling the agent on a new machine</li>
             <li>Admin removed your device and you need a fresh install</li>
           </ul>
           <p className="mt-2">
-            Regenerating creates a new token and <strong>invalidates the old one on every laptop</strong>{" "}
-            until you copy the new install command and run it again on each machine.
+            Regenerating revokes all active tokens and invalidates agents until you run a new
+            install command on each laptop.
           </p>
         </div>
         <p className="mt-2 text-xs text-muted">API URL: {appUrl}</p>

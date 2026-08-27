@@ -29,7 +29,7 @@ export async function POST() {
     );
   }
 
-  const command = buildInstallCommand(appUrl, plainToken, extractPath);
+  const command = buildInstallCommand(appUrl, plainToken);
 
   return NextResponse.json({
     command,

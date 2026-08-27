@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   const users = await prisma.user.findMany({
-    include: { agentToken: true, agentDevices: true },
+    include: { agentTokens: true, agentDevices: true },
   });
 
   if (users.length === 0) {
@@ -22,7 +22,7 @@ async function main() {
     console.log(`ROLE:${user.role}`);
     console.log(`SSIDS:${config.officeSsids.join(",")}`);
     console.log(
-      `DEVICES:${user.agentDevices.map((d) => d.serialNumber).join(",") || "none"}`
+      `DEVICES:${user.agentDevices.map((d) => d.serialNumber).join(",") || "none"}`,
     );
   }
 
@@ -31,10 +31,8 @@ async function main() {
   const tokenHash = await bcrypt.hash(plainToken, 12);
   const tokenPrefix = plainToken.slice(0, 8);
 
-  await prisma.agentToken.upsert({
-    where: { userId: user.id },
-    create: { userId: user.id, tokenHash, tokenPrefix },
-    update: { tokenHash, tokenPrefix },
+  await prisma.agentToken.create({
+    data: { userId: user.id, tokenHash, tokenPrefix, label: "dev script" },
   });
 
   console.log(`TOKEN:${plainToken}`);

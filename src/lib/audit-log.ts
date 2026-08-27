@@ -7,7 +7,10 @@ export type AuditAction =
   | "device_remove"
   | "config_update"
   | "user_role_change"
-  | "db_reset";
+  | "db_reset"
+  | "user_create"
+  | "agent_token_issue"
+  | "agent_device_registered";
 
 export async function logAuditEvent(params: {
   actorId: string;

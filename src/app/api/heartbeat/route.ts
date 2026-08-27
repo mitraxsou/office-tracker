@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { getUserByAgentToken } from "@/lib/auth";
-import { authenticateAgentToken, registerOrUpdateDevice } from "@/lib/agent-auth";
+import {
+  authenticateAgentToken,
+  bindAgentTokenToSerial,
+  logAgentDeviceRegistered,
+  registerOrUpdateDevice,
+} from "@/lib/agent-auth";
 import { processHeartbeat } from "@/lib/heartbeat-service";
 import { getAppConfig, getUserHoursTarget } from "@/lib/app-config";
 import {
@@ -40,9 +45,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  const deviceResult = await registerOrUpdateDevice(auth.userId, serialNumber);
+  const bindResult = await bindAgentTokenToSerial(auth.agentTokenId, serialNumber);
+  if (!bindResult.ok) {
+    return NextResponse.json({ error: bindResult.error }, { status: bindResult.status });
+  }
+
+  const deviceResult = await registerOrUpdateDevice(
+    auth.userId,
+    serialNumber,
+    auth.agentTokenId,
+  );
   if (!deviceResult.ok) {
     return NextResponse.json({ error: deviceResult.error }, { status: deviceResult.status });
+  }
+
+  if (deviceResult.registered || bindResult.newlyBound) {
+    await logAgentDeviceRegistered({
+      userId: auth.userId,
+      serialNumber,
+    });
   }
 
   const user = await getUserByAgentToken(token);
@@ -72,5 +93,6 @@ export async function POST(request: Request) {
     ok: true,
     inOffice: result.inOffice,
     deviceRegistered: deviceResult.registered,
+    tokenBound: bindResult.newlyBound,
   });
 }

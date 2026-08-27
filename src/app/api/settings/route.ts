@@ -36,7 +36,7 @@ export async function PATCH(request: Request) {
   const updated = await prisma.user.update({
     where: { id: user.id },
     data: { timezone },
-    include: { agentToken: true, agentDevices: true },
+    include: { agentTokens: { where: { revokedAt: null } }, agentDevices: true },
   });
 
   return NextResponse.json({ user: updated });

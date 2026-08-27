@@ -2,6 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { AdminVisitForm } from "./AdminVisitForm";
+import { AdminUserManagement } from "./AdminUserManagement";
+import { copyToClipboard } from "@/lib/clipboard";
+
+type TokenRow = {
+  id: string;
+  prefix: string;
+  label: string | null;
+  boundSerialNumber: string | null;
+  status: "pending" | "bound";
+  createdAt: string;
+  lastUsedAt: string | null;
+};
 
 type DailyPoint = { date: string; totalHours: number; compliancePct: number };
 type UserRow = {
@@ -10,6 +22,7 @@ type UserRow = {
   name: string | null;
   role: string;
   hoursTarget: number;
+  tokens: TokenRow[];
   devices: Array<{ id: string; serialNumber: string; lastSeenAt: string | null }>;
   today: {
     totalHours: number;
@@ -124,6 +137,8 @@ export function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
   const [roleLoadingId, setRoleLoadingId] = useState<string | null>(null);
+  const [tokenLoadingId, setTokenLoadingId] = useState<string | null>(null);
+  const [issuedCommand, setIssuedCommand] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -138,6 +153,8 @@ export function AdminDashboard() {
 
   useEffect(() => {
     load();
+    const interval = setInterval(load, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   async function removeDevice(deviceId: string) {
@@ -165,13 +182,60 @@ export function AdminDashboard() {
     load();
   }
 
+  async function issueToken(userId: string) {
+    setTokenLoadingId(userId);
+    setIssuedCommand(null);
+    const res = await fetch(`/api/admin/users/${userId}/tokens`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    setTokenLoadingId(null);
+    if (!res.ok) {
+      setRoleError("Failed to issue token");
+      return;
+    }
+    const body = await res.json();
+    if (body.installCommand) {
+      await copyToClipboard(body.installCommand);
+      setIssuedCommand(body.installCommand);
+    }
+    load();
+  }
+
   if (loading) return <p className="text-muted">Loading reports...</p>;
   if (error || !data) return <p className="text-red-400">{error ?? "No data"}</p>;
 
   const maxHours = Math.max(...data.dailyTrend.map((d) => d.totalHours), data.summary.hoursTarget);
+  const recentAgentEvents = data.auditLog.filter((l) => l.action === "agent_device_registered");
 
   return (
     <div className="space-y-6">
+      <AdminUserManagement onUserCreated={load} />
+
+      {issuedCommand && (
+        <div className="rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm">
+          Install command copied to clipboard. Send it to the user (they run it inside the
+          extracted agent folder).
+          <pre className="mt-2 overflow-x-auto text-xs whitespace-pre-wrap">{issuedCommand}</pre>
+        </div>
+      )}
+
+      {recentAgentEvents.length > 0 && (
+        <section className="card border-green-500/30 p-4">
+          <h2 className="mb-2 text-sm font-medium text-green-300">Recent agent registrations</h2>
+          <ul className="space-y-1 text-sm">
+            {recentAgentEvents.slice(0, 5).map((log) => (
+              <li key={log.id}>
+                {new Date(log.createdAt).toLocaleString("en-IN")} ·{" "}
+                {log.targetEmail ?? "user"} · serial{" "}
+                <code>{String(log.details?.serialNumber ?? "?")}</code>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard label="Total users" value={String(data.summary.totalUsers)} />
         <SummaryCard label="In office now" value={String(data.summary.inOfficeNow)} />
@@ -216,8 +280,9 @@ export function AdminDashboard() {
                 <th className="py-2 pr-4">Today</th>
                 <th className="py-2 pr-4">5h met</th>
                 <th className="py-2 pr-4">Agent</th>
+                <th className="py-2 pr-4">Tokens / devices</th>
                 <th className="py-2 pr-4">Last heartbeat</th>
-                <th className="py-2">Devices</th>
+                <th className="py-2">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -265,30 +330,54 @@ export function AdminDashboard() {
                     </span>
                   </td>
                   <td className="py-3 pr-4">{u.today.agentHealthy ? "Healthy" : "Stale"}</td>
+                  <td className="py-3 pr-4 text-xs">
+                    <div className="space-y-2">
+                      {u.tokens.length === 0 ? (
+                        <span className="text-muted">No tokens</span>
+                      ) : (
+                        u.tokens.map((t) => (
+                          <div key={t.id}>
+                            <span
+                              className={
+                                t.status === "bound" ? "text-green-400" : "text-amber-300"
+                              }
+                            >
+                              {t.label ?? t.prefix} · {t.status}
+                            </span>
+                            {t.boundSerialNumber && (
+                              <code className="ml-1">{t.boundSerialNumber}</code>
+                            )}
+                          </div>
+                        ))
+                      )}
+                      {u.devices.map((d) => (
+                        <div key={d.id} className="flex items-center gap-2">
+                          <code>{d.serialNumber}</code>
+                          <button
+                            type="button"
+                            onClick={() => removeDevice(d.id)}
+                            className="text-red-400 hover:underline"
+                          >
+                            remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </td>
                   <td className="py-3 pr-4 text-xs text-muted">
                     {u.today.lastHeartbeat
                       ? new Date(u.today.lastHeartbeat).toLocaleString("en-IN")
                       : "None"}
                   </td>
                   <td className="py-3">
-                    {u.devices.length === 0 ? (
-                      <span className="text-muted">None</span>
-                    ) : (
-                      <ul className="space-y-1">
-                        {u.devices.map((d) => (
-                          <li key={d.id} className="flex items-center gap-2">
-                            <code className="text-xs">{d.serialNumber}</code>
-                            <button
-                              type="button"
-                              onClick={() => removeDevice(d.id)}
-                              className="text-xs text-red-400 hover:underline"
-                            >
-                              remove
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                    <button
+                      type="button"
+                      disabled={tokenLoadingId === u.id}
+                      onClick={() => issueToken(u.id)}
+                      className="text-xs text-accent hover:underline disabled:opacity-50"
+                    >
+                      {tokenLoadingId === u.id ? "..." : "Issue laptop token"}
+                    </button>
                   </td>
                 </tr>
               );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AgentStatusPanel } from "@/components/AgentStatusPanel";
 import { UserSettingsForm } from "@/components/UserSettingsForm";
 import { AgentSetupPanel } from "@/components/AgentSetupPanel";
 
@@ -39,6 +40,8 @@ export function SettingsPageClient({
 
   return (
     <>
+      <AgentStatusPanel />
+
       <UserSettingsForm
         timezone={timezone}
         hoursTarget={hoursTarget}

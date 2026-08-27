@@ -17,7 +17,8 @@ export default async function SettingsPage({
   const welcomeToken = params.welcome === "1" ? await consumeWelcomeToken() : null;
   const installToken = await peekInstallToken();
   const { record, plainToken: newToken } = await ensureAgentToken(user.id);
-  const displayToken = welcomeToken ?? newToken ?? installToken;  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const displayToken = welcomeToken ?? newToken ?? installToken;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const localDevAgentPath = process.env.AGENT_INSTALL_PATH || null;
   const globalConfig = await getAppConfig();
   const hoursTarget = await getUserHoursTarget(user);

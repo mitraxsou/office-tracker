@@ -65,7 +65,10 @@ export async function getCurrentUser() {
   return prisma.user.findUnique({
     where: { id: userId },
     include: {
-      agentToken: true,
+      agentTokens: {
+        where: { revokedAt: null },
+        orderBy: { createdAt: "desc" },
+      },
       agentDevices: { orderBy: { lastSeenAt: "desc" } },
     },
   });
@@ -75,16 +78,40 @@ export function generateAgentToken() {
   return crypto.randomBytes(32).toString("hex");
 }
 
-async function createAgentTokenRecord(userId: string, plainToken: string) {
+export async function createAgentTokenRecord(
+  userId: string,
+  plainToken: string,
+  opts?: { label?: string; issuedById?: string | null },
+) {
   const tokenHash = await hashPassword(plainToken);
   const tokenPrefix = plainToken.slice(0, 8);
   return prisma.agentToken.create({
-    data: { userId, tokenHash, tokenPrefix },
+    data: {
+      userId,
+      tokenHash,
+      tokenPrefix,
+      label: opts?.label?.trim() || null,
+      issuedById: opts?.issuedById ?? null,
+    },
   });
 }
 
+/** Issue a new install token (admin or first-time setup). Plain token returned once. */
+export async function issueAgentToken(
+  userId: string,
+  opts?: { label?: string; issuedById?: string | null },
+) {
+  const plainToken = generateAgentToken();
+  const record = await createAgentTokenRecord(userId, plainToken, opts);
+  return { record, plainToken };
+}
+
+/** Ensure user has at least one active token; create only if none exist. */
 export async function ensureAgentToken(userId: string) {
-  const existing = await prisma.agentToken.findUnique({ where: { userId } });
+  const existing = await prisma.agentToken.findFirst({
+    where: { userId, revokedAt: null },
+    orderBy: { createdAt: "desc" },
+  });
   if (existing) return { record: existing, plainToken: null as string | null };
 
   const plainToken = generateAgentToken();
@@ -92,21 +119,16 @@ export async function ensureAgentToken(userId: string) {
   return { record, plainToken };
 }
 
+/** Revoke all active tokens and issue one fresh token. */
 export async function regenerateAgentToken(userId: string) {
-  const plainToken = generateAgentToken();
-  const tokenHash = await hashPassword(plainToken);
-  const tokenPrefix = plainToken.slice(0, 8);
-
-  const record = await prisma.agentToken.upsert({
-    where: { userId },
-    create: { userId, tokenHash, tokenPrefix },
-    update: { tokenHash, tokenPrefix },
+  await prisma.agentToken.updateMany({
+    where: { userId, revokedAt: null },
+    data: { revokedAt: new Date() },
   });
-
-  return { record, plainToken };
+  return issueAgentToken(userId);
 }
 
-export async function getUserByAgentToken(token: string) {
+export async function resolveAgentTokenRecord(token: string) {
   if (token.length < 16) return null;
 
   const tokenPrefix = token.slice(0, 8);
@@ -115,12 +137,17 @@ export async function getUserByAgentToken(token: string) {
     include: { user: { include: { agentDevices: true } } },
   });
 
-  if (!agentToken) return null;
+  if (!agentToken || agentToken.revokedAt) return null;
 
   const valid = await verifyPassword(token, agentToken.tokenHash);
   if (!valid) return null;
 
-  return agentToken.user;
+  return agentToken;
+}
+
+export async function getUserByAgentToken(token: string) {
+  const agentToken = await resolveAgentTokenRecord(token);
+  return agentToken?.user ?? null;
 }
 
 async function resolveRole(email: string) {
@@ -143,6 +170,42 @@ export async function isRegistrationAllowed() {
   return config.allowRegistration;
 }
 
+export async function createUserByAdmin(params: {
+  email: string;
+  password: string;
+  name?: string;
+  issueToken?: boolean;
+  issuedById?: string;
+}) {
+  const normalizedEmail = params.email.toLowerCase().trim();
+  const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+  if (existing) {
+    throw new Error("User already exists");
+  }
+
+  await ensureAppConfig();
+  const passwordHash = await hashPassword(params.password);
+  const user = await prisma.user.create({
+    data: {
+      email: normalizedEmail,
+      passwordHash,
+      name: params.name?.trim() || null,
+      role: "user",
+    },
+  });
+
+  let plainAgentToken: string | null = null;
+  if (params.issueToken !== false) {
+    const issued = await issueAgentToken(user.id, {
+      label: "Initial laptop",
+      issuedById: params.issuedById ?? null,
+    });
+    plainAgentToken = issued.plainToken;
+  }
+
+  return { user, plainAgentToken };
+}
+
 export async function registerUser(email: string, password: string, name?: string) {
   if (!(await isRegistrationAllowed())) {
     throw new Error("Registration is disabled");
@@ -162,8 +225,7 @@ export async function registerUser(email: string, password: string, name?: strin
     },
   });
 
-  const plainToken = generateAgentToken();
-  await createAgentTokenRecord(user.id, plainToken);
+  const { plainToken } = await issueAgentToken(user.id, { label: "Initial laptop" });
   return { user, plainAgentToken: plainToken };
 }
 
@@ -178,4 +240,28 @@ export async function authenticateUser(email: string, password: string) {
 
 export function maskAgentToken(prefix: string) {
   return `${prefix}${"•".repeat(56)}`;
+}
+
+export function summarizeAgentTokens(
+  tokens: Array<{
+    id: string;
+    tokenPrefix: string;
+    label: string | null;
+    boundSerialNumber: string | null;
+    revokedAt: Date | null;
+    createdAt: Date;
+    lastUsedAt: Date | null;
+  }>,
+) {
+  return tokens
+    .filter((t) => !t.revokedAt)
+    .map((t) => ({
+      id: t.id,
+      prefix: t.tokenPrefix,
+      label: t.label,
+      boundSerialNumber: t.boundSerialNumber,
+      status: t.boundSerialNumber ? ("bound" as const) : ("pending" as const),
+      createdAt: t.createdAt.toISOString(),
+      lastUsedAt: t.lastUsedAt?.toISOString() ?? null,
+    }));
 }
