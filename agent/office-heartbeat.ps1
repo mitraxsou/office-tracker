@@ -22,6 +22,54 @@ function Get-RunCounterPath {
     Join-Path $env:LOCALAPPDATA "OfficeTracker\run-counter.txt"
 }
 
+function Get-VersionPath {
+    Join-Path $env:LOCALAPPDATA "OfficeTracker\version.txt"
+}
+
+function Get-LocalAgentVersion {
+    $path = Get-VersionPath
+    if (-not (Test-Path $path)) { return "0.0.0" }
+    return (Get-Content $path -Raw -ErrorAction SilentlyContinue).Trim()
+}
+
+function Compare-AgentVersion {
+    param([string]$Left, [string]$Right)
+    $parse = {
+        param([string]$v)
+        $v.Trim().Split(".") | ForEach-Object { [int]($_ -replace '\D', '0') }
+    }
+    $lv = & $parse $Left
+    $rv = & $parse $Right
+    $len = [Math]::Max($lv.Count, $rv.Count)
+    for ($i = 0; $i -lt $len; $i++) {
+        $l = if ($i -lt $lv.Count) { $lv[$i] } else { 0 }
+        $r = if ($i -lt $rv.Count) { $rv[$i] } else { 0 }
+        if ($l -gt $r) { return 1 }
+        if ($l -lt $r) { return -1 }
+    }
+    return 0
+}
+
+function Test-NeedsAgentUpdate($ServerConfig) {
+    if (-not $ServerConfig.agentScriptVersion) { return $false }
+    $local = Get-LocalAgentVersion
+    return (Compare-AgentVersion $ServerConfig.agentScriptVersion $local) -gt 0
+}
+
+function Invoke-AgentSelfUpdate([string]$ApiUrl, [string]$Token) {
+    $updateScript = Join-Path $env:LOCALAPPDATA "OfficeTracker\update.ps1"
+    if (-not (Test-Path $updateScript)) {
+        Write-Log "WARN update.ps1 missing; cannot auto-update"
+        return
+    }
+    try {
+        Write-Log "Auto-update: server has newer agent version"
+        & $updateScript -ApiUrl $ApiUrl -Token $Token -Silent
+    } catch {
+        Write-Log "WARN auto-update failed: $($_.Exception.Message)"
+    }
+}
+
 function Get-LaptopSerial {
     try {
         $serial = (Get-CimInstance Win32_Bios -ErrorAction Stop).SerialNumber
@@ -166,6 +214,10 @@ try {
     exit 1
 }
 
+if (Test-NeedsAgentUpdate $serverConfig) {
+    Invoke-AgentSelfUpdate -ApiUrl $apiUrl -Token $token
+}
+
 Set-RunCounter ((Get-RunCounter) + 1)
 
 $ssidResult = Get-CurrentWifiSsid
@@ -206,6 +258,8 @@ if ($DryRun) {
     Write-Host "  Hours target: $($serverConfig.hoursTarget)"
     Write-Host "  Timezone:    $($serverConfig.timezone)"
     Write-Host "  API version: $($serverConfig.apiVersion)"
+    Write-Host "  Agent version (server): $($serverConfig.agentScriptVersion)"
+    Write-Host "  Agent version (local):  $(Get-LocalAgentVersion)"
     Write-Host ""
     Write-Host "Would POST heartbeat (server decides inOffice): $payload"
     exit 0

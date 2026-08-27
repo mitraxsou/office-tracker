@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getUserByAgentToken } from "@/lib/auth";
 import { getAppConfig, getUserHoursTarget } from "@/lib/app-config";
+import { getAgentVersion } from "@/lib/agent-version";
 import { API_VERSION, extractBearerToken } from "@/lib/security";
 
 export async function GET(request: Request) {
@@ -23,6 +24,6 @@ export async function GET(request: Request) {
     hoursTarget,
     timezone: user.timezone,
     apiVersion: API_VERSION,
-    agentScriptVersion: API_VERSION,
+    agentScriptVersion: getAgentVersion(),
   });
 }

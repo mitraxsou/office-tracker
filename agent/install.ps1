@@ -4,6 +4,8 @@
 # Scheduled:   PwCOfficePulse task every 2 minutes (hidden via VBS wrapper)
 # Startup:     shortcut in user Startup folder
 #
+# Safe to re-run: detects an existing install and refreshes files + task silently.
+#
 # Usage:
 #   .\install.ps1 -ApiUrl "https://your-app.vercel.app" -Token "your-agent-token-from-settings"
 
@@ -26,6 +28,12 @@ function Test-IsAdmin {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Test-ExistingInstall {
+    $installDir = Join-Path $env:LOCALAPPDATA "OfficeTracker"
+    $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    return (Test-Path $installDir) -and ($null -ne $task)
 }
 
 function Get-LaptopSerial {
@@ -94,7 +102,22 @@ function Register-HiddenTask {
     $shortcut.Save()
 }
 
+function Copy-AgentScripts {
+    param(
+        [string]$SourceDir,
+        [string]$TargetDir
+    )
+    foreach ($file in @("office-heartbeat.ps1", "update.ps1", "uninstall.ps1", "version.txt")) {
+        $src = Join-Path $SourceDir $file
+        if (Test-Path $src) {
+            Copy-Item $src (Join-Path $TargetDir $file) -Force
+        }
+    }
+}
+
 function Install-UserLevel {
+    param([bool]$IsReinstall)
+
     $installDir = Join-Path $env:LOCALAPPDATA "OfficeTracker"
     $scriptDir = $PSScriptRoot
 
@@ -102,9 +125,7 @@ function Install-UserLevel {
         New-Item -ItemType Directory -Path $installDir -Force | Out-Null
     }
 
-    Copy-Item (Join-Path $scriptDir "office-heartbeat.ps1") (Join-Path $installDir "office-heartbeat.ps1") -Force
-    Copy-Item (Join-Path $scriptDir "update.ps1") (Join-Path $installDir "update.ps1") -Force -ErrorAction SilentlyContinue
-    Copy-Item (Join-Path $scriptDir "uninstall.ps1") (Join-Path $installDir "uninstall.ps1") -Force -ErrorAction SilentlyContinue
+    Copy-AgentScripts -SourceDir $scriptDir -TargetDir $installDir
 
     $serial = Get-LaptopSerial
     $config = @{
@@ -118,14 +139,21 @@ function Install-UserLevel {
     $vbsPath = New-HiddenRunner -ScriptPath $heartbeatScript -Dir $installDir
     Register-HiddenTask -VbsPath $vbsPath -InstallDir $installDir
 
-    Write-Host ""
-    Write-Host "PwC Office Pulse installed (user-level)" -ForegroundColor Green
-    Write-Host "Install dir:     $installDir"
-    Write-Host "Scheduled task:  $TaskName (hidden, every 2 min)"
-    Write-Host "Startup shortcut: PwC Office Pulse.lnk"
-    Write-Host "Config:          $(Join-Path $installDir 'config.json')"
-    Write-Host ""
-    Write-Host "Test:  powershell -ExecutionPolicy Bypass -File `"$heartbeatScript`" -DryRun"
+    if ($IsReinstall) {
+        Write-Host "PwC Office Pulse refreshed (existing install updated)." -ForegroundColor Green
+    } else {
+        Write-Host ""
+        Write-Host "PwC Office Pulse installed (user-level)" -ForegroundColor Green
+        Write-Host "Install dir:     $installDir"
+        Write-Host "Scheduled task:  $TaskName (hidden, every 2 min)"
+        Write-Host "Startup shortcut: PwC Office Pulse.lnk"
+        Write-Host "Config:          $(Join-Path $installDir 'config.json')"
+        Write-Host ""
+        Write-Host "The agent auto-updates silently when new versions are published."
+        Write-Host "Re-running this install command is safe anytime."
+        Write-Host ""
+        Write-Host "Test:  powershell -ExecutionPolicy Bypass -File `"$heartbeatScript`" -DryRun"
+    }
 }
 
 function Install-AdminLevel {
@@ -144,9 +172,8 @@ function Install-AdminLevel {
         New-Item -ItemType Directory -Path $installDir -Force | Out-Null
     }
 
-    Copy-Item (Join-Path $PSScriptRoot "office-heartbeat.ps1") (Join-Path $installDir "office-heartbeat.ps1") -Force
-    Copy-Item (Join-Path $PSScriptRoot "update.ps1") (Join-Path $installDir "update.ps1") -Force -ErrorAction SilentlyContinue
-    Copy-Item (Join-Path $PSScriptRoot "uninstall.ps1") (Join-Path $installDir "uninstall.ps1") -Force -ErrorAction SilentlyContinue
+    Copy-AgentScripts -SourceDir $PSScriptRoot -TargetDir $installDir
+    Copy-AgentScripts -SourceDir $PSScriptRoot -TargetDir (Join-Path $env:LOCALAPPDATA "OfficeTracker")
 
     $localConfigDir = Join-Path $env:LOCALAPPDATA "OfficeTracker"
     if (-not (Test-Path $localConfigDir)) { New-Item -ItemType Directory -Path $localConfigDir -Force | Out-Null }
@@ -163,12 +190,16 @@ function Install-AdminLevel {
     Write-Host "Config:   $(Join-Path $localConfigDir 'config.json')"
 }
 
-Write-Host "PwC Office Pulse installer"
-Write-Host "Admin required: NO (default user-level install)"
-Write-Host ""
+$isReinstall = Test-ExistingInstall
+
+if (-not $isReinstall) {
+    Write-Host "PwC Office Pulse installer"
+    Write-Host "Admin required: NO (default user-level install)"
+    Write-Host ""
+}
 
 if ($RequireAdmin) {
     Install-AdminLevel
 } else {
-    Install-UserLevel
+    Install-UserLevel -IsReinstall $isReinstall
 }

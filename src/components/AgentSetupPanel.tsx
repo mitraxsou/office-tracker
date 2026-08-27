@@ -57,7 +57,9 @@ export function AgentSetupPanel({
           Install {AGENT_PRODUCT_NAME}
         </h2>
         <p className="mb-4 text-sm text-muted">
-          No admin required. Use <strong>PowerShell</strong> (not Command Prompt).
+          No admin required. Use <strong>PowerShell</strong> (not Command Prompt). The agent
+          auto-updates silently when new versions are published. Re-running the install command
+          is safe if you think the agent is missing; it refreshes an existing install.
         </p>
 
         <ol className="mb-6 list-decimal space-y-3 pl-5 text-sm">

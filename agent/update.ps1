@@ -1,63 +1,201 @@
-# Office Tracker agent updater. Copies latest scripts from GitHub clone to install dir.
-# NO admin required.
+# PwC Office Pulse agent updater. Downloads latest scripts from the server.
+# NO admin required. Safe to run manually or from the heartbeat auto-update check.
 #
-# One-time setup: clone the repo once:
-#   git clone https://github.com/mitraxsou/office-tracker.git %USERPROFILE%\OfficeTracker-repo
-#
-# Then run this script (or schedule it weekly):
-#   powershell -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\OfficeTracker\update.ps1"
-#
-# Optional: pass -RepoPath if your clone is elsewhere:
-#   .\update.ps1 -RepoPath "C:\Users\you\OfficeTracker-repo"
+# Usage:
+#   .\update.ps1                              # reads config.json, silent by default when called internally
+#   .\update.ps1 -ApiUrl "https://..." -Token "..." -Silent
+#   .\update.ps1 -Verbose                     # show progress (manual runs)
 
 param(
-    [string]$RepoPath = (Join-Path $env:USERPROFILE "OfficeTracker-repo")
+    [string]$ApiUrl,
+    [string]$Token,
+    [switch]$Silent,
+    [switch]$Verbose
 )
 
 $ErrorActionPreference = "Stop"
 $TaskName = "PwCOfficePulse"
-$installDir = Join-Path $env:LOCALAPPDATA "OfficeTracker"
+$TaskDescription = "PwC Office Pulse - office hours tracker"
+$LegacyTaskNames = @("OfficeTrackerHeartbeat", "PwCOfficePulse")
+$ExtractFolder = "PwCOfficePulse"
+$AgentFiles = @("office-heartbeat.ps1", "update.ps1", "uninstall.ps1", "install.ps1", "version.txt")
 
-Write-Host "Office Tracker agent updater"
-Write-Host "Repo:    $RepoPath"
-Write-Host "Install: $installDir"
-Write-Host ""
-
-if (-not (Test-Path $RepoPath)) {
-    Write-Host "ERROR: Repo not found at $RepoPath" -ForegroundColor Red
-    Write-Host "Clone first: git clone https://github.com/mitraxsou/office-tracker.git `"$RepoPath`""
-    exit 1
+function Get-InstallDir {
+    Join-Path $env:LOCALAPPDATA "OfficeTracker"
 }
 
-Push-Location $RepoPath
-try {
-    Write-Host "Pulling latest from GitHub..."
-    git pull --ff-only 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "WARNING: git pull failed. Copying local files anyway." -ForegroundColor Yellow
+function Get-ConfigPath {
+    Join-Path (Get-InstallDir) "config.json"
+}
+
+function Get-VersionPath {
+    Join-Path (Get-InstallDir) "version.txt"
+}
+
+function Get-LockPath {
+    Join-Path (Get-InstallDir) ".update.lock"
+}
+
+function Write-UpdateLog([string]$Message) {
+    $logDir = Join-Path (Get-InstallDir) "logs"
+    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
+    $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message"
+    Add-Content -Path (Join-Path $logDir "update.log") -Value $line -ErrorAction SilentlyContinue
+    if ($Verbose -and -not $Silent) { Write-Host $Message }
+}
+
+function Compare-AgentVersion {
+    param([string]$Left, [string]$Right)
+    $parse = {
+        param([string]$v)
+        $v.Trim().Split(".") | ForEach-Object { [int]($_ -replace '\D', '0') }
     }
-} finally {
-    Pop-Location
+    $lv = & $parse $Left
+    $rv = & $parse $Right
+    $len = [Math]::Max($lv.Count, $rv.Count)
+    for ($i = 0; $i -lt $len; $i++) {
+        $l = if ($i -lt $lv.Count) { $lv[$i] } else { 0 }
+        $r = if ($i -lt $rv.Count) { $rv[$i] } else { 0 }
+        if ($l -gt $r) { return 1 }
+        if ($l -lt $r) { return -1 }
+    }
+    return 0
 }
 
+function Get-LocalAgentVersion {
+    $path = Get-VersionPath
+    if (-not (Test-Path $path)) { return "0.0.0" }
+    return (Get-Content $path -Raw -ErrorAction SilentlyContinue).Trim()
+}
+
+function New-HiddenRunner {
+    param([string]$ScriptPath, [string]$Dir)
+    $vbsPath = Join-Path $Dir "run-heartbeat.vbs"
+    $vbsContent = @"
+CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$ScriptPath""", 0, False
+"@
+    Set-Content -Path $vbsPath -Value $vbsContent -Encoding ASCII
+    return $vbsPath
+}
+
+function Refresh-ScheduledTask {
+    param([string]$VbsPath, [string]$InstallDir)
+    $wscript = (Get-Command wscript.exe).Source
+    $actionArgs = "//B //Nologo `"$VbsPath`""
+    $action = New-ScheduledTaskAction -Execute $wscript -Argument $actionArgs
+    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
+        -RepetitionInterval (New-TimeSpan -Minutes 2) `
+        -RepetitionDuration (New-TimeSpan -Days 3650)
+    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
+        -LogonType Interactive -RunLevel Limited
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+        -StartWhenAvailable -MultipleInstances IgnoreNew
+    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
+        -Principal $principal -Settings $settings -Description $TaskDescription -Force | Out-Null
+
+    $startupDir = [Environment]::GetFolderPath("Startup")
+    $shortcutPath = Join-Path $startupDir "PwC Office Pulse.lnk"
+    $wsh = New-Object -ComObject WScript.Shell
+    $shortcut = $wsh.CreateShortcut($shortcutPath)
+    $shortcut.TargetPath = $wscript
+    $shortcut.Arguments = $actionArgs
+    $shortcut.WorkingDirectory = $InstallDir
+    $shortcut.WindowStyle = 7
+    $shortcut.Description = $TaskDescription
+    $shortcut.Save()
+}
+
+function Resolve-AgentSourceDir {
+    param([string]$ExtractRoot)
+    $nested = Join-Path $ExtractRoot $ExtractFolder
+    if (Test-Path (Join-Path $nested "office-heartbeat.ps1")) { return $nested }
+    if (Test-Path (Join-Path $ExtractRoot "office-heartbeat.ps1")) { return $ExtractRoot }
+    throw "Agent scripts not found in downloaded zip"
+}
+
+$installDir = Get-InstallDir
 if (-not (Test-Path $installDir)) {
     New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 }
 
-$agentSource = Join-Path $RepoPath "agent"
-Copy-Item (Join-Path $agentSource "office-heartbeat.ps1") (Join-Path $installDir "office-heartbeat.ps1") -Force
-Copy-Item (Join-Path $agentSource "update.ps1") (Join-Path $installDir "update.ps1") -Force
-Write-Host "Copied latest agent scripts to $installDir"
-
-# Restart scheduled task to pick up changes
-$task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-if ($task) {
-    Stop-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-    Start-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-    Write-Host "Restarted scheduled task: $TaskName"
-} else {
-    Write-Host "No scheduled task found. Run install.ps1 if not yet installed."
+$configPath = Get-ConfigPath
+if (-not $ApiUrl -or -not $Token) {
+    if (-not (Test-Path $configPath)) {
+        Write-UpdateLog "ERROR: config.json not found"
+        if (-not $Silent) { Write-Host "ERROR: config.json not found. Run install.ps1 first." -ForegroundColor Red }
+        exit 1
+    }
+    $localConfig = Get-Content $configPath -Raw | ConvertFrom-Json
+    if (-not $ApiUrl) { $ApiUrl = $localConfig.apiUrl.TrimEnd("/") }
+    if (-not $Token) { $Token = $localConfig.token }
 }
 
-Write-Host ""
-Write-Host "Update complete." -ForegroundColor Green
+$lockPath = Get-LockPath
+if (Test-Path $lockPath) {
+    $lockAge = (Get-Date) - (Get-Item $lockPath).LastWriteTime
+    if ($lockAge.TotalMinutes -lt 10) {
+        Write-UpdateLog "SKIP update already in progress"
+        exit 0
+    }
+    Remove-Item $lockPath -Force -ErrorAction SilentlyContinue
+}
+
+Set-Content -Path $lockPath -Value (Get-Date -Format "o") -Encoding UTF8
+
+try {
+    $headers = @{ Authorization = "Bearer $Token" }
+    $tempZip = Join-Path $env:TEMP "PwCOfficePulse-agent-$([Guid]::NewGuid().ToString('N')).zip"
+    $tempExtract = Join-Path $env:TEMP "PwCOfficePulse-extract-$([Guid]::NewGuid().ToString('N'))"
+
+    Write-UpdateLog "Downloading agent from $ApiUrl/api/agent/download"
+    Invoke-WebRequest -Uri "$ApiUrl/api/agent/download" -Headers $headers `
+        -OutFile $tempZip -UseBasicParsing -TimeoutSec 120
+
+    New-Item -ItemType Directory -Path $tempExtract -Force | Out-Null
+    Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force
+
+    $sourceDir = Resolve-AgentSourceDir -ExtractRoot $tempExtract
+    $newVersion = "0.0.0"
+    $versionFile = Join-Path $sourceDir "version.txt"
+    if (Test-Path $versionFile) {
+        $newVersion = (Get-Content $versionFile -Raw).Trim()
+    }
+
+    $localVersion = Get-LocalAgentVersion
+    if ((Compare-AgentVersion $newVersion $localVersion) -le 0) {
+        Write-UpdateLog "SKIP already at v$localVersion (server v$newVersion)"
+        if (-not $Silent) { Write-Host "Agent already up to date (v$localVersion)." -ForegroundColor Green }
+        exit 0
+    }
+
+    Write-UpdateLog "Updating v$localVersion -> v$newVersion"
+
+    foreach ($file in $AgentFiles) {
+        $src = Join-Path $sourceDir $file
+        if (Test-Path $src) {
+            Copy-Item $src (Join-Path $installDir $file) -Force
+        }
+    }
+
+    $heartbeatScript = Join-Path $installDir "office-heartbeat.ps1"
+    $vbsPath = New-HiddenRunner -ScriptPath $heartbeatScript -Dir $installDir
+
+    $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    if ($task) {
+        Refresh-ScheduledTask -VbsPath $vbsPath -InstallDir $installDir
+        Write-UpdateLog "Refreshed scheduled task (did not stop running heartbeat)"
+    }
+
+    Write-UpdateLog "OK updated to v$newVersion"
+    if (-not $Silent) {
+        Write-Host "PwC Office Pulse updated to v$newVersion." -ForegroundColor Green
+    }
+} catch {
+    Write-UpdateLog "ERROR $($_.Exception.Message)"
+    if (-not $Silent) { Write-Host "Update failed: $($_.Exception.Message)" -ForegroundColor Red }
+    exit 1
+} finally {
+    Remove-Item $lockPath -Force -ErrorAction SilentlyContinue
+    if ($tempZip -and (Test-Path $tempZip)) { Remove-Item $tempZip -Force -ErrorAction SilentlyContinue }
+    if ($tempExtract -and (Test-Path $tempExtract)) { Remove-Item $tempExtract -Recurse -Force -ErrorAction SilentlyContinue }
+}

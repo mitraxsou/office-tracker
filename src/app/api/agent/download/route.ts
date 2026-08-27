@@ -3,18 +3,31 @@ import { readFile } from "fs/promises";
 import path from "path";
 import JSZip from "jszip";
 import { AGENT_EXTRACT_FOLDER, AGENT_PRODUCT_NAME } from "@/lib/agent-branding";
-import { getCurrentUser } from "@/lib/auth";
+import { getAgentVersion } from "@/lib/agent-version";
+import { getCurrentUser, getUserByAgentToken } from "@/lib/auth";
+import { extractBearerToken } from "@/lib/security";
 
 const AGENT_FILES = [
   "install.ps1",
   "office-heartbeat.ps1",
   "uninstall.ps1",
   "update.ps1",
+  "version.txt",
 ];
 
-export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
+async function authorizeAgentDownload(request: Request): Promise<boolean> {
+  const sessionUser = await getCurrentUser();
+  if (sessionUser) return true;
+
+  const token = extractBearerToken(request);
+  if (!token) return false;
+
+  const agentUser = await getUserByAgentToken(token);
+  return Boolean(agentUser);
+}
+
+export async function GET(request: Request) {
+  if (!(await authorizeAgentDownload(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -28,7 +41,7 @@ export async function GET() {
 
   zip.file(
     `${AGENT_EXTRACT_FOLDER}/README.txt`,
-    `${AGENT_PRODUCT_NAME} agent\n\n1. Extract this zip to your Downloads folder (creates ${AGENT_EXTRACT_FOLDER}\\)\n2. Open Settings in the web app\n3. Click "Copy install command" and run in PowerShell\n`
+    `${AGENT_PRODUCT_NAME} agent (v${getAgentVersion()})\n\n1. Extract this zip to your Downloads folder (creates ${AGENT_EXTRACT_FOLDER}\\)\n2. Open Settings in the web app\n3. Click "Copy install command" and run in PowerShell\n\nRe-running the install command is safe: it refreshes an existing install.\n`
   );
 
   const buffer = await zip.generateAsync({ type: "nodebuffer" });
@@ -36,6 +49,7 @@ export async function GET() {
     headers: {
       "Content-Type": "application/zip",
       "Content-Disposition": 'attachment; filename="PwCOfficePulse-agent.zip"',
+      "X-Agent-Version": getAgentVersion(),
     },
   });
 }
