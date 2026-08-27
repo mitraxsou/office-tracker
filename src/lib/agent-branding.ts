@@ -18,12 +18,22 @@ export const AGENT_STARTUP_SHORTCUT = "PwC Office Pulse.lnk";
 /** Legacy startup shortcuts removed on uninstall */
 export const LEGACY_STARTUP_SHORTCUTS = ["OfficeTrackerHeartbeat.lnk", "PwC Office Pulse.lnk"];
 
-/** Default folder after downloading agent zip from Settings */
-export const AGENT_DOWNLOAD_FOLDER = `%USERPROFILE%\\Downloads\\PwCOfficePulse`;
+/** Default folder after extracting the agent zip (under Downloads) */
+export const AGENT_EXTRACT_FOLDER = "PwCOfficePulse";
+
+/** Human-readable extract location for UI copy */
+export const AGENT_DOWNLOAD_FOLDER = `%USERPROFILE%\\Downloads\\${AGENT_EXTRACT_FOLDER}`;
+
+/** PowerShell path for install/uninstall commands (run in PowerShell, not cmd.exe) */
+export const AGENT_EXTRACT_PATH_PS = `$env:USERPROFILE\\Downloads\\${AGENT_EXTRACT_FOLDER}`;
 
 export function buildInstallCommand(appUrl: string, token: string, installScriptDir: string) {
   const scriptPath = `${installScriptDir}\\install.ps1`.replace(/\\\\/g, "\\");
   return `powershell -ExecutionPolicy Bypass -File "${scriptPath}" -ApiUrl "${appUrl}" -Token "${token}"`;
+}
+
+export function defaultInstallScriptDir(localDevPath?: string | null) {
+  return localDevPath || AGENT_EXTRACT_PATH_PS;
 }
 
 export function buildUninstallCommand(installScriptDir: string) {

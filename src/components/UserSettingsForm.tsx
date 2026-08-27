@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { copyToClipboard } from "@/lib/clipboard";
 
 type Device = {
   id: string;
@@ -17,7 +18,8 @@ type UserSettingsFormProps = {
   officeSsids: string[];
   maskedToken: string;
   appUrl: string;
-  initialPlainToken?: string | null;
+  plainToken: string | null;
+  onPlainTokenChange: (token: string | null) => void;
   isWelcome?: boolean;
   devices: Device[];
 };
@@ -28,13 +30,13 @@ export function UserSettingsForm({
   officeSsids,
   maskedToken,
   appUrl,
-  initialPlainToken,
+  plainToken,
+  onPlainTokenChange,
   isWelcome,
   devices,
 }: UserSettingsFormProps) {
   const router = useRouter();
   const [tz, setTz] = useState(timezone);
-  const [plainToken, setPlainToken] = useState<string | null>(initialPlainToken ?? null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -65,6 +67,14 @@ export function UserSettingsForm({
   }
 
   async function regenerateToken() {
+    if (
+      !confirm(
+        "Regenerating invalidates your current token on all laptops until you reinstall with a new install command. Continue?"
+      )
+    ) {
+      return;
+    }
+
     setRegenerating(true);
     setError(null);
     const res = await fetch("/api/settings/regenerate-token", { method: "POST" });
@@ -74,12 +84,17 @@ export function UserSettingsForm({
       return;
     }
     const data = await res.json();
-    setPlainToken(data.token);
+    onPlainTokenChange(data.token);
+    router.refresh();
   }
 
   async function copyToken() {
     if (!plainToken) return;
-    await navigator.clipboard.writeText(plainToken);
+    const ok = await copyToClipboard(plainToken);
+    if (!ok) {
+      setError("Could not copy token. Select it manually and press Ctrl+C.");
+      return;
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
@@ -88,8 +103,8 @@ export function UserSettingsForm({
     <form onSubmit={handleSave} className="space-y-6">
       {isWelcome && (
         <div className="rounded-lg bg-[var(--pwc-orange-muted)] px-4 py-3 text-sm">
-          Account created. Download the agent below, copy the install command, and run it in
-          PowerShell.
+          Account created. Follow the numbered install steps below to set up the agent on your
+          laptop.
         </div>
       )}
 
@@ -124,7 +139,8 @@ export function UserSettingsForm({
       <section className="card p-6">
         <h2 className="mb-2 text-lg font-medium">Agent token</h2>
         <p className="mb-4 text-sm text-muted">
-          Stored as bcrypt hash on server. Laptop keeps <code>apiUrl</code> and token only.
+          Stored as bcrypt hash on server. Your laptop keeps <code>apiUrl</code> and this token
+          only.
         </p>
         {plainToken ? (
           <div className="flex flex-wrap items-center gap-2">
@@ -132,7 +148,7 @@ export function UserSettingsForm({
               {plainToken}
             </code>
             <button type="button" onClick={copyToken} className="btn-secondary px-3 py-2 text-sm">
-              {copied ? "Copied" : "Copy"}
+              {copied ? "Copied!" : "Copy token"}
             </button>
           </div>
         ) : (
@@ -150,6 +166,19 @@ export function UserSettingsForm({
             </button>
           </div>
         )}
+        <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-3 text-xs text-muted">
+          <p className="mb-2 font-medium text-[var(--foreground)]">When to regenerate</p>
+          <ul className="list-disc space-y-1 pl-4">
+            <li>Laptop was reimaged or replaced</li>
+            <li>You suspect the token was leaked or compromised</li>
+            <li>Reinstalling the agent on a new machine</li>
+            <li>Admin removed your device and you need a fresh install</li>
+          </ul>
+          <p className="mt-2">
+            Regenerating creates a new token and <strong>invalidates the old one on every laptop</strong>{" "}
+            until you copy the new install command and run it again on each machine.
+          </p>
+        </div>
         <p className="mt-2 text-xs text-muted">API URL: {appUrl}</p>
       </section>
 

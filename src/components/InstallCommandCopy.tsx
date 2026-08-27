@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { copyToClipboard } from "@/lib/clipboard";
 
 type InstallCommandCopyProps = {
   appUrl: string;
@@ -31,7 +32,8 @@ export function InstallCommandCopy({
 
   async function copy(which: "local" | "github") {
     const text = which === "local" ? localCommand : githubCommand;
-    await navigator.clipboard.writeText(text);
+    const ok = await copyToClipboard(text);
+    if (!ok) return;
     setCopied(which);
     setTimeout(() => setCopied(null), 2000);
   }

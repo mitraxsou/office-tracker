@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { readFile } from "fs/promises";
 import path from "path";
 import JSZip from "jszip";
-import { AGENT_PRODUCT_NAME } from "@/lib/agent-branding";
+import { AGENT_EXTRACT_FOLDER, AGENT_PRODUCT_NAME } from "@/lib/agent-branding";
 import { getCurrentUser } from "@/lib/auth";
 
 const AGENT_FILES = [
@@ -23,12 +23,12 @@ export async function GET() {
 
   for (const file of AGENT_FILES) {
     const content = await readFile(path.join(agentDir, file));
-    zip.file(file, content);
+    zip.file(`${AGENT_EXTRACT_FOLDER}/${file}`, content);
   }
 
   zip.file(
-    "README.txt",
-    `${AGENT_PRODUCT_NAME} agent\n\n1. Extract this folder to e.g. %USERPROFILE%\\Downloads\\PwCOfficePulse\n2. Open Settings in the web app\n3. Click "Copy install command" and run in PowerShell\n`
+    `${AGENT_EXTRACT_FOLDER}/README.txt`,
+    `${AGENT_PRODUCT_NAME} agent\n\n1. Extract this zip to your Downloads folder (creates ${AGENT_EXTRACT_FOLDER}\\)\n2. Open Settings in the web app\n3. Click "Copy install command" and run in PowerShell\n`
   );
 
   const buffer = await zip.generateAsync({ type: "nodebuffer" });

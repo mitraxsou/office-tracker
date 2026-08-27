@@ -57,11 +57,12 @@ export default function HelpPage() {
         <section className="card space-y-3 p-6">
           <h2 className="text-lg font-medium text-accent">Agent install</h2>
           <p className="text-sm text-muted">
-            No admin required. Runs as your user account. Install commands are on{" "}
+            No admin required. Runs as your user account. Full numbered steps are on{" "}
             <Link href="/settings" className="text-accent hover:underline">
               Settings
             </Link>
-            .
+            : download zip, extract to Downloads, open PowerShell, copy install command, run it,
+            then check the dashboard.
           </p>
         </section>
       </main>

@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { copyToClipboard } from "@/lib/clipboard";
 
 export function UninstallCommandCopy({ uninstallPath }: { uninstallPath: string }) {
   const [copied, setCopied] = useState(false);
   const command = `powershell -ExecutionPolicy Bypass -File "${uninstallPath}\\uninstall.ps1"`;
 
   async function copy() {
-    await navigator.clipboard.writeText(command);
+    const ok = await copyToClipboard(command);
+    if (!ok) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }

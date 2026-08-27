@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, ensureAgentToken } from "@/lib/auth";
-import { AGENT_DOWNLOAD_FOLDER, buildInstallCommand } from "@/lib/agent-branding";
+import {
+  AGENT_EXTRACT_FOLDER,
+  AGENT_EXTRACT_PATH_PS,
+  buildInstallCommand,
+} from "@/lib/agent-branding";
 import { peekInstallToken } from "@/lib/welcome-token";
 
 export async function POST() {
@@ -10,8 +14,7 @@ export async function POST() {
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const extractPath =
-    process.env.AGENT_INSTALL_PATH || `$env:USERPROFILE\\Downloads\\PwCOfficePulse`;
+  const extractPath = process.env.AGENT_INSTALL_PATH || AGENT_EXTRACT_PATH_PS;
 
   const existing = await ensureAgentToken(user.id);
   const plainToken = existing.plainToken ?? (await peekInstallToken());
@@ -20,7 +23,7 @@ export async function POST() {
     return NextResponse.json(
       {
         error:
-          "Agent token is not available. Regenerate your token in Settings, then copy the install command.",
+          "Agent token is not available. Click Regenerate token above, then copy the install command.",
       },
       { status: 400 }
     );
@@ -32,7 +35,7 @@ export async function POST() {
     command,
     token: plainToken,
     appUrl,
-    agentFolder: AGENT_DOWNLOAD_FOLDER,
+    agentFolder: AGENT_EXTRACT_FOLDER,
     extractPath,
   });
 }
