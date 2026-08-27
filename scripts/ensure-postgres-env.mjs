@@ -34,11 +34,14 @@ if (!generateOnly) {
       console.error(`  Loaded: ${loadedFiles.join(", ")} — but POSTGRES_* / DATABASE_URL not set.`);
     }
     console.error("");
+    console.error("Do not run raw `npx prisma db push` — Prisma only loads .env, not .env.vercel.local.");
+    console.error("Use: npm run db:push   or   node scripts/prisma-with-env.mjs db push");
+    console.error("");
     console.error("Fix (manual copy — no Vercel CLI):");
     console.error("  1. Vercel → Storage → Postgres → .env.local tab");
     console.error("     Copy POSTGRES_PRISMA_URL and POSTGRES_URL_NON_POOLING");
     console.error("  2. Paste into .env.vercel.local (see .env.vercel.local.example)");
-    console.error("  3. Run: .\\scripts\\setup-prod-db.ps1");
+    console.error("  3. Run: .\\scripts\\setup-prod-db.ps1   or   npm run db:push");
     console.error("");
     console.error("Or fix Vercel CLI pull:");
     console.error("  Remove-Item Env:VERCEL_TOKEN -ErrorAction SilentlyContinue");

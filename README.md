@@ -131,6 +131,8 @@ If pull fails with `You defined "--token", but its contents are invalid`, a bad 
 
 For local Neon dev, set `DATABASE_URL` or `POSTGRES_PRISMA_URL` in `.env.local` — `scripts/ensure-postgres-env.mjs` loads `.env`, `.env.local`, and `.env.vercel.local`, maps legacy names, and passes resolved vars to Prisma.
 
+**Do not run raw `npx prisma db push`.** Prisma only reads `.env`, not `.env.vercel.local`. Use `npm run db:push`, `.\scripts\setup-prod-db.ps1`, or `node scripts/prisma-with-env.mjs db push`.
+
 ### 4. Set production URL
 
 After first deploy, set `NEXT_PUBLIC_APP_URL` to your Vercel URL and **redeploy**.
