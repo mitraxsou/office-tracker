@@ -62,6 +62,8 @@ If Vercel shows vars like `DATABASE_URL_POSTGRES_URL`, `DATABASE_URL_DATABASE_UR
 
 1. Vercel project → **Settings** → **Environment Variables**
 2. **Delete** every var starting with `DATABASE_URL_` that came from Storage (e.g. `DATABASE_URL_POSTGRES_URL`, `DATABASE_URL_DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `DATABASE_URL_POSTGRES_HOST`, …)
+
+   **Bulk delete (no CLI login):** use [scripts/vercel-env-setup.md](scripts/vercel-env-setup.md) and `scripts/cleanup-vercel-env.ps1` with a [Vercel API token](https://vercel.com/account/tokens) — works on PwC laptops where `vercel login` fails SSL inspection.
 3. **Storage** tab → select your Postgres database → **Connect to Project**
 4. When prompted for env var prefix, leave it **blank** (default) — do **not** enter `DATABASE_URL`
 5. Confirm these appear (no prefix): `POSTGRES_URL`, `POSTGRES_PRISMA_URL`, `POSTGRES_URL_NON_POOLING`
