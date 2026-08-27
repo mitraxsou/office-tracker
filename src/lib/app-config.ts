@@ -1,5 +1,23 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { DEFAULT_HOURS_TARGET, DEFAULT_OFFICE_SSIDS } from "./constants";
+
+export function logAppConfigSchemaDriftIfNeeded(err: unknown): boolean {
+  const isMissingColumn =
+    err instanceof Prisma.PrismaClientKnownRequestError &&
+    err.code === "P2022" &&
+    String(err.message).includes("allowRegistration");
+
+  if (!isMissingColumn) return false;
+
+  console.error(
+    "[app-config] Database schema is behind the app (missing AppConfig.allowRegistration).\n" +
+      "Fix now — Neon SQL Editor (fastest, no redeploy):\n" +
+      '  ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "allowRegistration" BOOLEAN NOT NULL DEFAULT false;\n' +
+      "Or Vercel: set RUN_DB_SETUP_ON_DEPLOY=true, redeploy, verify login, then set back to false."
+  );
+  return true;
+}
 
 export type AppConfigData = {
   hoursTarget: number;
@@ -11,19 +29,24 @@ export type AppConfigData = {
 const CONFIG_ID = "global";
 
 export async function ensureAppConfig(): Promise<AppConfigData> {
-  let config = await prisma.appConfig.findUnique({ where: { id: CONFIG_ID } });
-  if (!config) {
-    config = await prisma.appConfig.create({
-      data: {
-        id: CONFIG_ID,
-        hoursTarget: DEFAULT_HOURS_TARGET,
-        officeSsids: JSON.stringify(DEFAULT_OFFICE_SSIDS),
-        maxDevicesPerUser: 10,
-        allowRegistration: false,
-      },
-    });
+  try {
+    let config = await prisma.appConfig.findUnique({ where: { id: CONFIG_ID } });
+    if (!config) {
+      config = await prisma.appConfig.create({
+        data: {
+          id: CONFIG_ID,
+          hoursTarget: DEFAULT_HOURS_TARGET,
+          officeSsids: JSON.stringify(DEFAULT_OFFICE_SSIDS),
+          maxDevicesPerUser: 10,
+          allowRegistration: false,
+        },
+      });
+    }
+    return parseConfig(config);
+  } catch (err) {
+    logAppConfigSchemaDriftIfNeeded(err);
+    throw err;
   }
-  return parseConfig(config);
 }
 
 export async function getAppConfig(): Promise<AppConfigData> {

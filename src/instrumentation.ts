@@ -7,11 +7,13 @@ export async function register() {
   if (!hasPostgresEnv()) return;
 
   const { ensureBreakglassAdmin } = await import("./lib/breakglass");
-  const { ensureAppConfig } = await import("./lib/app-config");
+  const { ensureAppConfig, logAppConfigSchemaDriftIfNeeded } = await import("./lib/app-config");
   try {
     await ensureAppConfig();
     await ensureBreakglassAdmin();
   } catch (err) {
-    console.error("[startup] breakglass/config init failed:", err);
+    if (!logAppConfigSchemaDriftIfNeeded(err)) {
+      console.error("[startup] breakglass/config init failed:", err);
+    }
   }
 }
