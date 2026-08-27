@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { DEFAULT_HOURS_TARGET, DEFAULT_OFFICE_SSIDS } from "./constants";
+import { DEFAULT_HOURS_TARGET, parseDefaultSsidsFromEnv } from "./constants";
 import { ensureBreakglassAdmin } from "./breakglass";
 
 export async function seedDefaults() {
@@ -8,13 +8,13 @@ export async function seedDefaults() {
     create: {
       id: "global",
       hoursTarget: DEFAULT_HOURS_TARGET,
-      officeSsids: JSON.stringify(DEFAULT_OFFICE_SSIDS),
+      officeSsids: JSON.stringify(parseDefaultSsidsFromEnv()),
       maxDevicesPerUser: 10,
       allowRegistration: false,
     },
     update: {
       hoursTarget: DEFAULT_HOURS_TARGET,
-      officeSsids: JSON.stringify(DEFAULT_OFFICE_SSIDS),
+      officeSsids: JSON.stringify(parseDefaultSsidsFromEnv()),
       maxDevicesPerUser: 10,
       allowRegistration: false,
     },

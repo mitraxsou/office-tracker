@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
-import { DEFAULT_HOURS_TARGET, DEFAULT_OFFICE_SSIDS } from "./constants";
+import { DEFAULT_HOURS_TARGET, parseDefaultSsidsFromEnv } from "./constants";
 
 export function logAppConfigSchemaDriftIfNeeded(err: unknown): boolean {
   const isMissingColumn =
@@ -36,7 +36,7 @@ export async function ensureAppConfig(): Promise<AppConfigData> {
         data: {
           id: CONFIG_ID,
           hoursTarget: DEFAULT_HOURS_TARGET,
-          officeSsids: JSON.stringify(DEFAULT_OFFICE_SSIDS),
+          officeSsids: JSON.stringify(parseDefaultSsidsFromEnv()),
           maxDevicesPerUser: 10,
           allowRegistration: false,
         },
@@ -79,7 +79,7 @@ function parseConfig(config: {
   maxDevicesPerUser: number;
   allowRegistration: boolean;
 }): AppConfigData {
-  let ssids: string[] = DEFAULT_OFFICE_SSIDS;
+  let ssids: string[] = parseDefaultSsidsFromEnv();
   try {
     const parsed = JSON.parse(config.officeSsids);
     if (Array.isArray(parsed)) ssids = parsed;
