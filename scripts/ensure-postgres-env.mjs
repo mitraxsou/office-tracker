@@ -9,8 +9,9 @@ import { fileURLToPath } from "url";
 import { loadEnvFiles } from "./load-env-files.mjs";
 import {
   applyPrismaGenerateEnv,
-  hasPostgresEnv,
-  resolvePostgresEnv,
+  formatMissingPostgresEnvError,
+  isVercel,
+  preparePostgresEnvForPush,
 } from "./resolve-postgres-env.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -21,48 +22,25 @@ const dashDash = args.indexOf("--");
 const childArgv = dashDash >= 0 ? args.slice(dashDash + 1) : [];
 
 const loadedFiles = loadEnvFiles();
-resolvePostgresEnv();
 
 if (generateOnly) {
-  // Generate does not connect to the DB. Always use placeholders so postinstall/build
+  // Generate does not connect to the DB. Always use placeholders so install/build
   // succeed on Vercel even when Storage vars are missing during install or partial.
   applyPrismaGenerateEnv();
 } else {
-  const { prismaUrl, directUrl } = resolvePostgresEnv();
+  const prepared = preparePostgresEnvForPush();
 
-  if (!prismaUrl || !directUrl || !hasPostgresEnv()) {
-    console.error("");
-    console.error("Missing Postgres connection env vars for Prisma.");
-    const keys = Object.keys(process.env).filter(
-      (k) => k.includes("POSTGRES") || k.includes("DATABASE"),
-    );
-    if (keys.length > 0) {
-      console.error(`  Env keys present (values hidden): ${keys.sort().join(", ")}`);
-    }
-    if (loadedFiles.length === 0) {
-      console.error("  No .env, .env.local, or .env.vercel.local found in project root.");
-    } else {
-      console.error(`  Loaded: ${loadedFiles.join(", ")} — but POSTGRES_* / DATABASE_URL not set.`);
-    }
-    console.error("");
-    console.error("Do not run raw `npx prisma db push` — Prisma only loads .env, not .env.vercel.local.");
-    console.error("Use: npm run db:push   or   node scripts/prisma-with-env.mjs db push");
-    console.error("");
-    console.error("Fix (manual copy — no Vercel CLI):");
-    console.error("  1. Vercel → Storage → Postgres → .env.local tab");
-    console.error("     Copy POSTGRES_PRISMA_URL and POSTGRES_URL_NON_POOLING");
-    console.error("  2. Paste into .env.vercel.local (see .env.vercel.local.example)");
-    console.error("  3. Run: .\\scripts\\setup-prod-db.ps1   or   npm run db:push");
-    console.error("");
-    console.error("Or fix Vercel CLI pull:");
-    console.error("  Remove-Item Env:VERCEL_TOKEN -ErrorAction SilentlyContinue");
-    console.error("  npx vercel env pull .env.vercel.local");
-    console.error("");
+  if (!prepared.ok) {
+    console.error(formatMissingPostgresEnvError({ loadedFiles }));
     process.exit(1);
   }
 
   if (process.env.DEBUG_POSTGRES_ENV === "1") {
-    console.log(`Postgres env OK (from: ${loadedFiles.join(", ") || "process env"})`);
+    const source = isVercel()
+      ? "Vercel process.env"
+      : loadedFiles.join(", ") || "process env";
+    console.log(`Postgres env OK (from: ${source})`);
+    console.log(`  Keys: ${prepared.relatedKeys.join(", ") || "(resolved from URL values)"}`);
   }
 }
 

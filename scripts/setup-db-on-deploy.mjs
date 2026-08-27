@@ -9,20 +9,23 @@
 import { spawnSync } from "child_process";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
+import {
+  formatMissingPostgresEnvError,
+  preparePostgresEnvForPush,
+} from "./resolve-postgres-env.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const ensureScript = resolve(repoRoot, "scripts/ensure-postgres-env.mjs");
 
 function isDeployDbSetupEnabled() {
   return process.env.RUN_DB_SETUP_ON_DEPLOY?.trim().toLowerCase() === "true";
 }
 
-function runEnsurePostgres(childArgv) {
-  const result = spawnSync("node", [ensureScript, "--", ...childArgv], {
+function runNpx(childArgv) {
+  const result = spawnSync("npx", childArgv, {
     stdio: "inherit",
     env: process.env,
     cwd: repoRoot,
-    shell: true,
+    shell: process.platform === "win32",
   });
   if ((result.status ?? 1) !== 0) {
     process.exit(result.status ?? 1);
@@ -37,8 +40,18 @@ console.log("");
 console.log("RUN_DB_SETUP_ON_DEPLOY=true — running prisma db push and seed on deploy...");
 console.log("");
 
-runEnsurePostgres(["prisma", "db", "push", "--accept-data-loss", "--skip-generate"]);
-runEnsurePostgres(["tsx", "prisma/seed.ts"]);
+const prepared = preparePostgresEnvForPush();
+if (!prepared.ok) {
+  console.error(formatMissingPostgresEnvError());
+  process.exit(1);
+}
+
+if (process.env.DEBUG_POSTGRES_ENV === "1") {
+  console.log(`Postgres env keys: ${prepared.relatedKeys.join(", ") || "(resolved)"}`);
+}
+
+runNpx(["prisma", "db", "push", "--accept-data-loss", "--skip-generate"]);
+runNpx(["tsx", "prisma/seed.ts"]);
 
 console.log("");
 console.log("Deploy DB setup complete (schema pushed, seed ran).");
