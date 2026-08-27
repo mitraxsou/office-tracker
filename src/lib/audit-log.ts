@@ -5,11 +5,15 @@ export type AuditAction =
   | "visit_update"
   | "visit_delete"
   | "device_remove"
+  | "device_remove_self"
   | "config_update"
   | "user_role_change"
   | "db_reset"
   | "user_create"
   | "agent_token_issue"
+  | "agent_token_share"
+  | "agent_token_reissue"
+  | "agent_token_revoke"
   | "agent_device_registered";
 
 export async function logAuditEvent(params: {
