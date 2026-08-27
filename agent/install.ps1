@@ -139,6 +139,13 @@ function Install-UserLevel {
     $vbsPath = New-HiddenRunner -ScriptPath $heartbeatScript -Dir $installDir
     Register-HiddenTask -VbsPath $vbsPath -InstallDir $installDir
 
+    # Send first heartbeat immediately so admin/settings show "bound" within seconds
+    try {
+        & $heartbeatScript 2>&1 | Out-Null
+    } catch {
+        # Scheduled task will retry every 2 min; user can also run -DryRun to diagnose
+    }
+
     if ($IsReinstall) {
         Write-Host "PwC Office Pulse refreshed (existing install updated)." -ForegroundColor Green
     } else {
