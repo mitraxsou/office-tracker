@@ -32,8 +32,8 @@ Also set `ALLOW_REGISTRATION=false` on production to block public sign-ups.
 
 | Environment | Database |
 |---|---|
-| **Local dev** | Neon Postgres (recommended) or local Postgres via `DATABASE_URL` |
-| **Production (Vercel)** | Neon Postgres via `DATABASE_URL` |
+| **Local dev** | Neon Postgres (recommended) or local Postgres via `DATABASE_URL` or `POSTGRES_PRISMA_URL` |
+| **Production (Vercel)** | Vercel Storage → Postgres (Neon). Auto-injects `POSTGRES_*` env vars when linked to the project |
 
 User identity is **email + userId** in the database. Visit history lives in Postgres, not on the laptop.
 
@@ -41,21 +41,31 @@ User identity is **email + userId** in the database. Visit history lives in Post
 
 ## Deploy to Vercel (one-time)
 
-### 1. Neon Postgres
+### 1. Vercel Storage (Postgres / Neon)
 
-1. Create a free project at [neon.tech](https://neon.tech)
-2. Copy the **PostgreSQL connection string** (with `?sslmode=require`)
+1. In your Vercel project: **Storage** → **Create Database** → **Postgres**
+2. Connect the database to the **office-tracker** project (Vercel auto-injects env vars)
+
+**Auto-injected by Vercel Storage** (do not create manually):
+
+| Variable | Purpose |
+|---|---|
+| `POSTGRES_URL` | General connection |
+| `POSTGRES_PRISMA_URL` | Prisma Client (pooled; used by the app) |
+| `POSTGRES_URL_NON_POOLING` | Migrations / `prisma db push` |
+
+Prisma is configured to use `POSTGRES_PRISMA_URL` and `POSTGRES_URL_NON_POOLING` directly — no manual `DATABASE_URL` mapping required.
 
 ### 2. Import GitHub repo in Vercel
 
 1. Go to [vercel.com/new](https://vercel.com/new)
 2. Import **mitraxsou/office-tracker**
 3. Framework: **Next.js** (auto-detected)
-4. Add environment variables:
+4. Link Vercel Storage Postgres (step 1)
+5. Add **manual** environment variables:
 
 | Variable | Value |
 |---|---|
-| `DATABASE_URL` | Neon connection string |
 | `AUTH_SECRET` | Random 32+ char string |
 | `NEXT_PUBLIC_APP_URL` | `https://YOUR-PROJECT.vercel.app` (update after first deploy) |
 | `BREAKGLASS_EMAIL` | `admin@pwc.office` |
@@ -63,25 +73,21 @@ User identity is **email + userId** in the database. Visit history lives in Post
 | `ALLOW_REGISTRATION` | `false` |
 | `DEFAULT_OFFICE_SSIDS` | `OfficeConnect,ExternalConnect` |
 
-5. Deploy
+6. Deploy
 
 ### 3. Initialize database
 
-From your machine (with Neon `DATABASE_URL` in env):
-
-```bash
-npx prisma db push
-npm run db:seed
-```
-
-Or set `DATABASE_URL` in Vercel, pull env, and run locally:
+From your machine, pull Vercel env and push schema:
 
 ```bash
 npx vercel env pull .env.vercel.local
-# set DATABASE_URL from pulled file, then:
+# Uses POSTGRES_URL_NON_POOLING from the pulled file for db push
+node scripts/ensure-postgres-env.mjs
 npx prisma db push
 npm run db:seed
 ```
+
+Or with a Neon connection string locally, set `DATABASE_URL` in `.env.local` (the ensure script maps it for Prisma).
 
 ### 4. Set production URL
 
@@ -105,7 +111,7 @@ Agent install commands in Settings will then use the Vercel URL automatically.
 ```bash
 npm install
 cp .env.example .env.local
-# Edit .env.local: DATABASE_URL (Neon), AUTH_SECRET, NEXT_PUBLIC_APP_URL=http://localhost:3000
+# Edit .env.local: DATABASE_URL or POSTGRES_PRISMA_URL (Neon), AUTH_SECRET, NEXT_PUBLIC_APP_URL=http://localhost:3000
 npx prisma db push
 npm run db:seed
 npm run dev
