@@ -92,6 +92,20 @@ If Vercel shows vars like `DATABASE_URL_POSTGRES_URL`, `DATABASE_URL_DATABASE_UR
 
 ### 3. Initialize database
 
+**When PwC firewall blocks Neon (port 5432 / Prisma P1001) — run setup on Vercel deploy:**
+
+1. Vercel project → **Settings** → **Environment Variables**
+2. Add **`RUN_DB_SETUP_ON_DEPLOY`** = **`true`** for **Production** only
+3. Confirm **`BREAKGLASS_EMAIL`** and **`BREAKGLASS_PASSWORD`** are already set (seed creates the admin user)
+4. **Deployments** → latest deployment → **⋯** → **Redeploy** (or push a commit to `main`)
+5. Watch build logs for `RUN_DB_SETUP_ON_DEPLOY=true — running prisma db push and seed`
+6. After a successful deploy, sign in at your production URL with breakglass credentials → `/admin`
+7. **Remove** `RUN_DB_SETUP_ON_DEPLOY` or set it to **`false`** so normal deploys do not re-run push/seed
+
+This runs during `npm run build` on Vercel (which can reach Neon). Local `npm run db:push` / `db:seed` are unchanged for machines that can connect.
+
+**Alternative — manual env copy on a machine that can reach Neon:**
+
 **Recommended (manual env copy — works when `vercel env pull` fails on PwC laptops):**
 
 1. In Vercel: **Storage** → your Postgres database → **`.env.local` tab**  
