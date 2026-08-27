@@ -6,9 +6,13 @@ export async function register() {
   const { hasPostgresEnv } = await import("./lib/db-env");
   if (!hasPostgresEnv()) return;
 
+  const { prisma } = await import("./lib/db");
   const { ensureBreakglassAdmin } = await import("./lib/breakglass");
   const { ensureAppConfig, logAppConfigSchemaDriftIfNeeded } = await import("./lib/app-config");
   try {
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "allowRegistration" BOOLEAN NOT NULL DEFAULT false;'
+    );
     await ensureAppConfig();
     await ensureBreakglassAdmin();
   } catch (err) {
