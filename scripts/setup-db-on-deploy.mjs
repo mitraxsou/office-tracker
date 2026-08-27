@@ -37,7 +37,7 @@ console.log("");
 console.log("RUN_DB_SETUP_ON_DEPLOY=true — running prisma db push and seed on deploy...");
 console.log("");
 
-runEnsurePostgres(["prisma", "db", "push"]);
+runEnsurePostgres(["prisma", "db", "push", "--accept-data-loss", "--skip-generate"]);
 runEnsurePostgres(["tsx", "prisma/seed.ts"]);
 
 console.log("");

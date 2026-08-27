@@ -33,6 +33,12 @@ if (generateOnly) {
   if (!prismaUrl || !directUrl || !hasPostgresEnv()) {
     console.error("");
     console.error("Missing Postgres connection env vars for Prisma.");
+    const keys = Object.keys(process.env).filter(
+      (k) => k.includes("POSTGRES") || k.includes("DATABASE"),
+    );
+    if (keys.length > 0) {
+      console.error(`  Env keys present (values hidden): ${keys.sort().join(", ")}`);
+    }
     if (loadedFiles.length === 0) {
       console.error("  No .env, .env.local, or .env.vercel.local found in project root.");
     } else {
