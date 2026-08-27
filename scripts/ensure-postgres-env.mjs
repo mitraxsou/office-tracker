@@ -4,9 +4,16 @@
  */
 
 import { spawnSync } from "child_process";
+import { dirname, resolve } from "path";
+import { fileURLToPath } from "url";
 import { loadEnvFiles } from "./load-env-files.mjs";
-import { hasPostgresEnv, resolvePostgresEnv } from "./resolve-postgres-env.mjs";
+import {
+  applyPrismaGenerateEnv,
+  hasPostgresEnv,
+  resolvePostgresEnv,
+} from "./resolve-postgres-env.mjs";
 
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
 const generateOnly =
   args.includes("--generate-only") || process.env.PRISMA_GENERATE_ONLY === "1";
@@ -16,16 +23,14 @@ const childArgv = dashDash >= 0 ? args.slice(dashDash + 1) : [];
 const loadedFiles = loadEnvFiles();
 resolvePostgresEnv();
 
-if (generateOnly && !hasPostgresEnv()) {
-  const placeholder = "postgresql://build:build@localhost:5432/build?schema=public";
-  process.env.POSTGRES_PRISMA_URL = placeholder;
-  process.env.POSTGRES_URL_NON_POOLING = placeholder;
-}
-
-if (!generateOnly) {
+if (generateOnly) {
+  // Generate does not connect to the DB. Always use placeholders so postinstall/build
+  // succeed on Vercel even when Storage vars are missing during install or partial.
+  applyPrismaGenerateEnv();
+} else {
   const { prismaUrl, directUrl } = resolvePostgresEnv();
 
-  if (!prismaUrl || !directUrl) {
+  if (!prismaUrl || !directUrl || !hasPostgresEnv()) {
     console.error("");
     console.error("Missing Postgres connection env vars for Prisma.");
     if (loadedFiles.length === 0) {
@@ -56,11 +61,11 @@ if (!generateOnly) {
 }
 
 if (childArgv.length > 0) {
-  const [command, ...commandArgs] = childArgv;
-  const result = spawnSync(command, commandArgs, {
+  const result = spawnSync("npx", childArgv, {
     stdio: "inherit",
     env: process.env,
-    shell: true,
+    cwd: repoRoot,
+    shell: process.platform === "win32",
   });
   process.exit(result.status ?? 1);
 }

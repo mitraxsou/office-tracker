@@ -16,12 +16,20 @@
  *   5. pooled URL above
  */
 
+export const PRISMA_GENERATE_PLACEHOLDER_URL =
+  "postgresql://build:build@localhost:5432/build?schema=public";
+
 function firstNonEmpty(...values) {
   for (const value of values) {
     const trimmed = value?.trim();
     if (trimmed) return trimmed;
   }
   return "";
+}
+
+export function isPostgresUrl(value) {
+  const trimmed = value?.trim();
+  return Boolean(trimmed && /^postgres(ql)?:\/\//i.test(trimmed));
 }
 
 export function resolvePostgresEnv() {
@@ -50,7 +58,7 @@ export function resolvePostgresEnv() {
 }
 
 export function hasPostgresEnv() {
-  return Boolean(
+  return isPostgresUrl(
     firstNonEmpty(
       process.env.POSTGRES_PRISMA_URL,
       process.env.POSTGRES_URL,
@@ -60,4 +68,10 @@ export function hasPostgresEnv() {
       process.env.DATABASE_URL_POSTGRES_URL,
     ),
   );
+}
+
+/** prisma generate never connects; use safe placeholders so install/build always succeed. */
+export function applyPrismaGenerateEnv() {
+  process.env.POSTGRES_PRISMA_URL = PRISMA_GENERATE_PLACEHOLDER_URL;
+  process.env.POSTGRES_URL_NON_POOLING = PRISMA_GENERATE_PLACEHOLDER_URL;
 }
