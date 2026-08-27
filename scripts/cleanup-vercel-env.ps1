@@ -33,8 +33,7 @@
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [string]$ProjectId = $env:VERCEL_PROJECT_ID,
-    [string]$TeamId = $env:VERCEL_TEAM_ID,
-    [switch]$WhatIf
+    [string]$TeamId = $env:VERCEL_TEAM_ID
 )
 
 Set-StrictMode -Version Latest
@@ -129,6 +128,7 @@ function Invoke-VercelCurl {
     $url = "$ApiBase$Path$queryString"
     $args = @(
         "-sS",
+        "--ssl-no-revoke",
         "-w", "`n__HTTP_CODE__:%{http_code}",
         "-H", "Authorization: Bearer $token",
         "-H", "Accept: application/json"
@@ -333,7 +333,7 @@ foreach ($item in $toRemove) {
 }
 Write-Host ""
 
-if ($WhatIf -or $WhatIfPreference) {
+if ($WhatIfPreference) {
     Write-Warn "WhatIf mode — no changes made."
     exit 0
 }
