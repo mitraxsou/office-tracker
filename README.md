@@ -54,7 +54,20 @@ User identity is **email + userId** in the database. Visit history lives in Post
 | `POSTGRES_PRISMA_URL` | Prisma Client (pooled; used by the app) |
 | `POSTGRES_URL_NON_POOLING` | Migrations / `prisma db push` |
 
-Prisma is configured to use `POSTGRES_PRISMA_URL` and `POSTGRES_URL_NON_POOLING` directly — no manual `DATABASE_URL` mapping required.
+Prisma is configured to use `POSTGRES_PRISMA_URL` and `POSTGRES_URL_NON_POOLING`. The app auto-maps legacy `DATABASE_URL` and misconfigured `DATABASE_URL_*` prefixed Storage vars (see below).
+
+### Fix misconfigured Storage prefix (`DATABASE_URL_`)
+
+If Vercel shows vars like `DATABASE_URL_POSTGRES_URL`, `DATABASE_URL_DATABASE_URL`, `DATABASE_URL_UNPOOLED` instead of `POSTGRES_URL`, `POSTGRES_PRISMA_URL`, `POSTGRES_URL_NON_POOLING`, the Storage connection was linked with a **custom prefix**. The app will still deploy using those prefixed vars, but you should fix the dashboard:
+
+1. Vercel project → **Settings** → **Environment Variables**
+2. **Delete** every var starting with `DATABASE_URL_` that came from Storage (e.g. `DATABASE_URL_POSTGRES_URL`, `DATABASE_URL_DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `DATABASE_URL_POSTGRES_HOST`, …)
+3. **Storage** tab → select your Postgres database → **Connect to Project**
+4. When prompted for env var prefix, leave it **blank** (default) — do **not** enter `DATABASE_URL`
+5. Confirm these appear (no prefix): `POSTGRES_URL`, `POSTGRES_PRISMA_URL`, `POSTGRES_URL_NON_POOLING`
+6. **Redeploy** (Deployments → … → Redeploy)
+
+**Quick workaround (no reconnect):** copy the value of `DATABASE_URL_POSTGRES_URL` (or `DATABASE_URL_DATABASE_URL`) and create a manual env var `DATABASE_URL` with that value for Production, Preview, and Development. Redeploy.
 
 ### 2. Import GitHub repo in Vercel
 

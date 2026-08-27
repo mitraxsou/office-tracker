@@ -120,7 +120,7 @@ Before calling work done:
 ## Deploy checklist (Vercel)
 
 1. Push to GitHub (private repo ok)
-2. Import in Vercel; **Storage → Postgres** → connect to project (auto-injects `POSTGRES_URL`, `POSTGRES_PRISMA_URL`, `POSTGRES_URL_NON_POOLING`)
+2. Import in Vercel; **Storage → Postgres** → connect to project with **no env prefix** (auto-injects `POSTGRES_URL`, `POSTGRES_PRISMA_URL`, `POSTGRES_URL_NON_POOLING`). If prefixed as `DATABASE_URL_*`, delete and reconnect — app auto-maps prefixed vars as fallback.
 3. Set manual env: `AUTH_SECRET`, `NEXT_PUBLIC_APP_URL`, `BREAKGLASS_*`, `ALLOW_REGISTRATION=false`, `DEFAULT_OFFICE_SSIDS`
 4. `prisma` provider **postgresql**; schema uses `POSTGRES_PRISMA_URL` + `POSTGRES_URL_NON_POOLING`
 5. Post-deploy: `npx vercel env pull` then `npm run db:push` and `npm run db:seed` against Neon

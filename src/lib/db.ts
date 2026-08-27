@@ -1,4 +1,7 @@
+import { resolvePostgresEnv } from "./db-env";
 import { PrismaClient } from "@prisma/client";
+
+resolvePostgresEnv();
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 

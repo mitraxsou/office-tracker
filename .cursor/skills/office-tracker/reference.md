@@ -6,7 +6,8 @@
 |---|---|
 | `POSTGRES_PRISMA_URL` | Prisma Client (pooled). Auto from Vercel Storage; or set locally |
 | `POSTGRES_URL_NON_POOLING` | Migrations / `db push`. Auto from Vercel Storage; or set locally |
-| `DATABASE_URL` | Legacy local alias — copied to `POSTGRES_*` by `scripts/ensure-postgres-env.mjs` |
+| `DATABASE_URL` | Legacy local alias — resolved to `POSTGRES_*` at runtime |
+| `DATABASE_URL_*` | Misconfigured Storage prefix vars — auto-mapped; reconnect Storage with no prefix |
 | `AUTH_SECRET` | Session JWT (32+ chars) |
 | `NEXT_PUBLIC_APP_URL` | Public URL for install commands and agent |
 | `DEFAULT_OFFICE_SSIDS` | Seed value; admin manages via AppConfig in prod |
