@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+:root {
+  --pwc-orange: #fd5108;
+  --pwc-orange-hover: #e04a07;
+  --pwc-orange-muted: rgba(253, 81, 8, 0.15);
+  --background: #1a1a1a;
+  --background-elevated: #2d2d2d;
+  --foreground: #ffffff;
+  --muted: #b3b3b3;
+  --border: #404040;
+  --success: #2ecc71;
+  --warning: #fd5108;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+input,
+select,
+textarea {
+  color: var(--foreground);
+  background: var(--background);
+  border-color: var(--border);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--pwc-orange);
+  outline-offset: 1px;
+}
+
+.card {
+  background: var(--background-elevated);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+
+.btn-primary {
+  background: var(--pwc-orange);
+  color: #ffffff;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  transition: background 0.15s ease;
+}
+
+.btn-primary:hover {
+  background: var(--pwc-orange-hover);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+
+.btn-secondary:hover {
+  border-color: var(--pwc-orange);
+  color: var(--pwc-orange);
+}
+
+.text-muted {
+  color: var(--muted);
+}
+
+.text-accent {
+  color: var(--pwc-orange);
+}
+
+.link-nav {
+  color: var(--muted);
+  transition: color 0.15s ease;
+}
+
+.link-nav:hover,
+.link-nav-active {
+  color: var(--pwc-orange);
+}
+
+.progress-track {
+  background: var(--border);
+}
+
+.progress-fill {
+  background: var(--pwc-orange);
+}
+
+.progress-fill-met {
+  background: var(--success);
+}
+
+.badge-met {
+  background: rgba(46, 204, 113, 0.15);
+  color: var(--success);
+}
+
+.badge-pending {
+  background: var(--pwc-orange-muted);
+  color: var(--pwc-orange);
+}

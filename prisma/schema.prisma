@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  passwordHash String
+  name         String?
+  role         String        @default("user")
+  timezone     String        @default("Asia/Kolkata")
+  hoursTarget  Float?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  agentToken   AgentToken?
+  agentDevices AgentDevice[]
+  heartbeats   Heartbeat[]
+  visits       Visit[]
+  auditActions AuditLog[]    @relation("AuditActor")
+  auditTargets AuditLog[]    @relation("AuditTarget")
+}
+
+model AgentToken {
+  id          String   @id @default(cuid())
+  tokenHash   String
+  tokenPrefix String   @unique
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+}
+
+model AgentDevice {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serialNumber String
+  label        String?
+  lastSeenAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@unique([userId, serialNumber])
+}
+
+model AppConfig {
+  id                String   @id @default("global")
+  hoursTarget       Float    @default(5.0)
+  officeSsids       String   @default("[\"OfficeConnect\",\"ExternalConnect\"]")
+  maxDevicesPerUser Int      @default(10)
+  updatedAt         DateTime @updatedAt
+}
+
+model Heartbeat {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ssid       String?
+  vpnGateway String?
+  inOffice   Boolean
+  source     String   @default("wifi")
+  recordedAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([userId, recordedAt])
+}
+
+model Visit {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startAt   DateTime
+  endAt     DateTime?
+  source    String    @default("wifi")
+  ssid      String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId, startAt])
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  actorId      String
+  actor        User     @relation("AuditActor", fields: [actorId], references: [id], onDelete: Cascade)
+  action       String
+  targetUserId String?
+  targetUser   User?    @relation("AuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+  details      String?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+}
