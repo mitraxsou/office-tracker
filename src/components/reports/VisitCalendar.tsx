@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import {
   calendarWeeksForMonth,
   dailyTrendMap,
-  formatMonthLabel,
 } from "@/lib/month-range";
 import { dayBoundsFromKey } from "@/lib/timezone-dates";
 import { formatHours, formatTime, roundHours, visitsForDay, type VisitPoint } from "@/lib/visits";
@@ -150,8 +149,8 @@ export function VisitCalendar({
       </div>
 
       <p className="text-xs text-muted">
-        {formatMonthLabel(monthKey, timezone)}. Green = daily target met ({hoursTarget}h). Orange tint =
-        visits but below target. Click a day for visit details.
+        Green = daily target met ({hoursTarget}h). Orange tint = visits but below target. Click a
+        day for visit details.
       </p>
 
       {selectedDate && (

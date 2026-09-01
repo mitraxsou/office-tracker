@@ -1,4 +1,4 @@
-import { allDayKeysInMonth } from "./month-range";
+import { allDayKeysInMonth, daysInMonth, parseMonthKey } from "./month-range";
 import { aggregateHoursForDay } from "./user-reports";
 
 export function validateMonthlyDaysTarget(value: unknown): number | null {
@@ -14,6 +14,25 @@ export function dayQualifiesForTarget(hours: number, hoursTarget: number): boole
 
 export function countQualifyingDays(dailyHours: number[], hoursTarget: number): number {
   return dailyHours.filter((hours) => dayQualifiesForTarget(hours, hoursTarget)).length;
+}
+
+export function countOfficeVisitDays(dailyHours: number[]): number {
+  return dailyHours.filter((hours) => hours > 0).length;
+}
+
+export type MonthlyProgressState = "met" | "on_track" | "behind";
+
+export function getMonthlyProgressState(
+  qualifyingDays: number,
+  monthlyDaysTarget: number,
+  daysElapsed: number,
+  daysInCalendarMonth: number,
+): MonthlyProgressState {
+  if (qualifyingDays >= monthlyDaysTarget) return "met";
+  if (daysElapsed <= 0) return "behind";
+  const expectedByNow = (monthlyDaysTarget * daysElapsed) / daysInCalendarMonth;
+  if (qualifyingDays >= Math.floor(expectedByNow)) return "on_track";
+  return "behind";
 }
 
 export function monthKeyInTimezone(date: Date, timezone: string): string {
@@ -50,10 +69,13 @@ export function dayKeysInMonthUpToToday(date: Date, timezone: string): string[] 
 export type MonthlyProgress = {
   monthKey: string;
   qualifyingDays: number;
+  officeVisitDays: number;
+  daysInMonth: number;
   monthlyDaysTarget: number;
   metTarget: boolean;
   remainingDays: number;
   daysElapsed: number;
+  progressState: MonthlyProgressState;
 };
 
 export function dayKeysForMonth(
@@ -85,14 +107,25 @@ export async function getMonthlyProgress(
     dayKeys.map((dayKey) => aggregateHoursForDay(userId, timezone, dayKey)),
   );
   const qualifyingDays = countQualifyingDays(dailyHours, hoursTarget);
+  const officeVisitDays = countOfficeVisitDays(dailyHours);
+  const { year, month } = parseMonthKey(targetMonth);
+  const daysInCalendarMonth = daysInMonth(year, month);
 
   return {
     monthKey: targetMonth,
     qualifyingDays,
+    officeVisitDays,
+    daysInMonth: daysInCalendarMonth,
     monthlyDaysTarget,
     metTarget: qualifyingDays >= monthlyDaysTarget,
     remainingDays: Math.max(0, monthlyDaysTarget - qualifyingDays),
     daysElapsed: dayKeys.length,
+    progressState: getMonthlyProgressState(
+      qualifyingDays,
+      monthlyDaysTarget,
+      dayKeys.length,
+      daysInCalendarMonth,
+    ),
   };
 }
 
@@ -113,11 +146,20 @@ export function monthDayKeysFromTrend(
   dailyTrend: Array<{ date: string; totalHours: number }>,
   monthKey: string,
   hoursTarget: number,
-): { qualifyingDays: number; daysInRange: number } {
+): {
+  qualifyingDays: number;
+  officeVisitDays: number;
+  daysInRange: number;
+  daysInMonth: number;
+} {
   const inMonth = dailyTrend.filter((d) => d.date.startsWith(monthKey));
-  const qualifyingDays = countQualifyingDays(
-    inMonth.map((d) => d.totalHours),
-    hoursTarget,
-  );
-  return { qualifyingDays, daysInRange: inMonth.length };
+  const hours = inMonth.map((d) => d.totalHours);
+  const qualifyingDays = countQualifyingDays(hours, hoursTarget);
+  const { year, month } = parseMonthKey(monthKey);
+  return {
+    qualifyingDays,
+    officeVisitDays: countOfficeVisitDays(hours),
+    daysInRange: inMonth.length,
+    daysInMonth: daysInMonth(year, month),
+  };
 }

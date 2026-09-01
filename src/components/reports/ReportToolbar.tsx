@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { formatMonthLabel, shiftMonth } from "@/lib/month-range";
+import { shiftMonth } from "@/lib/month-range";
 import { exportToCsv } from "@/lib/report-range";
 
 type MonthReportToolbarProps = {
@@ -32,19 +32,8 @@ export function MonthReportToolbar({
         >
           ‹
         </button>
-        <span className="min-w-[10rem] text-center text-sm font-medium">
-          {formatMonthLabel(monthKey, timezone)}
-        </span>
-        <button
-          type="button"
-          onClick={() => onMonthChange(shiftMonth(monthKey, 1))}
-          className="rounded-md border border-[var(--border)] px-2.5 py-1.5 text-sm text-muted transition-colors hover:border-[var(--pwc-orange)] hover:text-[var(--pwc-orange)]"
-          aria-label="Next month"
-        >
-          ›
-        </button>
         <label className="sr-only" htmlFor="month-picker">
-          Jump to month
+          Select month
         </label>
         <input
           id="month-picker"
@@ -53,8 +42,16 @@ export function MonthReportToolbar({
           onChange={(e) => {
             if (e.target.value) onMonthChange(e.target.value);
           }}
-          className="rounded-md border border-[var(--border)] px-2 py-1 text-xs"
+          className="picker-input rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-1.5 text-sm font-medium"
         />
+        <button
+          type="button"
+          onClick={() => onMonthChange(shiftMonth(monthKey, 1))}
+          className="rounded-md border border-[var(--border)] px-2.5 py-1.5 text-sm text-muted transition-colors hover:border-[var(--pwc-orange)] hover:text-[var(--pwc-orange)]"
+          aria-label="Next month"
+        >
+          ›
+        </button>
       </div>
 
       <div className="ml-auto flex flex-wrap items-center gap-2">

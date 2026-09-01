@@ -193,6 +193,36 @@ type StatusBreakdown = {
   noAgent: number;
 };
 
+export function AgentPulseSparkline({
+  buckets,
+  className = "",
+}: {
+  buckets: number[];
+  className?: string;
+}) {
+  const max = Math.max(1, ...buckets);
+
+  return (
+    <div
+      className={`flex h-10 items-end gap-px ${className}`}
+      role="img"
+      aria-label="Agent pulse activity over the last 24 hours"
+    >
+      {buckets.map((count, index) => (
+        <div
+          key={index}
+          className="flex-1 rounded-t bg-[var(--pwc-orange)] transition-opacity"
+          style={{
+            height: `${Math.max(8, (count / max) * 100)}%`,
+            opacity: count > 0 ? 0.55 + (count / max) * 0.45 : 0.12,
+          }}
+          title={`${count} pulse${count === 1 ? "" : "s"}`}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function StatusDonutChart({
   breakdown,
   title,

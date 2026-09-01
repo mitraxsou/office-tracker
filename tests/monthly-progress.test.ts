@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   countQualifyingDays,
+  countOfficeVisitDays,
   dayKeysForMonth,
   dayKeysInMonthUpToToday,
   dayQualifiesForTarget,
+  getMonthlyProgressState,
   monthKeyInTimezone,
   monthDayKeysFromTrend,
   validateMonthlyDaysTarget,
@@ -34,6 +36,26 @@ describe("countQualifyingDays", () => {
   it("treats exact target as qualifying", () => {
     expect(dayQualifiesForTarget(5, 5)).toBe(true);
     expect(dayQualifiesForTarget(4.99, 5)).toBe(false);
+  });
+});
+
+describe("countOfficeVisitDays", () => {
+  it("counts days with any logged hours", () => {
+    expect(countOfficeVisitDays([0, 0.5, 5, 0, 2])).toBe(3);
+  });
+});
+
+describe("getMonthlyProgressState", () => {
+  it("marks target met when qualifying days reach the monthly goal", () => {
+    expect(getMonthlyProgressState(8, 8, 15, 30)).toBe("met");
+  });
+
+  it("marks on track when pace matches elapsed days", () => {
+    expect(getMonthlyProgressState(1, 8, 4, 30)).toBe("on_track");
+  });
+
+  it("marks behind when pace is below expected", () => {
+    expect(getMonthlyProgressState(0, 8, 10, 30)).toBe("behind");
   });
 });
 
@@ -72,6 +94,8 @@ describe("monthDayKeysFromTrend", () => {
     ];
     const result = monthDayKeysFromTrend(trend, "2026-09", 5);
     expect(result.qualifyingDays).toBe(1);
+    expect(result.officeVisitDays).toBe(2);
     expect(result.daysInRange).toBe(2);
+    expect(result.daysInMonth).toBe(30);
   });
 });

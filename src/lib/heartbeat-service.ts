@@ -278,7 +278,7 @@ export async function getPulseStats(userId: string, staleMinutes: number) {
   const now = new Date();
   const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  const [pulsesLast24h, recentPulses, lastHeartbeat] = await Promise.all([
+  const [pulsesLast24h, recentPulses, lastHeartbeat, heartbeats24h] = await Promise.all([
     prisma.heartbeat.count({
       where: { userId, recordedAt: { gte: since24h } },
     }),
@@ -291,6 +291,11 @@ export async function getPulseStats(userId: string, staleMinutes: number) {
     prisma.heartbeat.findFirst({
       where: { userId },
       orderBy: { recordedAt: "desc" },
+    }),
+    prisma.heartbeat.findMany({
+      where: { userId, recordedAt: { gte: since24h } },
+      select: { recordedAt: true },
+      orderBy: { recordedAt: "asc" },
     }),
   ]);
 
@@ -308,12 +313,36 @@ export async function getPulseStats(userId: string, staleMinutes: number) {
     minutesSinceLastPulse,
     agentHealthy,
     lastHeartbeat: lastHeartbeat?.recordedAt.toISOString() ?? null,
+    pulseTimeline24h: buildPulseTimeline24h(
+      heartbeats24h.map((h) => h.recordedAt),
+      now,
+    ),
     recentPulses: recentPulses.map((p) => ({
       recordedAt: p.recordedAt.toISOString(),
       inOffice: p.inOffice,
       ssid: p.ssid,
     })),
   };
+}
+
+export function buildPulseTimeline24h(
+  recordedAts: Date[],
+  now: Date = new Date(),
+  bucketCount = 24,
+): number[] {
+  const buckets = Array(bucketCount).fill(0);
+  const windowMs = 24 * 60 * 60 * 1000;
+  const since = now.getTime() - windowMs;
+  const bucketMs = windowMs / bucketCount;
+
+  for (const recordedAt of recordedAts) {
+    const t = recordedAt.getTime();
+    if (t < since) continue;
+    const idx = Math.min(bucketCount - 1, Math.floor((t - since) / bucketMs));
+    buckets[idx]++;
+  }
+
+  return buckets;
 }
 
 export { DEFAULT_OFFICE_SSIDS };
