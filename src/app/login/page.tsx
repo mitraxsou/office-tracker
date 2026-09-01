@@ -1,7 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { authenticateUser, createSession } from "@/lib/auth";
+import {
+  authenticateUser,
+  clearLoginAttempts,
+  createSession,
+  getLoginAttemptCount,
+  MAX_LOGIN_ATTEMPTS,
+  recordFailedLoginAttempt,
+} from "@/lib/auth";
+
+const LOCKOUT_MESSAGE =
+  "Too many failed attempts. Contact your pilot admin to reset your password.";
 
 export default function LoginPage({
   searchParams,
@@ -17,6 +27,8 @@ async function LoginForm({
   searchParams: Promise<{ error?: string }>;
 }) {
   const params = await searchParams;
+  const attemptCount = await getLoginAttemptCount();
+  const lockedOut = attemptCount >= MAX_LOGIN_ATTEMPTS;
 
   async function login(formData: FormData) {
     "use server";
@@ -24,8 +36,13 @@ async function LoginForm({
     const password = String(formData.get("password") ?? "");
     const user = await authenticateUser(email, password);
     if (!user) {
+      const attempts = await recordFailedLoginAttempt();
+      if (attempts >= MAX_LOGIN_ATTEMPTS) {
+        redirect(`/login?error=${encodeURIComponent(LOCKOUT_MESSAGE)}`);
+      }
       redirect("/login?error=Invalid+email+or+password");
     }
+    await clearLoginAttempts();
     await createSession(user.id);
     redirect("/dashboard");
   }
@@ -46,6 +63,11 @@ async function LoginForm({
         {params.error && (
           <p className="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
             {params.error}
+          </p>
+        )}
+        {lockedOut && !params.error && (
+          <p className="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
+            {LOCKOUT_MESSAGE}
           </p>
         )}
         <form action={login} className="mt-6 space-y-4">

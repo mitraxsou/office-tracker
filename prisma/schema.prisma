@@ -9,15 +9,17 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(cuid())
-  email        String        @unique
-  passwordHash String
-  name         String?
-  role         String        @default("user")
-  timezone     String        @default("Asia/Kolkata")
-  hoursTarget  Float?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id                 String        @id @default(cuid())
+  email              String        @unique
+  passwordHash       String
+  name               String?
+  role               String        @default("user")
+  timezone           String        @default("Asia/Kolkata")
+  hoursTarget        Float?
+  mustChangePassword Boolean       @default(false)
+  passwordResetAt    DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
   agentTokens  AgentToken[]
   agentDevices AgentDevice[]
   heartbeats   Heartbeat[]

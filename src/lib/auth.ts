@@ -12,7 +12,14 @@ import type { InstallTokenForUser } from "./install-token-types";
 export type { InstallTokenForUser } from "./install-token-types";
 
 const SESSION_COOKIE = "office-tracker-session";
+const LOGIN_ATTEMPTS_COOKIE = "office-tracker-login-attempts";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
+const LOGIN_ATTEMPTS_MAX_AGE = 60 * 15;
+
+export const MAX_LOGIN_ATTEMPTS = 3;
+
+const TEMP_PASSWORD_CHARS =
+  "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 
 function getSecret() {
   const secret = process.env.AUTH_SECRET;
@@ -28,6 +35,54 @@ export async function hashPassword(password: string) {
 
 export async function verifyPassword(password: string, hash: string) {
   return bcrypt.compare(password, hash);
+}
+
+export function generateTempPassword(length = 12) {
+  const bytes = crypto.randomBytes(length);
+  let result = "";
+  for (let i = 0; i < length; i++) {
+    result += TEMP_PASSWORD_CHARS[bytes[i] % TEMP_PASSWORD_CHARS.length];
+  }
+  return result;
+}
+
+export async function resetUserPasswordByAdmin(userId: string) {
+  const tempPassword = generateTempPassword();
+  const passwordHash = await hashPassword(tempPassword);
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordHash,
+      mustChangePassword: true,
+      passwordResetAt: new Date(),
+    },
+  });
+  return tempPassword;
+}
+
+export async function getLoginAttemptCount(): Promise<number> {
+  const cookieStore = await cookies();
+  const val = cookieStore.get(LOGIN_ATTEMPTS_COOKIE)?.value;
+  const n = parseInt(val ?? "0", 10);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export async function recordFailedLoginAttempt(): Promise<number> {
+  const cookieStore = await cookies();
+  const next = await getLoginAttemptCount() + 1;
+  cookieStore.set(LOGIN_ATTEMPTS_COOKIE, String(next), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: LOGIN_ATTEMPTS_MAX_AGE,
+    path: "/",
+  });
+  return next;
+}
+
+export async function clearLoginAttempts() {
+  const cookieStore = await cookies();
+  cookieStore.delete(LOGIN_ATTEMPTS_COOKIE);
 }
 
 export async function createSession(userId: string) {

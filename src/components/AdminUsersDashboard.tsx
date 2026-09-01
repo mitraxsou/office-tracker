@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AdminUserManagement } from "./AdminUserManagement";
+import { AdminResetPasswordButton } from "./AdminResetPasswordButton";
 import { copyToClipboard } from "@/lib/clipboard";
 
 type TokenRow = {
@@ -92,6 +93,7 @@ export function AdminUsersDashboard() {
             "agent_device_registered",
             "device_remove",
             "device_remove_self",
+            "password_reset",
           ].includes(l.action),
         ),
       );
@@ -269,6 +271,12 @@ export function AdminUsersDashboard() {
               >
                 {busyUserId === u.id ? "..." : "Issue laptop token"}
               </button>
+              <AdminResetPasswordButton
+                userId={u.id}
+                userEmail={u.email}
+                disabled={busyUserId === u.id}
+                onDone={() => load(true)}
+              />
             </div>
           </div>
 

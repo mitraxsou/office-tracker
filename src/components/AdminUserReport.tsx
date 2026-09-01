@@ -11,6 +11,7 @@ import { HoursTrendChart } from "./reports/ReportCharts";
 import { exportDailyTrendCsv, MonthReportToolbar } from "./reports/ReportToolbar";
 import { currentMonthKey } from "@/lib/month-range";
 import { formatHours, formatTime } from "@/lib/visits";
+import { AdminResetPasswordButton } from "./AdminResetPasswordButton";
 
 type UserReport = {
   user: {
@@ -380,6 +381,15 @@ export function AdminUserReport({ userId }: { userId: string }) {
           </div>
         </section>
       )}
+
+      <section className="card p-6">
+        <h3 className="mb-2 text-sm font-medium">Account</h3>
+        <p className="mb-3 text-sm text-muted">
+          Issue a temporary password if the user cannot sign in. Share it once; it is not stored in
+          plain text.
+        </p>
+        <AdminResetPasswordButton userId={userId} userEmail={data.user.email} />
+      </section>
 
       <div className="space-y-4">
         <div>
