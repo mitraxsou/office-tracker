@@ -63,6 +63,7 @@ export function AdminUserReport({ userId }: { userId: string }) {
   const [data, setData] = useState<UserReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [officeSsids, setOfficeSsids] = useState<string[]>([]);
   const [resetConfirm, setResetConfirm] = useState("");
   const [resetScope, setResetScope] = useState<"tracking" | "all">("tracking");
   const [actionError, setActionError] = useState<string | null>(null);
@@ -78,6 +79,13 @@ export function AdminUserReport({ userId }: { userId: string }) {
     setData(await res.json());
     setError(null);
   }, [userId, days]);
+
+  useEffect(() => {
+    fetch("/api/admin/config")
+      .then((r) => r.json())
+      .then((data) => setOfficeSsids(data.config?.officeSsids ?? []))
+      .catch(() => setOfficeSsids([]));
+  }, []);
 
   useEffect(() => {
     load();
@@ -250,7 +258,7 @@ export function AdminUserReport({ userId }: { userId: string }) {
         )}
       </section>
 
-      <AdminVisitManager userId={userId} onChanged={load} />
+      <AdminVisitManager userId={userId} officeSsids={officeSsids} onChanged={load} />
 
       <section className="card border-red-500/30 p-6">
         <h3 className="mb-2 text-lg font-medium text-red-400">Testing: reset or delete user</h3>

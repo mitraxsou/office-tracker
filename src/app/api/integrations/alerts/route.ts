@@ -12,7 +12,7 @@ async function getIntegrationActorId() {
 }
 
 export async function GET(request: Request) {
-  if (!verifyIntegrationApiKey(request)) {
+  if (!(await verifyIntegrationApiKey(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!verifyIntegrationApiKey(request)) {
+  if (!(await verifyIntegrationApiKey(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

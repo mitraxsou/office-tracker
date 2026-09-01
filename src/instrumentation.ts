@@ -44,7 +44,7 @@ export async function register() {
       'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "pendingTokenTtlDays" INTEGER NOT NULL DEFAULT 7;'
     );
     await prisma.$executeRawUnsafe(
-      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "heartbeatRetentionDays" INTEGER NOT NULL DEFAULT 1;'
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "heartbeatRetentionDays" INTEGER NOT NULL DEFAULT 7;'
     );
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "agentStaleMinutes" INTEGER NOT NULL DEFAULT 8;'
@@ -59,6 +59,7 @@ export async function register() {
         "graceMinutes" INTEGER NOT NULL DEFAULT 45,
         "notifyTeams" BOOLEAN NOT NULL DEFAULT true,
         "notifyEmail" BOOLEAN NOT NULL DEFAULT true,
+        "notificationsEnabled" BOOLEAN NOT NULL DEFAULT true,
         "alertIfNotInOffice" BOOLEAN NOT NULL DEFAULT true,
         "alertIfAgentStale" BOOLEAN NOT NULL DEFAULT true,
         "alertIfBehindHours" BOOLEAN NOT NULL DEFAULT false,
@@ -71,6 +72,50 @@ export async function register() {
     `);
     await prisma.$executeRawUnsafe(
       'CREATE UNIQUE INDEX IF NOT EXISTS "UserNotificationPrefs_userId_key" ON "UserNotificationPrefs"("userId");'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "UserNotificationPrefs" ADD COLUMN IF NOT EXISTS "notificationsEnabled" BOOLEAN NOT NULL DEFAULT true;'
+    );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "VisitCorrectionRequest" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "visitId" TEXT,
+        "message" TEXT NOT NULL,
+        "issueType" TEXT,
+        "status" TEXT NOT NULL DEFAULT 'open',
+        "adminNote" TEXT,
+        "resolvedAt" TIMESTAMP(3),
+        "resolvedById" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "VisitCorrectionRequest_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "VisitCorrectionRequest_status_createdAt_idx" ON "VisitCorrectionRequest"("status", "createdAt");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "VisitCorrectionRequest_userId_idx" ON "VisitCorrectionRequest"("userId");'
+    );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "IntegrationApiKey" (
+        "id" TEXT NOT NULL,
+        "label" TEXT NOT NULL,
+        "keyPrefix" TEXT NOT NULL,
+        "keyHash" TEXT NOT NULL,
+        "createdById" TEXT NOT NULL,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "revokedAt" TIMESTAMP(3),
+        "lastUsedAt" TIMESTAMP(3),
+        CONSTRAINT "IntegrationApiKey_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "IntegrationApiKey_keyPrefix_key" ON "IntegrationApiKey"("keyPrefix");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "IntegrationApiKey_createdById_idx" ON "IntegrationApiKey"("createdById");'
     );
     await ensureAppConfig();
     await ensureBreakglassAdmin();

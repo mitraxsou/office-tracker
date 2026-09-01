@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { DateTimeField, dateTimeLocalToIso, toLocalDateTimeInput } from "@/components/DateTimeField";
+import { SsidSelect } from "@/components/SsidSelect";
 
 type Visit = {
   id: string;
@@ -12,16 +14,11 @@ type Visit = {
 
 type Props = {
   userId: string;
+  officeSsids: string[];
   onChanged?: () => void;
 };
 
-function toLocalInput(iso: string) {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-export function AdminVisitManager({ userId, onChanged }: Props) {
+export function AdminVisitManager({ userId, officeSsids, onChanged }: Props) {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +29,7 @@ export function AdminVisitManager({ userId, onChanged }: Props) {
   const [editSsid, setEditSsid] = useState("");
   const [addStart, setAddStart] = useState("");
   const [addEnd, setAddEnd] = useState("");
-  const [addSsid, setAddSsid] = useState("");
+  const [addSsid, setAddSsid] = useState(officeSsids[0] ?? "");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -59,9 +56,9 @@ export function AdminVisitManager({ userId, onChanged }: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         userId,
-        startAt: new Date(addStart).toISOString(),
-        endAt: new Date(addEnd).toISOString(),
-        ssid: addSsid.trim() || null,
+        startAt: dateTimeLocalToIso(addStart),
+        endAt: dateTimeLocalToIso(addEnd),
+        ssid: addSsid || null,
       }),
     });
     if (!res.ok) {
@@ -72,7 +69,7 @@ export function AdminVisitManager({ userId, onChanged }: Props) {
     setMessage("Visit added.");
     setAddStart("");
     setAddEnd("");
-    setAddSsid("");
+    setAddSsid(officeSsids[0] ?? "");
     load();
     onChanged?.();
   }
@@ -84,9 +81,9 @@ export function AdminVisitManager({ userId, onChanged }: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         id,
-        startAt: new Date(editStart).toISOString(),
-        endAt: editEnd ? new Date(editEnd).toISOString() : null,
-        ssid: editSsid.trim() || null,
+        startAt: dateTimeLocalToIso(editStart),
+        endAt: editEnd ? dateTimeLocalToIso(editEnd) : null,
+        ssid: editSsid || null,
       }),
     });
     if (!res.ok) {
@@ -111,9 +108,9 @@ export function AdminVisitManager({ userId, onChanged }: Props) {
 
   function startEdit(v: Visit) {
     setEditingId(v.id);
-    setEditStart(toLocalInput(v.startAt));
-    setEditEnd(v.endAt ? toLocalInput(v.endAt) : "");
-    setEditSsid(v.ssid ?? "");
+    setEditStart(toLocalDateTimeInput(new Date(v.startAt)));
+    setEditEnd(v.endAt ? toLocalDateTimeInput(new Date(v.endAt)) : "");
+    setEditSsid(v.ssid ?? officeSsids[0] ?? "");
   }
 
   return (
@@ -121,36 +118,20 @@ export function AdminVisitManager({ userId, onChanged }: Props) {
       <h2 className="mb-4 text-lg font-medium">Visit data</h2>
 
       <form onSubmit={handleAdd} className="mb-6 grid gap-3 sm:grid-cols-2">
-        <p className="text-sm text-muted sm:col-span-2">Add a manual visit to correct missing data.</p>
-        <label className="block text-sm">
-          <span className="text-muted">Start</span>
-          <input
-            type="datetime-local"
-            required
-            value={addStart}
-            onChange={(e) => setAddStart(e.target.value)}
-            className="mt-1 w-full rounded-lg border px-3 py-2"
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="text-muted">End</span>
-          <input
-            type="datetime-local"
-            required
-            value={addEnd}
-            onChange={(e) => setAddEnd(e.target.value)}
-            className="mt-1 w-full rounded-lg border px-3 py-2"
-          />
-        </label>
-        <label className="block text-sm sm:col-span-2">
-          <span className="text-muted">SSID (optional)</span>
-          <input
-            type="text"
+        <p className="text-sm text-muted sm:col-span-2">
+          Add a manual visit to correct missing data. Use the date and time pickers.
+        </p>
+        <DateTimeField label="Start" value={addStart} onChange={setAddStart} required />
+        <DateTimeField label="End" value={addEnd} onChange={setAddEnd} required />
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-sm text-muted">Office Wi-Fi (SSID)</label>
+          <SsidSelect
+            officeSsids={officeSsids}
             value={addSsid}
-            onChange={(e) => setAddSsid(e.target.value)}
-            className="mt-1 w-full rounded-lg border px-3 py-2"
+            onChange={setAddSsid}
+            allowEmpty={false}
           />
-        </label>
+        </div>
         <div className="sm:col-span-2">
           <button type="submit" className="btn-primary px-4 py-2 text-sm">
             Add visit
@@ -180,28 +161,19 @@ export function AdminVisitManager({ userId, onChanged }: Props) {
                 <tr key={v.id} className="border-b border-[var(--border)]">
                   {editingId === v.id ? (
                     <>
-                      <td className="py-2 pr-3">
-                        <input
-                          type="datetime-local"
-                          value={editStart}
-                          onChange={(e) => setEditStart(e.target.value)}
-                          className="w-full rounded border px-2 py-1 text-xs"
-                        />
+                      <td className="py-2 pr-3 align-top">
+                        <DateTimeField label="" value={editStart} onChange={setEditStart} required />
                       </td>
-                      <td className="py-2 pr-3">
-                        <input
-                          type="datetime-local"
-                          value={editEnd}
-                          onChange={(e) => setEditEnd(e.target.value)}
-                          className="w-full rounded border px-2 py-1 text-xs"
-                        />
+                      <td className="py-2 pr-3 align-top">
+                        <DateTimeField label="" value={editEnd} onChange={setEditEnd} />
                       </td>
                       <td className="py-2 pr-3 text-muted">{v.source}</td>
                       <td className="py-2 pr-3">
-                        <input
-                          type="text"
+                        <SsidSelect
+                          officeSsids={officeSsids}
                           value={editSsid}
-                          onChange={(e) => setEditSsid(e.target.value)}
+                          onChange={setEditSsid}
+                          allowEmpty={false}
                           className="w-full rounded border px-2 py-1 text-xs"
                         />
                       </td>

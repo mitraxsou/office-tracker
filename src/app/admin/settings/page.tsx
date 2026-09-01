@@ -6,12 +6,15 @@ import { AppNav } from "@/components/AppNav";
 import { AdminSettingsForm } from "@/components/AdminSettingsForm";
 import { AdminPilotControls } from "@/components/AdminPilotControls";
 import { AdminSubNav } from "@/components/AdminSubNav";
+import { AdminIntegrationKeys } from "@/components/AdminIntegrationKeys";
+import { listIntegrationApiKeys } from "@/lib/integration-api-keys";
 
 export default async function AdminSettingsPage() {
   const admin = await requireAdmin();
   if (!admin) redirect("/dashboard");
 
   const config = await getAppConfig();
+  const integrationKeys = await listIntegrationApiKeys();
 
   return (
     <>
@@ -30,6 +33,7 @@ export default async function AdminSettingsPage() {
           heartbeatRetentionDays={config.heartbeatRetentionDays}
           agentStaleMinutes={config.agentStaleMinutes}
         />
+        <AdminIntegrationKeys initialKeys={integrationKeys} />
         <AdminPilotControls
           allowRegistration={config.allowRegistration}
           registrationEnvLocked={isRegistrationEnvLocked()}

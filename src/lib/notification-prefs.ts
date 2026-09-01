@@ -8,6 +8,7 @@ export type NotificationPrefsData = {
   officeStartTime: string;
   officeEndTime: string;
   graceMinutes: number;
+  notificationsEnabled: boolean;
   notifyTeams: boolean;
   notifyEmail: boolean;
   alertIfNotInOffice: boolean;
@@ -22,6 +23,7 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefsData = {
   officeStartTime: "09:30",
   officeEndTime: "18:00",
   graceMinutes: 45,
+  notificationsEnabled: true,
   notifyTeams: true,
   notifyEmail: true,
   alertIfNotInOffice: true,
@@ -50,6 +52,7 @@ export function toNotificationPrefsData(row: {
   officeStartTime: string;
   officeEndTime: string;
   graceMinutes: number;
+  notificationsEnabled?: boolean;
   notifyTeams: boolean;
   notifyEmail: boolean;
   alertIfNotInOffice: boolean;
@@ -63,6 +66,7 @@ export function toNotificationPrefsData(row: {
     officeStartTime: isValidTime(row.officeStartTime) ? row.officeStartTime : "09:30",
     officeEndTime: isValidTime(row.officeEndTime) ? row.officeEndTime : "18:00",
     graceMinutes: row.graceMinutes,
+    notificationsEnabled: row.notificationsEnabled ?? true,
     notifyTeams: row.notifyTeams,
     notifyEmail: row.notifyEmail,
     alertIfNotInOffice: row.alertIfNotInOffice,
@@ -113,6 +117,7 @@ export async function updateNotificationPrefs(
     }
     update.graceMinutes = data.graceMinutes;
   }
+  if (data.notificationsEnabled !== undefined) update.notificationsEnabled = data.notificationsEnabled;
   if (data.notifyTeams !== undefined) update.notifyTeams = data.notifyTeams;
   if (data.notifyEmail !== undefined) update.notifyEmail = data.notifyEmail;
   if (data.alertIfNotInOffice !== undefined) update.alertIfNotInOffice = data.alertIfNotInOffice;

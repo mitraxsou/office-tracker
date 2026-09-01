@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { DateTimeField, dateTimeLocalToIso } from "@/components/DateTimeField";
+import { SsidSelect } from "@/components/SsidSelect";
 
 type UserOption = { id: string; email: string };
 
 export function AdminVisitForm() {
   const [users, setUsers] = useState<UserOption[]>([]);
+  const [officeSsids, setOfficeSsids] = useState<string[]>([]);
   const [userId, setUserId] = useState("");
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
@@ -15,17 +18,21 @@ export function AdminVisitForm() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch("/api/admin/users")
-      .then((r) => r.json())
-      .then((data) => {
-        const list = (data.users ?? []).map((u: { id: string; email: string }) => ({
+    Promise.all([fetch("/api/admin/users"), fetch("/api/admin/config")])
+      .then(async ([usersRes, configRes]) => {
+        const usersData = await usersRes.json();
+        const configData = await configRes.json();
+        const list = (usersData.users ?? []).map((u: { id: string; email: string }) => ({
           id: u.id,
           email: u.email,
         }));
+        const ssids: string[] = configData.config?.officeSsids ?? [];
         setUsers(list);
+        setOfficeSsids(ssids);
+        setSsid(ssids[0] ?? "");
         if (list.length > 0) setUserId(list[0].id);
       })
-      .catch(() => setError("Failed to load users"));
+      .catch(() => setError("Failed to load form data"));
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -39,9 +46,9 @@ export function AdminVisitForm() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         userId,
-        startAt: new Date(startAt).toISOString(),
-        endAt: new Date(endAt).toISOString(),
-        ssid: ssid.trim() || null,
+        startAt: dateTimeLocalToIso(startAt),
+        endAt: dateTimeLocalToIso(endAt),
+        ssid: ssid || null,
       }),
     });
 
@@ -55,7 +62,7 @@ export function AdminVisitForm() {
     setMessage("Visit added.");
     setStartAt("");
     setEndAt("");
-    setSsid("");
+    setSsid(officeSsids[0] ?? "");
   }
 
   return (
@@ -76,36 +83,17 @@ export function AdminVisitForm() {
             ))}
           </select>
         </label>
-        <label className="block text-sm">
-          <span className="text-muted">SSID (optional)</span>
-          <input
-            type="text"
+        <div>
+          <label className="mb-1 block text-sm text-muted">Office Wi-Fi (SSID)</label>
+          <SsidSelect
+            officeSsids={officeSsids}
             value={ssid}
-            onChange={(e) => setSsid(e.target.value)}
-            placeholder="OfficeConnect"
-            className="mt-1 w-full rounded-lg border px-3 py-2"
+            onChange={setSsid}
+            allowEmpty={false}
           />
-        </label>
-        <label className="block text-sm">
-          <span className="text-muted">Start</span>
-          <input
-            type="datetime-local"
-            value={startAt}
-            onChange={(e) => setStartAt(e.target.value)}
-            required
-            className="mt-1 w-full rounded-lg border px-3 py-2"
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="text-muted">End</span>
-          <input
-            type="datetime-local"
-            value={endAt}
-            onChange={(e) => setEndAt(e.target.value)}
-            required
-            className="mt-1 w-full rounded-lg border px-3 py-2"
-          />
-        </label>
+        </div>
+        <DateTimeField label="Start" value={startAt} onChange={setStartAt} required />
+        <DateTimeField label="End" value={endAt} onChange={setEndAt} required />
       </div>
       <button type="submit" disabled={loading} className="btn-primary px-4 py-2 disabled:opacity-50">
         {loading ? "Adding..." : "Add visit"}

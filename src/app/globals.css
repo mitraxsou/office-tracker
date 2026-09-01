@@ -103,3 +103,13 @@ textarea:focus {
   background: var(--pwc-orange-muted);
   color: var(--pwc-orange);
 }
+
+.picker-input {
+  color-scheme: dark;
+  min-height: 2.5rem;
+}
+
+.picker-input::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+  cursor: pointer;
+}

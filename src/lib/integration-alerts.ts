@@ -35,14 +35,7 @@ function appBaseUrl() {
   return process.env.NEXT_PUBLIC_APP_URL ?? "https://office-tracker-theta.vercel.app";
 }
 
-export function verifyIntegrationApiKey(request: Request): boolean {
-  const expected = process.env.INTEGRATION_API_KEY?.trim();
-  if (!expected) return false;
-  const auth = request.headers.get("authorization");
-  if (auth === `Bearer ${expected}`) return true;
-  const header = request.headers.get("x-api-key");
-  return header === expected;
-}
+export { verifyIntegrationApiKey } from "./integration-api-keys";
 
 async function wasAlertSentToday(
   userId: string,
@@ -121,6 +114,7 @@ async function evaluateUserAlerts(
   now: Date,
 ): Promise<IntegrationAlert[]> {
   const prefs = await getNotificationPrefs(user.id);
+  if (!prefs.notificationsEnabled) return [];
   if (!prefs.notifyTeams && !prefs.notifyEmail) return [];
 
   const hoursTarget = await getUserHoursTarget(user);

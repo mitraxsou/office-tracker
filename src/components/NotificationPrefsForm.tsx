@@ -67,6 +67,8 @@ export function NotificationPrefsForm() {
     );
   }
 
+  const alertsDisabled = !prefs.notificationsEnabled;
+
   return (
     <section className="card p-6">
       <h2 className="mb-1 text-lg font-medium">Office schedule and alerts</h2>
@@ -75,7 +77,21 @@ export function NotificationPrefsForm() {
         records.
       </p>
 
-      <div className="space-y-5">
+      <label className="mb-5 flex items-center gap-3 rounded-lg border border-[var(--border)] px-4 py-3 text-sm">
+        <input
+          type="checkbox"
+          checked={prefs.notificationsEnabled}
+          onChange={(e) => setPrefs({ ...prefs, notificationsEnabled: e.target.checked })}
+        />
+        <span>
+          <span className="font-medium">Enable notifications</span>
+          <span className="mt-0.5 block text-xs text-muted">
+            Turn off to stop all Teams and email alerts from Office Pulse.
+          </span>
+        </span>
+      </label>
+
+      <div className={`space-y-5 ${alertsDisabled ? "pointer-events-none opacity-50" : ""}`}>
         <div>
           <p className="mb-2 text-sm font-medium">Usual office days</p>
           <div className="flex flex-wrap gap-2">

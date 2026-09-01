@@ -22,9 +22,26 @@ model User {
   agentDevices AgentDevice[]
   heartbeats   Heartbeat[]
   visits       Visit[]
+  visitCorrectionRequests VisitCorrectionRequest[]
+  resolvedVisitReports    VisitCorrectionRequest[] @relation("VisitReportResolver")
   auditActions AuditLog[]    @relation("AuditActor")
   auditTargets AuditLog[]    @relation("AuditTarget")
   notificationPrefs UserNotificationPrefs?
+  integrationApiKeys IntegrationApiKey[]
+}
+
+model IntegrationApiKey {
+  id          String    @id @default(cuid())
+  label       String
+  keyPrefix   String    @unique
+  keyHash     String
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+  lastUsedAt  DateTime?
+
+  @@index([createdById])
 }
 
 model UserNotificationPrefs {
@@ -37,6 +54,7 @@ model UserNotificationPrefs {
   graceMinutes          Int      @default(45)
   notifyTeams           Boolean  @default(true)
   notifyEmail           Boolean  @default(true)
+  notificationsEnabled  Boolean  @default(true)
   alertIfNotInOffice    Boolean  @default(true)
   alertIfAgentStale     Boolean  @default(true)
   alertIfBehindHours    Boolean  @default(false)
@@ -115,8 +133,29 @@ model Visit {
   ssid      String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  correctionRequests VisitCorrectionRequest[]
 
   @@index([userId, startAt])
+}
+
+model VisitCorrectionRequest {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  visitId      String?
+  visit        Visit?    @relation(fields: [visitId], references: [id], onDelete: SetNull)
+  message      String
+  issueType    String?
+  status       String    @default("open")
+  adminNote    String?
+  resolvedAt   DateTime?
+  resolvedById String?
+  resolvedBy   User?     @relation("VisitReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId])
 }
 
 model AuditLog {

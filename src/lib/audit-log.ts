@@ -19,7 +19,11 @@ export type AuditAction =
   | "user_delete"
   | "heartbeat_purge"
   | "agent_stale_email"
-  | "integration_alert";
+  | "integration_alert"
+  | "visit_correction_request"
+  | "visit_report_resolve"
+  | "integration_key_create"
+  | "integration_key_revoke";
 
 export async function logAuditEvent(params: {
   actorId: string;

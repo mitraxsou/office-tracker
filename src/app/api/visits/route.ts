@@ -54,3 +54,32 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ visit }, { status: 201 });
 }
+
+export async function DELETE(request: Request) {
+  const userId = await getSessionUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "id required" }, { status: 400 });
+  }
+
+  const existing = await prisma.visit.findUnique({ where: { id } });
+  if (!existing) {
+    return NextResponse.json({ error: "Visit not found" }, { status: 404 });
+  }
+
+  const { deleteVisitDeniedReason } = await import("@/lib/visit-actions");
+  const denied = deleteVisitDeniedReason(existing, userId);
+  if (denied) {
+    const status = existing.userId !== userId ? 403 : 400;
+    return NextResponse.json({ error: denied }, { status });
+  }
+
+  await prisma.visit.delete({ where: { id } });
+
+  return NextResponse.json({ ok: true });
+}

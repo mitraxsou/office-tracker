@@ -10,6 +10,7 @@ import { ManualVisitForm } from "@/components/ManualVisitForm";
 import { QuickOfficeToggle } from "@/components/QuickOfficeToggle";
 import { AgentSetupBanner } from "@/components/AgentSetupBanner";
 import { AgentHealthBanner } from "@/components/AgentHealthBanner";
+import { RecentHeartbeats } from "@/components/RecentHeartbeats";
 import { formatTime } from "@/lib/visits";
 
 export default async function DashboardPage() {
@@ -108,6 +109,7 @@ export default async function DashboardPage() {
               {formatTime(openVisit.startAt, user.timezone)}
             </strong>
             {openVisit.ssid ? ` on ${openVisit.ssid}` : ""}
+            . This is when your current visit started (not your first heartbeat ever).
           </p>
         )}
 
@@ -130,12 +132,28 @@ export default async function DashboardPage() {
 
         <QuickOfficeToggle inOfficeNow={summary.inOfficeNow} />
 
+        {!agentNeverConnected && pulse.recentPulses.length > 0 && (
+          <RecentHeartbeats
+            pulses={pulse.recentPulses}
+            timezone={user.timezone}
+            retentionDays={config.heartbeatRetentionDays}
+          />
+        )}
+
+        <p className="text-xs text-muted">
+          Manage Teams and email alerts in{" "}
+          <Link href="/settings" className="text-accent hover:underline">
+            Settings
+          </Link>
+          .
+        </p>
+
         <section className="card p-6">
           <h2 className="mb-4 text-lg font-medium">Today&apos;s visits</h2>
           <VisitList visits={summary.visits} timezone={user.timezone} />
         </section>
 
-        <ManualVisitForm timezone={user.timezone} />
+        <ManualVisitForm timezone={user.timezone} officeSsids={config.officeSsids} />
       </main>
     </>
   );

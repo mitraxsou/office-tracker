@@ -3,7 +3,7 @@ import { prisma } from "./db";
 import { DEFAULT_HOURS_TARGET, parseDefaultSsidsFromEnv } from "./constants";
 
 export const DEFAULT_PENDING_TOKEN_TTL_DAYS = 7;
-export const DEFAULT_HEARTBEAT_RETENTION_DAYS = 1;
+export const DEFAULT_HEARTBEAT_RETENTION_DAYS = 7;
 export const DEFAULT_AGENT_STALE_MINUTES = 8;
 
 export function logAppConfigSchemaDriftIfNeeded(err: unknown): boolean {
