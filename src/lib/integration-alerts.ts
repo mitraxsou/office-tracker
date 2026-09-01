@@ -1,8 +1,8 @@
 import { prisma } from "./db";
 import { getAppConfig, getUserHoursTarget } from "./app-config";
 import { getTodaySummary, getPulseStats } from "./heartbeat-service";
+import { dayBoundsFromKey, dayKeyInTimezone } from "./timezone-dates";
 import {
-  dayKeyInTimezone,
   getMinutesInTimezone,
   getNotificationPrefs,
   isWorkDayNow,
@@ -54,7 +54,7 @@ async function wasAlertSentToday(
       targetUserId: userId,
       action: INTEGRATION_ALERT_ACTION,
       details: { contains: `"type":"${type}"` },
-      createdAt: { gte: new Date(`${dayKey}T00:00:00`) },
+      createdAt: { gte: dayBoundsFromKey(dayKey, "Asia/Kolkata").start },
     },
   });
   if (!existing?.details) return false;
@@ -129,7 +129,7 @@ async function evaluateUserAlerts(
   const pulse = await getPulseStats(user.id, config.agentStaleMinutes);
 
   const dayKey = dayKeyInTimezone(now, user.timezone);
-  const dayStart = new Date(`${dayKey}T00:00:00`);
+  const dayStart = dayBoundsFromKey(dayKey, user.timezone).start;
   const nowMinutes = getMinutesInTimezone(now, user.timezone);
   const workDay = isWorkDayNow(prefs, now, user.timezone);
   const baseUrl = appBaseUrl();

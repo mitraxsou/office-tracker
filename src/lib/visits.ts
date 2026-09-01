@@ -3,6 +3,9 @@ import {
   DEFAULT_TIMEZONE,
   VISIT_GAP_MS,
 } from "./constants";
+import { dayBoundsFromKey, dayKeyInTimezone, getDayBounds } from "./timezone-dates";
+
+export { dayKeyInTimezone, getDayBounds, dayBoundsFromKey };
 
 export type VisitPoint = {
   id: string;
@@ -17,26 +20,9 @@ export type HeartbeatPoint = {
   inOffice: boolean;
 };
 
-export function getDayBounds(date: Date, timezone: string) {
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const dayKey = formatter.format(date);
-  const start = new Date(`${dayKey}T00:00:00`);
-  const end = new Date(`${dayKey}T23:59:59.999`);
-  return { dayKey, start, end };
-}
-
 export function visitDurationMs(visit: VisitPoint, now = new Date()): number {
   const end = visit.endAt ?? now;
   return Math.max(0, end.getTime() - visit.startAt.getTime());
-}
-
-export function dayKeyInTimezone(date: Date, timezone: string): string {
-  return getDayBounds(date, timezone).dayKey;
 }
 
 /**

@@ -4,6 +4,7 @@ import { getAppConfig, getUserHoursTarget } from "./app-config";
 import { getTodaySummary, closeStaleOpenVisits, closeEndOfDayOpenVisits } from "./heartbeat-service";
 import { revokeExpiredPendingTokens } from "./token-expiry";
 import { effectiveVisitEnd } from "./visits";
+import { dayBoundsFromKey } from "./timezone-dates";
 
 function dayKeyForTimezone(date: Date, timezone: string) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -26,8 +27,7 @@ async function aggregateHoursForDay(userId: string, timezone: string, dayKey: st
   await closeEndOfDayOpenVisits(userId, timezone);
   await closeStaleOpenVisits(userId, staleMs);
 
-  const dayStart = new Date(`${dayKey}T00:00:00`);
-  const dayEnd = new Date(`${dayKey}T23:59:59.999`);
+  const { start: dayStart, end: dayEnd } = dayBoundsFromKey(dayKey, timezone);
 
   const visits = await prisma.visit.findMany({
     where: {

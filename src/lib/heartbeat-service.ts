@@ -3,6 +3,7 @@ import { DEFAULT_OFFICE_SSIDS, isOfficeSsid } from "./constants";
 import { getAppConfig, getAgentStaleMs } from "./app-config";
 import { maybePurgeOldHeartbeats } from "./heartbeat-retention";
 import { effectiveVisitEnd, dayKeyInTimezone } from "./visits";
+import { dayBoundsFromKey, getDayBounds } from "./timezone-dates";
 
 export async function processHeartbeat(params: {
   userId: string;
@@ -149,7 +150,7 @@ export async function closeEndOfDayOpenVisits(userId: string, timezone: string) 
   const todayKey = dayKeyInTimezone(now, timezone);
   if (visitDayKey >= todayKey) return false;
 
-  const dayEnd = new Date(`${visitDayKey}T23:59:59.999`);
+  const dayEnd = dayBoundsFromKey(visitDayKey, timezone).end;
   const lastHeartbeat = await prisma.heartbeat.findFirst({
     where: {
       userId,
@@ -222,15 +223,7 @@ export async function getTodaySummary(userId: string, timezone: string, hoursTar
   await closeEndOfDayOpenVisits(userId, timezone);
   await closeStaleOpenVisits(userId, staleMs);
 
-  const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  const dayKey = formatter.format(now);
-  const dayStart = new Date(`${dayKey}T00:00:00`);
-  const dayEnd = new Date(`${dayKey}T23:59:59.999`);
+  const { dayKey, start: dayStart, end: dayEnd } = getDayBounds(now, timezone);
 
   const visits = await prisma.visit.findMany({
     where: {

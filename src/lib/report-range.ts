@@ -1,3 +1,5 @@
+import { getDayBounds, dayBoundsFromKey } from "./timezone-dates";
+
 export type ReportRange = {
   from: Date;
   to: Date;
@@ -13,12 +15,7 @@ export function addDays(date: Date, days: number) {
 }
 
 export function dayKeyForTimezone(date: Date, timezone: string) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
+  return getDayBounds(date, timezone).dayKey;
 }
 
 export function parseReportRange(
@@ -29,8 +26,10 @@ export function parseReportRange(
   const toParam = searchParams.get("to");
 
   if (fromParam && toParam && /^\d{4}-\d{2}-\d{2}$/.test(fromParam) && /^\d{4}-\d{2}-\d{2}$/.test(toParam)) {
-    const from = new Date(`${fromParam}T00:00:00`);
-    const to = new Date(`${toParam}T23:59:59.999`);
+    const fromBounds = dayBoundsFromKey(fromParam, timezone);
+    const toBounds = dayBoundsFromKey(toParam, timezone);
+    const from = fromBounds.start;
+    const to = toBounds.end;
     if (!Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime()) && from <= to) {
       const days = Math.ceil((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000)) + 1;
       return {
@@ -46,12 +45,14 @@ export function parseReportRange(
   const days = Math.min(90, Math.max(1, Number.parseInt(searchParams.get("days") ?? "30", 10) || 30));
   const to = new Date();
   const from = addDays(to, -(days - 1));
+  const toBounds = getDayBounds(to, timezone);
+  const fromBounds = getDayBounds(from, timezone);
   return {
-    from,
-    to,
+    from: fromBounds.start,
+    to: toBounds.end,
     days,
-    fromKey: dayKeyForTimezone(from, timezone),
-    toKey: dayKeyForTimezone(to, timezone),
+    fromKey: fromBounds.dayKey,
+    toKey: toBounds.dayKey,
   };
 }
 
