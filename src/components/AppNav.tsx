@@ -24,6 +24,9 @@ export async function AppNav() {
           <Link href="/dashboard" className="link-nav text-sm">
             Today
           </Link>
+          <Link href="/reports" className="link-nav text-sm">
+            Reports
+          </Link>
           <Link href="/history" className="link-nav text-sm">
             History
           </Link>

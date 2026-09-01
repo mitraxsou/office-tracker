@@ -1,7 +1,7 @@
 import { summarizeAgentTokens } from "./auth";
 import { prisma } from "./db";
 import { getAppConfig, getUserHoursTarget } from "./app-config";
-import { getTodaySummary, closeStaleOpenVisits } from "./heartbeat-service";
+import { getTodaySummary, closeStaleOpenVisits, closeEndOfDayOpenVisits } from "./heartbeat-service";
 import { revokeExpiredPendingTokens } from "./token-expiry";
 import { effectiveVisitEnd } from "./visits";
 
@@ -23,6 +23,7 @@ function addDays(date: Date, days: number) {
 async function aggregateHoursForDay(userId: string, timezone: string, dayKey: string) {
   const config = await getAppConfig();
   const staleMs = config.agentStaleMinutes * 60 * 1000;
+  await closeEndOfDayOpenVisits(userId, timezone);
   await closeStaleOpenVisits(userId, staleMs);
 
   const dayStart = new Date(`${dayKey}T00:00:00`);
@@ -51,15 +52,17 @@ async function aggregateHoursForDay(userId: string, timezone: string, dayKey: st
       now,
       staleMs,
       lastHeartbeatAt: lastHeartbeat?.recordedAt ?? null,
+      dayEnd,
     });
     const clippedEnd = end > dayEnd ? dayEnd : end;
     return sum + Math.max(0, clippedEnd.getTime() - start.getTime());
   }, 0);
 }
 
-export async function getAdminReports() {
+export async function getAdminReports(options?: { days?: number }) {
   const config = await getAppConfig();
   const defaultTz = "Asia/Kolkata";
+  const trendDays = Math.min(90, Math.max(1, options?.days ?? 7));
 
   await revokeExpiredPendingTokens();
 
@@ -115,7 +118,7 @@ export async function getAdminReports() {
     activeUsers: number;
   }> = [];
 
-  for (let i = 6; i >= 0; i--) {
+  for (let i = trendDays - 1; i >= 0; i--) {
     const day = addDays(today, -i);
     const key = dayKeyForTimezone(day, defaultTz);
     let dayTotalMs = 0;
@@ -156,5 +159,26 @@ export async function getAdminReports() {
     dailyTrend,
     statusBreakdown,
     users: userSummaries,
+    range: { days: trendDays },
   };
+}
+
+export async function getAdminDayDetail(dateKey: string) {
+  const users = await prisma.user.findMany({ orderBy: { email: "asc" } });
+  const rows = await Promise.all(
+    users.map(async (user) => {
+      const hoursTarget = await getUserHoursTarget(user);
+      const ms = await aggregateHoursForDay(user.id, user.timezone, dateKey);
+      const hours = ms / (1000 * 60 * 60);
+      return {
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        hours: Math.round(hours * 10) / 10,
+        hoursTarget,
+        metTarget: hours >= hoursTarget,
+      };
+    }),
+  );
+  return { date: dateKey, users: rows };
 }

@@ -24,6 +24,26 @@ model User {
   visits       Visit[]
   auditActions AuditLog[]    @relation("AuditActor")
   auditTargets AuditLog[]    @relation("AuditTarget")
+  notificationPrefs UserNotificationPrefs?
+}
+
+model UserNotificationPrefs {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workDays              String   @default("[1,2,3,4,5]")
+  officeStartTime       String   @default("09:30")
+  officeEndTime         String   @default("18:00")
+  graceMinutes          Int      @default(45)
+  notifyTeams           Boolean  @default(true)
+  notifyEmail           Boolean  @default(true)
+  alertIfNotInOffice    Boolean  @default(true)
+  alertIfAgentStale     Boolean  @default(true)
+  alertIfBehindHours    Boolean  @default(false)
+  behindHoursCheckTime  String   @default("15:00")
+  behindHoursMinExpected Float   @default(2.5)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 }
 
 model AgentToken {

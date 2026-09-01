@@ -56,6 +56,37 @@ describe("effectiveVisitEnd", () => {
     });
     expect(end).toEqual(now);
   });
+
+  it("uses last heartbeat as logout when the calendar day has ended", () => {
+    const dayEnd = new Date("2026-08-28T23:59:59.999+05:30");
+    const now = new Date("2026-08-29T10:00:00+05:30");
+    const end = effectiveVisitEnd({
+      endAt: null,
+      updatedAt,
+      startAt,
+      now,
+      staleMs,
+      lastHeartbeatAt,
+      dayEnd,
+    });
+    expect(end).toEqual(lastHeartbeatAt);
+  });
+
+  it("does not extend open visit past day end when aggregating a past day", () => {
+    const dayEnd = new Date("2026-08-28T23:59:59.999+05:30");
+    const now = new Date("2026-09-01T12:00:00+05:30");
+    const end = effectiveVisitEnd({
+      endAt: null,
+      updatedAt,
+      startAt,
+      now,
+      staleMs,
+      lastHeartbeatAt,
+      dayEnd,
+    });
+    expect(end).toEqual(lastHeartbeatAt);
+    expect(end.getTime()).toBeLessThanOrEqual(dayEnd.getTime());
+  });
 });
 
 describe("mergeHeartbeatsIntoVisits", () => {

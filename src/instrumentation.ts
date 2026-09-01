@@ -49,6 +49,29 @@ export async function register() {
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "agentStaleMinutes" INTEGER NOT NULL DEFAULT 8;'
     );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "UserNotificationPrefs" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "workDays" TEXT NOT NULL DEFAULT '[1,2,3,4,5]',
+        "officeStartTime" TEXT NOT NULL DEFAULT '09:30',
+        "officeEndTime" TEXT NOT NULL DEFAULT '18:00',
+        "graceMinutes" INTEGER NOT NULL DEFAULT 45,
+        "notifyTeams" BOOLEAN NOT NULL DEFAULT true,
+        "notifyEmail" BOOLEAN NOT NULL DEFAULT true,
+        "alertIfNotInOffice" BOOLEAN NOT NULL DEFAULT true,
+        "alertIfAgentStale" BOOLEAN NOT NULL DEFAULT true,
+        "alertIfBehindHours" BOOLEAN NOT NULL DEFAULT false,
+        "behindHoursCheckTime" TEXT NOT NULL DEFAULT '15:00',
+        "behindHoursMinExpected" DOUBLE PRECISION NOT NULL DEFAULT 2.5,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "UserNotificationPrefs_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "UserNotificationPrefs_userId_key" ON "UserNotificationPrefs"("userId");'
+    );
     await ensureAppConfig();
     await ensureBreakglassAdmin();
   } catch (err) {

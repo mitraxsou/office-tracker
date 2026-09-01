@@ -1,7 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import {
+  ComplianceTrendChart,
+  HoursTrendChart,
+  StatusDonutChart,
+  type DailyHoursPoint,
+} from "@/components/reports/ReportCharts";
+import {
+  exportDailyTrendCsv,
+  ReportFilters,
+  ReportToolbar,
+  useTableSort,
+} from "@/components/reports/ReportToolbar";
+import { exportToCsv } from "@/lib/report-range";
 
 type DailyPoint = { date: string; totalHours: number; compliancePct: number };
 
@@ -20,6 +33,15 @@ type UserRow = {
   };
 };
 
+type DayDetailUser = {
+  userId: string;
+  email: string;
+  name: string | null;
+  hours: number;
+  hoursTarget: number;
+  metTarget: boolean;
+};
+
 type ReportsData = {
   summary: {
     totalUsers: number;
@@ -31,6 +53,7 @@ type ReportsData = {
   dailyTrend: DailyPoint[];
   statusBreakdown: { inOffice: number; notInOffice: number; noAgent: number };
   users: UserRow[];
+  range: { days: number; from: string; to: string };
   auditLog: Array<{
     id: string;
     action: string;
@@ -40,123 +63,145 @@ type ReportsData = {
   }>;
 };
 
-function BarChart({
-  data,
-  valueKey,
-  maxValue,
-  label,
-  suffix = "",
-}: {
-  data: DailyPoint[];
-  valueKey: "totalHours" | "compliancePct";
-  maxValue: number;
-  label: string;
-  suffix?: string;
-}) {
-  return (
-    <div>
-      <p className="mb-3 text-sm font-medium">{label}</p>
-      <div className="flex h-40 items-end gap-2">
-        {data.map((d) => {
-          const value = d[valueKey];
-          const height = maxValue > 0 ? Math.max(4, (value / maxValue) * 100) : 4;
-          return (
-            <div key={d.date} className="flex flex-1 flex-col items-center gap-1">
-              <span className="text-[10px] text-muted">
-                {value}
-                {suffix}
-              </span>
-              <div
-                className="w-full rounded-t bg-[var(--pwc-orange)]"
-                style={{ height: `${height}%` }}
-                title={`${d.date}: ${value}${suffix}`}
-              />
-              <span className="text-[10px] text-muted">{d.date.slice(5)}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function StatusChart({ breakdown }: { breakdown: ReportsData["statusBreakdown"] }) {
-  const total = breakdown.inOffice + breakdown.notInOffice + breakdown.noAgent || 1;
-  const segments = [
-    { label: "In office", value: breakdown.inOffice, color: "bg-green-500" },
-    { label: "Not in office", value: breakdown.notInOffice, color: "bg-blue-500" },
-    { label: "No agent", value: breakdown.noAgent, color: "bg-gray-500" },
-  ];
-
-  return (
-    <div>
-      <p className="mb-3 text-sm font-medium">Users by status today</p>
-      <div className="flex h-6 overflow-hidden rounded-full">
-        {segments.map((s) =>
-          s.value > 0 ? (
-            <div
-              key={s.label}
-              className={`${s.color}`}
-              style={{ width: `${(s.value / total) * 100}%` }}
-              title={`${s.label}: ${s.value}`}
-            />
-          ) : null
-        )}
-      </div>
-      <ul className="mt-3 space-y-1 text-xs text-muted">
-        {segments.map((s) => (
-          <li key={s.label}>
-            {s.label}: {s.value}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 export function AdminDashboard() {
+  const [days, setDays] = useState(30);
+  const [fromKey, setFromKey] = useState("");
+  const [toKey, setToKey] = useState("");
   const [data, setData] = useState<ReportsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [dayDetail, setDayDetail] = useState<DayDetailUser[] | null>(null);
+  const [search, setSearch] = useState("");
+  const [compliance, setCompliance] = useState<"all" | "met" | "not_met">("all");
+  const [agentStatus, setAgentStatus] = useState<"all" | "healthy" | "stale" | "in_office">("all");
 
-  async function load(silent = false) {
-    if (!silent) setLoading(true);
-    else setRefreshing(true);
+  const load = useCallback(
+    async (params: { days?: number; from?: string; to?: string }, silent = false) => {
+      if (!silent) setLoading(true);
+      else setRefreshing(true);
 
-    const res = await fetch("/api/admin/reports");
+      const qs = new URLSearchParams();
+      if (params.from && params.to) {
+        qs.set("from", params.from);
+        qs.set("to", params.to);
+      } else {
+        qs.set("days", String(params.days ?? days));
+      }
 
-    if (!silent) setLoading(false);
-    else setRefreshing(false);
+      const res = await fetch(`/api/admin/reports?${qs}`);
+      if (!silent) setLoading(false);
+      else setRefreshing(false);
 
-    if (!res.ok) {
-      if (!silent) setError("Failed to load reports");
-      return;
-    }
-    setError(null);
-    setData(await res.json());
-  }
+      if (!res.ok) {
+        if (!silent) setError("Failed to load reports");
+        return;
+      }
+      setError(null);
+      const json = await res.json();
+      setData(json);
+      setDays(json.range.days);
+      setFromKey(json.range.from);
+      setToKey(json.range.to);
+      setSelectedDate(null);
+      setDayDetail(null);
+    },
+    [days],
+  );
 
   useEffect(() => {
-    load();
+    void load({ days: 30 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const maxHours = data
-    ? Math.max(...data.dailyTrend.map((d) => d.totalHours), data.summary.hoursTarget)
-    : 5;
+  async function handleBarClick(date: string) {
+    const next = selectedDate === date ? null : date;
+    setSelectedDate(next);
+    if (!next) {
+      setDayDetail(null);
+      return;
+    }
+    const res = await fetch(`/api/admin/reports/day?date=${next}`);
+    if (res.ok) {
+      const json = await res.json();
+      setDayDetail(json.users);
+    }
+  }
+
+  const filteredUsers = useMemo(() => {
+    if (!data) return [];
+    return data.users.filter((u) => {
+      if (search) {
+        const q = search.toLowerCase();
+        if (!u.email.toLowerCase().includes(q) && !(u.name?.toLowerCase().includes(q) ?? false)) {
+          return false;
+        }
+      }
+      if (compliance === "met" && !u.today.metTarget) return false;
+      if (compliance === "not_met" && u.today.metTarget) return false;
+      if (agentStatus === "in_office" && !u.today.inOfficeNow) return false;
+      if (agentStatus === "healthy" && !u.today.agentHealthy) return false;
+      if (agentStatus === "stale" && u.today.agentHealthy) return false;
+      return true;
+    });
+  }, [data, search, compliance, agentStatus]);
+
+  const { sorted, toggleSort, sortKey, sortDir } = useTableSort(filteredUsers, "email");
+
+  const chartData: DailyHoursPoint[] = useMemo(
+    () =>
+      (data?.dailyTrend ?? []).map((d) => ({
+        date: d.date,
+        totalHours: d.totalHours,
+        compliancePct: d.compliancePct,
+        metTarget: d.compliancePct >= 50,
+      })),
+    [data],
+  );
+
+  const displayUsers = useMemo(() => {
+    if (selectedDate && dayDetail) {
+      return dayDetail.map((d) => ({
+        id: d.userId,
+        email: d.email,
+        name: d.name,
+        role: "user",
+        hoursTarget: d.hoursTarget,
+        today: {
+          totalHours: d.hours,
+          metTarget: d.metTarget,
+          agentHealthy: true,
+          inOfficeNow: false,
+          lastHeartbeat: null,
+        },
+      }));
+    }
+    return sorted;
+  }, [selectedDate, dayDetail, sorted]);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end gap-3">
+      <ReportToolbar
+        days={days}
+        fromKey={fromKey}
+        toKey={toKey}
+        onRangeChange={(p) => load(p)}
+        onExport={() => {
+          if (data) {
+            exportDailyTrendCsv(`admin-office-hours-${fromKey}-${toKey}.csv`, chartData);
+          }
+        }}
+      >
         {refreshing && <span className="text-xs text-muted">Refreshing...</span>}
         <button
           type="button"
-          onClick={() => load(true)}
-          className="btn-secondary px-3 py-1 text-xs"
+          onClick={() => load({ days }, true)}
+          className="btn-secondary px-3 py-1.5 text-xs"
         >
-          Refresh reports
+          Refresh
         </button>
-      </div>
+      </ReportToolbar>
 
       {loading && !data && <p className="text-muted">Loading reports...</p>}
       {error && !data && <p className="text-red-400">{error}</p>}
@@ -166,51 +211,83 @@ export function AdminDashboard() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <SummaryCard label="Total users" value={String(data.summary.totalUsers)} />
             <SummaryCard label="In office now" value={String(data.summary.inOfficeNow)} />
-            <SummaryCard label="Met 5h today" value={`${data.summary.metTodayPct}%`} />
+            <SummaryCard label="Met target today" value={`${data.summary.metTodayPct}%`} />
             <SummaryCard label="Avg hours today" value={`${data.summary.avgHours}h`} />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="card p-6">
-              <BarChart
-                data={data.dailyTrend}
-                valueKey="totalHours"
-                maxValue={maxHours}
-                label="Daily office hours (last 7 days, all users)"
-                suffix="h"
+              <HoursTrendChart
+                data={chartData}
+                targetHours={data.summary.hoursTarget}
+                title={`Org office hours (${days} days)`}
+                selectedDate={selectedDate}
+                onBarClick={handleBarClick}
               />
+              {selectedDate && (
+                <p className="mt-2 text-xs text-muted">
+                  Drill-down: <strong className="text-accent">{selectedDate}</strong> per user below.{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDate(null);
+                      setDayDetail(null);
+                    }}
+                    className="text-accent hover:underline"
+                  >
+                    Clear
+                  </button>
+                </p>
+              )}
             </section>
             <section className="card p-6">
-              <BarChart
-                data={data.dailyTrend}
-                valueKey="compliancePct"
-                maxValue={100}
-                label="Compliance rate (% met target)"
-                suffix="%"
+              <ComplianceTrendChart
+                data={chartData}
+                title="Compliance rate (% users met target)"
               />
             </section>
           </div>
 
           <section className="card p-6">
-            <StatusChart breakdown={data.statusBreakdown} />
+            <StatusDonutChart breakdown={data.statusBreakdown} title="Users by status today" />
           </section>
 
           <section className="card p-6">
-            <h2 className="mb-4 text-lg font-medium">Users today</h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-medium">
+                {selectedDate ? `Users on ${selectedDate}` : "Users today"}
+              </h2>
+              {!selectedDate && (
+                <ReportFilters
+                  search={search}
+                  onSearchChange={setSearch}
+                  compliance={compliance}
+                  onComplianceChange={setCompliance}
+                  agentStatus={agentStatus}
+                  onAgentStatusChange={setAgentStatus}
+                />
+              )}
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[var(--border)] text-left text-muted">
-                    <th className="py-2 pr-4">User</th>
-                    <th className="py-2 pr-4">Today</th>
-                    <th className="py-2 pr-4">5h met</th>
-                    <th className="py-2 pr-4">Agent</th>
-                    <th className="py-2 pr-4">Last pulse</th>
-                    <th className="py-2">Report</th>
+                    <th className="cursor-pointer py-2 pr-4" onClick={() => toggleSort("email")}>
+                      User {sortKey === "email" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+                    </th>
+                    <th className="py-2 pr-4">Hours</th>
+                    <th className="py-2 pr-4">Target met</th>
+                    {!selectedDate && (
+                      <>
+                        <th className="py-2 pr-4">Agent</th>
+                        <th className="py-2 pr-4">Last pulse</th>
+                        <th className="py-2">Report</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
-                  {data.users.map((u) => (
+                  {displayUsers.map((u) => (
                     <tr key={u.id} className="border-b border-[var(--border)]">
                       <td className="py-3 pr-4">
                         <div className="font-medium">{u.email}</div>
@@ -224,27 +301,53 @@ export function AdminDashboard() {
                           {u.today.metTarget ? "Yes" : "No"}
                         </span>
                       </td>
-                      <td className="py-3 pr-4">
-                        {u.today.agentHealthy ? "Healthy" : "Stale"}
-                      </td>
-                      <td className="py-3 pr-4 text-xs text-muted">
-                        {u.today.lastHeartbeat
-                          ? new Date(u.today.lastHeartbeat).toLocaleString("en-IN")
-                          : "None"}
-                      </td>
-                      <td className="py-3">
-                        <Link
-                          href={`/admin/reports/users/${u.id}`}
-                          className="text-xs text-accent hover:underline"
-                        >
-                          View report
-                        </Link>
-                      </td>
+                      {!selectedDate && (
+                        <>
+                          <td className="py-3 pr-4">
+                            {u.today.agentHealthy ? "Healthy" : "Stale"}
+                          </td>
+                          <td className="py-3 pr-4 text-xs text-muted">
+                            {u.today.lastHeartbeat
+                              ? new Date(u.today.lastHeartbeat).toLocaleString("en-IN")
+                              : "None"}
+                          </td>
+                          <td className="py-3">
+                            <Link
+                              href={`/admin/reports/users/${u.id}`}
+                              className="text-xs text-accent hover:underline"
+                            >
+                              View report
+                            </Link>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            {!selectedDate && (
+              <button
+                type="button"
+                className="btn-secondary mt-3 px-3 py-1 text-xs"
+                onClick={() => {
+                  exportToCsv(
+                    `users-today-${fromKey}.csv`,
+                    ["Email", "Name", "Hours", "Target", "Met", "Agent"],
+                    filteredUsers.map((u) => [
+                      u.email,
+                      u.name ?? "",
+                      u.today.totalHours.toFixed(1),
+                      String(u.hoursTarget),
+                      u.today.metTarget ? "Yes" : "No",
+                      u.today.agentHealthy ? "Healthy" : "Stale",
+                    ]),
+                  );
+                }}
+              >
+                Export filtered users
+              </button>
+            )}
           </section>
 
           <section className="card p-6">

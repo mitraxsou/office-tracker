@@ -39,7 +39,10 @@ const STATUS_LABELS = {
 
 const PULSE_LABELS = {
   healthy: { text: "Sending pulses regularly", color: "text-green-400" },
-  stale: { text: "No recent pulse — agent may be offline", color: "text-amber-300" },
+  stale: {
+    text: "Not responding — reinstall from Settings or contact admin",
+    color: "text-red-300",
+  },
   none: { text: "No pulses received yet", color: "text-muted" },
 };
 
@@ -78,6 +81,28 @@ export function AgentStatusPanel() {
       <p className={`text-sm font-medium ${meta.color}`}>{meta.title}</p>
       <p className="mt-1 text-sm text-muted">{meta.detail}</p>
       <p className={`mt-2 text-sm font-medium ${pulseMeta.color}`}>{pulseMeta.text}</p>
+
+      {status.pulseStatus === "stale" && (
+        <div className="mt-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-3 text-sm text-muted">
+          <p>
+            Re-run the install command from{" "}
+            <a href="/settings" className="text-accent hover:underline">
+              Settings
+            </a>
+            . Confirm Task Scheduler has <code>PwCOfficePulse</code>. If it still fails, contact
+            your admin.
+          </p>
+        </div>
+      )}
+
+      {status.pulsesLast24h < 30 && status.deviceCount > 0 && status.pulseStatus === "healthy" && (
+        <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-sm text-muted">
+          <p>
+            Only {status.pulsesLast24h} pulses in the last 24 hours (expected ~720). The laptop may
+            have been asleep or the task may not be running reliably.
+          </p>
+        </div>
+      )}
 
       <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
         <div>

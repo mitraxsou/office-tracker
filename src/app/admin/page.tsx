@@ -14,7 +14,10 @@ export default async function AdminPage() {
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-8">
         <div>
           <h1 className="text-2xl font-semibold">Admin reports</h1>
-          <p className="text-sm text-muted">Compliance charts and visit corrections</p>
+          <p className="text-sm text-muted">
+            Interactive charts, date filters, and drill-down. Hover for tooltips, click bars to
+            filter by day.
+          </p>
         </div>
         <AdminSubNav active="reports" />
         <AdminDashboard />

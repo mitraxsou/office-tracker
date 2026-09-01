@@ -1,14 +1,15 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
-import { getTodaySummary } from "@/lib/heartbeat-service";
-import { getUserHoursTarget } from "@/lib/app-config";
+import { getTodaySummary, getPulseStats } from "@/lib/heartbeat-service";
+import { getUserHoursTarget, getAppConfig } from "@/lib/app-config";
 import { AppNav } from "@/components/AppNav";
 import { ProgressMeter } from "@/components/ProgressMeter";
 import { VisitList } from "@/components/VisitList";
 import { ManualVisitForm } from "@/components/ManualVisitForm";
 import { QuickOfficeToggle } from "@/components/QuickOfficeToggle";
 import { AgentSetupBanner } from "@/components/AgentSetupBanner";
+import { AgentHealthBanner } from "@/components/AgentHealthBanner";
 import { formatTime } from "@/lib/visits";
 
 export default async function DashboardPage() {
@@ -20,7 +21,15 @@ export default async function DashboardPage() {
     user.timezone,
     await getUserHoursTarget(user)
   );
-  const agentNeverConnected = !summary.lastHeartbeat;
+  const config = await getAppConfig();
+  const pulse = await getPulseStats(user.id, config.agentStaleMinutes);
+  const agentNeverConnected = !summary.lastHeartbeat && user.agentDevices.length === 0;
+  const agentStale = !!summary.lastHeartbeat && !summary.agentHealthy;
+  const agentLowPulses =
+    user.agentDevices.length > 0 &&
+    !!pulse.lastHeartbeat &&
+    pulse.agentHealthy &&
+    pulse.pulsesLast24h < 30;
   const ssidMissing =
     !!summary.lastHeartbeat && !summary.lastHeartbeat.ssid && summary.lastHeartbeat.inOffice === false;
   const openVisit = summary.visits.find((v) => v.endAt === null);
@@ -38,6 +47,13 @@ export default async function DashboardPage() {
 
         {agentNeverConnected && <AgentSetupBanner />}
         {!agentNeverConnected && ssidMissing && <AgentSetupBanner ssidMissing />}
+        {agentStale && (
+          <AgentHealthBanner
+            variant="stale"
+            minutesSinceLastPulse={pulse.minutesSinceLastPulse}
+          />
+        )}
+        {!agentStale && agentLowPulses && <AgentHealthBanner variant="low_pulses" />}
 
         <ProgressMeter
           totalHours={summary.totalHours}
@@ -102,9 +118,9 @@ export default async function DashboardPage() {
           </p>
         )}
 
-        {!agentNeverConnected && !summary.agentHealthy && (
+        {!agentNeverConnected && !summary.agentHealthy && !agentStale && (
           <p className="text-sm text-muted">
-            Agent has not sent a heartbeat in 8+ minutes. Check Task Scheduler or re-run{" "}
+            Agent has not sent a heartbeat recently. Check Task Scheduler or re-run{" "}
             <Link href="/settings" className="text-accent hover:underline">
               install.ps1
             </Link>

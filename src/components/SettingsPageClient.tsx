@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AgentStatusPanel } from "@/components/AgentStatusPanel";
 import { UserSettingsForm } from "@/components/UserSettingsForm";
+import { NotificationPrefsForm } from "@/components/NotificationPrefsForm";
 import { AgentSetupPanel } from "@/components/AgentSetupPanel";
 
 type Device = {
@@ -70,6 +71,8 @@ export function SettingsPageClient({
         boundTokens={boundTokens}
         onDevicesChange={setDevices}
       />
+
+      <NotificationPrefsForm />
 
       <AgentSetupPanel
         appUrl={appUrl}

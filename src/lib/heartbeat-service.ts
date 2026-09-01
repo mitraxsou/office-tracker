@@ -2,7 +2,7 @@ import { prisma } from "./db";
 import { DEFAULT_OFFICE_SSIDS, isOfficeSsid } from "./constants";
 import { getAppConfig, getAgentStaleMs } from "./app-config";
 import { maybePurgeOldHeartbeats } from "./heartbeat-retention";
-import { effectiveVisitEnd } from "./visits";
+import { effectiveVisitEnd, dayKeyInTimezone } from "./visits";
 
 export async function processHeartbeat(params: {
   userId: string;
@@ -16,6 +16,14 @@ export async function processHeartbeat(params: {
 
   const config = await getAppConfig();
   void maybePurgeOldHeartbeats(config.heartbeatRetentionDays);
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { timezone: true },
+  });
+  if (user) {
+    await closeEndOfDayOpenVisits(userId, user.timezone);
+  }
 
   await prisma.heartbeat.create({
     data: {
@@ -125,6 +133,42 @@ export async function closeStaleOpenVisits(userId: string, staleMs?: number) {
   return true;
 }
 
+/**
+ * Close visits still open after their calendar day ended.
+ * Uses the last heartbeat that day as logout time.
+ */
+export async function closeEndOfDayOpenVisits(userId: string, timezone: string) {
+  const open = await prisma.visit.findFirst({
+    where: { userId, endAt: null },
+    orderBy: { startAt: "desc" },
+  });
+  if (!open) return false;
+
+  const now = new Date();
+  const visitDayKey = dayKeyInTimezone(open.startAt, timezone);
+  const todayKey = dayKeyInTimezone(now, timezone);
+  if (visitDayKey >= todayKey) return false;
+
+  const dayEnd = new Date(`${visitDayKey}T23:59:59.999`);
+  const lastHeartbeat = await prisma.heartbeat.findFirst({
+    where: {
+      userId,
+      recordedAt: { gte: open.startAt, lte: dayEnd },
+    },
+    orderBy: { recordedAt: "desc" },
+  });
+
+  const fallback = open.updatedAt <= dayEnd ? open.updatedAt : open.startAt;
+  const endAt = lastHeartbeat?.recordedAt ?? fallback;
+  const cappedEnd = endAt > dayEnd ? dayEnd : endAt;
+
+  await prisma.visit.update({
+    where: { id: open.id },
+    data: { endAt: cappedEnd },
+  });
+  return true;
+}
+
 export async function createManualVisit(params: {
   userId: string;
   startAt: Date;
@@ -175,6 +219,7 @@ export async function checkOutOffice(userId: string) {
 export async function getTodaySummary(userId: string, timezone: string, hoursTarget: number) {
   const now = new Date();
   const staleMs = await getAgentStaleMs();
+  await closeEndOfDayOpenVisits(userId, timezone);
   await closeStaleOpenVisits(userId, staleMs);
 
   const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -214,6 +259,7 @@ export async function getTodaySummary(userId: string, timezone: string, hoursTar
       now,
       staleMs,
       lastHeartbeatAt: lastHeartbeat?.recordedAt ?? null,
+      dayEnd,
     });
     const clippedEnd = end > dayEnd ? dayEnd : end;
     return sum + Math.max(0, clippedEnd.getTime() - start.getTime());

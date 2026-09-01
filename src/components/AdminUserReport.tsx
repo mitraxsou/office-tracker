@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AdminVisitManager } from "./AdminVisitManager";
+import { HoursTrendChart } from "./reports/ReportCharts";
+import { exportDailyTrendCsv } from "./reports/ReportToolbar";
 
 type UserReport = {
   user: {
@@ -116,8 +118,6 @@ export function AdminUserReport({ userId }: { userId: string }) {
   if (error && !data) return <p className="text-red-400">{error}</p>;
   if (!data) return null;
 
-  const maxHours = Math.max(...data.dailyTrend.map((d) => d.totalHours), data.user.hoursTarget);
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -139,8 +139,25 @@ export function AdminUserReport({ userId }: { userId: string }) {
               <option value={7}>7 days</option>
               <option value={14}>14 days</option>
               <option value={30}>30 days</option>
+              <option value={90}>90 days</option>
             </select>
           </label>
+          <button
+            type="button"
+            onClick={() =>
+              exportDailyTrendCsv(
+                `user-${data.user.email}-${days}d.csv`,
+                data.dailyTrend.map((d) => ({
+                  date: d.date,
+                  totalHours: d.totalHours,
+                  metTarget: d.metTarget,
+                })),
+              )
+            }
+            className="btn-secondary px-3 py-1 text-xs"
+          >
+            Export CSV
+          </button>
           <button type="button" onClick={() => load()} className="btn-secondary px-3 py-1 text-xs">
             Refresh
           </button>
@@ -158,22 +175,15 @@ export function AdminUserReport({ userId }: { userId: string }) {
       </div>
 
       <section className="card p-6">
-        <h3 className="mb-3 text-sm font-medium">Daily hours ({data.range.days} days)</h3>
-        <div className="flex h-32 items-end gap-1">
-          {data.dailyTrend.map((d) => {
-            const height = maxHours > 0 ? Math.max(4, (d.totalHours / maxHours) * 100) : 4;
-            return (
-              <div key={d.date} className="flex flex-1 flex-col items-center gap-1">
-                <span className="text-[10px] text-muted">{d.totalHours}h</span>
-                <div
-                  className={`w-full rounded-t ${d.metTarget ? "bg-green-500" : "bg-[var(--pwc-orange)]"}`}
-                  style={{ height: `${height}%` }}
-                />
-                <span className="text-[10px] text-muted">{d.date.slice(5)}</span>
-              </div>
-            );
-          })}
-        </div>
+        <HoursTrendChart
+          data={data.dailyTrend.map((d) => ({
+            date: d.date,
+            totalHours: d.totalHours,
+            metTarget: d.metTarget,
+          }))}
+          targetHours={data.user.hoursTarget}
+          title={`Daily hours (${data.range.days} days)`}
+        />
       </section>
 
       <section className="card p-6">

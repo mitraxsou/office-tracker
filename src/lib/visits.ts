@@ -35,9 +35,14 @@ export function visitDurationMs(visit: VisitPoint, now = new Date()): number {
   return Math.max(0, end.getTime() - visit.startAt.getTime());
 }
 
+export function dayKeyInTimezone(date: Date, timezone: string): string {
+  return getDayBounds(date, timezone).dayKey;
+}
+
 /**
  * Open visits normally end on the next out-of-office heartbeat or after a gap.
  * If the agent goes silent, infer end at last activity + staleMs.
+ * When the calendar day has ended, treat the last heartbeat as logout (not "now").
  */
 export function effectiveVisitEnd(params: {
   endAt: Date | null;
@@ -46,8 +51,21 @@ export function effectiveVisitEnd(params: {
   now: Date;
   staleMs: number;
   lastHeartbeatAt: Date | null;
+  dayEnd?: Date | null;
 }): Date {
   if (params.endAt) return params.endAt;
+
+  const lastActivity = params.updatedAt ?? params.startAt;
+
+  if (params.dayEnd && params.now > params.dayEnd) {
+    if (params.lastHeartbeatAt && params.lastHeartbeatAt <= params.dayEnd) {
+      return params.lastHeartbeatAt;
+    }
+    if (params.lastHeartbeatAt && params.lastHeartbeatAt > params.dayEnd) {
+      return params.dayEnd;
+    }
+    return lastActivity <= params.dayEnd ? lastActivity : params.dayEnd;
+  }
 
   const agentStale =
     !params.lastHeartbeatAt ||
@@ -55,7 +73,6 @@ export function effectiveVisitEnd(params: {
 
   if (!agentStale) return params.now;
 
-  const lastActivity = params.updatedAt ?? params.startAt;
   return new Date(lastActivity.getTime() + params.staleMs);
 }
 

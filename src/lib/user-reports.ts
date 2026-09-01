@@ -1,6 +1,6 @@
 import { prisma } from "./db";
 import { getAppConfig, getUserHoursTarget } from "./app-config";
-import { getTodaySummary, getPulseStats, closeStaleOpenVisits } from "./heartbeat-service";
+import { getTodaySummary, getPulseStats, closeStaleOpenVisits, closeEndOfDayOpenVisits } from "./heartbeat-service";
 import { summarizeAgentTokens } from "./auth";
 import { revokeExpiredPendingTokens } from "./token-expiry";
 import { effectiveVisitEnd } from "./visits";
@@ -23,6 +23,7 @@ function addDays(date: Date, days: number) {
 export async function aggregateHoursForDay(userId: string, timezone: string, dayKey: string) {
   const config = await getAppConfig();
   const staleMs = config.agentStaleMinutes * 60 * 1000;
+  await closeEndOfDayOpenVisits(userId, timezone);
   await closeStaleOpenVisits(userId, staleMs);
 
   const dayStart = new Date(`${dayKey}T00:00:00`);
@@ -51,6 +52,7 @@ export async function aggregateHoursForDay(userId: string, timezone: string, day
       now,
       staleMs,
       lastHeartbeatAt: lastHeartbeat?.recordedAt ?? null,
+      dayEnd,
     });
     const clippedEnd = end > dayEnd ? dayEnd : end;
     return sum + Math.max(0, clippedEnd.getTime() - start.getTime());
