@@ -23,7 +23,12 @@ export type AuditAction =
   | "visit_correction_request"
   | "visit_report_resolve"
   | "integration_key_create"
-  | "integration_key_revoke";
+  | "integration_key_revoke"
+  | "admin_ooo_update"
+  | "admin_notification_prefs_update"
+  | "device_removal_request"
+  | "device_removal_approve"
+  | "device_removal_reject";
 
 export async function logAuditEvent(params: {
   actorId: string;

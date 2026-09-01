@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AdminVisitManager } from "./AdminVisitManager";
+import { NotificationPrefsForm } from "./NotificationPrefsForm";
+import { OutOfOfficeSection } from "./OutOfOfficeSection";
 import { HoursTrendChart } from "./reports/ReportCharts";
 import { exportDailyTrendCsv } from "./reports/ReportToolbar";
 
@@ -257,6 +259,18 @@ export function AdminUserReport({ userId }: { userId: string }) {
           </div>
         )}
       </section>
+
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-lg font-medium">Notifications and out of office</h3>
+          <p className="mt-1 text-sm text-muted">
+            Manage alert settings when the user cannot access the portal. Out-of-office days and
+            non-work days (e.g. Sat/Sun) suppress all reminders.
+          </p>
+        </div>
+        <OutOfOfficeSection adminUserId={userId} />
+        <NotificationPrefsForm adminUserId={userId} />
+      </div>
 
       <AdminVisitManager userId={userId} officeSsids={officeSsids} onChanged={load} />
 

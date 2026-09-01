@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { getAppConfig, getUserHoursTarget } from "./app-config";
 import { getTodaySummary, getPulseStats } from "./heartbeat-service";
 import { dayBoundsFromKey, dayKeyInTimezone } from "./timezone-dates";
+import { roundHours } from "./visits";
 import {
   getMinutesInTimezone,
   getNotificationPrefs,
@@ -9,6 +10,7 @@ import {
   parseTimeToMinutes,
   type NotificationPrefsData,
 } from "./notification-prefs";
+import { buildOutOfOfficeLinkUrl, isUserOutOfOffice } from "./out-of-office";
 
 export type IntegrationAlertType = "absent" | "stale" | "behind";
 
@@ -27,6 +29,7 @@ export type IntegrationAlert = {
   dayKey: string;
   dashboardUrl: string;
   settingsUrl: string;
+  outOfOfficeUrl: string;
 };
 
 const INTEGRATION_ALERT_ACTION = "integration_alert";
@@ -123,10 +126,15 @@ async function evaluateUserAlerts(
   const pulse = await getPulseStats(user.id, config.agentStaleMinutes);
 
   const dayKey = dayKeyInTimezone(now, user.timezone);
+  if (await isUserOutOfOffice(user.id, dayKey)) return [];
+
   const dayStart = dayBoundsFromKey(dayKey, user.timezone).start;
   const nowMinutes = getMinutesInTimezone(now, user.timezone);
   const workDay = isWorkDayNow(prefs, now, user.timezone);
+  if (!workDay) return [];
+
   const baseUrl = appBaseUrl();
+  const outOfOfficeUrl = await buildOutOfOfficeLinkUrl(user.id, dayKey);
 
   const alerts: IntegrationAlert[] = [];
 
@@ -134,7 +142,7 @@ async function evaluateUserAlerts(
     userId: user.id,
     email: user.email,
     name: user.name,
-    hoursToday: summary.totalHours,
+    hoursToday: roundHours(summary.totalHours),
     hoursTarget,
     agentHealthy: pulse.agentHealthy,
     inOfficeNow: summary.inOfficeNow,
@@ -143,9 +151,10 @@ async function evaluateUserAlerts(
     dayKey,
     dashboardUrl: `${baseUrl}/dashboard`,
     settingsUrl: `${baseUrl}/settings`,
+    outOfOfficeUrl,
   };
 
-  if (types.has("stale") && prefs.alertIfAgentStale && !pulse.agentHealthy) {
+  if (types.has("stale") && prefs.alertIfAgentStale && workDay && !pulse.agentHealthy) {
     const hasDevice = (await prisma.agentDevice.count({ where: { userId: user.id } })) > 0;
     if (hasDevice && !(await wasAlertSentToday(user.id, "stale", dayKey))) {
       alerts.push({

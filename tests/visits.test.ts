@@ -5,6 +5,7 @@ import {
   mergeHeartbeatsIntoVisits,
   meetsHoursTarget,
   remainingHours,
+  roundHours,
   totalHoursFromVisits,
   visitsForDay,
 } from "../src/lib/visits";
@@ -185,5 +186,13 @@ describe("visitsForDay Asia/Kolkata", () => {
     expect(dayVisits[0].startAt.getTime()).toBeLessThanOrEqual(
       new Date("2026-08-27T01:00:00+05:30").getTime()
     );
+  });
+});
+
+describe("roundHours", () => {
+  it("rounds to one decimal place", () => {
+    expect(roundHours(1.7992508333333332)).toBe(1.8);
+    expect(roundHours(4.949)).toBe(4.9);
+    expect(roundHours(5)).toBe(5);
   });
 });

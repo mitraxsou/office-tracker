@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, getPendingInstallTokensForUser } from "@/lib/auth";
+import { getCurrentUser, getInstallTokensForUser } from "@/lib/auth";
 import {
   AGENT_EXTRACT_FOLDER,
   AGENT_EXTRACT_PATH_PS,
@@ -14,14 +14,14 @@ export async function POST() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const extractPath = process.env.AGENT_INSTALL_PATH || AGENT_EXTRACT_PATH_PS;
 
-  const pending = await getPendingInstallTokensForUser(user.id, appUrl);
-  const first = pending[0];
+  const tokens = await getInstallTokensForUser(user.id, appUrl);
+  const first = tokens[0];
 
   if (!first) {
     return NextResponse.json(
       {
         error:
-          "No pending install token. Ask your admin to issue a laptop token from Admin → Users & tokens.",
+          "No install token available. Ask your admin to issue a laptop token from Admin → Users & tokens.",
       },
       { status: 400 },
     );

@@ -62,7 +62,7 @@ Config: GET /api/agent/config (Bearer token) — SSIDs & hours target server-sid
 
 ### User (`role=user`)
 - `/dashboard`, `/history`, `/settings`, `/help`
-- Settings: timezone, token, install/uninstall commands, **read-only** org SSIDs & hours target, read-only registered laptops
+- Settings: timezone, token, install/uninstall commands, read-only hours target, read-only registered laptops
 - Cannot edit SSIDs, daily target, or device serials
 - Quick **Check in** / **Check out** when auto-detect fails
 
@@ -87,10 +87,11 @@ Config: GET /api/agent/config (Bearer token) — SSIDs & hours target server-sid
 
 See [reference.md](reference.md) for env vars and API routes.
 
-## UI / copy standards
+## UI / copy / code style
 
 - PwC colors: orange `#FD5108`, dark `#1A1A1A` / `#2D2D2D`
-- **No em dashes** in user-facing text; no ChatGPT tone ("seamlessly", "leverage", "robust")
+- **No em dashes (—) anywhere** in the repo: user-facing copy, comments, commit messages, error strings, docs, or UI labels. Use a hyphen (`-`), comma, colon, or parentheses instead.
+- No ChatGPT tone ("seamlessly", "leverage", "robust")
 - Direct internal IT voice; verb-first buttons ("Copy install command", "Check in")
 - Do not tell users to enable Location when IT has disabled it; mention alternate SSID detection
 

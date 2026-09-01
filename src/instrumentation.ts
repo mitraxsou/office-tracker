@@ -117,6 +117,46 @@ export async function register() {
     await prisma.$executeRawUnsafe(
       'CREATE INDEX IF NOT EXISTS "IntegrationApiKey_createdById_idx" ON "IntegrationApiKey"("createdById");'
     );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "UserOutOfOffice" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "dayKey" TEXT NOT NULL,
+        "source" TEXT NOT NULL DEFAULT 'settings',
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "UserOutOfOffice_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "UserOutOfOffice_userId_dayKey_key" ON "UserOutOfOffice"("userId", "dayKey");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "UserOutOfOffice_userId_idx" ON "UserOutOfOffice"("userId");'
+    );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "DeviceRemovalRequest" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "deviceId" TEXT NOT NULL,
+        "message" TEXT,
+        "status" TEXT NOT NULL DEFAULT 'open',
+        "adminNote" TEXT,
+        "resolvedAt" TIMESTAMP(3),
+        "resolvedById" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "DeviceRemovalRequest_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "DeviceRemovalRequest_status_createdAt_idx" ON "DeviceRemovalRequest"("status", "createdAt");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "DeviceRemovalRequest_userId_idx" ON "DeviceRemovalRequest"("userId");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "DeviceRemovalRequest_deviceId_idx" ON "DeviceRemovalRequest"("deviceId");'
+    );
     await ensureAppConfig();
     await ensureBreakglassAdmin();
   } catch (err) {

@@ -67,7 +67,8 @@ GET https://office-tracker-theta.vercel.app/api/integrations/alerts?types=stale,
       "notifyEmail": true,
       "dayKey": "2026-09-01",
       "dashboardUrl": "https://office-tracker-theta.vercel.app/dashboard",
-      "settingsUrl": "https://office-tracker-theta.vercel.app/settings"
+      "settingsUrl": "https://office-tracker-theta.vercel.app/settings",
+      "outOfOfficeUrl": "https://office-tracker-theta.vercel.app/ooo?token=..."
     }
   ]
 }
@@ -78,10 +79,10 @@ GET https://office-tracker-theta.vercel.app/api/integrations/alerts?types=stale,
 | Type | When |
 |------|------|
 | `absent` | Work day, past start + grace, no in-office Wi-Fi today |
-| `stale` | Agent not pulsing, user has a registered laptop |
+| `stale` | Work day, agent not pulsing, user has a registered laptop |
 | `behind` | Work day, past check time, hours below user threshold |
 
-Each type is sent **at most once per user per day** (after ack).
+Each type is sent **at most once per user per day** (after ack). **No alerts** are sent on days outside the user&apos;s configured office days (default Mon–Fri) or on **out-of-office** days.
 
 ### Acknowledge alerts (after sending)
 
@@ -147,14 +148,17 @@ Office Pulse: @{email}
 
 Dashboard: @{dashboardUrl}
 Settings: @{settingsUrl}
+Out of office today: @{outOfOfficeUrl}
 ```
+
+The **outOfOfficeUrl** link is unique per user per day. When clicked, it marks them out of office and stops further alerts for that day (no login required).
 
 #### 3b — Email (if `notifyEmail` is true)
 
 - **Send an email (V2)** (Office 365 Outlook)
 - **To**: `email`
 - **Subject**: `PwC Office Pulse reminder`
-- **Body**: HTML with `message`, `dashboardUrl`, `settingsUrl`
+- **Body**: HTML with `message`, `dashboardUrl`, `settingsUrl`, and a link using `outOfOfficeUrl` (“I’m out of office today”)
 
 ### Step 4 — HTTP POST ack
 
@@ -180,11 +184,16 @@ Users control alerts at **Settings → Office schedule and alerts**:
 - Teams / email toggles
 - Alert types: not in office, agent stale, behind on hours
 
+**Out of office** (Settings → Out of office):
+
+- Mark today or future days when away — no alerts for those days
+- Or use the one-click link in a Teams/email alert (`outOfOfficeUrl`)
+
 ## Limitations
 
 - Heartbeats cannot be recreated if the laptop was off; alerts nudge users to fix the agent or check in manually.
 - “Not in office” means no office Wi-Fi SSID detected, not badge/HR presence.
-- WFH days: user can disable `alertIfNotInOffice` or remove that day from work days.
+- WFH days: user can disable `alertIfNotInOffice`, remove that day from work days, or mark **Out of office** for that day.
 
 ## Testing the API
 

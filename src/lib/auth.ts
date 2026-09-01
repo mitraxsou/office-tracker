@@ -7,6 +7,9 @@ import crypto from "crypto";
 import { encryptPendingToken, decryptPendingToken } from "./token-crypto";
 import { buildInstallCommand } from "./agent-branding";
 import { isTokenExpired, revokeExpiredPendingTokens } from "./token-expiry";
+import type { InstallTokenForUser } from "./install-token-types";
+
+export type { InstallTokenForUser } from "./install-token-types";
 
 const SESSION_COOKIE = "office-tracker-session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
@@ -178,27 +181,36 @@ export function revealStoredPendingToken(
     expiresAt?: Date | null;
   },
 ) {
-  if (token.revokedAt || token.boundSerialNumber || !token.pendingTokenEnc) return null;
-  if (isTokenExpired({
-    revokedAt: token.revokedAt,
-    boundSerialNumber: token.boundSerialNumber,
-    expiresAt: token.expiresAt ?? null,
-  })) return null;
+  if (token.revokedAt || !token.pendingTokenEnc) return null;
+  if (
+    !token.boundSerialNumber &&
+    isTokenExpired({
+      revokedAt: token.revokedAt,
+      boundSerialNumber: token.boundSerialNumber,
+      expiresAt: token.expiresAt ?? null,
+    })
+  ) {
+    return null;
+  }
   return decryptPendingToken(token.pendingTokenEnc);
 }
 
-export async function getPendingInstallTokensForUser(userId: string, appUrl: string) {
+export async function getInstallTokensForUser(
+  userId: string,
+  appUrl: string,
+): Promise<InstallTokenForUser[]> {
   await revokeExpiredPendingTokens();
 
   const tokens = await prisma.agentToken.findMany({
-    where: { userId, revokedAt: null, boundSerialNumber: null },
-    orderBy: { createdAt: "desc" },
+    where: { userId, revokedAt: null },
+    orderBy: { createdAt: "asc" },
   });
 
   return tokens
     .map((t) => {
       const plain = revealStoredPendingToken(t);
       if (!plain) return null;
+      const status: "pending" | "bound" = t.boundSerialNumber ? "bound" : "pending";
       return {
         id: t.id,
         label: t.label,
@@ -206,9 +218,16 @@ export async function getPendingInstallTokensForUser(userId: string, appUrl: str
         plainToken: plain,
         installCommand: buildInstallCommand(appUrl, plain),
         createdAt: t.createdAt.toISOString(),
+        status,
+        boundSerialNumber: t.boundSerialNumber,
       };
     })
-    .filter((t): t is NonNullable<typeof t> => t !== null);
+    .filter((t): t is InstallTokenForUser => t !== null);
+}
+
+export async function getPendingInstallTokensForUser(userId: string, appUrl: string) {
+  const all = await getInstallTokensForUser(userId, appUrl);
+  return all.filter((t) => t.status === "pending");
 }
 
 export async function resolveAgentTokenRecord(token: string) {
@@ -358,7 +377,7 @@ export function summarizeAgentTokens(
         label: t.label,
         boundSerialNumber: t.boundSerialNumber,
         status,
-        shareable: status === "pending" && !!t.pendingTokenEnc,
+        shareable: (status === "pending" || status === "bound") && !!t.pendingTokenEnc,
         expiresAt: t.expiresAt?.toISOString() ?? null,
         createdAt: t.createdAt.toISOString(),
         lastUsedAt: t.lastUsedAt?.toISOString() ?? null,

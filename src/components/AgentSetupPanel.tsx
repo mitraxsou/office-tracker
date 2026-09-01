@@ -11,19 +11,21 @@ import {
   defaultInstallScriptDir,
 } from "@/lib/agent-branding";
 import { copyToClipboard } from "@/lib/clipboard";
+import type { InstallTokenForUser } from "@/lib/install-token-types";
 
 type AgentSetupPanelProps = {
   appUrl: string;
-  installCommand?: string | null;
+  installTokens?: InstallTokenForUser[];
   localDevAgentPath?: string | null;
 };
 
 export function AgentSetupPanel({
   appUrl,
-  installCommand,
+  installTokens = [],
   localDevAgentPath,
 }: AgentSetupPanelProps) {
-  const [copied, setCopied] = useState<"install" | "uninstall" | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedUninstall, setCopiedUninstall] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
 
   const isLocalDev = appUrl.includes("localhost") || appUrl.includes("127.0.0.1");
@@ -35,15 +37,15 @@ export function AgentSetupPanel({
     [isLocalDev, scriptDir],
   );
 
-  async function handleCopy(text: string, which: "install" | "uninstall") {
+  async function handleCopy(text: string, tokenId: string) {
     setCopyError(null);
     const ok = await copyToClipboard(text);
     if (!ok) {
       setCopyError("Could not copy to clipboard. Select the command below and press Ctrl+C.");
       return;
     }
-    setCopied(which);
-    setTimeout(() => setCopied(null), 2000);
+    setCopiedId(tokenId);
+    setTimeout(() => setCopiedId(null), 2000);
   }
 
   return (
@@ -88,21 +90,48 @@ export function AgentSetupPanel({
             </p>
           </li>
           <li>
-            <span className="font-medium">Copy the install command</span>
-            {!installCommand && (
+            <span className="font-medium">Copy the install command for your laptop</span>
+            {installTokens.length === 0 ? (
               <p className="mt-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-                No pending install token. Ask your admin to issue one — it will appear under{" "}
-                <strong>Laptop install tokens</strong> above.
+                No install tokens available. Ask your admin to issue one from Admin → Users &
+                tokens. It will appear under <strong>Laptop install tokens</strong> above.
               </p>
+            ) : (
+              <div className="mt-3 space-y-4">
+                {installTokens.map((t) => (
+                  <div
+                    key={t.id}
+                    className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3"
+                  >
+                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-medium text-foreground">
+                        {t.label ?? "Laptop token"}
+                      </span>
+                      <code className="text-muted">{t.prefix}</code>
+                      {t.status === "bound" && t.boundSerialNumber ? (
+                        <span className="rounded bg-green-500/15 px-2 py-0.5 text-green-400">
+                          Bound to {t.boundSerialNumber}
+                        </span>
+                      ) : (
+                        <span className="rounded bg-amber-500/15 px-2 py-0.5 text-amber-300">
+                          Waiting for first install
+                        </span>
+                      )}
+                    </div>
+                    <pre className="overflow-x-auto rounded border p-2 text-xs whitespace-pre-wrap">
+                      {t.installCommand}
+                    </pre>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(t.installCommand, t.id)}
+                      className="btn-primary mt-2 px-3 py-1.5 text-xs"
+                    >
+                      {copiedId === t.id ? "Copied!" : "Copy install command"}
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
-            <button
-              type="button"
-              onClick={() => installCommand && handleCopy(installCommand, "install")}
-              disabled={!installCommand}
-              className="btn-primary mt-2 px-4 py-2 text-sm disabled:opacity-50"
-            >
-              {copied === "install" ? "Copied!" : "Copy install command"}
-            </button>
           </li>
           <li>
             <span className="font-medium">Paste and run in PowerShell</span>
@@ -120,15 +149,6 @@ export function AgentSetupPanel({
             </p>
           </li>
         </ol>
-
-        {installCommand && (
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted">Install command (run inside extracted folder)</p>
-            <pre className="overflow-x-auto rounded-lg border bg-[var(--background)] p-4 text-xs whitespace-pre-wrap">
-              {installCommand}
-            </pre>
-          </div>
-        )}
       </section>
 
       <section className="card p-6">
@@ -159,10 +179,16 @@ export function AgentSetupPanel({
         </pre>
         <button
           type="button"
-          onClick={() => handleCopy(uninstallCommand, "uninstall")}
+          onClick={async () => {
+            const ok = await copyToClipboard(uninstallCommand);
+            if (ok) {
+              setCopiedUninstall(true);
+              setTimeout(() => setCopiedUninstall(false), 2000);
+            }
+          }}
           className="btn-secondary mt-3 px-4 py-2 text-sm"
         >
-          {copied === "uninstall" ? "Copied!" : "Copy uninstall command"}
+          {copiedUninstall ? "Copied!" : "Copy uninstall command"}
         </button>
       </section>
 

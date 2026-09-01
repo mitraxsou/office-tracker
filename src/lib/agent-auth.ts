@@ -58,7 +58,6 @@ export async function bindAgentTokenToSerial(agentTokenId: string, serialNumber:
       data: {
         boundSerialNumber: serialNumber,
         lastUsedAt: new Date(),
-        pendingTokenEnc: null,
         expiresAt: null,
       },
     });

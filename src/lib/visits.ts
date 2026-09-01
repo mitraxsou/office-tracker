@@ -134,6 +134,10 @@ export function mergeHeartbeatsIntoVisits(
   return visits;
 }
 
+export function roundHours(hours: number): number {
+  return Math.round(hours * 10) / 10;
+}
+
 export function formatHours(hours: number): string {
   const h = Math.floor(hours);
   const m = Math.round((hours - h) * 60);

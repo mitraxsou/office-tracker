@@ -13,7 +13,10 @@ const WEEKDAYS: Array<{ value: number; label: string }> = [
   { value: 7, label: "Sun" },
 ];
 
-export function NotificationPrefsForm() {
+export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } = {}) {
+  const apiUrl = adminUserId
+    ? `/api/admin/users/${adminUserId}/notification-prefs`
+    : "/api/settings/notification-prefs";
   const [prefs, setPrefs] = useState<NotificationPrefsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -21,13 +24,13 @@ export function NotificationPrefsForm() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/settings/notification-prefs")
+    fetch(apiUrl)
       .then((r) => r.json())
       .then((data) => {
         setPrefs(data.prefs);
         setLoading(false);
       });
-  }, []);
+  }, [apiUrl]);
 
   function toggleWorkDay(day: number) {
     if (!prefs) return;
@@ -43,7 +46,7 @@ export function NotificationPrefsForm() {
     setSaving(true);
     setError(null);
     setMessage(null);
-    const res = await fetch("/api/settings/notification-prefs", {
+    const res = await fetch(apiUrl, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(prefs),
@@ -71,10 +74,13 @@ export function NotificationPrefsForm() {
 
   return (
     <section className="card p-6">
-      <h2 className="mb-1 text-lg font-medium">Office schedule and alerts</h2>
+      <h2 className="mb-1 text-lg font-medium">
+        {adminUserId ? "Office schedule and alerts (admin)" : "Office schedule and alerts"}
+      </h2>
       <p className="mb-4 text-sm text-muted">
         Used by Power Automate to send Teams and email reminders. Alerts are nudges only, not HR
-        records.
+        records. Reminders are sent only on your selected <strong>usual office days</strong> (e.g.
+        Mon–Fri by default; Sat/Sun are skipped unless you enable them).
       </p>
 
       <label className="mb-5 flex items-center gap-3 rounded-lg border border-[var(--border)] px-4 py-3 text-sm">

@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import {
   getCurrentUser,
-  getPendingInstallTokensForUser,
-  summarizeAgentTokens,
+  getInstallTokensForUser,
 } from "@/lib/auth";
-import { getAppConfig, getUserHoursTarget } from "@/lib/app-config";
+import { getUserHoursTarget } from "@/lib/app-config";
+import { getEnrichedDevicesForUser } from "@/lib/device-enrichment";
 import { AppNav } from "@/components/AppNav";
 import { SettingsPageClient } from "@/components/SettingsPageClient";
 import { AGENT_PRODUCT_NAME } from "@/lib/agent-branding";
@@ -20,19 +20,10 @@ export default async function SettingsPage({
   const params = await searchParams;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const localDevAgentPath = process.env.AGENT_INSTALL_PATH || null;
-  const globalConfig = await getAppConfig();
   const hoursTarget = await getUserHoursTarget(user);
 
-  const pendingTokens = await getPendingInstallTokensForUser(user.id, appUrl);
-  const tokenSummary = summarizeAgentTokens(user.agentTokens);
-  const boundTokens = tokenSummary
-    .filter((t) => t.status === "bound")
-    .map((t) => ({
-      id: t.id,
-      label: t.label,
-      prefix: t.prefix,
-      boundSerialNumber: t.boundSerialNumber,
-    }));
+  const installTokens = await getInstallTokensForUser(user.id, appUrl);
+  const enrichedDevices = await getEnrichedDevicesForUser(user.id);
 
   return (
     <>
@@ -48,18 +39,10 @@ export default async function SettingsPage({
         <SettingsPageClient
           timezone={user.timezone}
           hoursTarget={hoursTarget}
-          officeSsids={globalConfig.officeSsids}
           appUrl={appUrl}
           isWelcome={params.welcome === "1"}
-          devices={user.agentDevices.map((d) => ({
-            id: d.id,
-            serialNumber: d.serialNumber,
-            label: d.label,
-            lastSeenAt: d.lastSeenAt?.toISOString() ?? null,
-            createdAt: d.createdAt.toISOString(),
-          }))}
-          pendingTokens={pendingTokens}
-          boundTokens={boundTokens}
+          devices={enrichedDevices}
+          installTokens={installTokens}
           localDevAgentPath={localDevAgentPath}
         />
       </main>

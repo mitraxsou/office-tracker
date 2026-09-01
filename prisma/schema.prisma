@@ -28,6 +28,21 @@ model User {
   auditTargets AuditLog[]    @relation("AuditTarget")
   notificationPrefs UserNotificationPrefs?
   integrationApiKeys IntegrationApiKey[]
+  outOfOfficeDays    UserOutOfOffice[]
+  deviceRemovalRequests DeviceRemovalRequest[]
+  resolvedDeviceRemovals DeviceRemovalRequest[] @relation("DeviceRemovalResolver")
+}
+
+model UserOutOfOffice {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dayKey    String
+  source    String   @default("settings")
+  createdAt DateTime @default(now())
+
+  @@unique([userId, dayKey])
+  @@index([userId])
 }
 
 model IntegrationApiKey {
@@ -93,8 +108,29 @@ model AgentDevice {
   label        String?
   lastSeenAt   DateTime?
   createdAt    DateTime    @default(now())
+  removalRequests DeviceRemovalRequest[]
 
   @@unique([userId, serialNumber])
+}
+
+model DeviceRemovalRequest {
+  id           String      @id @default(cuid())
+  userId       String
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId     String
+  device       AgentDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  message      String?
+  status       String      @default("open")
+  adminNote    String?
+  resolvedAt   DateTime?
+  resolvedById String?
+  resolvedBy   User?       @relation("DeviceRemovalResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId])
+  @@index([deviceId])
 }
 
 model AppConfig {
