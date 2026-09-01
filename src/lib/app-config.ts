@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
-import { DEFAULT_HOURS_TARGET, parseDefaultSsidsFromEnv } from "./constants";
+import { DEFAULT_HOURS_TARGET, DEFAULT_MONTHLY_DAYS_TARGET, parseDefaultSsidsFromEnv } from "./constants";
 
 export const DEFAULT_PENDING_TOKEN_TTL_DAYS = 7;
 export const DEFAULT_HEARTBEAT_RETENTION_DAYS = 7;
@@ -25,6 +25,7 @@ export function logAppConfigSchemaDriftIfNeeded(err: unknown): boolean {
 
 export type AppConfigData = {
   hoursTarget: number;
+  monthlyDaysTarget: number;
   officeSsids: string[];
   maxDevicesPerUser: number;
   allowRegistration: boolean;
@@ -43,6 +44,7 @@ export async function ensureAppConfig(): Promise<AppConfigData> {
         data: {
           id: CONFIG_ID,
           hoursTarget: DEFAULT_HOURS_TARGET,
+          monthlyDaysTarget: DEFAULT_MONTHLY_DAYS_TARGET,
           officeSsids: JSON.stringify(parseDefaultSsidsFromEnv()),
           maxDevicesPerUser: 10,
           allowRegistration: false,
@@ -67,6 +69,7 @@ export async function updateAppConfig(data: Partial<AppConfigData>) {
   await ensureAppConfig();
   const update: Record<string, unknown> = {};
   if (data.hoursTarget !== undefined) update.hoursTarget = data.hoursTarget;
+  if (data.monthlyDaysTarget !== undefined) update.monthlyDaysTarget = data.monthlyDaysTarget;
   if (data.officeSsids !== undefined) update.officeSsids = JSON.stringify(data.officeSsids);
   if (data.maxDevicesPerUser !== undefined) update.maxDevicesPerUser = data.maxDevicesPerUser;
   if (data.allowRegistration !== undefined) update.allowRegistration = data.allowRegistration;
@@ -93,6 +96,7 @@ export async function getAgentStaleMs() {
 
 function parseConfig(config: {
   hoursTarget: number;
+  monthlyDaysTarget?: number;
   officeSsids: string;
   maxDevicesPerUser: number;
   allowRegistration: boolean;
@@ -109,6 +113,7 @@ function parseConfig(config: {
   }
   return {
     hoursTarget: config.hoursTarget,
+    monthlyDaysTarget: config.monthlyDaysTarget ?? DEFAULT_MONTHLY_DAYS_TARGET,
     officeSsids: ssids,
     maxDevicesPerUser: config.maxDevicesPerUser,
     allowRegistration: config.allowRegistration,

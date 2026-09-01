@@ -1,3 +1,4 @@
+import { allDayKeysInMonth, monthBoundsFromKey, parseReportMonth } from "./month-range";
 import { getDayBounds, dayBoundsFromKey } from "./timezone-dates";
 
 export type ReportRange = {
@@ -6,6 +7,7 @@ export type ReportRange = {
   days: number;
   fromKey: string;
   toKey: string;
+  monthKey: string;
 };
 
 export function addDays(date: Date, days: number) {
@@ -22,6 +24,19 @@ export function parseReportRange(
   searchParams: URLSearchParams,
   timezone = "Asia/Kolkata",
 ): ReportRange {
+  const monthParam = searchParams.get("month");
+  if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+    const bounds = monthBoundsFromKey(monthParam, timezone);
+    return {
+      from: bounds.from,
+      to: bounds.to,
+      days: allDayKeysInMonth(monthParam).length,
+      fromKey: bounds.fromKey,
+      toKey: bounds.toKey,
+      monthKey: monthParam,
+    };
+  }
+
   const fromParam = searchParams.get("from");
   const toParam = searchParams.get("to");
 
@@ -32,27 +47,26 @@ export function parseReportRange(
     const to = toBounds.end;
     if (!Number.isNaN(from.getTime()) && !Number.isNaN(to.getTime()) && from <= to) {
       const days = Math.ceil((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+      const monthKey = fromParam.slice(0, 7);
       return {
         from,
         to,
         days: Math.min(90, days),
         fromKey: fromParam,
         toKey: toParam,
+        monthKey,
       };
     }
   }
 
-  const days = Math.min(90, Math.max(1, Number.parseInt(searchParams.get("days") ?? "30", 10) || 30));
-  const to = new Date();
-  const from = addDays(to, -(days - 1));
-  const toBounds = getDayBounds(to, timezone);
-  const fromBounds = getDayBounds(from, timezone);
+  const month = parseReportMonth(searchParams, timezone);
   return {
-    from: fromBounds.start,
-    to: toBounds.end,
-    days,
-    fromKey: fromBounds.dayKey,
-    toKey: toBounds.dayKey,
+    from: month.from,
+    to: month.to,
+    days: allDayKeysInMonth(month.monthKey).length,
+    fromKey: month.fromKey,
+    toKey: month.toKey,
+    monthKey: month.monthKey,
   };
 }
 

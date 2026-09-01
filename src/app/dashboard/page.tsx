@@ -3,8 +3,10 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { getTodaySummary, getPulseStats } from "@/lib/heartbeat-service";
 import { getUserHoursTarget, getAppConfig } from "@/lib/app-config";
+import { getMonthlyProgress } from "@/lib/monthly-progress";
 import { AppNav } from "@/components/AppNav";
 import { ProgressMeter } from "@/components/ProgressMeter";
+import { MonthlyProgressMeter } from "@/components/MonthlyProgressMeter";
 import { VisitList } from "@/components/VisitList";
 import { ManualVisitForm } from "@/components/ManualVisitForm";
 import { QuickOfficeToggle } from "@/components/QuickOfficeToggle";
@@ -23,6 +25,13 @@ export default async function DashboardPage() {
     await getUserHoursTarget(user)
   );
   const config = await getAppConfig();
+  const hoursTarget = await getUserHoursTarget(user);
+  const monthlyProgress = await getMonthlyProgress(
+    user.id,
+    user.timezone,
+    hoursTarget,
+    config.monthlyDaysTarget,
+  );
   const pulse = await getPulseStats(user.id, config.agentStaleMinutes);
   const agentNeverConnected = !summary.lastHeartbeat && user.agentDevices.length === 0;
   const agentStale = !!summary.lastHeartbeat && !summary.agentHealthy;
@@ -60,6 +69,13 @@ export default async function DashboardPage() {
           totalHours={summary.totalHours}
           targetHours={summary.hoursTarget}
           metTarget={summary.metTarget}
+        />
+
+        <MonthlyProgressMeter
+          qualifyingDays={monthlyProgress.qualifyingDays}
+          monthlyDaysTarget={monthlyProgress.monthlyDaysTarget}
+          metTarget={monthlyProgress.metTarget}
+          monthKey={monthlyProgress.monthKey}
         />
 
         <div className="grid gap-4 md:grid-cols-3">

@@ -24,6 +24,7 @@ model User {
   visits       Visit[]
   visitCorrectionRequests VisitCorrectionRequest[]
   resolvedVisitReports    VisitCorrectionRequest[] @relation("VisitReportResolver")
+  visitCorrectionMessages VisitCorrectionMessage[]
   auditActions AuditLog[]    @relation("AuditActor")
   auditTargets AuditLog[]    @relation("AuditTarget")
   notificationPrefs UserNotificationPrefs?
@@ -136,6 +137,7 @@ model DeviceRemovalRequest {
 model AppConfig {
   id                String   @id @default("global")
   hoursTarget       Float    @default(5.0)
+  monthlyDaysTarget Int      @default(8)
   officeSsids       String   @default("[\"OfficeConnect\",\"ExternalConnect\"]")
   maxDevicesPerUser Int      @default(10)
   allowRegistration     Boolean  @default(false)
@@ -175,23 +177,39 @@ model Visit {
 }
 
 model VisitCorrectionRequest {
-  id           String    @id @default(cuid())
-  userId       String
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  visitId      String?
-  visit        Visit?    @relation(fields: [visitId], references: [id], onDelete: SetNull)
-  message      String
-  issueType    String?
-  status       String    @default("open")
-  adminNote    String?
-  resolvedAt   DateTime?
-  resolvedById String?
-  resolvedBy   User?     @relation("VisitReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  visitId           String?
+  visit             Visit?    @relation(fields: [visitId], references: [id], onDelete: SetNull)
+  message           String
+  issueType         String?
+  status            String    @default("open")
+  adminNote         String?
+  visitSnapshot     String?
+  correctionSummary String?
+  resolvedAt        DateTime?
+  resolvedById      String?
+  resolvedBy        User?     @relation("VisitReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  messages          VisitCorrectionMessage[]
 
   @@index([status, createdAt])
   @@index([userId])
+}
+
+model VisitCorrectionMessage {
+  id         String                 @id @default(cuid())
+  requestId  String
+  request    VisitCorrectionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User                   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorRole String
+  body       String
+  createdAt  DateTime               @default(now())
+
+  @@index([requestId, createdAt])
 }
 
 model AuditLog {

@@ -26,6 +26,7 @@ export function VisitList({
   const [reportingId, setReportingId] = useState<string | null>(null);
   const [reportMessage, setReportMessage] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   if (visits.length === 0) {
@@ -35,6 +36,7 @@ export function VisitList({
   async function handleDelete(visitId: string) {
     if (!confirm("Delete this manual visit? This cannot be undone.")) return;
     setActionError(null);
+    setActionSuccess(null);
     setActionLoading(true);
     const res = await fetch(`/api/visits?id=${visitId}`, { method: "DELETE" });
     setActionLoading(false);
@@ -53,6 +55,7 @@ export function VisitList({
       return;
     }
     setActionError(null);
+    setActionSuccess(null);
     setActionLoading(true);
     const res = await fetch("/api/visits/report", {
       method: "POST",
@@ -67,6 +70,7 @@ export function VisitList({
     }
     setReportingId(null);
     setReportMessage("");
+    setActionSuccess("Correction request sent. Track status under My correction requests above.");
     router.refresh();
   }
 
@@ -74,6 +78,9 @@ export function VisitList({
     <div>
       {actionError && (
         <p className="mb-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{actionError}</p>
+      )}
+      {actionSuccess && (
+        <p className="mb-3 rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-400">{actionSuccess}</p>
       )}
       <ul className="divide-y divide-[var(--border)]">
         {visits.map((visit) => {

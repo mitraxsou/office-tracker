@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin";
 import { getAppConfig, updateAppConfig } from "@/lib/app-config";
+import { validateMonthlyDaysTarget } from "@/lib/monthly-progress";
 import { validateSsids } from "@/lib/security";
 import { normalizeSsid } from "@/lib/constants";
 import { logAuditEvent } from "@/lib/audit-log";
@@ -27,6 +28,7 @@ export async function PATCH(request: Request) {
 
   let body: {
     hoursTarget?: number;
+    monthlyDaysTarget?: number;
     officeSsids?: string[];
     maxDevicesPerUser?: number;
     allowRegistration?: boolean;
@@ -48,6 +50,14 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Invalid hoursTarget" }, { status: 400 });
     }
     update.hoursTarget = body.hoursTarget;
+  }
+
+  if (body.monthlyDaysTarget !== undefined) {
+    const validated = validateMonthlyDaysTarget(body.monthlyDaysTarget);
+    if (validated === null) {
+      return NextResponse.json({ error: "Invalid monthlyDaysTarget" }, { status: 400 });
+    }
+    update.monthlyDaysTarget = validated;
   }
 
   if (body.officeSsids !== undefined) {

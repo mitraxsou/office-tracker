@@ -1,5 +1,6 @@
 export const DEFAULT_TIMEZONE = "Asia/Kolkata";
 export const DEFAULT_HOURS_TARGET = 5;
+export const DEFAULT_MONTHLY_DAYS_TARGET = 8;
 export const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
 export const VISIT_GAP_MS = 8 * 60 * 1000;
 

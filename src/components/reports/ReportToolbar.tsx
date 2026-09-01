@@ -1,107 +1,63 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { formatMonthLabel, shiftMonth } from "@/lib/month-range";
 import { exportToCsv } from "@/lib/report-range";
 
-export type DateRangePreset = {
-  label: string;
-  days: number;
-};
-
-const DEFAULT_PRESETS: DateRangePreset[] = [
-  { label: "7 days", days: 7 },
-  { label: "14 days", days: 14 },
-  { label: "30 days", days: 30 },
-  { label: "90 days", days: 90 },
-];
-
-type ReportToolbarProps = {
-  days: number;
-  fromKey: string;
-  toKey: string;
-  onRangeChange: (params: { days?: number; from?: string; to?: string }) => void;
+type MonthReportToolbarProps = {
+  monthKey: string;
+  timezone?: string;
+  onMonthChange: (monthKey: string) => void;
   onExport?: () => void;
   exportLabel?: string;
   children?: React.ReactNode;
 };
 
-export function ReportToolbar({
-  days,
-  fromKey,
-  toKey,
-  onRangeChange,
+export function MonthReportToolbar({
+  monthKey,
+  timezone = "Asia/Kolkata",
+  onMonthChange,
   onExport,
   exportLabel = "Export CSV",
   children,
-}: ReportToolbarProps) {
-  const [customFrom, setCustomFrom] = useState(fromKey);
-  const [customTo, setCustomTo] = useState(toKey);
-  const [showCustom, setShowCustom] = useState(false);
-
+}: MonthReportToolbarProps) {
   return (
-    <div className="flex flex-wrap items-end gap-3 rounded-lg border border-[var(--border)] bg-[var(--background)] p-4">
-      <div className="flex flex-wrap gap-2">
-        {DEFAULT_PRESETS.map((preset) => (
-          <button
-            key={preset.days}
-            type="button"
-            onClick={() => onRangeChange({ days: preset.days })}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              !showCustom && days === preset.days
-                ? "bg-[var(--pwc-orange)] text-white"
-                : "border border-[var(--border)] text-muted hover:border-[var(--pwc-orange)] hover:text-[var(--pwc-orange)]"
-            }`}
-          >
-            {preset.label}
-          </button>
-        ))}
+    <div className="flex flex-wrap items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--background)] p-4">
+      <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => setShowCustom((v) => !v)}
-          className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-            showCustom
-              ? "bg-[var(--pwc-orange)] text-white"
-              : "border border-[var(--border)] text-muted hover:border-[var(--pwc-orange)]"
-          }`}
+          onClick={() => onMonthChange(shiftMonth(monthKey, -1))}
+          className="rounded-md border border-[var(--border)] px-2.5 py-1.5 text-sm text-muted transition-colors hover:border-[var(--pwc-orange)] hover:text-[var(--pwc-orange)]"
+          aria-label="Previous month"
         >
-          Custom
+          ‹
         </button>
+        <span className="min-w-[10rem] text-center text-sm font-medium">
+          {formatMonthLabel(monthKey, timezone)}
+        </span>
+        <button
+          type="button"
+          onClick={() => onMonthChange(shiftMonth(monthKey, 1))}
+          className="rounded-md border border-[var(--border)] px-2.5 py-1.5 text-sm text-muted transition-colors hover:border-[var(--pwc-orange)] hover:text-[var(--pwc-orange)]"
+          aria-label="Next month"
+        >
+          ›
+        </button>
+        <label className="sr-only" htmlFor="month-picker">
+          Jump to month
+        </label>
+        <input
+          id="month-picker"
+          type="month"
+          value={monthKey}
+          onChange={(e) => {
+            if (e.target.value) onMonthChange(e.target.value);
+          }}
+          className="rounded-md border border-[var(--border)] px-2 py-1 text-xs"
+        />
       </div>
 
-      {showCustom && (
-        <div className="flex flex-wrap items-end gap-2">
-          <label className="text-xs text-muted">
-            From
-            <input
-              type="date"
-              value={customFrom}
-              onChange={(e) => setCustomFrom(e.target.value)}
-              className="mt-1 block rounded border px-2 py-1 text-sm"
-            />
-          </label>
-          <label className="text-xs text-muted">
-            To
-            <input
-              type="date"
-              value={customTo}
-              onChange={(e) => setCustomTo(e.target.value)}
-              className="mt-1 block rounded border px-2 py-1 text-sm"
-            />
-          </label>
-          <button
-            type="button"
-            onClick={() => onRangeChange({ from: customFrom, to: customTo })}
-            className="btn-primary px-3 py-1.5 text-xs"
-          >
-            Apply
-          </button>
-        </div>
-      )}
-
       <div className="ml-auto flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted">
-          {fromKey} to {toKey}
-        </span>
         {children}
         {onExport && (
           <button type="button" onClick={onExport} className="btn-secondary px-3 py-1.5 text-xs">
@@ -110,6 +66,35 @@ export function ReportToolbar({
         )}
       </div>
     </div>
+  );
+}
+
+/** @deprecated Use MonthReportToolbar. Kept for export helpers. */
+export function ReportToolbar({
+  monthKey,
+  timezone,
+  onMonthChange,
+  onExport,
+  exportLabel,
+  children,
+}: {
+  monthKey: string;
+  timezone?: string;
+  onMonthChange: (monthKey: string) => void;
+  onExport?: () => void;
+  exportLabel?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <MonthReportToolbar
+      monthKey={monthKey}
+      timezone={timezone}
+      onMonthChange={onMonthChange}
+      onExport={onExport}
+      exportLabel={exportLabel}
+    >
+      {children}
+    </MonthReportToolbar>
   );
 }
 

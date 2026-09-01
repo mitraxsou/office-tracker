@@ -28,7 +28,9 @@ export type AuditAction =
   | "admin_notification_prefs_update"
   | "device_removal_request"
   | "device_removal_approve"
-  | "device_removal_reject";
+  | "device_removal_reject"
+  | "visit_correction_reply"
+  | "data_purge";
 
 export async function logAuditEvent(params: {
   actorId: string;

@@ -41,7 +41,7 @@
 - `User` — email, role, timezone, optional hoursTarget override
 - `AgentToken` — bcrypt token hash, tokenPrefix lookup
 - `AgentDevice` — serialNumber, lastSeenAt per user
-- `AppConfig` — global hoursTarget, officeSsids JSON
+- `AppConfig` — global hoursTarget, monthlyDaysTarget, officeSsids JSON
 - `Heartbeat` — ssid, inOffice, vpnGateway, recordedAt
 - `Visit` — startAt, endAt, source (wifi|manual)
 - `AuditLog` — admin actions

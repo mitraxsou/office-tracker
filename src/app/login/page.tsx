@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { authenticateUser, createSession } from "@/lib/auth";
 
 export default function LoginPage({
@@ -31,6 +32,9 @@ async function LoginForm({
 
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
+      <div className="fixed right-4 top-4 z-50">
+        <ThemeToggle />
+      </div>
       <div className="card w-full max-w-md p-8 shadow-xl">
         <div className="mb-6 flex items-center gap-2">
           <span className="inline-block h-3 w-3 rounded-full bg-[var(--pwc-orange)]" />
@@ -71,6 +75,12 @@ async function LoginForm({
           No account?{" "}
           <Link href="/register" className="text-accent hover:underline">
             Register
+          </Link>
+        </p>
+        <p className="mt-3 text-center text-sm text-muted">
+          New to Office Pulse?{" "}
+          <Link href="/help" className="text-accent hover:underline">
+            Read the setup guide
           </Link>
         </p>
       </div>

@@ -7,6 +7,7 @@ import { AdminSettingsForm } from "@/components/AdminSettingsForm";
 import { AdminPilotControls } from "@/components/AdminPilotControls";
 import { AdminSubNav } from "@/components/AdminSubNav";
 import { AdminIntegrationKeys } from "@/components/AdminIntegrationKeys";
+import { AdminMaintenance } from "@/components/AdminMaintenance";
 import { listIntegrationApiKeys } from "@/lib/integration-api-keys";
 
 export default async function AdminSettingsPage() {
@@ -22,11 +23,12 @@ export default async function AdminSettingsPage() {
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-8">
         <div>
           <h1 className="text-2xl font-semibold">Global settings</h1>
-          <p className="text-sm text-muted">Hours target and office SSIDs for all users</p>
+          <p className="text-sm text-muted">Hours and monthly days targets, office SSIDs for all users</p>
         </div>
         <AdminSubNav active="settings" />
         <AdminSettingsForm
           hoursTarget={config.hoursTarget}
+          monthlyDaysTarget={config.monthlyDaysTarget}
           officeSsids={config.officeSsids}
           maxDevicesPerUser={config.maxDevicesPerUser}
           pendingTokenTtlDays={config.pendingTokenTtlDays}
@@ -34,6 +36,7 @@ export default async function AdminSettingsPage() {
           agentStaleMinutes={config.agentStaleMinutes}
         />
         <AdminIntegrationKeys initialKeys={integrationKeys} />
+        <AdminMaintenance />
         <AdminPilotControls
           allowRegistration={config.allowRegistration}
           registrationEnvLocked={isRegistrationEnvLocked()}

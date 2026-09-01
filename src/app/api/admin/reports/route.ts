@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/admin";
 import { getAdminReports } from "@/lib/admin-reports";
 import { getRecentAuditLogs } from "@/lib/audit-log";
 import { parseReportRange } from "@/lib/report-range";
+import { currentMonthKey } from "@/lib/month-range";
 
 export async function GET(request: Request) {
   const admin = await requireAdmin();
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
   const range = parseReportRange(new URL(request.url).searchParams);
 
   const [reports, auditLog] = await Promise.all([
-    getAdminReports({ days: range.days }),
+    getAdminReports({ monthKey: range.monthKey }),
     getRecentAuditLogs(25),
   ]);
 
@@ -23,6 +24,8 @@ export async function GET(request: Request) {
       days: range.days,
       from: range.fromKey,
       to: range.toKey,
+      month: range.monthKey,
+      currentMonth: currentMonthKey("Asia/Kolkata"),
     },
     auditLog,
     actor: { id: admin.id, email: admin.email },

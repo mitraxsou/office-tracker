@@ -2,24 +2,10 @@ import { summarizeAgentTokens } from "./auth";
 import { prisma } from "./db";
 import { getAppConfig, getUserHoursTarget } from "./app-config";
 import { getTodaySummary, closeStaleOpenVisits, closeEndOfDayOpenVisits } from "./heartbeat-service";
+import { allDayKeysInMonth, currentMonthKey } from "./month-range";
 import { revokeExpiredPendingTokens } from "./token-expiry";
-import { effectiveVisitEnd } from "./visits";
+import { effectiveVisitEnd, roundHours } from "./visits";
 import { dayBoundsFromKey } from "./timezone-dates";
-
-function dayKeyForTimezone(date: Date, timezone: string) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-}
-
-function addDays(date: Date, days: number) {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
-}
 
 async function aggregateHoursForDay(userId: string, timezone: string, dayKey: string) {
   const config = await getAppConfig();
@@ -59,10 +45,11 @@ async function aggregateHoursForDay(userId: string, timezone: string, dayKey: st
   }, 0);
 }
 
-export async function getAdminReports(options?: { days?: number }) {
+export async function getAdminReports(options?: { days?: number; monthKey?: string }) {
   const config = await getAppConfig();
   const defaultTz = "Asia/Kolkata";
-  const trendDays = Math.min(90, Math.max(1, options?.days ?? 7));
+  const monthKey = options?.monthKey ?? currentMonthKey(defaultTz);
+  const monthDayKeys = allDayKeysInMonth(monthKey);
 
   await revokeExpiredPendingTokens();
 
@@ -110,7 +97,6 @@ export async function getAdminReports(options?: { days?: number }) {
       ? userSummaries.reduce((s, u) => s + u.today.totalHours, 0) / userSummaries.length
       : 0;
 
-  const today = new Date();
   const dailyTrend: Array<{
     date: string;
     totalHours: number;
@@ -118,9 +104,7 @@ export async function getAdminReports(options?: { days?: number }) {
     activeUsers: number;
   }> = [];
 
-  for (let i = trendDays - 1; i >= 0; i--) {
-    const day = addDays(today, -i);
-    const key = dayKeyForTimezone(day, defaultTz);
+  for (const key of monthDayKeys) {
     let dayTotalMs = 0;
     let metCount = 0;
 
@@ -159,7 +143,60 @@ export async function getAdminReports(options?: { days?: number }) {
     dailyTrend,
     statusBreakdown,
     users: userSummaries,
-    range: { days: trendDays },
+    range: { days: monthDayKeys.length, monthKey },
+  };
+}
+
+export type InOfficeNowUser = {
+  userId: string;
+  email: string;
+  name: string | null;
+  hoursToday: number;
+  hoursTarget: number;
+  metTarget: boolean;
+  visitStartAt: string | null;
+  visitSource: string | null;
+  visitSsid: string | null;
+  lastHeartbeatAt: string | null;
+  lastHeartbeatSource: string | null;
+  inOfficeNow: true;
+};
+
+export async function getInOfficeNowUsers(): Promise<{
+  count: number;
+  updatedAt: string;
+  users: InOfficeNowUser[];
+}> {
+  const users = await prisma.user.findMany({ orderBy: { email: "asc" } });
+  const rows = await Promise.all(
+    users.map(async (user) => {
+      const hoursTarget = await getUserHoursTarget(user);
+      const summary = await getTodaySummary(user.id, user.timezone, hoursTarget);
+      if (!summary.inOfficeNow) return null;
+
+      const openVisit = summary.visits.find((v) => v.endAt === null);
+      return {
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        hoursToday: roundHours(summary.totalHours),
+        hoursTarget,
+        metTarget: summary.metTarget,
+        visitStartAt: openVisit?.startAt.toISOString() ?? null,
+        visitSource: openVisit?.source ?? null,
+        visitSsid: openVisit?.ssid ?? null,
+        lastHeartbeatAt: summary.lastHeartbeat?.recordedAt.toISOString() ?? null,
+        lastHeartbeatSource: summary.lastHeartbeat?.source ?? null,
+        inOfficeNow: true as const,
+      };
+    }),
+  );
+
+  const inOffice = rows.filter((row): row is InOfficeNowUser => row !== null);
+  return {
+    count: inOffice.length,
+    updatedAt: new Date().toISOString(),
+    users: inOffice,
   };
 }
 

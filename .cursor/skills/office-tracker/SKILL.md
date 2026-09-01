@@ -9,7 +9,7 @@ description: >-
 
 # PwC Office Pulse (Office Tracker)
 
-Internal pilot: track **≥5 hours/day in office** on PwC laptops. Product name in UI and agent: **PwC Office Pulse**.
+Internal pilot: track **≥5 hours/day in office** on PwC laptops, with a default **8 office days per month** target. Product name in UI and agent: **PwC Office Pulse**.
 
 ## Architecture
 
@@ -62,13 +62,13 @@ Config: GET /api/agent/config (Bearer token) — SSIDs & hours target server-sid
 
 ### User (`role=user`)
 - `/dashboard`, `/history`, `/settings`, `/help`
-- Settings: timezone, token, install/uninstall commands, read-only hours target, read-only registered laptops
+- Settings: timezone, token, install/uninstall commands, read-only hours and monthly days targets, read-only registered laptops
 - Cannot edit SSIDs, daily target, or device serials
 - Quick **Check in** / **Check out** when auto-detect fails
 
 ### Admin (`role=admin`)
 - `/admin` — all users, compliance charts, visit corrections, device removal
-- `/admin/settings` — global hours target, office SSIDs
+- `/admin/settings` — global hours target, monthly office days target, office SSIDs
 - Audit log on admin actions
 
 **Breakglass admin:** env vars `BREAKGLASS_EMAIL` + `BREAKGLASS_PASSWORD` only (not hardcoded in source). Local dev example in `.env.local`.

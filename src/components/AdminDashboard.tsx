@@ -10,11 +10,12 @@ import {
 } from "@/components/reports/ReportCharts";
 import {
   exportDailyTrendCsv,
+  MonthReportToolbar,
   ReportFilters,
-  ReportToolbar,
   useTableSort,
 } from "@/components/reports/ReportToolbar";
 import { exportToCsv } from "@/lib/report-range";
+import { InOfficeNowPanel } from "@/components/InOfficeNowPanel";
 
 type DailyPoint = { date: string; totalHours: number; compliancePct: number };
 
@@ -53,7 +54,7 @@ type ReportsData = {
   dailyTrend: DailyPoint[];
   statusBreakdown: { inOffice: number; notInOffice: number; noAgent: number };
   users: UserRow[];
-  range: { days: number; from: string; to: string };
+  range: { days: number; from: string; to: string; month: string; currentMonth: string };
   auditLog: Array<{
     id: string;
     action: string;
@@ -64,7 +65,7 @@ type ReportsData = {
 };
 
 export function AdminDashboard() {
-  const [days, setDays] = useState(30);
+  const [monthKey, setMonthKey] = useState("");
   const [fromKey, setFromKey] = useState("");
   const [toKey, setToKey] = useState("");
   const [data, setData] = useState<ReportsData | null>(null);
@@ -76,19 +77,15 @@ export function AdminDashboard() {
   const [search, setSearch] = useState("");
   const [compliance, setCompliance] = useState<"all" | "met" | "not_met">("all");
   const [agentStatus, setAgentStatus] = useState<"all" | "healthy" | "stale" | "in_office">("all");
+  const [inOfficePanelOpen, setInOfficePanelOpen] = useState(false);
 
   const load = useCallback(
-    async (params: { days?: number; from?: string; to?: string }, silent = false) => {
+    async (month: string, silent = false) => {
       if (!silent) setLoading(true);
       else setRefreshing(true);
 
       const qs = new URLSearchParams();
-      if (params.from && params.to) {
-        qs.set("from", params.from);
-        qs.set("to", params.to);
-      } else {
-        qs.set("days", String(params.days ?? days));
-      }
+      if (month) qs.set("month", month);
 
       const res = await fetch(`/api/admin/reports?${qs}`);
       if (!silent) setLoading(false);
@@ -101,17 +98,17 @@ export function AdminDashboard() {
       setError(null);
       const json = await res.json();
       setData(json);
-      setDays(json.range.days);
+      setMonthKey(json.range.month);
       setFromKey(json.range.from);
       setToKey(json.range.to);
       setSelectedDate(null);
       setDayDetail(null);
     },
-    [days],
+    [],
   );
 
   useEffect(() => {
-    void load({ days: 30 });
+    void load("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -182,26 +179,24 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <ReportToolbar
-        days={days}
-        fromKey={fromKey}
-        toKey={toKey}
-        onRangeChange={(p) => load(p)}
+      <MonthReportToolbar
+        monthKey={monthKey}
+        onMonthChange={(m) => load(m)}
         onExport={() => {
           if (data) {
-            exportDailyTrendCsv(`admin-office-hours-${fromKey}-${toKey}.csv`, chartData);
+            exportDailyTrendCsv(`admin-office-hours-${monthKey}.csv`, chartData);
           }
         }}
       >
         {refreshing && <span className="text-xs text-muted">Refreshing...</span>}
         <button
           type="button"
-          onClick={() => load({ days }, true)}
+          onClick={() => load(monthKey, true)}
           className="btn-secondary px-3 py-1.5 text-xs"
         >
           Refresh
         </button>
-      </ReportToolbar>
+      </MonthReportToolbar>
 
       {loading && !data && <p className="text-muted">Loading reports...</p>}
       {error && !data && <p className="text-red-400">{error}</p>}
@@ -210,17 +205,27 @@ export function AdminDashboard() {
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <SummaryCard label="Total users" value={String(data.summary.totalUsers)} />
-            <SummaryCard label="In office now" value={String(data.summary.inOfficeNow)} />
+            <SummaryCard
+              label="In office now"
+              value={String(data.summary.inOfficeNow)}
+              onClick={() => setInOfficePanelOpen(true)}
+              clickable
+            />
             <SummaryCard label="Met target today" value={`${data.summary.metTodayPct}%`} />
             <SummaryCard label="Avg hours today" value={`${data.summary.avgHours}h`} />
           </div>
+
+          <InOfficeNowPanel
+            open={inOfficePanelOpen}
+            onClose={() => setInOfficePanelOpen(false)}
+          />
 
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="card p-6">
               <HoursTrendChart
                 data={chartData}
                 targetHours={data.summary.hoursTarget}
-                title={`Org office hours (${days} days)`}
+                title={`Org office hours (${monthKey})`}
                 selectedDate={selectedDate}
                 onBarClick={handleBarClick}
               />
@@ -377,9 +382,36 @@ export function AdminDashboard() {
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: string }) {
+function SummaryCard({
+  label,
+  value,
+  onClick,
+  clickable,
+}: {
+  label: string;
+  value: string;
+  onClick?: () => void;
+  clickable?: boolean;
+}) {
+  const className = [
+    "card p-4 text-left",
+    clickable ? "cursor-pointer transition-colors hover:border-[var(--pwc-orange)]" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  if (clickable && onClick) {
+    return (
+      <button type="button" onClick={onClick} className={className}>
+        <p className="text-xs text-muted">{label}</p>
+        <p className="mt-1 text-2xl font-semibold text-accent">{value}</p>
+        <p className="mt-1 text-xs text-muted">Click to view list</p>
+      </button>
+    );
+  }
+
   return (
-    <div className="card p-4">
+    <div className={className}>
       <p className="text-xs text-muted">{label}</p>
       <p className="mt-1 text-2xl font-semibold">{value}</p>
     </div>

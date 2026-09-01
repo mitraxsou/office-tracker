@@ -1,11 +1,33 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { destroySession, getCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 
 export async function AppNav() {
   const user = await getCurrentUser();
-  if (!user) return null;
+
+  if (!user) {
+    return (
+      <nav className="border-b border-[var(--border)] bg-[var(--background-elevated)]">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
+          <Link href="/help" className="flex items-center gap-2 font-semibold">
+            <span className="inline-block h-2 w-2 rounded-full bg-[var(--pwc-orange)]" />
+            PwC Office Pulse
+          </Link>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <Link href="/help" className="link-nav text-sm">
+              Help
+            </Link>
+            <Link href="/login" className="btn-primary px-3 py-1.5 text-sm">
+              Sign in
+            </Link>
+          </div>
+        </div>
+      </nav>
+    );
+  }
 
   async function logout() {
     "use server";
@@ -42,11 +64,14 @@ export async function AppNav() {
             Help
           </Link>
         </div>
-        <form action={logout}>
-          <button type="submit" className="link-nav text-sm">
-            Sign out
-          </button>
-        </form>
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+          <form action={logout}>
+            <button type="submit" className="link-nav text-sm">
+              Sign out
+            </button>
+          </form>
+        </div>
       </div>
     </nav>
   );

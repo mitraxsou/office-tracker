@@ -1,13 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AdminVisitManager } from "./AdminVisitManager";
 import { NotificationPrefsForm } from "./NotificationPrefsForm";
 import { OutOfOfficeSection } from "./OutOfOfficeSection";
+import { VisitCalendar } from "./reports/VisitCalendar";
 import { HoursTrendChart } from "./reports/ReportCharts";
-import { exportDailyTrendCsv } from "./reports/ReportToolbar";
+import { exportDailyTrendCsv, MonthReportToolbar } from "./reports/ReportToolbar";
+import { formatHours, formatTime } from "@/lib/visits";
 
 type UserReport = {
   user: {
@@ -56,31 +58,48 @@ type UserReport = {
     boundSerialNumber: string | null;
     expiresAt: string | null;
   }>;
-  range: { days: number };
+  range: { days: number; from: string; to: string; month: string; currentMonth: string };
+  monthlyDaysTarget: number;
+  monthlyProgress: {
+    monthKey: string;
+    qualifyingDays: number;
+    monthlyDaysTarget: number;
+    metTarget: boolean;
+  };
 };
 
 export function AdminUserReport({ userId }: { userId: string }) {
   const router = useRouter();
-  const [days, setDays] = useState(7);
+  const [monthKey, setMonthKey] = useState("");
+  const [fromKey, setFromKey] = useState("");
+  const [toKey, setToKey] = useState("");
   const [data, setData] = useState<UserReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [officeSsids, setOfficeSsids] = useState<string[]>([]);
   const [resetConfirm, setResetConfirm] = useState("");
   const [resetScope, setResetScope] = useState<"tracking" | "all">("tracking");
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (month: string) => {
     setLoading(true);
-    const res = await fetch(`/api/admin/users/${userId}/reports?days=${days}`);
+    const qs = new URLSearchParams();
+    if (month) qs.set("month", month);
+    const res = await fetch(`/api/admin/users/${userId}/reports?${qs}`);
     setLoading(false);
     if (!res.ok) {
       setError("Failed to load user report");
       return;
     }
-    setData(await res.json());
+    const json = await res.json();
+    setData(json);
+    setMonthKey(json.range.month);
+    setFromKey(json.range.from);
+    setToKey(json.range.to);
+    setSelectedDate(null);
     setError(null);
-  }, [userId, days]);
+  }, [userId]);
 
   useEffect(() => {
     fetch("/api/admin/config")
@@ -90,8 +109,15 @@ export function AdminUserReport({ userId }: { userId: string }) {
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    void load("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  const filteredVisits = useMemo(() => {
+    if (!data) return [];
+    if (!selectedDate) return data.visits;
+    return data.visits.filter((v) => v.startAt.startsWith(selectedDate));
+  }, [data, selectedDate]);
 
   async function handleReset() {
     if (resetConfirm !== "RESET") {
@@ -110,7 +136,7 @@ export function AdminUserReport({ userId }: { userId: string }) {
       return;
     }
     setResetConfirm("");
-    load();
+    load(monthKey);
   }
 
   async function handleDeleteUser() {
@@ -138,51 +164,54 @@ export function AdminUserReport({ userId }: { userId: string }) {
           <h2 className="mt-1 text-xl font-medium">{data.user.email}</h2>
           {data.user.name && <p className="text-sm text-muted">{data.user.name}</p>}
         </div>
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-muted">
-            Range
-            <select
-              value={days}
-              onChange={(e) => setDays(Number(e.target.value))}
-              className="ml-2 rounded-lg border px-2 py-1"
-            >
-              <option value={7}>7 days</option>
-              <option value={14}>14 days</option>
-              <option value={30}>30 days</option>
-              <option value={90}>90 days</option>
-            </select>
-          </label>
-          <button
-            type="button"
-            onClick={() =>
-              exportDailyTrendCsv(
-                `user-${data.user.email}-${days}d.csv`,
-                data.dailyTrend.map((d) => ({
-                  date: d.date,
-                  totalHours: d.totalHours,
-                  metTarget: d.metTarget,
-                })),
-              )
-            }
-            className="btn-secondary px-3 py-1 text-xs"
-          >
-            Export CSV
-          </button>
-          <button type="button" onClick={() => load()} className="btn-secondary px-3 py-1 text-xs">
-            Refresh
-          </button>
-        </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <MonthReportToolbar
+        monthKey={monthKey}
+        timezone={data.user.timezone}
+        onMonthChange={(m) => load(m)}
+        onExport={() =>
+          exportDailyTrendCsv(
+            `user-${data.user.email}-${monthKey}.csv`,
+            data.dailyTrend.map((d) => ({
+              date: d.date,
+              totalHours: d.totalHours,
+              metTarget: d.metTarget,
+            })),
+          )
+        }
+      >
+        <button type="button" onClick={() => load(monthKey)} className="btn-secondary px-3 py-1 text-xs">
+          Refresh
+        </button>
+      </MonthReportToolbar>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <SummaryCard label="Today" value={`${data.today.totalHours.toFixed(1)}h / ${data.user.hoursTarget}h`} />
         <SummaryCard label="5h met" value={data.today.metTarget ? "Yes" : "No"} />
+        <SummaryCard
+          label="Office days"
+          value={`${data.monthlyProgress.qualifyingDays} / ${data.monthlyDaysTarget}`}
+        />
         <SummaryCard
           label="Agent"
           value={data.pulse.agentHealthy ? "Healthy" : data.pulse.lastHeartbeat ? "Stale" : "No pulses"}
         />
         <SummaryCard label="Pulses (24h)" value={`${data.pulse.pulsesLast24h} / ~${data.pulse.expectedPulsesPerDay}`} />
       </div>
+
+      <section className="card p-6">
+        <h3 className="mb-4 text-sm font-medium">Office visit calendar</h3>
+        <VisitCalendar
+          monthKey={monthKey}
+          timezone={data.user.timezone}
+          hoursTarget={data.user.hoursTarget}
+          dailyTrend={data.dailyTrend}
+          visits={data.visits}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+        />
+      </section>
 
       <section className="card p-6">
         <HoursTrendChart
@@ -192,8 +221,55 @@ export function AdminUserReport({ userId }: { userId: string }) {
             metTarget: d.metTarget,
           }))}
           targetHours={data.user.hoursTarget}
-          title={`Daily hours (${data.range.days} days)`}
+          title={`Daily hours (${monthKey})`}
+          selectedDate={selectedDate}
+          onBarClick={(date) => setSelectedDate((prev) => (prev === date ? null : date))}
         />
+      </section>
+
+      <section className="card p-6">
+        <h3 className="mb-3 text-sm font-medium">
+          {selectedDate ? `Visits on ${selectedDate}` : "Visits this month"}
+        </h3>
+        {filteredVisits.length === 0 ? (
+          <p className="text-sm text-muted">No visits in this period.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border)] text-left text-muted">
+                  <th className="py-2 pr-4">Date</th>
+                  <th className="py-2 pr-4">Start</th>
+                  <th className="py-2 pr-4">End</th>
+                  <th className="py-2 pr-4">Duration</th>
+                  <th className="py-2 pr-4">Source</th>
+                  <th className="py-2">SSID</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredVisits.map((v) => {
+                  const start = new Date(v.startAt);
+                  const end = v.endAt ? new Date(v.endAt) : null;
+                  const durationMs = end ? end.getTime() - start.getTime() : 0;
+                  return (
+                    <tr key={v.id} className="border-b border-[var(--border)]">
+                      <td className="py-2 pr-4">{v.startAt.slice(0, 10)}</td>
+                      <td className="py-2 pr-4">{formatTime(start, data.user.timezone)}</td>
+                      <td className="py-2 pr-4">
+                        {end ? formatTime(end, data.user.timezone) : "open"}
+                      </td>
+                      <td className="py-2 pr-4">
+                        {end ? formatHours(durationMs / (1000 * 60 * 60)) : "-"}
+                      </td>
+                      <td className="py-2 pr-4">{v.source}</td>
+                      <td className="py-2">{v.ssid ?? "-"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section className="card p-6">
@@ -272,7 +348,7 @@ export function AdminUserReport({ userId }: { userId: string }) {
         <NotificationPrefsForm adminUserId={userId} />
       </div>
 
-      <AdminVisitManager userId={userId} officeSsids={officeSsids} onChanged={load} />
+      <AdminVisitManager userId={userId} officeSsids={officeSsids} onChanged={() => load(monthKey)} />
 
       <section className="card border-red-500/30 p-6">
         <h3 className="mb-2 text-lg font-medium text-red-400">Testing: reset or delete user</h3>

@@ -15,6 +15,7 @@ type Device = EnrichedDevice;
 type UserSettingsFormProps = {
   timezone: string;
   hoursTarget: number;
+  monthlyDaysTarget: number;
   appUrl: string;
   isWelcome?: boolean;
   devices: Device[];
@@ -25,6 +26,7 @@ type UserSettingsFormProps = {
 export function UserSettingsForm({
   timezone,
   hoursTarget,
+  monthlyDaysTarget,
   appUrl,
   isWelcome,
   devices,
@@ -116,6 +118,10 @@ export function UserSettingsForm({
           <div>
             <dt className="text-muted">Daily hours target</dt>
             <dd className="font-medium">{hoursTarget}h</dd>
+          </div>
+          <div>
+            <dt className="text-muted">Monthly office days target</dt>
+            <dd className="font-medium">{monthlyDaysTarget} days</dd>
           </div>
         </dl>
       </section>

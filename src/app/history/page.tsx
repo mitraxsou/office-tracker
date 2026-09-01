@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { AppNav } from "@/components/AppNav";
 import { VisitList } from "@/components/VisitList";
+import { UserCorrectionRequests } from "@/components/UserCorrectionRequests";
 import { formatDate } from "@/lib/visits";
 
 export default async function HistoryPage() {
@@ -29,13 +30,14 @@ export default async function HistoryPage() {
         <div>
           <h1 className="text-2xl font-semibold">History</h1>
           <p className="text-sm text-muted">
-            Last 50 visits. For charts and filters, see{" "}
+            Last 50 visits. For charts and calendar, see{" "}
             <a href="/reports" className="text-accent hover:underline">
               Reports
             </a>
             .
           </p>
         </div>
+        <UserCorrectionRequests />
         {Object.keys(grouped).length === 0 ? (
           <p className="text-muted">No visits yet.</p>
         ) : (

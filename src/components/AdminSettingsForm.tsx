@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 export function AdminSettingsForm({
   hoursTarget,
+  monthlyDaysTarget,
   officeSsids,
   maxDevicesPerUser,
   pendingTokenTtlDays,
@@ -12,6 +13,7 @@ export function AdminSettingsForm({
   agentStaleMinutes,
 }: {
   hoursTarget: number;
+  monthlyDaysTarget: number;
   officeSsids: string[];
   maxDevicesPerUser: number;
   pendingTokenTtlDays: number;
@@ -20,6 +22,7 @@ export function AdminSettingsForm({
 }) {
   const router = useRouter();
   const [target, setTarget] = useState(hoursTarget);
+  const [daysTarget, setDaysTarget] = useState(monthlyDaysTarget);
   const [ssidText, setSsidText] = useState(officeSsids.join("\n"));
   const [maxDevices, setMaxDevices] = useState(maxDevicesPerUser);
   const [tokenTtl, setTokenTtl] = useState(pendingTokenTtlDays);
@@ -45,6 +48,7 @@ export function AdminSettingsForm({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         hoursTarget: target,
+        monthlyDaysTarget: daysTarget,
         officeSsids: ssidList,
         maxDevicesPerUser: maxDevices,
         pendingTokenTtlDays: tokenTtl,
@@ -67,16 +71,33 @@ export function AdminSettingsForm({
   return (
     <form onSubmit={handleSave} className="space-y-6">
       <section className="card p-6">
-        <h2 className="mb-4 text-lg font-medium">Global daily hours target</h2>
-        <input
-          type="number"
-          min={0.5}
-          max={24}
-          step={0.5}
-          value={target}
-          onChange={(e) => setTarget(Number(e.target.value))}
-          className="w-full max-w-xs rounded-lg border px-3 py-2"
-        />
+        <h2 className="mb-4 text-lg font-medium">Global office targets</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block text-sm">
+            <span className="text-muted">Daily hours target</span>
+            <input
+              type="number"
+              min={0.5}
+              max={24}
+              step={0.5}
+              value={target}
+              onChange={(e) => setTarget(Number(e.target.value))}
+              className="mt-1 w-full max-w-xs rounded-lg border px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="text-muted">Monthly office days target</span>
+            <input
+              type="number"
+              min={1}
+              max={31}
+              step={1}
+              value={daysTarget}
+              onChange={(e) => setDaysTarget(Number(e.target.value))}
+              className="mt-1 w-full max-w-xs rounded-lg border px-3 py-2"
+            />
+          </label>
+        </div>
       </section>
 
       <section className="card p-6">

@@ -4,13 +4,28 @@
   --pwc-orange: #fd5108;
   --pwc-orange-hover: #e04a07;
   --pwc-orange-muted: rgba(253, 81, 8, 0.15);
+  --success: #2ecc71;
+  --warning: #fd5108;
+}
+
+html[data-theme="dark"],
+html:not([data-theme]) {
   --background: #1a1a1a;
   --background-elevated: #2d2d2d;
   --foreground: #ffffff;
   --muted: #b3b3b3;
   --border: #404040;
-  --success: #2ecc71;
-  --warning: #fd5108;
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  --background: #f4f4f4;
+  --background-elevated: #ffffff;
+  --foreground: #1a1a1a;
+  --muted: #5c5c5c;
+  --border: #d4d4d4;
+  --pwc-orange-muted: rgba(253, 81, 8, 0.12);
+  color-scheme: light;
 }
 
 body {
@@ -23,7 +38,7 @@ input,
 select,
 textarea {
   color: var(--foreground);
-  background: var(--background);
+  background: var(--background-elevated);
   border-color: var(--border);
 }
 
@@ -105,11 +120,24 @@ textarea:focus {
 }
 
 .picker-input {
-  color-scheme: dark;
   min-height: 2.5rem;
 }
 
-.picker-input::-webkit-calendar-picker-indicator {
+html[data-theme="dark"] .picker-input,
+html:not([data-theme]) .picker-input {
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] .picker-input::-webkit-calendar-picker-indicator,
+html:not([data-theme]) .picker-input::-webkit-calendar-picker-indicator {
   filter: invert(0.85);
+  cursor: pointer;
+}
+
+html[data-theme="light"] .picker-input {
+  color-scheme: light;
+}
+
+html[data-theme="light"] .picker-input::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }

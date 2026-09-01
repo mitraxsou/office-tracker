@@ -3,6 +3,7 @@ import { getSessionUserId } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { canUserReportVisit } from "@/lib/visit-actions";
 import { logAuditEvent } from "@/lib/audit-log";
+import { visitToSnapshot } from "@/lib/visit-corrections";
 
 export async function POST(request: Request) {
   const userId = await getSessionUserId();
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "message is too long" }, { status: 400 });
   }
 
+  let visitSnapshot: string | null = null;
   if (body.visitId) {
     const visit = await prisma.visit.findUnique({ where: { id: body.visitId } });
     if (!visit) {
@@ -33,6 +35,7 @@ export async function POST(request: Request) {
     if (!canUserReportVisit(visit, userId)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    visitSnapshot = JSON.stringify(visitToSnapshot(visit));
   }
 
   const issueType = body.issueType?.trim().slice(0, 64) || null;
@@ -43,6 +46,7 @@ export async function POST(request: Request) {
       visitId: body.visitId ?? null,
       message,
       issueType,
+      visitSnapshot,
     },
   });
 

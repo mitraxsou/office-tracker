@@ -114,7 +114,7 @@ export function HoursTrendChart({
                 key={entry.date}
                 fill={
                   selectedDate === entry.date
-                    ? "#ffffff"
+                    ? "var(--foreground)"
                     : entry.metTarget === false
                       ? "#c2410c"
                       : "var(--pwc-orange)"

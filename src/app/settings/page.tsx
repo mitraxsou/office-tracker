@@ -3,7 +3,7 @@ import {
   getCurrentUser,
   getInstallTokensForUser,
 } from "@/lib/auth";
-import { getUserHoursTarget } from "@/lib/app-config";
+import { getUserHoursTarget, getAppConfig } from "@/lib/app-config";
 import { getEnrichedDevicesForUser } from "@/lib/device-enrichment";
 import { AppNav } from "@/components/AppNav";
 import { SettingsPageClient } from "@/components/SettingsPageClient";
@@ -21,6 +21,7 @@ export default async function SettingsPage({
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const localDevAgentPath = process.env.AGENT_INSTALL_PATH || null;
   const hoursTarget = await getUserHoursTarget(user);
+  const config = await getAppConfig();
 
   const installTokens = await getInstallTokensForUser(user.id, appUrl);
   const enrichedDevices = await getEnrichedDevicesForUser(user.id);
@@ -39,6 +40,7 @@ export default async function SettingsPage({
         <SettingsPageClient
           timezone={user.timezone}
           hoursTarget={hoursTarget}
+          monthlyDaysTarget={config.monthlyDaysTarget}
           appUrl={appUrl}
           isWelcome={params.welcome === "1"}
           devices={enrichedDevices}

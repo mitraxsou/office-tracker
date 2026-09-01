@@ -103,7 +103,6 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
       OR: [{ endAt: null }, { endAt: { gte: from } }],
     },
     orderBy: { startAt: "desc" },
-    take: 50,
   });
 
   const heartbeats = await prisma.heartbeat.findMany({
