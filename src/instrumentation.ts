@@ -180,6 +180,59 @@ export async function register() {
     await prisma.$executeRawUnsafe(
       'CREATE INDEX IF NOT EXISTS "VisitCorrectionMessage_requestId_createdAt_idx" ON "VisitCorrectionMessage"("requestId", "createdAt");'
     );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "TimezoneChangeRequest" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "requestedTimezone" TEXT NOT NULL,
+        "currentTimezone" TEXT NOT NULL,
+        "message" TEXT,
+        "status" TEXT NOT NULL DEFAULT 'open',
+        "adminNote" TEXT,
+        "reviewedAt" TIMESTAMP(3),
+        "reviewedById" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "TimezoneChangeRequest_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "TimezoneChangeRequest_status_createdAt_idx" ON "TimezoneChangeRequest"("status", "createdAt");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "TimezoneChangeRequest_userId_idx" ON "TimezoneChangeRequest"("userId");'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AgentDevice" ADD COLUMN IF NOT EXISTS "installedAt" TIMESTAMP(3);'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AgentDevice" ADD COLUMN IF NOT EXISTS "uninstalledAt" TIMESTAMP(3);'
+    );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "AgentLifecycleEvent" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "deviceId" TEXT,
+        "serialNumber" TEXT NOT NULL,
+        "eventType" TEXT NOT NULL,
+        "source" TEXT NOT NULL,
+        "metadata" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "AgentLifecycleEvent_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "AgentLifecycleEvent_userId_createdAt_idx" ON "AgentLifecycleEvent"("userId", "createdAt");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "AgentLifecycleEvent_deviceId_createdAt_idx" ON "AgentLifecycleEvent"("deviceId", "createdAt");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "AgentLifecycleEvent_serialNumber_createdAt_idx" ON "AgentLifecycleEvent"("serialNumber", "createdAt");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "AgentLifecycleEvent_eventType_createdAt_idx" ON "AgentLifecycleEvent"("eventType", "createdAt");'
+    );
     await ensureAppConfig();
     await ensureBreakglassAdmin();
   } catch (err) {

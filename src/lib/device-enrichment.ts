@@ -12,11 +12,14 @@ export type EnrichedDevice = {
   serialNumber: string;
   label: string | null;
   lastSeenAt: string | null;
+  installedAt: string | null;
+  uninstalledAt: string | null;
   createdAt: string;
   agentStatus: AgentDeviceStatus;
   agentStatusLabel: string;
   pendingRemoval: boolean;
   boundTokenLabel: string | null;
+  isUninstalled: boolean;
 };
 
 export async function getEnrichedDevicesForUser(userId: string): Promise<EnrichedDevice[]> {
@@ -44,17 +47,23 @@ export async function getEnrichedDevicesForUser(userId: string): Promise<Enriche
   );
 
   return devices.map((d) => {
-    const agentStatus = computeDeviceAgentStatus(d.lastSeenAt, config.agentStaleMinutes);
+    const isUninstalled = d.uninstalledAt !== null;
+    const agentStatus = isUninstalled
+      ? "never"
+      : computeDeviceAgentStatus(d.lastSeenAt, config.agentStaleMinutes);
     return {
       id: d.id,
       serialNumber: d.serialNumber,
       label: d.label,
       lastSeenAt: d.lastSeenAt?.toISOString() ?? null,
+      installedAt: d.installedAt?.toISOString() ?? null,
+      uninstalledAt: d.uninstalledAt?.toISOString() ?? null,
       createdAt: d.createdAt.toISOString(),
       agentStatus,
-      agentStatusLabel: agentStatusLabel(agentStatus),
+      agentStatusLabel: isUninstalled ? "Uninstalled" : agentStatusLabel(agentStatus),
       pendingRemoval: pendingDeviceIds.has(d.id),
       boundTokenLabel: tokenBySerial.get(d.serialNumber) ?? null,
+      isUninstalled,
     };
   });
 }

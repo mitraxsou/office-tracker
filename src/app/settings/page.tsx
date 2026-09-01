@@ -5,6 +5,7 @@ import {
 } from "@/lib/auth";
 import { getUserHoursTarget, getAppConfig } from "@/lib/app-config";
 import { getEnrichedDevicesForUser } from "@/lib/device-enrichment";
+import { getUserTimezoneRequestState } from "@/lib/timezone-requests";
 import { AppNav } from "@/components/AppNav";
 import { SettingsPageClient } from "@/components/SettingsPageClient";
 import { AGENT_PRODUCT_NAME } from "@/lib/agent-branding";
@@ -25,6 +26,7 @@ export default async function SettingsPage({
 
   const { installTokens, legacyBoundCount } = await getUserInstallTokenState(user.id, appUrl);
   const enrichedDevices = await getEnrichedDevicesForUser(user.id);
+  const timezoneRequestState = await getUserTimezoneRequestState(user.id);
 
   return (
     <>
@@ -47,6 +49,7 @@ export default async function SettingsPage({
           installTokens={installTokens}
           legacyBoundCount={legacyBoundCount}
           localDevAgentPath={localDevAgentPath}
+          timezoneRequestState={timezoneRequestState}
         />
       </main>
     </>

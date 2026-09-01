@@ -50,7 +50,21 @@ type UserReport = {
     lastHeartbeat: string | null;
     recentPulses: Array<{ recordedAt: string; inOffice: boolean; ssid: string | null }>;
   };
-  devices: Array<{ id: string; serialNumber: string; lastSeenAt: string | null }>;
+  devices: Array<{
+    id: string;
+    serialNumber: string;
+    lastSeenAt: string | null;
+    installedAt?: string | null;
+    uninstalledAt?: string | null;
+  }>;
+  lifecycleEvents?: Array<{
+    id: string;
+    deviceId: string | null;
+    serialNumber: string;
+    eventType: string;
+    source: string;
+    createdAt: string;
+  }>;
   tokens: Array<{
     id: string;
     prefix: string;
@@ -336,6 +350,36 @@ export function AdminUserReport({ userId }: { userId: string }) {
           </div>
         )}
       </section>
+
+      {data.lifecycleEvents && data.lifecycleEvents.length > 0 && (
+        <section className="card p-6">
+          <h3 className="mb-3 text-sm font-medium">Agent install / uninstall history</h3>
+          <div className="max-h-48 overflow-y-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-[var(--border)] text-left text-muted">
+                  <th className="py-1 pr-2">Time</th>
+                  <th className="py-1 pr-2">Event</th>
+                  <th className="py-1 pr-2">Serial</th>
+                  <th className="py-1">Source</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.lifecycleEvents.map((event) => (
+                  <tr key={event.id} className="border-b border-[var(--border)]">
+                    <td className="py-1 pr-2">
+                      {new Date(event.createdAt).toLocaleString("en-IN")}
+                    </td>
+                    <td className="py-1 pr-2">{event.eventType}</td>
+                    <td className="py-1 pr-2 font-mono">{event.serialNumber}</td>
+                    <td className="py-1">{event.source}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <div className="space-y-4">
         <div>

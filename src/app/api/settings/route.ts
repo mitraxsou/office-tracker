@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import { validateTimezone } from "@/lib/security";
 
 export async function PATCH(request: Request) {
   const user = await getCurrentUser();
@@ -29,15 +27,11 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
 
-  if (!validateTimezone(timezone)) {
-    return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
-  }
-
-  const updated = await prisma.user.update({
-    where: { id: user.id },
-    data: { timezone },
-    include: { agentTokens: { where: { revokedAt: null } }, agentDevices: true },
-  });
-
-  return NextResponse.json({ user: updated });
+  return NextResponse.json(
+    {
+      error:
+        "Timezone changes require admin approval. Submit a request from Settings instead.",
+    },
+    { status: 403 },
+  );
 }

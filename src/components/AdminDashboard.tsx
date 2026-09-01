@@ -17,6 +17,7 @@ import {
 import { currentMonthKey } from "@/lib/month-range";
 import { exportToCsv } from "@/lib/report-range";
 import { InOfficeNowPanel } from "@/components/InOfficeNowPanel";
+import { AgentFollowUpPanel, useAgentFollowUpCount } from "@/components/AgentFollowUpPanel";
 
 type DailyPoint = { date: string; totalHours: number; compliancePct: number };
 
@@ -79,6 +80,8 @@ export function AdminDashboard() {
   const [compliance, setCompliance] = useState<"all" | "met" | "not_met">("all");
   const [agentStatus, setAgentStatus] = useState<"all" | "healthy" | "stale" | "in_office">("all");
   const [inOfficePanelOpen, setInOfficePanelOpen] = useState(false);
+  const [followUpPanelOpen, setFollowUpPanelOpen] = useState(false);
+  const [followUpCount, setFollowUpCount] = useAgentFollowUpCount(!loading && !!data);
 
   const load = useCallback(
     async (month: string, silent = false) => {
@@ -204,12 +207,18 @@ export function AdminDashboard() {
 
       {data && (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <SummaryCard label="Total users" value={String(data.summary.totalUsers)} />
             <SummaryCard
               label="In office now"
               value={String(data.summary.inOfficeNow)}
               onClick={() => setInOfficePanelOpen(true)}
+              clickable
+            />
+            <SummaryCard
+              label="Agents needing follow-up"
+              value={followUpCount === null ? "..." : String(followUpCount)}
+              onClick={() => setFollowUpPanelOpen(true)}
               clickable
             />
             <SummaryCard label="Met target today" value={`${data.summary.metTodayPct}%`} />
@@ -219,6 +228,13 @@ export function AdminDashboard() {
           <InOfficeNowPanel
             open={inOfficePanelOpen}
             onClose={() => setInOfficePanelOpen(false)}
+          />
+
+          <AgentFollowUpPanel
+            open={followUpPanelOpen}
+            onClose={() => setFollowUpPanelOpen(false)}
+            initialCount={followUpCount ?? undefined}
+            onCountChange={setFollowUpCount}
           />
 
           <div className="grid gap-4 lg:grid-cols-2">

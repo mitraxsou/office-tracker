@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin";
 import { removeDevice } from "@/lib/agent-auth";
+import { recordAgentUninstall } from "@/lib/agent-lifecycle";
 import { logAuditEvent } from "@/lib/audit-log";
 import { prisma } from "@/lib/db";
 
@@ -20,6 +21,13 @@ export async function DELETE(
   }
 
   try {
+    await recordAgentUninstall({
+      userId: device.userId,
+      deviceId: device.id,
+      serialNumber: device.serialNumber,
+      source: "admin",
+      metadata: { removedByAdminId: admin.id },
+    });
     await removeDevice(id);
     await logAuditEvent({
       actorId: admin.id,

@@ -30,7 +30,11 @@ export type AuditAction =
   | "device_removal_approve"
   | "device_removal_reject"
   | "visit_correction_reply"
-  | "data_purge";
+  | "data_purge"
+  | "timezone_change_request"
+  | "timezone_change_cancel"
+  | "timezone_change_approve"
+  | "timezone_change_reject";
 
 export async function logAuditEvent(params: {
   actorId: string;

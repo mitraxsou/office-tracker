@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { getAppConfig, getUserHoursTarget } from "./app-config";
 import { getTodaySummary, getPulseStats, closeStaleOpenVisits, closeEndOfDayOpenVisits } from "./heartbeat-service";
 import { summarizeAgentTokens } from "./auth";
+import { getLifecycleEventsForUser } from "./agent-lifecycle";
 import { revokeExpiredPendingTokens } from "./token-expiry";
 import { effectiveVisitEnd } from "./visits";
 import { dayBoundsFromKey } from "./timezone-dates";
@@ -149,7 +150,10 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
       id: d.id,
       serialNumber: d.serialNumber,
       lastSeenAt: d.lastSeenAt?.toISOString() ?? null,
+      installedAt: d.installedAt?.toISOString() ?? null,
+      uninstalledAt: d.uninstalledAt?.toISOString() ?? null,
     })),
+    lifecycleEvents: await getLifecycleEventsForUser(user.id),
     tokens: summarizeAgentTokens(user.agentTokens),
   };
 }

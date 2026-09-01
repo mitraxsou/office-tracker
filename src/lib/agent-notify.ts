@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { getAppConfig } from "./app-config";
 import { getPulseStats } from "./heartbeat-service";
 import { logAuditEvent } from "./audit-log";
+import { userHasActiveInstalledDevice } from "./agent-lifecycle";
 
 const ALERT_ACTION = "agent_stale_email";
 
@@ -134,6 +135,7 @@ export async function notifyStaleAgents() {
 
   let sent = 0;
   for (const user of users) {
+    if (!(await userHasActiveInstalledDevice(user.id))) continue;
     const pulse = await getPulseStats(user.id, config.agentStaleMinutes);
     if (pulse.agentHealthy) continue;
     if (

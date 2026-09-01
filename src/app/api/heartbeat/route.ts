@@ -6,6 +6,7 @@ import {
   logAgentDeviceRegistered,
   registerOrUpdateDevice,
 } from "@/lib/agent-auth";
+import { recordHeartbeatLifecycle } from "@/lib/agent-lifecycle";
 import { processHeartbeat } from "@/lib/heartbeat-service";
 import { getAppConfig, getUserHoursTarget } from "@/lib/app-config";
 import {
@@ -65,6 +66,14 @@ export async function POST(request: Request) {
       serialNumber,
     });
   }
+
+  await recordHeartbeatLifecycle({
+    userId: auth.userId,
+    deviceId: deviceResult.device.id,
+    serialNumber,
+    registered: deviceResult.registered,
+    tokenPrefix: auth.agentToken.tokenPrefix,
+  });
 
   const user = await getUserByAgentToken(token);
   if (!user) {

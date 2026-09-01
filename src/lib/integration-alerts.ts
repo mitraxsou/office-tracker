@@ -11,6 +11,7 @@ import {
   type NotificationPrefsData,
 } from "./notification-prefs";
 import { buildOutOfOfficeLinkUrl, isUserOutOfOffice } from "./out-of-office";
+import { userHasActiveInstalledDevice } from "./agent-lifecycle";
 
 export type IntegrationAlertType = "absent" | "stale" | "behind";
 
@@ -155,7 +156,7 @@ async function evaluateUserAlerts(
   };
 
   if (types.has("stale") && prefs.alertIfAgentStale && workDay && !pulse.agentHealthy) {
-    const hasDevice = (await prisma.agentDevice.count({ where: { userId: user.id } })) > 0;
+    const hasDevice = await userHasActiveInstalledDevice(user.id);
     if (hasDevice && !(await wasAlertSentToday(user.id, "stale", dayKey))) {
       alerts.push({
         ...base,

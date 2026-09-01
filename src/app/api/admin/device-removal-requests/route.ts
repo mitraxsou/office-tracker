@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 import { removeDevice } from "@/lib/agent-auth";
+import { recordAgentUninstall } from "@/lib/agent-lifecycle";
 import { logAuditEvent } from "@/lib/audit-log";
 
 export async function GET(request: Request) {
@@ -82,6 +83,13 @@ export async function PATCH(request: Request) {
 
   if (status === "approved") {
     try {
+      await recordAgentUninstall({
+        userId: existing.user.id,
+        deviceId: existing.deviceId,
+        serialNumber: existing.device.serialNumber,
+        source: "admin",
+        metadata: { via: "removal_request", requestId: existing.id },
+      });
       await removeDevice(existing.deviceId);
       await logAuditEvent({
         actorId: admin.id,

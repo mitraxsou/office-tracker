@@ -10,8 +10,14 @@ import { AgentSetupPanel } from "@/components/AgentSetupPanel";
 import { ThemePreference } from "@/components/ThemeToggle";
 import type { EnrichedDevice } from "@/lib/device-enrichment";
 import type { InstallTokenForUser } from "@/lib/install-token-types";
+import type { TimezoneRequestSummary } from "@/lib/timezone-requests";
 
 type Device = EnrichedDevice;
+
+type TimezoneRequestState = {
+  openRequest: TimezoneRequestSummary | null;
+  latestRequest: TimezoneRequestSummary | null;
+};
 
 type SettingsPageClientProps = {
   timezone: string;
@@ -23,6 +29,7 @@ type SettingsPageClientProps = {
   installTokens: InstallTokenForUser[];
   legacyBoundCount: number;
   localDevAgentPath?: string | null;
+  timezoneRequestState: TimezoneRequestState;
 };
 
 export function SettingsPageClient({
@@ -35,6 +42,7 @@ export function SettingsPageClient({
   installTokens,
   legacyBoundCount,
   localDevAgentPath,
+  timezoneRequestState,
 }: SettingsPageClientProps) {
   const [devices, setDevices] = useState(initialDevices);
 
@@ -74,6 +82,7 @@ export function SettingsPageClient({
         isWelcome={isWelcome}
         devices={devices}
         onDevicesChange={setDevices}
+        timezoneRequestState={timezoneRequestState}
       />
 
       <NotificationPrefsForm />

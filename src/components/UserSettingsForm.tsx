@@ -6,8 +6,14 @@ import { timezoneOptionsForUser } from "@/lib/constants";
 
 import type { EnrichedDevice } from "@/lib/device-enrichment";
 import { agentStatusClass } from "@/lib/device-enrichment";
+import type { TimezoneRequestSummary } from "@/lib/timezone-requests";
 
 type Device = EnrichedDevice;
+
+type TimezoneRequestState = {
+  openRequest: TimezoneRequestSummary | null;
+  latestRequest: TimezoneRequestSummary | null;
+};
 
 type UserSettingsFormProps = {
   timezone: string;
@@ -16,7 +22,13 @@ type UserSettingsFormProps = {
   isWelcome?: boolean;
   devices: Device[];
   onDevicesChange: (devices: Device[]) => void;
+  timezoneRequestState: TimezoneRequestState;
 };
+
+function timezoneLabel(value: string) {
+  const opt = timezoneOptionsForUser(value).find((o) => o.value === value);
+  return opt?.label ?? value;
+}
 
 export function UserSettingsForm({
   timezone,
@@ -25,35 +37,75 @@ export function UserSettingsForm({
   isWelcome,
   devices,
   onDevicesChange,
+  timezoneRequestState: initialTimezoneRequestState,
 }: UserSettingsFormProps) {
   const router = useRouter();
   const [tz, setTz] = useState(timezone);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [timezoneRequestState, setTimezoneRequestState] = useState(initialTimezoneRequestState);
 
-  async function handleSave(e: React.FormEvent) {
+  const openRequest = timezoneRequestState.openRequest;
+  const rejectedRequest =
+    timezoneRequestState.latestRequest?.status === "rejected"
+      ? timezoneRequestState.latestRequest
+      : null;
+
+  async function handleTimezoneRequest(e: React.FormEvent) {
     e.preventDefault();
+    if (openRequest) return;
+
     setLoading(true);
     setError(null);
-    setSaved(false);
+    setSubmitted(false);
+    setSuccessMessage(null);
 
-    const res = await fetch("/api/settings", {
-      method: "PATCH",
+    const res = await fetch("/api/settings/timezone-request", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ timezone: tz }),
+      body: JSON.stringify({ requestedTimezone: tz }),
     });
 
     setLoading(false);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      setError(data.error ?? "Failed to save settings");
+      setError(data.error ?? "Failed to submit timezone request");
       return;
     }
 
-    setSaved(true);
+    const data = await res.json();
+    setTimezoneRequestState({
+      openRequest: data.request,
+      latestRequest: null,
+    });
+    setSubmitted(true);
+    router.refresh();
+  }
+
+  async function cancelTimezoneRequest() {
+    if (!openRequest) return;
+
+    setCancelling(true);
+    setError(null);
+    setSubmitted(false);
+
+    const res = await fetch(`/api/settings/timezone-request?id=${openRequest.id}`, {
+      method: "DELETE",
+    });
+
+    setCancelling(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? "Failed to cancel request");
+      return;
+    }
+
+    setTimezoneRequestState({ openRequest: null, latestRequest: null });
+    setTz(timezone);
     router.refresh();
   }
 
@@ -85,7 +137,7 @@ export function UserSettingsForm({
   }
 
   return (
-    <form onSubmit={handleSave} className="space-y-6">
+    <form onSubmit={handleTimezoneRequest} className="space-y-6">
       {isWelcome && (
         <div className="rounded-lg bg-[var(--pwc-orange-muted)] px-4 py-3 text-sm">
           Account created. If your admin issued an install token, copy the install command in the{" "}
@@ -115,31 +167,74 @@ export function UserSettingsForm({
         <h2 className="mb-2 text-lg font-medium">Your timezone</h2>
         <p className="mb-3 text-sm text-muted">
           Used for today&apos;s hours, visit times, and notification schedule (office days and
-          alert times).
+          alert times). Changes require admin approval.
         </p>
-        <label className="block text-sm">
-          <span className="text-muted">Timezone</span>
-          <select
-            value={tz}
-            onChange={(e) => setTz(e.target.value)}
-            className="mt-1 block w-full max-w-md rounded-lg border px-3 py-2"
-          >
-            {timezoneOptionsForUser(timezone).map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit" disabled={loading} className="btn-primary mt-4 px-4 py-2 disabled:opacity-50">
-          {loading ? "Saving..." : "Save timezone"}
-        </button>
+
+        {openRequest ? (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-300">
+                Pending admin approval
+              </span>
+            </div>
+            <dl className="mt-3 space-y-2">
+              <div>
+                <dt className="text-xs text-muted">Current timezone</dt>
+                <dd className="font-medium">{timezoneLabel(openRequest.currentTimezone)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted">Requested timezone</dt>
+                <dd className="font-medium">{timezoneLabel(openRequest.requestedTimezone)}</dd>
+              </div>
+            </dl>
+            <button
+              type="button"
+              disabled={cancelling}
+              onClick={cancelTimezoneRequest}
+              className="mt-3 text-xs text-muted hover:underline disabled:opacity-50"
+            >
+              {cancelling ? "Cancelling..." : "Cancel request"}
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="mb-3 text-sm">
+              Active timezone: <span className="font-medium">{timezoneLabel(timezone)}</span>
+            </p>
+            {rejectedRequest?.adminNote && (
+              <p className="mb-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
+                Your last timezone request was rejected: {rejectedRequest.adminNote}
+              </p>
+            )}
+            <label className="block text-sm">
+              <span className="text-muted">Request new timezone</span>
+              <select
+                value={tz}
+                onChange={(e) => setTz(e.target.value)}
+                className="mt-1 block w-full max-w-md rounded-lg border px-3 py-2"
+              >
+                {timezoneOptionsForUser(timezone).map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="submit"
+              disabled={loading || tz === timezone}
+              className="btn-primary mt-4 px-4 py-2 disabled:opacity-50"
+            >
+              {loading ? "Submitting..." : "Request timezone change"}
+            </button>
+          </>
+        )}
       </section>
 
       <section className="card p-6">
         <h2 className="mb-2 text-lg font-medium">Registered laptops</h2>
         <p className="mb-4 text-sm text-muted">
-          Registered on first heartbeat. To remove a laptop, submit a request — an admin must
+          Registered on first heartbeat. To remove a laptop, submit a request. An admin must
           approve it (prevents accidental removal).
         </p>
         {devices.length === 0 ? (
@@ -190,8 +285,10 @@ export function UserSettingsForm({
       {error && (
         <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>
       )}
-      {saved && (
-        <p className="rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-400">Timezone saved.</p>
+      {submitted && (
+        <p className="rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-400">
+          Timezone change request sent to admin for review.
+        </p>
       )}
     </form>
   );
