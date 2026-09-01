@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_HOURS_TARGET, VISIT_GAP_MS } from "../src/lib/constants";
 import {
+  effectiveVisitEnd,
   mergeHeartbeatsIntoVisits,
   meetsHoursTarget,
   remainingHours,
@@ -9,6 +10,53 @@ import {
 } from "../src/lib/visits";
 
 const ms = (minutes: number) => minutes * 60 * 1000;
+
+describe("effectiveVisitEnd", () => {
+  const staleMs = VISIT_GAP_MS;
+  const startAt = new Date("2026-08-28T03:00:00+05:30");
+  const updatedAt = new Date("2026-08-28T03:15:00+05:30");
+  const lastHeartbeatAt = new Date("2026-08-28T03:15:25+05:30");
+
+  it("returns stored endAt when visit is closed", () => {
+    const endAt = new Date("2026-08-28T04:00:00+05:30");
+    expect(
+      effectiveVisitEnd({
+        endAt,
+        updatedAt,
+        startAt,
+        now: new Date("2026-09-01T12:00:00+05:30"),
+        staleMs,
+        lastHeartbeatAt,
+      }),
+    ).toEqual(endAt);
+  });
+
+  it("ends open visit at last activity + gap when agent is stale", () => {
+    const now = new Date("2026-09-01T12:00:00+05:30");
+    const end = effectiveVisitEnd({
+      endAt: null,
+      updatedAt,
+      startAt,
+      now,
+      staleMs,
+      lastHeartbeatAt,
+    });
+    expect(end.getTime()).toBe(updatedAt.getTime() + staleMs);
+  });
+
+  it("uses now for open visit when agent is still healthy", () => {
+    const now = new Date("2026-08-28T03:20:00+05:30");
+    const end = effectiveVisitEnd({
+      endAt: null,
+      updatedAt,
+      startAt,
+      now,
+      staleMs,
+      lastHeartbeatAt,
+    });
+    expect(end).toEqual(now);
+  });
+});
 
 describe("mergeHeartbeatsIntoVisits", () => {
   it("merges consecutive in-office heartbeats within gap", () => {

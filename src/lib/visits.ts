@@ -35,6 +35,30 @@ export function visitDurationMs(visit: VisitPoint, now = new Date()): number {
   return Math.max(0, end.getTime() - visit.startAt.getTime());
 }
 
+/**
+ * Open visits normally end on the next out-of-office heartbeat or after a gap.
+ * If the agent goes silent, infer end at last activity + staleMs.
+ */
+export function effectiveVisitEnd(params: {
+  endAt: Date | null;
+  updatedAt: Date;
+  startAt: Date;
+  now: Date;
+  staleMs: number;
+  lastHeartbeatAt: Date | null;
+}): Date {
+  if (params.endAt) return params.endAt;
+
+  const agentStale =
+    !params.lastHeartbeatAt ||
+    params.now.getTime() - params.lastHeartbeatAt.getTime() > params.staleMs;
+
+  if (!agentStale) return params.now;
+
+  const lastActivity = params.updatedAt ?? params.startAt;
+  return new Date(lastActivity.getTime() + params.staleMs);
+}
+
 export function totalHoursFromVisits(visits: VisitPoint[], now = new Date()): number {
   const totalMs = visits.reduce((sum, v) => sum + visitDurationMs(v, now), 0);
   return totalMs / (1000 * 60 * 60);

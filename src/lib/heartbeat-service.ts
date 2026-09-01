@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { DEFAULT_OFFICE_SSIDS, isOfficeSsid } from "./constants";
 import { getAppConfig, getAgentStaleMs } from "./app-config";
 import { maybePurgeOldHeartbeats } from "./heartbeat-retention";
+import { effectiveVisitEnd } from "./visits";
 
 export async function processHeartbeat(params: {
   userId: string;
@@ -87,6 +88,43 @@ async function closeOpenVisit(userId: string, at: Date) {
   });
 }
 
+/** Close visits left open when the agent stopped sending heartbeats. */
+export async function closeStaleOpenVisits(userId: string, staleMs?: number) {
+  const gap = staleMs ?? (await getAgentStaleMs());
+  const now = new Date();
+
+  const open = await prisma.visit.findFirst({
+    where: { userId, endAt: null },
+    orderBy: { startAt: "desc" },
+  });
+  if (!open) return false;
+
+  const lastHeartbeat = await prisma.heartbeat.findFirst({
+    where: { userId },
+    orderBy: { recordedAt: "desc" },
+  });
+
+  const agentStale =
+    !lastHeartbeat || now.getTime() - lastHeartbeat.recordedAt.getTime() > gap;
+
+  if (!agentStale) return false;
+
+  const endAt = effectiveVisitEnd({
+    endAt: null,
+    updatedAt: open.updatedAt,
+    startAt: open.startAt,
+    now,
+    staleMs: gap,
+    lastHeartbeatAt: lastHeartbeat?.recordedAt ?? null,
+  });
+
+  await prisma.visit.update({
+    where: { id: open.id },
+    data: { endAt },
+  });
+  return true;
+}
+
 export async function createManualVisit(params: {
   userId: string;
   startAt: Date;
@@ -136,6 +174,9 @@ export async function checkOutOffice(userId: string) {
 
 export async function getTodaySummary(userId: string, timezone: string, hoursTarget: number) {
   const now = new Date();
+  const staleMs = await getAgentStaleMs();
+  await closeStaleOpenVisits(userId, staleMs);
+
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
     year: "numeric",
@@ -160,19 +201,25 @@ export async function getTodaySummary(userId: string, timezone: string, hoursTar
     orderBy: { recordedAt: "desc" },
   });
 
-  const staleMs = await getAgentStaleMs();
+  const agentHealthy =
+    lastHeartbeat !== null && now.getTime() - lastHeartbeat.recordedAt.getTime() <= staleMs;
 
   const openVisit = visits.find((v) => v.endAt === null);
   const totalMs = visits.reduce((sum, v) => {
     const start = v.startAt < dayStart ? dayStart : v.startAt;
-    const end = v.endAt ?? now;
+    const end = effectiveVisitEnd({
+      endAt: v.endAt,
+      updatedAt: v.updatedAt,
+      startAt: v.startAt,
+      now,
+      staleMs,
+      lastHeartbeatAt: lastHeartbeat?.recordedAt ?? null,
+    });
     const clippedEnd = end > dayEnd ? dayEnd : end;
     return sum + Math.max(0, clippedEnd.getTime() - start.getTime());
   }, 0);
 
   const totalHours = totalMs / (1000 * 60 * 60);
-  const agentHealthy =
-    lastHeartbeat !== null && now.getTime() - lastHeartbeat.recordedAt.getTime() <= staleMs;
 
   return {
     dayKey,
@@ -180,7 +227,8 @@ export async function getTodaySummary(userId: string, timezone: string, hoursTar
     hoursTarget,
     metTarget: totalHours >= hoursTarget,
     remainingHours: Math.max(0, hoursTarget - totalHours),
-    inOfficeNow: openVisit !== undefined,
+    inOfficeNow:
+      agentHealthy && openVisit !== undefined && lastHeartbeat?.inOffice === true,
     visits,
     lastHeartbeat,
     agentHealthy,

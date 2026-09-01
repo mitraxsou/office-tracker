@@ -1,8 +1,9 @@
 import { summarizeAgentTokens } from "./auth";
 import { prisma } from "./db";
 import { getAppConfig, getUserHoursTarget } from "./app-config";
-import { getTodaySummary } from "./heartbeat-service";
+import { getTodaySummary, closeStaleOpenVisits } from "./heartbeat-service";
 import { revokeExpiredPendingTokens } from "./token-expiry";
+import { effectiveVisitEnd } from "./visits";
 
 function dayKeyForTimezone(date: Date, timezone: string) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -20,6 +21,10 @@ function addDays(date: Date, days: number) {
 }
 
 async function aggregateHoursForDay(userId: string, timezone: string, dayKey: string) {
+  const config = await getAppConfig();
+  const staleMs = config.agentStaleMinutes * 60 * 1000;
+  await closeStaleOpenVisits(userId, staleMs);
+
   const dayStart = new Date(`${dayKey}T00:00:00`);
   const dayEnd = new Date(`${dayKey}T23:59:59.999`);
 
@@ -31,10 +36,22 @@ async function aggregateHoursForDay(userId: string, timezone: string, dayKey: st
     },
   });
 
+  const lastHeartbeat = await prisma.heartbeat.findFirst({
+    where: { userId },
+    orderBy: { recordedAt: "desc" },
+  });
+
   const now = new Date();
   return visits.reduce((sum, v) => {
     const start = v.startAt < dayStart ? dayStart : v.startAt;
-    const end = v.endAt ?? now;
+    const end = effectiveVisitEnd({
+      endAt: v.endAt,
+      updatedAt: v.updatedAt,
+      startAt: v.startAt,
+      now,
+      staleMs,
+      lastHeartbeatAt: lastHeartbeat?.recordedAt ?? null,
+    });
     const clippedEnd = end > dayEnd ? dayEnd : end;
     return sum + Math.max(0, clippedEnd.getTime() - start.getTime());
   }, 0);
