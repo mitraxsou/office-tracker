@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { AgentStatusPanel } from "@/components/AgentStatusPanel";
 import { UserSettingsForm } from "@/components/UserSettingsForm";
 import { NotificationPrefsForm } from "@/components/NotificationPrefsForm";
@@ -20,6 +21,7 @@ type SettingsPageClientProps = {
   isWelcome?: boolean;
   devices: Device[];
   installTokens: InstallTokenForUser[];
+  legacyBoundCount: number;
   localDevAgentPath?: string | null;
 };
 
@@ -31,13 +33,37 @@ export function SettingsPageClient({
   isWelcome,
   devices: initialDevices,
   installTokens,
+  legacyBoundCount,
   localDevAgentPath,
 }: SettingsPageClientProps) {
   const [devices, setDevices] = useState(initialDevices);
 
+  useEffect(() => {
+    const hash = window.location.hash.replace("#", "");
+    if (hash === "install" || hash === "agent") {
+      const el = document.getElementById("install");
+      if (el) {
+        window.requestAnimationFrame(() => {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
+    }
+  }, []);
+
   return (
     <>
-      <AgentStatusPanel />
+      <AgentStatusPanel
+        installTokens={installTokens}
+        legacyBoundCount={legacyBoundCount}
+        appUrl={appUrl}
+      />
+
+      <AgentSetupPanel
+        appUrl={appUrl}
+        installTokens={installTokens}
+        legacyBoundCount={legacyBoundCount}
+        localDevAgentPath={localDevAgentPath}
+      />
 
       <ThemePreference className="mb-6" />
 
@@ -45,22 +71,14 @@ export function SettingsPageClient({
         timezone={timezone}
         hoursTarget={hoursTarget}
         monthlyDaysTarget={monthlyDaysTarget}
-        appUrl={appUrl}
         isWelcome={isWelcome}
         devices={devices}
-        installTokens={installTokens}
         onDevicesChange={setDevices}
       />
 
       <NotificationPrefsForm />
 
       <OutOfOfficeSection />
-
-      <AgentSetupPanel
-        appUrl={appUrl}
-        installTokens={installTokens}
-        localDevAgentPath={localDevAgentPath}
-      />
     </>
   );
 }

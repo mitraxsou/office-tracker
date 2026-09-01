@@ -24,10 +24,11 @@ export function AgentSetupBanner({ ssidMissing }: { ssidMissing?: boolean }) {
       <p className="font-medium text-[var(--pwc-orange)]">Agent not installed or never connected</p>
       <p className="mt-1 text-sm text-muted">
         Install the Windows agent to record hours. This is your personal dashboard, not admin. Go to
-        Settings for the install command.
+        Settings for the install command in the{" "}
+        <strong>Install or reinstall</strong> section.
       </p>
-      <Link href="/settings" className="btn-primary mt-3 inline-block px-4 py-2 text-sm">
-        Open Settings
+      <Link href="/settings#install" className="btn-primary mt-3 inline-block px-4 py-2 text-sm">
+        Open install steps
       </Link>
     </div>
   );

@@ -13,7 +13,7 @@ export function AgentHealthBanner({ variant, minutesSinceLastPulse }: AgentHealt
         <p className="mt-1 text-sm text-muted">
           Office hours are not being tracked automatically. Install the Windows agent from Settings.
         </p>
-        <Link href="/settings" className="btn-primary mt-3 inline-block px-4 py-2 text-sm">
+        <Link href="/settings#install" className="btn-primary mt-3 inline-block px-4 py-2 text-sm">
           Open Settings and install
         </Link>
       </div>
@@ -30,7 +30,7 @@ export function AgentHealthBanner({ variant, minutesSinceLastPulse }: AgentHealt
           <code>PwCOfficePulse</code>.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Link href="/settings" className="btn-primary px-4 py-2 text-sm">
+          <Link href="/settings#install" className="btn-primary px-4 py-2 text-sm">
             Reinstall from Settings
           </Link>
           <Link href="/help" className="btn-secondary px-4 py-2 text-sm">
@@ -57,7 +57,7 @@ export function AgentHealthBanner({ variant, minutesSinceLastPulse }: AgentHealt
         <li>Check <code>%LOCALAPPDATA%\OfficeTracker\logs\heartbeat.log</code> on the laptop</li>
       </ul>
       <div className="mt-3 flex flex-wrap gap-2">
-        <Link href="/settings" className="btn-primary px-4 py-2 text-sm">
+        <Link href="/settings#install" className="btn-primary px-4 py-2 text-sm">
           Reinstall from Settings
         </Link>
         <Link href="/help" className="btn-secondary px-4 py-2 text-sm">

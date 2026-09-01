@@ -96,9 +96,9 @@ function buildAbsentMessage(prefs: NotificationPrefsData): string {
 
 function buildStaleMessage(minutes: number | null): string {
   if (minutes != null) {
-    return `Your Office Pulse agent has not sent a heartbeat in about ${minutes} minutes. Re-run the install command from Settings.`;
+    return `Your Office Pulse agent has not sent a heartbeat in about ${minutes} minutes. Re-run the install command from Settings (#install section).`;
   }
-  return "Your Office Pulse agent is not sending heartbeats. Re-run the install command from Settings.";
+  return "Your Office Pulse agent is not sending heartbeats. Re-run the install command from Settings (#install section).";
 }
 
 function buildBehindMessage(hoursToday: number, minExpected: number, target: number): string {

@@ -2,13 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { copyToClipboard } from "@/lib/clipboard";
 import { timezoneOptionsForUser } from "@/lib/constants";
 
 import type { EnrichedDevice } from "@/lib/device-enrichment";
 import { agentStatusClass } from "@/lib/device-enrichment";
-
-import type { InstallTokenForUser } from "@/lib/install-token-types";
 
 type Device = EnrichedDevice;
 
@@ -16,10 +13,8 @@ type UserSettingsFormProps = {
   timezone: string;
   hoursTarget: number;
   monthlyDaysTarget: number;
-  appUrl: string;
   isWelcome?: boolean;
   devices: Device[];
-  installTokens: InstallTokenForUser[];
   onDevicesChange: (devices: Device[]) => void;
 };
 
@@ -27,10 +22,8 @@ export function UserSettingsForm({
   timezone,
   hoursTarget,
   monthlyDaysTarget,
-  appUrl,
   isWelcome,
   devices,
-  installTokens,
   onDevicesChange,
 }: UserSettingsFormProps) {
   const router = useRouter();
@@ -38,7 +31,6 @@ export function UserSettingsForm({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -63,16 +55,6 @@ export function UserSettingsForm({
 
     setSaved(true);
     router.refresh();
-  }
-
-  async function handleCopy(text: string, tokenId: string) {
-    const ok = await copyToClipboard(text);
-    if (!ok) {
-      setError("Could not copy. Select the text and press Ctrl+C.");
-      return;
-    }
-    setCopiedId(tokenId);
-    setTimeout(() => setCopiedId(null), 2000);
   }
 
   async function requestDeviceRemoval(deviceId: string, serialNumber: string) {
@@ -106,8 +88,11 @@ export function UserSettingsForm({
     <form onSubmit={handleSave} className="space-y-6">
       {isWelcome && (
         <div className="rounded-lg bg-[var(--pwc-orange-muted)] px-4 py-3 text-sm">
-          Account created. If your admin issued an install token, it appears below. Follow the
-          numbered install steps to set up the agent on your laptop.
+          Account created. If your admin issued an install token, copy the install command in the{" "}
+          <a href="#install" className="text-accent hover:underline">
+            Install or reinstall
+          </a>{" "}
+          section above.
         </div>
       )}
 
@@ -149,77 +134,6 @@ export function UserSettingsForm({
         <button type="submit" disabled={loading} className="btn-primary mt-4 px-4 py-2 disabled:opacity-50">
           {loading ? "Saving..." : "Save timezone"}
         </button>
-      </section>
-
-      <section className="card p-6">
-        <h2 className="mb-2 text-lg font-medium">Laptop install tokens</h2>
-        <p className="mb-4 text-sm text-muted">
-          One token per laptop. Copy the install command to set up or reinstall the agent without
-          asking admin again. After the first heartbeat, the token binds to that laptop&apos;s
-          serial number.
-        </p>
-
-        {installTokens.length === 0 ? (
-          <p className="text-sm text-muted">
-            No install tokens yet. Ask your admin to issue one from Admin → Users & tokens.
-          </p>
-        ) : (
-          <div className="space-y-4">
-            {installTokens.map((t) => (
-              <div
-                key={t.id}
-                className={`rounded-lg border p-4 text-sm ${
-                  t.status === "pending"
-                    ? "border-amber-500/30 bg-amber-500/5"
-                    : "border-[var(--border)] bg-[var(--background)]"
-                }`}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={`font-medium ${
-                      t.status === "pending" ? "text-amber-200" : "text-foreground"
-                    }`}
-                  >
-                    {t.label ?? "Laptop token"}
-                  </span>
-                  <code className="text-xs text-muted">{t.prefix}</code>
-                  {t.status === "bound" && t.boundSerialNumber ? (
-                    <span className="rounded bg-green-500/15 px-2 py-0.5 text-xs text-green-400">
-                      Bound to {t.boundSerialNumber}
-                    </span>
-                  ) : (
-                    <span className="rounded bg-amber-500/15 px-2 py-0.5 text-xs text-amber-300">
-                      Waiting for first install
-                    </span>
-                  )}
-                </div>
-                <p className="mt-2 text-xs text-muted">
-                  Issued {new Date(t.createdAt).toLocaleString("en-IN")}
-                </p>
-                <pre className="mt-3 overflow-x-auto rounded border bg-[var(--background-elevated)] p-3 text-xs whitespace-pre-wrap">
-                  {t.installCommand}
-                </pre>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(t.installCommand, t.id)}
-                    className="btn-primary px-3 py-1 text-xs"
-                  >
-                    {copiedId === t.id ? "Copied!" : "Copy install command"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(t.plainToken, `${t.id}-token`)}
-                    className="btn-secondary px-3 py-1 text-xs"
-                  >
-                    {copiedId === `${t.id}-token` ? "Copied!" : "Copy token"}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        <p className="mt-4 text-xs text-muted">API URL: {appUrl}</p>
       </section>
 
       <section className="card p-6">

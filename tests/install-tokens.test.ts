@@ -24,4 +24,25 @@ describe("revealStoredPendingToken", () => {
     });
     expect(result).toBeNull();
   });
+
+  it("legacy bound tokens without encrypted copy cannot reveal install command", () => {
+    const plain = "b".repeat(64);
+    const enc = encryptPendingToken(plain);
+    expect(
+      revealStoredPendingToken({
+        pendingTokenEnc: enc,
+        boundSerialNumber: "ABC123",
+        revokedAt: null,
+        expiresAt: null,
+      }),
+    ).toBe(plain);
+    expect(
+      revealStoredPendingToken({
+        pendingTokenEnc: null,
+        boundSerialNumber: "ABC123",
+        revokedAt: null,
+        expiresAt: null,
+      }),
+    ).toBeNull();
+  });
 });

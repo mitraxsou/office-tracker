@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   AGENT_EXTRACT_FOLDER,
   AGENT_INSTALL_DIR,
+  AGENT_PRODUCT_NAME,
   AGENT_TASK_NAME,
 } from "@/lib/agent-branding";
 
@@ -136,15 +137,14 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
                 . If registration is disabled, your admin must create the account for you. Open{" "}
               </>
             )}
-            <Link href="/settings" className="text-accent hover:underline">
+            <Link href="/settings#install" className="text-accent hover:underline">
               Settings
             </Link>{" "}
             after your first login.
           </li>
           <li>
             <strong className="text-foreground">Ask admin for an install token</strong> (one per laptop).
-            Tokens appear under <strong>Laptop install tokens</strong> in Settings. Each token includes a
-            ready-to-run install command with your API URL and token embedded.
+            Tokens appear under <strong>Install or reinstall {AGENT_PRODUCT_NAME}</strong> in Settings.
           </li>
         </ol>
         <p className="text-xs text-muted">
@@ -182,7 +182,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
         <ol className="list-decimal space-y-4 pl-5 text-sm">
           <li>
             <span className="font-medium">Sign in</span> and open{" "}
-            <Link href="/settings" className="text-accent hover:underline">
+            <Link href="/settings#install" className="text-accent hover:underline">
               Settings
             </Link>
             .
@@ -217,7 +217,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           <li>
             <span className="font-medium">Copy the install command</span>
             <p className="mt-1 text-muted">
-              In Settings, under <strong>Laptop install tokens</strong>, click{" "}
+              In Settings, under <strong>Install or reinstall {AGENT_PRODUCT_NAME}</strong>, click{" "}
               <strong>Copy install command</strong> for the token that matches this laptop. If you have no
               tokens, ask your admin to issue one from Admin → Users &amp; tokens.
             </p>
@@ -330,10 +330,10 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             </dd>
           </div>
           <div>
-            <dt className="font-medium">Laptop install tokens</dt>
+            <dt className="font-medium">Install or reinstall agent</dt>
             <dd className="mt-1 text-muted">
-              Copy install commands to set up or reinstall the agent without asking admin again. Each token
-              binds to one laptop serial on first heartbeat.
+              At the top of Settings, copy install commands to set up or reinstall the agent without
+              asking admin again. Each token binds to one laptop serial on first heartbeat.
             </dd>
           </div>
           <div>
@@ -366,7 +366,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           <div>
             <p className="font-medium">Agent stale or offline</p>
             <p className="mt-1 text-muted">
-              Re-copy and re-run the install command from Settings. Check Task Scheduler for task{" "}
+              Re-copy and re-run the install command from Settings (#install section). Check Task Scheduler for task{" "}
               <code>{AGENT_TASK_NAME}</code>. Review{" "}
               <code>%LOCALAPPDATA%\OfficeTracker\logs\heartbeat.log</code> on the laptop. If the laptop was
               asleep for hours, heartbeats pause until it wakes.
@@ -395,8 +395,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
         </div>
         {isLoggedIn && (
           <p className="text-sm">
-            <Link href="/settings" className="btn-primary inline-block px-4 py-2 text-sm">
-              Open Settings
+            <Link href="/settings#install" className="btn-primary inline-block px-4 py-2 text-sm">
+              Open install steps
             </Link>
           </p>
         )}

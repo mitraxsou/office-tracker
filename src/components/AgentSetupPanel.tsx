@@ -12,19 +12,21 @@ import {
 } from "@/lib/agent-branding";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { InstallTokenForUser } from "@/lib/install-token-types";
+import { InstallTokenCommands } from "@/components/InstallTokenCommands";
 
 type AgentSetupPanelProps = {
   appUrl: string;
   installTokens?: InstallTokenForUser[];
+  legacyBoundCount?: number;
   localDevAgentPath?: string | null;
 };
 
 export function AgentSetupPanel({
   appUrl,
   installTokens = [],
+  legacyBoundCount = 0,
   localDevAgentPath,
 }: AgentSetupPanelProps) {
-  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedUninstall, setCopiedUninstall] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
 
@@ -37,26 +39,16 @@ export function AgentSetupPanel({
     [isLocalDev, scriptDir],
   );
 
-  async function handleCopy(text: string, tokenId: string) {
-    setCopyError(null);
-    const ok = await copyToClipboard(text);
-    if (!ok) {
-      setCopyError("Could not copy to clipboard. Select the command below and press Ctrl+C.");
-      return;
-    }
-    setCopiedId(tokenId);
-    setTimeout(() => setCopiedId(null), 2000);
-  }
-
   return (
-    <div className="space-y-6">
+    <div id="install" className="scroll-mt-6 space-y-6">
       <section className="card border-[var(--pwc-orange)] p-6">
         <h2 className="mb-2 text-lg font-medium text-[var(--pwc-orange)]">
-          Install {AGENT_PRODUCT_NAME}
+          Install or reinstall {AGENT_PRODUCT_NAME}
         </h2>
         <p className="mb-4 text-sm text-muted">
-          No admin required. Use <strong>PowerShell</strong> (not Command Prompt). Re-running
-          install is safe; it refreshes an existing install silently.
+          Use this section to set up the agent or fix a stale install. No admin required. Use{" "}
+          <strong>PowerShell</strong> (not Command Prompt). Re-running install is safe; it refreshes
+          an existing install silently.
         </p>
 
         <ol className="mb-6 list-decimal space-y-3 pl-5 text-sm">
@@ -91,47 +83,12 @@ export function AgentSetupPanel({
           </li>
           <li>
             <span className="font-medium">Copy the install command for your laptop</span>
-            {installTokens.length === 0 ? (
-              <p className="mt-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-                No install tokens available. Ask your admin to issue one from Admin → Users &
-                tokens. It will appear under <strong>Laptop install tokens</strong> above.
-              </p>
-            ) : (
-              <div className="mt-3 space-y-4">
-                {installTokens.map((t) => (
-                  <div
-                    key={t.id}
-                    className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3"
-                  >
-                    <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-                      <span className="font-medium text-foreground">
-                        {t.label ?? "Laptop token"}
-                      </span>
-                      <code className="text-muted">{t.prefix}</code>
-                      {t.status === "bound" && t.boundSerialNumber ? (
-                        <span className="rounded bg-green-500/15 px-2 py-0.5 text-green-400">
-                          Bound to {t.boundSerialNumber}
-                        </span>
-                      ) : (
-                        <span className="rounded bg-amber-500/15 px-2 py-0.5 text-amber-300">
-                          Waiting for first install
-                        </span>
-                      )}
-                    </div>
-                    <pre className="overflow-x-auto rounded border p-2 text-xs whitespace-pre-wrap">
-                      {t.installCommand}
-                    </pre>
-                    <button
-                      type="button"
-                      onClick={() => handleCopy(t.installCommand, t.id)}
-                      className="btn-primary mt-2 px-3 py-1.5 text-xs"
-                    >
-                      {copiedId === t.id ? "Copied!" : "Copy install command"}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div className="mt-3">
+              <InstallTokenCommands
+                installTokens={installTokens}
+                legacyBoundCount={legacyBoundCount}
+              />
+            </div>
           </li>
           <li>
             <span className="font-medium">Paste and run in PowerShell</span>
@@ -149,6 +106,7 @@ export function AgentSetupPanel({
             </p>
           </li>
         </ol>
+        <p className="text-xs text-muted">API URL: {appUrl}</p>
       </section>
 
       <section className="card p-6">
@@ -172,7 +130,8 @@ export function AgentSetupPanel({
       <section className="card p-6">
         <h2 className="mb-2 text-lg font-medium">Uninstall {AGENT_PRODUCT_NAME}</h2>
         <p className="mb-4 text-sm text-muted">
-          Run from the extracted agent folder in PowerShell. No admin required.
+          For a clean reinstall, run uninstall first from the extracted agent folder in PowerShell.
+          No admin required.
         </p>
         <pre className="overflow-x-auto rounded-lg border bg-[var(--background)] p-4 text-xs whitespace-pre-wrap">
           {uninstallCommand}
@@ -180,10 +139,13 @@ export function AgentSetupPanel({
         <button
           type="button"
           onClick={async () => {
+            setCopyError(null);
             const ok = await copyToClipboard(uninstallCommand);
             if (ok) {
               setCopiedUninstall(true);
               setTimeout(() => setCopiedUninstall(false), 2000);
+            } else {
+              setCopyError("Could not copy. Select the command above and press Ctrl+C.");
             }
           }}
           className="btn-secondary mt-3 px-4 py-2 text-sm"

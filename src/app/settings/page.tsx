@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import {
   getCurrentUser,
-  getInstallTokensForUser,
+  getUserInstallTokenState,
 } from "@/lib/auth";
 import { getUserHoursTarget, getAppConfig } from "@/lib/app-config";
 import { getEnrichedDevicesForUser } from "@/lib/device-enrichment";
@@ -23,7 +23,7 @@ export default async function SettingsPage({
   const hoursTarget = await getUserHoursTarget(user);
   const config = await getAppConfig();
 
-  const installTokens = await getInstallTokensForUser(user.id, appUrl);
+  const { installTokens, legacyBoundCount } = await getUserInstallTokenState(user.id, appUrl);
   const enrichedDevices = await getEnrichedDevicesForUser(user.id);
 
   return (
@@ -45,6 +45,7 @@ export default async function SettingsPage({
           isWelcome={params.welcome === "1"}
           devices={enrichedDevices}
           installTokens={installTokens}
+          legacyBoundCount={legacyBoundCount}
           localDevAgentPath={localDevAgentPath}
         />
       </main>

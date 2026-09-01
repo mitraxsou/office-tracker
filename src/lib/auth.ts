@@ -195,10 +195,15 @@ export function revealStoredPendingToken(
   return decryptPendingToken(token.pendingTokenEnc);
 }
 
-export async function getInstallTokensForUser(
+export type UserInstallTokenState = {
+  installTokens: InstallTokenForUser[];
+  legacyBoundCount: number;
+};
+
+export async function getUserInstallTokenState(
   userId: string,
   appUrl: string,
-): Promise<InstallTokenForUser[]> {
+): Promise<UserInstallTokenState> {
   await revokeExpiredPendingTokens();
 
   const tokens = await prisma.agentToken.findMany({
@@ -206,7 +211,7 @@ export async function getInstallTokensForUser(
     orderBy: { createdAt: "asc" },
   });
 
-  return tokens
+  const installTokens = tokens
     .map((t) => {
       const plain = revealStoredPendingToken(t);
       if (!plain) return null;
@@ -223,6 +228,20 @@ export async function getInstallTokensForUser(
       };
     })
     .filter((t): t is InstallTokenForUser => t !== null);
+
+  const legacyBoundCount = tokens.filter(
+    (t) => t.boundSerialNumber && !revealStoredPendingToken(t),
+  ).length;
+
+  return { installTokens, legacyBoundCount };
+}
+
+export async function getInstallTokensForUser(
+  userId: string,
+  appUrl: string,
+): Promise<InstallTokenForUser[]> {
+  const state = await getUserInstallTokenState(userId, appUrl);
+  return state.installTokens;
 }
 
 export async function getPendingInstallTokensForUser(userId: string, appUrl: string) {

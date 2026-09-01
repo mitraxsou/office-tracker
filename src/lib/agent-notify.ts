@@ -82,7 +82,7 @@ export async function sendStaleAgentEmail(params: {
     <p>Office hours are not updating until the agent is fixed.</p>
     <p><strong>What to do:</strong></p>
     <ol>
-      <li>Open <a href="${appUrl}/settings">Settings</a> and re-run the install command.</li>
+      <li>Open <a href="${appUrl}/settings#install">Settings install steps</a> and re-run the install command.</li>
       <li>Check Task Scheduler for <code>PwCOfficePulse</code>.</li>
       <li>If it still fails, contact your admin.</li>
     </ol>

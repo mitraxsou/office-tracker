@@ -139,7 +139,7 @@ export default async function DashboardPage() {
         {!agentNeverConnected && !summary.agentHealthy && !agentStale && (
           <p className="text-sm text-muted">
             Agent has not sent a heartbeat recently. Check Task Scheduler or re-run{" "}
-            <Link href="/settings" className="text-accent hover:underline">
+            <Link href="/settings#install" className="text-accent hover:underline">
               install.ps1
             </Link>
             .
