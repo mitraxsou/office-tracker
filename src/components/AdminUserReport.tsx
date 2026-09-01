@@ -9,6 +9,7 @@ import { OutOfOfficeSection } from "./OutOfOfficeSection";
 import { VisitCalendar } from "./reports/VisitCalendar";
 import { HoursTrendChart } from "./reports/ReportCharts";
 import { exportDailyTrendCsv, MonthReportToolbar } from "./reports/ReportToolbar";
+import { currentMonthKey } from "@/lib/month-range";
 import { formatHours, formatTime } from "@/lib/visits";
 
 type UserReport = {
@@ -70,7 +71,7 @@ type UserReport = {
 
 export function AdminUserReport({ userId }: { userId: string }) {
   const router = useRouter();
-  const [monthKey, setMonthKey] = useState("");
+  const [monthKey, setMonthKey] = useState(() => currentMonthKey("Asia/Kolkata"));
   const [fromKey, setFromKey] = useState("");
   const [toKey, setToKey] = useState("");
   const [data, setData] = useState<UserReport | null>(null);

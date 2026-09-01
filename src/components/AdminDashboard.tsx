@@ -14,6 +14,7 @@ import {
   ReportFilters,
   useTableSort,
 } from "@/components/reports/ReportToolbar";
+import { currentMonthKey } from "@/lib/month-range";
 import { exportToCsv } from "@/lib/report-range";
 import { InOfficeNowPanel } from "@/components/InOfficeNowPanel";
 
@@ -65,7 +66,7 @@ type ReportsData = {
 };
 
 export function AdminDashboard() {
-  const [monthKey, setMonthKey] = useState("");
+  const [monthKey, setMonthKey] = useState(() => currentMonthKey("Asia/Kolkata"));
   const [fromKey, setFromKey] = useState("");
   const [toKey, setToKey] = useState("");
   const [data, setData] = useState<ReportsData | null>(null);

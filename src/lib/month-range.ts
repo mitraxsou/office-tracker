@@ -34,6 +34,9 @@ export function currentMonthKey(timezone: string, ref = new Date()): string {
 }
 
 export function shiftMonth(monthKey: string, delta: number): string {
+  if (!monthKey || !/^\d{4}-\d{2}$/.test(monthKey)) {
+    monthKey = currentMonthKey("Asia/Kolkata");
+  }
   const { year, month } = parseMonthKey(monthKey);
   const d = new Date(year, month - 1 + delta, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -59,6 +62,9 @@ export function monthBoundsFromKey(monthKey: string, timezone: string): MonthRan
 }
 
 export function formatMonthLabel(monthKey: string, timezone = "Asia/Kolkata"): string {
+  if (!monthKey || !/^\d{4}-\d{2}$/.test(monthKey)) {
+    monthKey = currentMonthKey(timezone);
+  }
   const { year, month } = parseMonthKey(monthKey);
   const ref = new Date(year, month - 1, 15);
   return new Intl.DateTimeFormat("en-IN", {

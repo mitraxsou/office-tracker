@@ -44,6 +44,12 @@ describe("formatMonthLabel", () => {
   it("formats month and year for display", () => {
     expect(formatMonthLabel("2026-09", "Asia/Kolkata")).toMatch(/September 2026/);
   });
+
+  it("falls back to current month for empty or invalid keys", () => {
+    expect(() => formatMonthLabel("", "Asia/Kolkata")).not.toThrow();
+    expect(() => formatMonthLabel("invalid", "Asia/Kolkata")).not.toThrow();
+    expect(formatMonthLabel("", "Asia/Kolkata")).toMatch(/\w+ \d{4}/);
+  });
 });
 
 describe("calendarWeeksForMonth", () => {
