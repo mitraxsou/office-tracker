@@ -7,15 +7,24 @@ export function AdminSettingsForm({
   hoursTarget,
   officeSsids,
   maxDevicesPerUser,
+  pendingTokenTtlDays,
+  heartbeatRetentionDays,
+  agentStaleMinutes,
 }: {
   hoursTarget: number;
   officeSsids: string[];
   maxDevicesPerUser: number;
+  pendingTokenTtlDays: number;
+  heartbeatRetentionDays: number;
+  agentStaleMinutes: number;
 }) {
   const router = useRouter();
   const [target, setTarget] = useState(hoursTarget);
   const [ssidText, setSsidText] = useState(officeSsids.join("\n"));
   const [maxDevices, setMaxDevices] = useState(maxDevicesPerUser);
+  const [tokenTtl, setTokenTtl] = useState(pendingTokenTtlDays);
+  const [heartbeatRetention, setHeartbeatRetention] = useState(heartbeatRetentionDays);
+  const [staleMinutes, setStaleMinutes] = useState(agentStaleMinutes);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -38,6 +47,9 @@ export function AdminSettingsForm({
         hoursTarget: target,
         officeSsids: ssidList,
         maxDevicesPerUser: maxDevices,
+        pendingTokenTtlDays: tokenTtl,
+        heartbeatRetentionDays: heartbeatRetention,
+        agentStaleMinutes: staleMinutes,
       }),
     });
 
@@ -87,6 +99,49 @@ export function AdminSettingsForm({
           onChange={(e) => setMaxDevices(Number(e.target.value))}
           className="w-full max-w-xs rounded-lg border px-3 py-2"
         />
+      </section>
+
+      <section className="card p-6">
+        <h2 className="mb-2 text-lg font-medium">Agent & token settings</h2>
+        <p className="mb-4 text-sm text-muted">
+          Pending install tokens auto-revoke if never bound. Raw heartbeats are purged after the
+          retention window (visits are kept).
+        </p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <label className="block text-sm">
+            <span className="text-muted">Pending token TTL (days)</span>
+            <input
+              type="number"
+              min={1}
+              max={90}
+              value={tokenTtl}
+              onChange={(e) => setTokenTtl(Number(e.target.value))}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="text-muted">Heartbeat retention (days)</span>
+            <input
+              type="number"
+              min={1}
+              max={30}
+              value={heartbeatRetention}
+              onChange={(e) => setHeartbeatRetention(Number(e.target.value))}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="text-muted">Agent stale after (minutes)</span>
+            <input
+              type="number"
+              min={2}
+              max={60}
+              value={staleMinutes}
+              onChange={(e) => setStaleMinutes(Number(e.target.value))}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+        </div>
       </section>
 
       {error && <p className="text-sm text-red-400">{error}</p>}

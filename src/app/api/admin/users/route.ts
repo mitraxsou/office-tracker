@@ -8,6 +8,7 @@ import {
   issueAgentToken,
   summarizeAgentTokens,
 } from "@/lib/auth";
+import { revokeExpiredPendingTokens } from "@/lib/token-expiry";
 import { logAuditEvent } from "@/lib/audit-log";
 import { buildInstallCommand } from "@/lib/agent-branding";
 
@@ -20,6 +21,8 @@ export async function GET() {
   if (!admin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+
+  await revokeExpiredPendingTokens();
 
   const users = await prisma.user.findMany({
     include: {

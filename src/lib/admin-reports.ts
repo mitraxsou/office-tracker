@@ -2,6 +2,7 @@ import { summarizeAgentTokens } from "./auth";
 import { prisma } from "./db";
 import { getAppConfig, getUserHoursTarget } from "./app-config";
 import { getTodaySummary } from "./heartbeat-service";
+import { revokeExpiredPendingTokens } from "./token-expiry";
 
 function dayKeyForTimezone(date: Date, timezone: string) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -42,6 +43,8 @@ async function aggregateHoursForDay(userId: string, timezone: string, dayKey: st
 export async function getAdminReports() {
   const config = await getAppConfig();
   const defaultTz = "Asia/Kolkata";
+
+  await revokeExpiredPendingTokens();
 
   const users = await prisma.user.findMany({
     include: {

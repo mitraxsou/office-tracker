@@ -26,6 +26,9 @@ export default async function AdminSettingsPage() {
           hoursTarget={config.hoursTarget}
           officeSsids={config.officeSsids}
           maxDevicesPerUser={config.maxDevicesPerUser}
+          pendingTokenTtlDays={config.pendingTokenTtlDays}
+          heartbeatRetentionDays={config.heartbeatRetentionDays}
+          agentStaleMinutes={config.agentStaleMinutes}
         />
         <AdminPilotControls
           allowRegistration={config.allowRegistration}

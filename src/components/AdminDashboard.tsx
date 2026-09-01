@@ -1,9 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AdminVisitForm } from "./AdminVisitForm";
+import Link from "next/link";
 
 type DailyPoint = { date: string; totalHours: number; compliancePct: number };
+
+type UserRow = {
+  id: string;
+  email: string;
+  name: string | null;
+  role: string;
+  hoursTarget: number;
+  today: {
+    totalHours: number;
+    metTarget: boolean;
+    agentHealthy: boolean;
+    inOfficeNow: boolean;
+    lastHeartbeat: string | null;
+  };
+};
 
 type ReportsData = {
   summary: {
@@ -15,6 +30,7 @@ type ReportsData = {
   };
   dailyTrend: DailyPoint[];
   statusBreakdown: { inOffice: number; notInOffice: number; noAgent: number };
+  users: UserRow[];
   auditLog: Array<{
     id: string;
     action: string;
@@ -180,6 +196,58 @@ export function AdminDashboard() {
           </section>
 
           <section className="card p-6">
+            <h2 className="mb-4 text-lg font-medium">Users today</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)] text-left text-muted">
+                    <th className="py-2 pr-4">User</th>
+                    <th className="py-2 pr-4">Today</th>
+                    <th className="py-2 pr-4">5h met</th>
+                    <th className="py-2 pr-4">Agent</th>
+                    <th className="py-2 pr-4">Last pulse</th>
+                    <th className="py-2">Report</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.users.map((u) => (
+                    <tr key={u.id} className="border-b border-[var(--border)]">
+                      <td className="py-3 pr-4">
+                        <div className="font-medium">{u.email}</div>
+                        {u.name && <div className="text-xs text-muted">{u.name}</div>}
+                      </td>
+                      <td className="py-3 pr-4">
+                        {u.today.totalHours.toFixed(1)}h / {u.hoursTarget}h
+                      </td>
+                      <td className="py-3 pr-4">
+                        <span className={u.today.metTarget ? "text-green-400" : "text-accent"}>
+                          {u.today.metTarget ? "Yes" : "No"}
+                        </span>
+                      </td>
+                      <td className="py-3 pr-4">
+                        {u.today.agentHealthy ? "Healthy" : "Stale"}
+                      </td>
+                      <td className="py-3 pr-4 text-xs text-muted">
+                        {u.today.lastHeartbeat
+                          ? new Date(u.today.lastHeartbeat).toLocaleString("en-IN")
+                          : "None"}
+                      </td>
+                      <td className="py-3">
+                        <Link
+                          href={`/admin/reports/users/${u.id}`}
+                          className="text-xs text-accent hover:underline"
+                        >
+                          View report
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="card p-6">
             <h2 className="mb-4 text-lg font-medium">Admin activity log</h2>
             {data.auditLog.length === 0 ? (
               <p className="text-sm text-muted">No admin actions yet.</p>
@@ -199,11 +267,6 @@ export function AdminDashboard() {
                 ))}
               </ul>
             )}
-          </section>
-
-          <section className="card p-6">
-            <h2 className="mb-4 text-lg font-medium">Correct visit data</h2>
-            <AdminVisitForm />
           </section>
         </>
       )}

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AdminUserManagement } from "./AdminUserManagement";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -9,8 +10,9 @@ type TokenRow = {
   prefix: string;
   label: string | null;
   boundSerialNumber: string | null;
-  status: "pending" | "bound";
+  status: "pending" | "bound" | "expired";
   shareable: boolean;
+  expiresAt: string | null;
   createdAt: string;
   lastUsedAt: string | null;
 };
@@ -217,6 +219,12 @@ export function AdminUsersDashboard() {
             <div>
               <h2 className="text-lg font-medium">{u.email}</h2>
               {u.name && <p className="text-sm text-muted">{u.name}</p>}
+              <Link
+                href={`/admin/reports/users/${u.id}`}
+                className="text-xs text-accent hover:underline"
+              >
+                View report →
+              </Link>
               <p className="mt-1 text-xs text-muted">
                 Today: {u.today.totalHours.toFixed(1)}h / {u.hoursTarget}h · Agent:{" "}
                 {u.today.agentHealthy ? "Healthy" : "Stale"}
@@ -286,13 +294,17 @@ export function AdminUsersDashboard() {
                       <td className="py-2 pr-3">{t.label ?? "—"}</td>
                       <td className="py-2 pr-3 font-mono text-xs">{t.prefix}</td>
                       <td className="py-2 pr-3">
-                        <span
-                          className={
-                            t.status === "bound" ? "text-green-400" : "text-amber-300"
-                          }
-                        >
-                          {t.status}
-                        </span>
+                            <span
+                              className={
+                                t.status === "bound"
+                                  ? "text-green-400"
+                                  : t.status === "expired"
+                                    ? "text-red-400"
+                                    : "text-amber-300"
+                              }
+                            >
+                              {t.status}
+                            </span>
                       </td>
                       <td className="py-2 pr-3 font-mono text-xs">
                         {t.boundSerialNumber ?? "—"}
@@ -331,6 +343,9 @@ export function AdminUsersDashboard() {
                                 Revoke
                               </button>
                             </>
+                          )}
+                          {t.status === "expired" && (
+                            <span className="text-muted">Expired — issue a new token</span>
                           )}
                           {t.status === "bound" && (
                             <span className="text-muted">Bound — issue new token for another laptop</span>

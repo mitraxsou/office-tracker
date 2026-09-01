@@ -64,3 +64,42 @@ export async function PATCH(
 
   return NextResponse.json({ user: updated });
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const admin = await requireAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { id } = await params;
+
+  if (id === admin.id) {
+    return NextResponse.json({ error: "You cannot delete yourself" }, { status: 400 });
+  }
+
+  const target = await prisma.user.findUnique({ where: { id } });
+  if (!target) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  if (target.role === "admin") {
+    const adminCount = await prisma.user.count({ where: { role: "admin" } });
+    if (adminCount <= 1) {
+      return NextResponse.json({ error: "Cannot delete the last admin" }, { status: 400 });
+    }
+  }
+
+  await prisma.user.delete({ where: { id } });
+
+  await logAuditEvent({
+    actorId: admin.id,
+    action: "user_delete",
+    targetUserId: id,
+    details: { email: target.email },
+  });
+
+  return NextResponse.json({ ok: true });
+}

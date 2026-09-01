@@ -4,6 +4,53 @@ import { prisma } from "@/lib/db";
 import { createManualVisit } from "@/lib/heartbeat-service";
 import { logAuditEvent } from "@/lib/audit-log";
 
+export async function GET(request: Request) {
+  const admin = await requireAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const userId = searchParams.get("userId");
+  if (!userId) {
+    return NextResponse.json({ error: "userId required" }, { status: 400 });
+  }
+
+  const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? "50")));
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
+
+  const where: {
+    userId: string;
+    startAt?: { lte: Date };
+    OR?: Array<{ endAt: null } | { endAt: { gte: Date } }>;
+  } = { userId };
+
+  if (to) {
+    where.startAt = { lte: new Date(to) };
+  }
+  if (from) {
+    where.OR = [{ endAt: null }, { endAt: { gte: new Date(from) } }];
+  }
+
+  const visits = await prisma.visit.findMany({
+    where,
+    orderBy: { startAt: "desc" },
+    take: limit,
+  });
+
+  return NextResponse.json({
+    visits: visits.map((v) => ({
+      id: v.id,
+      userId: v.userId,
+      startAt: v.startAt.toISOString(),
+      endAt: v.endAt?.toISOString() ?? null,
+      source: v.source,
+      ssid: v.ssid,
+    })),
+  });
+}
+
 export async function POST(request: Request) {
   const admin = await requireAdmin();
   if (!admin) {

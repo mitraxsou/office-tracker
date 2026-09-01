@@ -41,7 +41,7 @@ export default function HelpPage() {
         <section className="card space-y-3 p-6">
           <h2 className="text-lg font-medium text-accent">Security</h2>
           <ul className="list-disc space-y-2 pl-5 text-sm text-muted">
-            <li>Agent tokens stored as bcrypt hashes. Pending install commands are visible in Settings until the laptop registers.</li>
+            <li>Agent tokens stored as bcrypt hashes. Pending install commands are visible in Settings until the laptop registers or the token expires (admin-configurable TTL).</li>
             <li>Heartbeat rate limit: 1 request per 30 seconds per token</li>
             <li>Inputs validated (SSID length, timestamps, no injection characters)</li>
             <li>Session cookies: httpOnly, secure in production, sameSite=lax</li>

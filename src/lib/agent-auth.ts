@@ -2,11 +2,14 @@ import { prisma } from "./db";
 import bcrypt from "bcryptjs";
 import { getAppConfig } from "./app-config";
 import { logAuditEvent } from "./audit-log";
+import { isTokenExpired, revokeExpiredPendingTokens } from "./token-expiry";
 
 export async function authenticateAgentToken(token: string) {
   if (token.length < 16) {
     return { ok: false as const, status: 401, error: "Invalid token" };
   }
+
+  await revokeExpiredPendingTokens();
 
   const tokenPrefix = token.slice(0, 8);
   const agentToken = await prisma.agentToken.findUnique({
@@ -16,6 +19,10 @@ export async function authenticateAgentToken(token: string) {
 
   if (!agentToken || agentToken.revokedAt) {
     return { ok: false as const, status: 401, error: "Unauthorized" };
+  }
+
+  if (isTokenExpired(agentToken)) {
+    return { ok: false as const, status: 401, error: "Token expired" };
   }
 
   const valid = await bcrypt.compare(token, agentToken.tokenHash);
@@ -52,6 +59,7 @@ export async function bindAgentTokenToSerial(agentTokenId: string, serialNumber:
         boundSerialNumber: serialNumber,
         lastUsedAt: new Date(),
         pendingTokenEnc: null,
+        expiresAt: null,
       },
     });
   } else {

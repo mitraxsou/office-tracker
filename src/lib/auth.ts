@@ -2,10 +2,11 @@ import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { prisma } from "./db";
-import { ensureAppConfig } from "./app-config";
+import { ensureAppConfig, getAppConfig } from "./app-config";
 import crypto from "crypto";
 import { encryptPendingToken, decryptPendingToken } from "./token-crypto";
 import { buildInstallCommand } from "./agent-branding";
+import { isTokenExpired, revokeExpiredPendingTokens } from "./token-expiry";
 
 const SESSION_COOKIE = "office-tracker-session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30;
@@ -85,8 +86,12 @@ export async function createAgentTokenRecord(
   plainToken: string,
   opts?: { label?: string; issuedById?: string | null },
 ) {
+  const config = await getAppConfig();
   const tokenHash = await hashPassword(plainToken);
   const tokenPrefix = plainToken.slice(0, 8);
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + config.pendingTokenTtlDays);
+
   return prisma.agentToken.create({
     data: {
       userId,
@@ -95,6 +100,7 @@ export async function createAgentTokenRecord(
       label: opts?.label?.trim() || null,
       issuedById: opts?.issuedById ?? null,
       pendingTokenEnc: encryptPendingToken(plainToken),
+      expiresAt,
     },
   });
 }
@@ -165,13 +171,25 @@ export async function reissueAgentToken(
 }
 
 export function revealStoredPendingToken(
-  token: { pendingTokenEnc: string | null; boundSerialNumber: string | null; revokedAt: Date | null },
+  token: {
+    pendingTokenEnc: string | null;
+    boundSerialNumber: string | null;
+    revokedAt: Date | null;
+    expiresAt?: Date | null;
+  },
 ) {
   if (token.revokedAt || token.boundSerialNumber || !token.pendingTokenEnc) return null;
+  if (isTokenExpired({
+    revokedAt: token.revokedAt,
+    boundSerialNumber: token.boundSerialNumber,
+    expiresAt: token.expiresAt ?? null,
+  })) return null;
   return decryptPendingToken(token.pendingTokenEnc);
 }
 
 export async function getPendingInstallTokensForUser(userId: string, appUrl: string) {
+  await revokeExpiredPendingTokens();
+
   const tokens = await prisma.agentToken.findMany({
     where: { userId, revokedAt: null, boundSerialNumber: null },
     orderBy: { createdAt: "desc" },
@@ -196,6 +214,8 @@ export async function getPendingInstallTokensForUser(userId: string, appUrl: str
 export async function resolveAgentTokenRecord(token: string) {
   if (token.length < 16) return null;
 
+  await revokeExpiredPendingTokens();
+
   const tokenPrefix = token.slice(0, 8);
   const agentToken = await prisma.agentToken.findUnique({
     where: { tokenPrefix },
@@ -203,6 +223,7 @@ export async function resolveAgentTokenRecord(token: string) {
   });
 
   if (!agentToken || agentToken.revokedAt) return null;
+  if (isTokenExpired(agentToken)) return null;
 
   const valid = await verifyPassword(token, agentToken.tokenHash);
   if (!valid) return null;
@@ -315,20 +336,32 @@ export function summarizeAgentTokens(
     boundSerialNumber: string | null;
     revokedAt: Date | null;
     pendingTokenEnc: string | null;
+    expiresAt: Date | null;
     createdAt: Date;
     lastUsedAt: Date | null;
   }>,
 ) {
   return tokens
     .filter((t) => !t.revokedAt)
-    .map((t) => ({
-      id: t.id,
-      prefix: t.tokenPrefix,
-      label: t.label,
-      boundSerialNumber: t.boundSerialNumber,
-      status: t.boundSerialNumber ? ("bound" as const) : ("pending" as const),
-      shareable: !t.boundSerialNumber && !!t.pendingTokenEnc,
-      createdAt: t.createdAt.toISOString(),
-      lastUsedAt: t.lastUsedAt?.toISOString() ?? null,
-    }));
+    .map((t) => {
+      let status: "bound" | "pending" | "expired";
+      if (t.boundSerialNumber) {
+        status = "bound";
+      } else if (isTokenExpired(t)) {
+        status = "expired";
+      } else {
+        status = "pending";
+      }
+      return {
+        id: t.id,
+        prefix: t.tokenPrefix,
+        label: t.label,
+        boundSerialNumber: t.boundSerialNumber,
+        status,
+        shareable: status === "pending" && !!t.pendingTokenEnc,
+        expiresAt: t.expiresAt?.toISOString() ?? null,
+        createdAt: t.createdAt.toISOString(),
+        lastUsedAt: t.lastUsedAt?.toISOString() ?? null,
+      };
+    });
 }

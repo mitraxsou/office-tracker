@@ -37,6 +37,18 @@ export async function register() {
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "AgentDevice" ADD COLUMN IF NOT EXISTS "agentTokenId" TEXT;'
     );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AgentToken" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMP(3);'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "pendingTokenTtlDays" INTEGER NOT NULL DEFAULT 7;'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "heartbeatRetentionDays" INTEGER NOT NULL DEFAULT 1;'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "agentStaleMinutes" INTEGER NOT NULL DEFAULT 8;'
+    );
     await ensureAppConfig();
     await ensureBreakglassAdmin();
   } catch (err) {

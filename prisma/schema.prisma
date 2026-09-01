@@ -38,6 +38,7 @@ model AgentToken {
   lastUsedAt        DateTime?
   issuedById        String?
   pendingTokenEnc   String?
+  expiresAt         DateTime?
   createdAt         DateTime  @default(now())
   devices           AgentDevice[]
 
@@ -63,8 +64,11 @@ model AppConfig {
   hoursTarget       Float    @default(5.0)
   officeSsids       String   @default("[\"OfficeConnect\",\"ExternalConnect\"]")
   maxDevicesPerUser Int      @default(10)
-  allowRegistration Boolean  @default(false)
-  updatedAt         DateTime @updatedAt
+  allowRegistration     Boolean  @default(false)
+  pendingTokenTtlDays   Int      @default(7)
+  heartbeatRetentionDays Int     @default(1)
+  agentStaleMinutes     Int      @default(8)
+  updatedAt             DateTime @updatedAt
 }
 
 model Heartbeat {

@@ -5,11 +5,16 @@ import { useEffect, useState } from "react";
 type AgentStatus = {
   installStatus: "not_installed" | "waiting" | "connected";
   agentHealthy: boolean;
+  pulseStatus: "healthy" | "stale" | "none";
   lastHeartbeat: string | null;
   inOfficeNow: boolean;
   deviceCount: number;
   pendingTokens: number;
   boundTokens: number;
+  pulsesLast24h: number;
+  expectedPulsesPerDay: number;
+  minutesSinceLastPulse: number | null;
+  recentPulses: Array<{ recordedAt: string; inOffice: boolean; ssid: string | null }>;
   devices: Array<{ id: string; serialNumber: string; lastSeenAt: string | null }>;
 };
 
@@ -20,16 +25,22 @@ const STATUS_LABELS = {
     color: "text-amber-300",
   },
   waiting: {
-    title: "Waiting for first heartbeat",
+    title: "Waiting for heartbeat",
     detail:
-      "Install may have finished. The agent checks in every 2 minutes. Refresh this page shortly.",
+      "Install may have finished. The agent checks in every 2 minutes. Use Refresh status below.",
     color: "text-blue-300",
   },
   connected: {
     title: "Agent connected",
-    detail: "Your laptop is registered and sending heartbeats.",
+    detail: "Your laptop is registered and sending pulses regularly.",
     color: "text-green-300",
   },
+};
+
+const PULSE_LABELS = {
+  healthy: { text: "Sending pulses regularly", color: "text-green-400" },
+  stale: { text: "No recent pulse — agent may be offline", color: "text-amber-300" },
+  none: { text: "No pulses received yet", color: "text-muted" },
 };
 
 export function AgentStatusPanel() {
@@ -59,16 +70,21 @@ export function AgentStatusPanel() {
   if (!status) return null;
 
   const meta = STATUS_LABELS[status.installStatus];
+  const pulseMeta = PULSE_LABELS[status.pulseStatus];
 
   return (
     <section className="card p-6">
       <h2 className="mb-1 text-lg font-medium">Agent status</h2>
       <p className={`text-sm font-medium ${meta.color}`}>{meta.title}</p>
       <p className="mt-1 text-sm text-muted">{meta.detail}</p>
+      <p className={`mt-2 text-sm font-medium ${pulseMeta.color}`}>{pulseMeta.text}</p>
+
       <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
         <div>
-          <dt className="text-muted">Registered laptops</dt>
-          <dd>{status.deviceCount}</dd>
+          <dt className="text-muted">Pulses last 24h</dt>
+          <dd>
+            {status.pulsesLast24h} / ~{status.expectedPulsesPerDay} expected
+          </dd>
         </div>
         <div>
           <dt className="text-muted">Last heartbeat</dt>
@@ -79,14 +95,34 @@ export function AgentStatusPanel() {
           </dd>
         </div>
         <div>
-          <dt className="text-muted">Agent health</dt>
-          <dd>{status.agentHealthy ? "Healthy" : status.deviceCount ? "Stale" : "Not installed"}</dd>
+          <dt className="text-muted">Minutes since last pulse</dt>
+          <dd>{status.minutesSinceLastPulse ?? "—"}</dd>
         </div>
         <div>
           <dt className="text-muted">In office now</dt>
           <dd>{status.inOfficeNow ? "Yes" : "No"}</dd>
         </div>
+        <div>
+          <dt className="text-muted">Registered laptops</dt>
+          <dd>{status.deviceCount}</dd>
+        </div>
       </dl>
+
+      {status.recentPulses.length > 0 && (
+        <div className="mt-3">
+          <p className="mb-1 text-xs font-medium text-muted">Recent pulses</p>
+          <ul className="space-y-1 text-xs text-muted">
+            {status.recentPulses.map((p, i) => (
+              <li key={i}>
+                {new Date(p.recordedAt).toLocaleTimeString("en-IN")} ·{" "}
+                {p.inOffice ? "in office" : "out"}
+                {p.ssid ? ` · ${p.ssid}` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {status.devices.length > 0 && (
         <ul className="mt-3 space-y-1 text-xs">
           {status.devices.map((d) => (
@@ -101,6 +137,7 @@ export function AgentStatusPanel() {
           ))}
         </ul>
       )}
+
       <button
         type="button"
         onClick={() => {

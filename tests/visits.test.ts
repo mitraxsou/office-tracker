@@ -1,13 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_HOURS_TARGET, VISIT_GAP_MS } from "../src/lib/constants";
 import {
   mergeHeartbeatsIntoVisits,
   meetsHoursTarget,
   remainingHours,
   totalHoursFromVisits,
   visitsForDay,
-  VISIT_GAP_MS,
 } from "../src/lib/visits";
-import { DEFAULT_HOURS_TARGET } from "../src/lib/constants";
 
 const ms = (minutes: number) => minutes * 60 * 1000;
 

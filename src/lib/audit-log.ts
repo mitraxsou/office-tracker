@@ -14,7 +14,10 @@ export type AuditAction =
   | "agent_token_share"
   | "agent_token_reissue"
   | "agent_token_revoke"
-  | "agent_device_registered";
+  | "agent_device_registered"
+  | "user_data_reset"
+  | "user_delete"
+  | "heartbeat_purge";
 
 export async function logAuditEvent(params: {
   actorId: string;

@@ -30,6 +30,9 @@ export async function PATCH(request: Request) {
     officeSsids?: string[];
     maxDevicesPerUser?: number;
     allowRegistration?: boolean;
+    pendingTokenTtlDays?: number;
+    heartbeatRetentionDays?: number;
+    agentStaleMinutes?: number;
   };
 
   try {
@@ -73,6 +76,27 @@ export async function PATCH(request: Request) {
       );
     }
     update.allowRegistration = body.allowRegistration;
+  }
+
+  if (body.pendingTokenTtlDays !== undefined) {
+    if (body.pendingTokenTtlDays < 1 || body.pendingTokenTtlDays > 90) {
+      return NextResponse.json({ error: "pendingTokenTtlDays must be 1–90" }, { status: 400 });
+    }
+    update.pendingTokenTtlDays = body.pendingTokenTtlDays;
+  }
+
+  if (body.heartbeatRetentionDays !== undefined) {
+    if (body.heartbeatRetentionDays < 1 || body.heartbeatRetentionDays > 30) {
+      return NextResponse.json({ error: "heartbeatRetentionDays must be 1–30" }, { status: 400 });
+    }
+    update.heartbeatRetentionDays = body.heartbeatRetentionDays;
+  }
+
+  if (body.agentStaleMinutes !== undefined) {
+    if (body.agentStaleMinutes < 2 || body.agentStaleMinutes > 60) {
+      return NextResponse.json({ error: "agentStaleMinutes must be 2–60" }, { status: 400 });
+    }
+    update.agentStaleMinutes = body.agentStaleMinutes;
   }
 
   const config = await updateAppConfig(update);

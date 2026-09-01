@@ -2,6 +2,10 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { DEFAULT_HOURS_TARGET, parseDefaultSsidsFromEnv } from "./constants";
 
+export const DEFAULT_PENDING_TOKEN_TTL_DAYS = 7;
+export const DEFAULT_HEARTBEAT_RETENTION_DAYS = 1;
+export const DEFAULT_AGENT_STALE_MINUTES = 8;
+
 export function logAppConfigSchemaDriftIfNeeded(err: unknown): boolean {
   const isMissingColumn =
     err instanceof Prisma.PrismaClientKnownRequestError &&
@@ -24,6 +28,9 @@ export type AppConfigData = {
   officeSsids: string[];
   maxDevicesPerUser: number;
   allowRegistration: boolean;
+  pendingTokenTtlDays: number;
+  heartbeatRetentionDays: number;
+  agentStaleMinutes: number;
 };
 
 const CONFIG_ID = "global";
@@ -39,6 +46,9 @@ export async function ensureAppConfig(): Promise<AppConfigData> {
           officeSsids: JSON.stringify(parseDefaultSsidsFromEnv()),
           maxDevicesPerUser: 10,
           allowRegistration: false,
+          pendingTokenTtlDays: DEFAULT_PENDING_TOKEN_TTL_DAYS,
+          heartbeatRetentionDays: DEFAULT_HEARTBEAT_RETENTION_DAYS,
+          agentStaleMinutes: DEFAULT_AGENT_STALE_MINUTES,
         },
       });
     }
@@ -60,6 +70,9 @@ export async function updateAppConfig(data: Partial<AppConfigData>) {
   if (data.officeSsids !== undefined) update.officeSsids = JSON.stringify(data.officeSsids);
   if (data.maxDevicesPerUser !== undefined) update.maxDevicesPerUser = data.maxDevicesPerUser;
   if (data.allowRegistration !== undefined) update.allowRegistration = data.allowRegistration;
+  if (data.pendingTokenTtlDays !== undefined) update.pendingTokenTtlDays = data.pendingTokenTtlDays;
+  if (data.heartbeatRetentionDays !== undefined) update.heartbeatRetentionDays = data.heartbeatRetentionDays;
+  if (data.agentStaleMinutes !== undefined) update.agentStaleMinutes = data.agentStaleMinutes;
 
   const config = await prisma.appConfig.update({
     where: { id: CONFIG_ID },
@@ -73,11 +86,19 @@ export async function getUserHoursTarget(user: { hoursTarget: number | null }) {
   return user.hoursTarget ?? global.hoursTarget;
 }
 
+export async function getAgentStaleMs() {
+  const config = await getAppConfig();
+  return config.agentStaleMinutes * 60 * 1000;
+}
+
 function parseConfig(config: {
   hoursTarget: number;
   officeSsids: string;
   maxDevicesPerUser: number;
   allowRegistration: boolean;
+  pendingTokenTtlDays?: number;
+  heartbeatRetentionDays?: number;
+  agentStaleMinutes?: number;
 }): AppConfigData {
   let ssids: string[] = parseDefaultSsidsFromEnv();
   try {
@@ -91,5 +112,8 @@ function parseConfig(config: {
     officeSsids: ssids,
     maxDevicesPerUser: config.maxDevicesPerUser,
     allowRegistration: config.allowRegistration,
+    pendingTokenTtlDays: config.pendingTokenTtlDays ?? DEFAULT_PENDING_TOKEN_TTL_DAYS,
+    heartbeatRetentionDays: config.heartbeatRetentionDays ?? DEFAULT_HEARTBEAT_RETENTION_DAYS,
+    agentStaleMinutes: config.agentStaleMinutes ?? DEFAULT_AGENT_STALE_MINUTES,
   };
 }
