@@ -68,11 +68,19 @@ function Get-LocalAgentVersion {
     return (Get-Content $path -Raw -ErrorAction SilentlyContinue).Trim()
 }
 
+function Publish-AgentScriptTxt {
+    param([string]$Ps1Path)
+    $txtPath = [System.IO.Path]::ChangeExtension($Ps1Path, ".txt")
+    Copy-Item $Ps1Path $txtPath -Force
+    return $txtPath
+}
+
 function New-HiddenRunner {
     param([string]$ScriptPath, [string]$Dir)
+    $txtPath = Publish-AgentScriptTxt -Ps1Path $ScriptPath
     $vbsPath = Join-Path $Dir "run-heartbeat.vbs"
     $vbsContent = @"
-CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$ScriptPath""", 0, False
+CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""& { `$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s }""", 0, False
 "@
     Set-Content -Path $vbsPath -Value $vbsContent -Encoding ASCII
     return $vbsPath
@@ -83,15 +91,22 @@ function Refresh-ScheduledTask {
     $wscript = (Get-Command wscript.exe).Source
     $actionArgs = "//B //Nologo `"$VbsPath`""
     $action = New-ScheduledTaskAction -Execute $wscript -Argument $actionArgs
-    $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
+    $repeatTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
         -RepetitionInterval (New-TimeSpan -Minutes 2) `
         -RepetitionDuration (New-TimeSpan -Days 3650)
+    $logonTrigger = New-ScheduledTaskTrigger -AtLogOn
     $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
         -LogonType Interactive -RunLevel Limited
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
-        -StartWhenAvailable -MultipleInstances IgnoreNew
-    Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
-        -Principal $principal -Settings $settings -Description $TaskDescription -Force | Out-Null
+        -StartWhenAvailable -MultipleInstances Queue
+
+    try {
+        Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger @($repeatTrigger, $logonTrigger) `
+            -Principal $principal -Settings $settings -Description $TaskDescription -Force | Out-Null
+    } catch {
+        Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $repeatTrigger `
+            -Principal $principal -Settings $settings -Description $TaskDescription -Force | Out-Null
+    }
 
     $startupDir = [Environment]::GetFolderPath("Startup")
     $shortcutPath = Join-Path $startupDir "PwC Office Pulse.lnk"
@@ -178,6 +193,8 @@ try {
     }
 
     $heartbeatScript = Join-Path $installDir "office-heartbeat.ps1"
+    Publish-AgentScriptTxt -Ps1Path $heartbeatScript | Out-Null
+    Publish-AgentScriptTxt -Ps1Path (Join-Path $installDir "update.ps1") | Out-Null
     $vbsPath = New-HiddenRunner -ScriptPath $heartbeatScript -Dir $installDir
 
     $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue

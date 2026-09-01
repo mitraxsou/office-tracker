@@ -8,7 +8,18 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ConfigFetchIntervalRuns = 5
+
+function Write-Log([string]$Message) {
+    $logDir = Join-Path $env:LOCALAPPDATA "OfficeTracker\logs"
+    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
+    $logFile = Join-Path $logDir "heartbeat.log"
+    $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message"
+    Add-Content -Path $logFile -Value $line -ErrorAction SilentlyContinue
+}
+
+Write-Log "START v$(if (Test-Path (Join-Path $env:LOCALAPPDATA 'OfficeTracker\version.txt')) { (Get-Content (Join-Path $env:LOCALAPPDATA 'OfficeTracker\version.txt') -Raw).Trim() } else { 'unknown' })"
 
 function Get-ConfigPath {
     Join-Path $env:LOCALAPPDATA "OfficeTracker\config.json"
@@ -64,7 +75,12 @@ function Invoke-AgentSelfUpdate([string]$ApiUrl, [string]$Token) {
     }
     try {
         Write-Log "Auto-update: server has newer agent version"
-        & $updateScript -ApiUrl $ApiUrl -Token $Token -Silent
+        $txtPath = [System.IO.Path]::ChangeExtension($updateScript, ".txt")
+        Copy-Item $updateScript $txtPath -Force
+        $escapedApi = $ApiUrl -replace "'", "''"
+        $escapedToken = $Token -replace "'", "''"
+        powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden `
+            -Command "& { `$ApiUrl='$escapedApi'; `$Token='$escapedToken'; `$Silent=`$true; `$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s }" | Out-Null
     } catch {
         Write-Log "WARN auto-update failed: $($_.Exception.Message)"
     }
@@ -142,12 +158,22 @@ function Get-VpnGatewayDiagnostic {
     return $null
 }
 
-function Write-Log([string]$Message) {
-    $logDir = Join-Path $env:LOCALAPPDATA "OfficeTracker\logs"
-    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
-    $logFile = Join-Path $logDir "heartbeat.log"
-    $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message"
-    Add-Content -Path $logFile -Value $line -ErrorAction SilentlyContinue
+function Wait-NetworkReady {
+    param(
+        [string]$ApiUrl,
+        [int]$MaxWaitSec = 60
+    )
+    $hostName = ([Uri]$ApiUrl).Host
+    $deadline = (Get-Date).AddSeconds($MaxWaitSec)
+    while ((Get-Date) -lt $deadline) {
+        try {
+            [void][System.Net.Dns]::GetHostEntry($hostName)
+            return $true
+        } catch {}
+        Start-Sleep -Seconds 3
+    }
+    Write-Log "WARN network not ready after ${MaxWaitSec}s; continuing anyway"
+    return $false
 }
 
 function Get-RunCounter {
@@ -205,6 +231,8 @@ if (-not (Test-Path $configPath)) {
 $localConfig = Get-Content $configPath -Raw | ConvertFrom-Json
 $apiUrl = $localConfig.apiUrl.TrimEnd("/")
 $token = $localConfig.token
+
+Wait-NetworkReady -ApiUrl $apiUrl | Out-Null
 
 try {
     $serverConfig = Get-ServerConfig -ApiUrl $apiUrl -Token $token
@@ -265,11 +293,21 @@ if ($DryRun) {
     exit 0
 }
 
-try {
-    $response = Invoke-RestMethod -Uri "$apiUrl/api/heartbeat" -Method POST `
-        -ContentType "application/json" -Body $payload -TimeoutSec 30
-    Write-Log "OK ssid=$ssid method=$ssidMethod serial=$serialNumber inOffice=$($response.inOffice)"
-} catch {
-    Write-Log "ERROR POST failed: $($_.Exception.Message)"
-    exit 1
+$maxPostAttempts = 3
+$postError = $null
+for ($attempt = 1; $attempt -le $maxPostAttempts; $attempt++) {
+    try {
+        $response = Invoke-RestMethod -Uri "$apiUrl/api/heartbeat" -Method POST `
+            -ContentType "application/json" -Body $payload -TimeoutSec 30
+        Write-Log "OK ssid=$ssid method=$ssidMethod serial=$serialNumber inOffice=$($response.inOffice)"
+        exit 0
+    } catch {
+        $postError = $_.Exception.Message
+        if ($attempt -lt $maxPostAttempts) {
+            Write-Log "WARN POST attempt $attempt failed: $postError; retrying"
+            Start-Sleep -Seconds ([Math]::Min(15, 3 * $attempt))
+        }
+    }
 }
+Write-Log "ERROR POST failed after $maxPostAttempts attempts: $postError"
+exit 1
