@@ -8,9 +8,11 @@ import {
   getMonthlyProgressState,
   monthKeyInTimezone,
   monthDayKeysFromTrend,
+  monthKeysInYear,
   monthKeysInYearUpToMonth,
   validateMonthlyDaysTarget,
   yearFromDate,
+  yearMonthStatus,
 } from "../src/lib/monthly-progress";
 
 describe("validateMonthlyDaysTarget", () => {
@@ -122,5 +124,29 @@ describe("year compliance helpers", () => {
   it("returns all twelve months for a completed year", () => {
     const ref = new Date("2026-09-02T10:00:00+05:30");
     expect(monthKeysInYearUpToMonth(2025, "Asia/Kolkata", ref)).toHaveLength(12);
+  });
+
+  it("returns all twelve month keys for any calendar year", () => {
+    expect(monthKeysInYear(2026)).toEqual([
+      "2026-01",
+      "2026-02",
+      "2026-03",
+      "2026-04",
+      "2026-05",
+      "2026-06",
+      "2026-07",
+      "2026-08",
+      "2026-09",
+      "2026-10",
+      "2026-11",
+      "2026-12",
+    ]);
+  });
+
+  it("classifies year month status for past, current, and future months", () => {
+    expect(yearMonthStatus("2026-08", "2026-09", true)).toBe("met");
+    expect(yearMonthStatus("2026-08", "2026-09", false)).toBe("not_met");
+    expect(yearMonthStatus("2026-09", "2026-09", false)).toBe("not_met");
+    expect(yearMonthStatus("2026-10", "2026-09", false)).toBe("pending");
   });
 });

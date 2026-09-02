@@ -1,5 +1,6 @@
 import { allDayKeysInMonth, daysInMonth, parseMonthKey } from "./month-range";
 import { aggregateHoursForDay } from "./user-reports";
+import type { ApprovedExemptions } from "./compliance-exemptions";
 
 export function validateMonthlyDaysTarget(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 31) {
@@ -79,22 +80,37 @@ export type MonthlyProgress = {
   progressState: MonthlyProgressState;
 };
 
+export type YearMonthStatus = "met" | "not_met" | "pending";
+
+export type YearMonthMetVia = "earned" | "exemption";
+
 export type YearMonthCompliance = {
   monthKey: string;
   metTarget: boolean;
   qualifyingDays: number;
   monthlyDaysTarget: number;
+  status: YearMonthStatus;
+  metVia?: YearMonthMetVia;
+  hasPendingExemption?: boolean;
 };
 
 export type YearCompliance = {
   year: number;
   compliantMonths: number;
+  monthsInYear: number;
   monthsElapsed: number;
   monthDetails: YearMonthCompliance[];
 };
 
 export function yearFromDate(date: Date, timezone: string): number {
   return Number(monthKeyInTimezone(date, timezone).slice(0, 4));
+}
+
+export function monthKeysInYear(year: number): string[] {
+  return Array.from({ length: 12 }, (_, index) => {
+    const month = String(index + 1).padStart(2, "0");
+    return `${year}-${month}`;
+  });
 }
 
 export function monthKeysInYearUpToMonth(
@@ -105,10 +121,81 @@ export function monthKeysInYearUpToMonth(
   const currentYear = yearFromDate(referenceDate, timezone);
   if (year > currentYear) return [];
   const monthCount = year < currentYear ? 12 : Number(monthKeyInTimezone(referenceDate, timezone).slice(5, 7));
-  return Array.from({ length: monthCount }, (_, index) => {
-    const month = String(index + 1).padStart(2, "0");
-    return `${year}-${month}`;
-  });
+  return monthKeysInYear(year).slice(0, monthCount);
+}
+
+export function yearMonthStatus(
+  monthKey: string,
+  currentMonthKey: string,
+  metTarget: boolean,
+): YearMonthStatus {
+  if (monthKey > currentMonthKey) return "pending";
+  if (metTarget) return "met";
+  return "not_met";
+}
+
+export function countExemptQualifyingDays(
+  qualifyingDayKeys: Set<string>,
+  exemptDayKeysInMonth: string[],
+): number {
+  let bonus = 0;
+  for (const dayKey of exemptDayKeysInMonth) {
+    if (!qualifyingDayKeys.has(dayKey)) {
+      bonus += 1;
+    }
+  }
+  return qualifyingDayKeys.size + bonus;
+}
+
+export function resolveMonthCompliance(params: {
+  monthKey: string;
+  currentMonthKey: string;
+  qualifyingDays: number;
+  monthlyDaysTarget: number;
+  hasMonthExemption: boolean;
+  exemptDayKeysInMonth: string[];
+  qualifyingDayKeys: Set<string>;
+  hasPendingExemption?: boolean;
+}): Pick<YearMonthCompliance, "metTarget" | "qualifyingDays" | "status" | "metVia" | "hasPendingExemption"> {
+  if (params.monthKey > params.currentMonthKey) {
+    return {
+      metTarget: false,
+      qualifyingDays: params.qualifyingDays,
+      status: "pending",
+      hasPendingExemption: params.hasPendingExemption,
+    };
+  }
+
+  if (params.hasMonthExemption) {
+    return {
+      metTarget: true,
+      qualifyingDays: params.qualifyingDays,
+      status: "met",
+      metVia: "exemption",
+      hasPendingExemption: params.hasPendingExemption,
+    };
+  }
+
+  const effectiveQualifyingDays = countExemptQualifyingDays(
+    params.qualifyingDayKeys,
+    params.exemptDayKeysInMonth,
+  );
+  const naturalMet = params.qualifyingDays >= params.monthlyDaysTarget;
+  const metTarget = naturalMet || effectiveQualifyingDays >= params.monthlyDaysTarget;
+  const metVia: YearMonthMetVia | undefined = params.hasMonthExemption
+    ? "exemption"
+    : metTarget && !naturalMet
+      ? "exemption"
+      : metTarget
+        ? "earned"
+        : undefined;
+  return {
+    metTarget,
+    qualifyingDays: effectiveQualifyingDays,
+    status: metTarget ? "met" : "not_met",
+    metVia,
+    hasPendingExemption: params.hasPendingExemption,
+  };
 }
 
 export function dayKeysForMonth(
@@ -133,13 +220,25 @@ export async function getMonthlyProgress(
   monthlyDaysTarget: number,
   referenceDate: Date = new Date(),
   monthKey?: string,
+  approvedExemptions?: ApprovedExemptions,
 ): Promise<MonthlyProgress> {
   const targetMonth = monthKey ?? monthKeyInTimezone(referenceDate, timezone);
   const dayKeys = dayKeysForMonth(targetMonth, timezone, referenceDate);
   const dailyHours = await Promise.all(
     dayKeys.map((dayKey) => aggregateHoursForDay(userId, timezone, dayKey)),
   );
-  const qualifyingDays = countQualifyingDays(dailyHours, hoursTarget);
+  const qualifyingDayKeys = new Set(
+    dayKeys.filter((_, index) => dayQualifiesForTarget(dailyHours[index] ?? 0, hoursTarget)),
+  );
+  const qualifyingDays = qualifyingDayKeys.size;
+  const exemptDayKeysInMonth =
+    approvedExemptions?.dayKeys.filter((dayKey) => dayKey.startsWith(`${targetMonth}-`)) ?? [];
+  const hasMonthExemption = approvedExemptions?.monthKeys.includes(targetMonth) ?? false;
+  const effectiveQualifyingDays = hasMonthExemption
+    ? qualifyingDays
+    : countExemptQualifyingDays(qualifyingDayKeys, exemptDayKeysInMonth);
+  const naturalMet = qualifyingDays >= monthlyDaysTarget;
+  const metTarget = hasMonthExemption || naturalMet || effectiveQualifyingDays >= monthlyDaysTarget;
   const officeVisitDays = countOfficeVisitDays(dailyHours);
   const totalHours = dailyHours.reduce((sum, hours) => sum + hours, 0);
   const { year, month } = parseMonthKey(targetMonth);
@@ -147,16 +246,16 @@ export async function getMonthlyProgress(
 
   return {
     monthKey: targetMonth,
-    qualifyingDays,
+    qualifyingDays: hasMonthExemption ? qualifyingDays : effectiveQualifyingDays,
     officeVisitDays,
     totalHours: Math.round(totalHours * 10) / 10,
     daysInMonth: daysInCalendarMonth,
     monthlyDaysTarget,
-    metTarget: qualifyingDays >= monthlyDaysTarget,
-    remainingDays: Math.max(0, monthlyDaysTarget - qualifyingDays),
+    metTarget,
+    remainingDays: Math.max(0, monthlyDaysTarget - (hasMonthExemption ? monthlyDaysTarget : effectiveQualifyingDays)),
     daysElapsed: dayKeys.length,
     progressState: getMonthlyProgressState(
-      qualifyingDays,
+      hasMonthExemption ? monthlyDaysTarget : effectiveQualifyingDays,
       monthlyDaysTarget,
       dayKeys.length,
       daysInCalendarMonth,
@@ -183,32 +282,64 @@ export async function getYearCompliance(
   hoursTarget: number,
   monthlyDaysTarget: number,
   referenceDate: Date = new Date(),
+  approvedExemptions?: ApprovedExemptions,
+  pendingExemptionMonthKeys: string[] = [],
 ): Promise<YearCompliance> {
   const year = yearFromDate(referenceDate, timezone);
-  const monthKeys = monthKeysInYearUpToMonth(year, timezone, referenceDate);
+  const currentMonthKey = monthKeyInTimezone(referenceDate, timezone);
+  const monthKeys = monthKeysInYear(year);
+  const monthsElapsed = monthKeysInYearUpToMonth(year, timezone, referenceDate).length;
+  const exemptions = approvedExemptions ?? { monthKeys: [], dayKeys: [] };
+  const pendingMonths = new Set(pendingExemptionMonthKeys);
+
   const monthDetails = await Promise.all(
     monthKeys.map(async (monthKey) => {
-      const progress = await getMonthlyProgress(
-        userId,
-        timezone,
-        hoursTarget,
-        monthlyDaysTarget,
-        referenceDate,
-        monthKey,
+      const dayKeys = dayKeysForMonth(monthKey, timezone, referenceDate);
+      if (monthKey > currentMonthKey) {
+        return {
+          monthKey,
+          metTarget: false,
+          qualifyingDays: 0,
+          monthlyDaysTarget,
+          status: "pending" as const,
+          hasPendingExemption: pendingMonths.has(monthKey),
+        };
+      }
+
+      const dailyHours = await Promise.all(
+        dayKeys.map((dayKey) => aggregateHoursForDay(userId, timezone, dayKey)),
       );
+      const qualifyingDayKeys = new Set(
+        dayKeys.filter((_, index) => dayQualifiesForTarget(dailyHours[index] ?? 0, hoursTarget)),
+      );
+      const qualifyingDays = qualifyingDayKeys.size;
+      const exemptDayKeysInMonth = exemptions.dayKeys.filter((dayKey) =>
+        dayKey.startsWith(`${monthKey}-`),
+      );
+      const resolved = resolveMonthCompliance({
+        monthKey,
+        currentMonthKey,
+        qualifyingDays,
+        monthlyDaysTarget,
+        hasMonthExemption: exemptions.monthKeys.includes(monthKey),
+        exemptDayKeysInMonth,
+        qualifyingDayKeys,
+        hasPendingExemption: pendingMonths.has(monthKey),
+      });
+
       return {
         monthKey,
-        metTarget: progress.metTarget,
-        qualifyingDays: progress.qualifyingDays,
         monthlyDaysTarget,
+        ...resolved,
       };
     }),
   );
 
   return {
     year,
-    compliantMonths: monthDetails.filter((month) => month.metTarget).length,
-    monthsElapsed: monthKeys.length,
+    compliantMonths: monthDetails.filter((month) => month.status === "met").length,
+    monthsInYear: 12,
+    monthsElapsed,
     monthDetails,
   };
 }
