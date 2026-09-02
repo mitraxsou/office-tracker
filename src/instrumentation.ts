@@ -224,6 +224,30 @@ export async function register() {
     await prisma.$executeRawUnsafe(
       'CREATE INDEX IF NOT EXISTS "TimezoneChangeRequest_userId_idx" ON "TimezoneChangeRequest"("userId");'
     );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "ProfileChangeRequest" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "currentName" TEXT,
+        "currentEmail" TEXT NOT NULL,
+        "requestedName" TEXT,
+        "requestedEmail" TEXT,
+        "message" TEXT,
+        "status" TEXT NOT NULL DEFAULT 'open',
+        "adminNote" TEXT,
+        "reviewedAt" TIMESTAMP(3),
+        "reviewedById" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "ProfileChangeRequest_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "ProfileChangeRequest_status_createdAt_idx" ON "ProfileChangeRequest"("status", "createdAt");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "ProfileChangeRequest_userId_idx" ON "ProfileChangeRequest"("userId");'
+    );
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "AgentDevice" ADD COLUMN IF NOT EXISTS "installedAt" TIMESTAMP(3);'
     );

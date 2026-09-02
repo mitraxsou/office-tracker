@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeSsid, isOfficeSsid, parseDefaultSsidsFromEnv, DEFAULT_OFFICE_SSIDS } from "../src/lib/constants";
+import { normalizeSsid, isOfficeSsid, allowlistMatchPrefix, parseDefaultSsidsFromEnv, DEFAULT_OFFICE_SSIDS } from "../src/lib/constants";
 
 describe("parseDefaultSsidsFromEnv", () => {
   it("returns hardcoded defaults when env is unset", () => {
@@ -57,5 +57,16 @@ describe("isOfficeSsid", () => {
   it("rejects unknown SSIDs", () => {
     expect(isOfficeSsid("HomeWiFi", allowlist)).toBe(false);
     expect(isOfficeSsid(null, allowlist)).toBe(false);
+  });
+
+  it("supports optional trailing wildcard on allowlist entries", () => {
+    expect(isOfficeSsid("pwcglb.com 2 (Unauthenticated)", ["pwcglb.com*"])).toBe(true);
+    expect(isOfficeSsid("OfficeConnect 5", ["OfficeConnect*"])).toBe(true);
+    expect(isOfficeSsid("HomeWiFi", ["pwcglb.com*"])).toBe(false);
+  });
+
+  it("exposes allowlist prefix without wildcard", () => {
+    expect(allowlistMatchPrefix("pwcglb.com*")).toBe("pwcglb.com");
+    expect(allowlistMatchPrefix("OfficeConnect")).toBe("officeconnect");
   });
 });

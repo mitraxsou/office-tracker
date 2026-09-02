@@ -16,6 +16,7 @@ model User {
   role               String        @default("user")
   timezone           String        @default("Asia/Kolkata")
   hoursTarget        Float?
+  agentStaleGraceHours Int?
   mustChangePassword Boolean       @default(false)
   passwordResetAt    DateTime?
   createdAt          DateTime      @default(now())
@@ -45,12 +46,13 @@ model UserOutOfOffice {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  dayKey    String
+  startDate String
+  endDate   String
   source    String   @default("settings")
   createdAt DateTime @default(now())
 
-  @@unique([userId, dayKey])
   @@index([userId])
+  @@index([userId, startDate])
 }
 
 model IntegrationApiKey {

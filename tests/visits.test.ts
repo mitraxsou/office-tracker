@@ -254,6 +254,29 @@ describe("hours calculations", () => {
     expect(spanMs).toBeCloseTo(6 * ms(60), 0);
   });
 
+  it("open manual visit extends to now when still in office", () => {
+    const dayStart = new Date("2026-09-02T00:00:00+05:30");
+    const dayEnd = new Date("2026-09-02T23:59:59.999+05:30");
+    const now = new Date("2026-09-02T18:00:00+05:30");
+    const visits = [
+      {
+        id: "1",
+        startAt: new Date("2026-09-02T13:00:00+05:30"),
+        endAt: null,
+        source: "manual",
+        updatedAt: new Date("2026-09-02T13:00:00+05:30"),
+      },
+    ];
+    const spanMs = daySpanMsForDay(visits, {
+      dayStart,
+      dayEnd,
+      now,
+      staleMs: VISIT_GAP_MS,
+      lastHeartbeatAt: null,
+    });
+    expect(spanMs).toBeCloseTo(5 * ms(60), 0);
+  });
+
   it("manual checkout caps day before later heartbeat", () => {
     const dayStart = new Date("2026-08-27T00:00:00+05:30");
     const dayEnd = new Date("2026-08-27T23:59:59.999+05:30");

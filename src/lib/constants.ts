@@ -46,16 +46,23 @@ export function parseDefaultSsidsFromEnv(): string[] {
 export function normalizeSsid(ssid: string): string {
   return ssid
     .trim()
-    .replace(/\s*\(unauthenticated\)\s*$/i, "") // captive portal profile name
-    .replace(/\s+\d+$/, "") // "OfficeConnect 11" -> "OfficeConnect" (Get-NetConnectionProfile)
+    .replace(/\s*\(unauthenticated\)\s*$/i, "") // Windows Get-NetConnectionProfile captive portal suffix
+    .replace(/\s+\d+$/, "") // "OfficeConnect 2" / "pwcglb.com 2" band suffix from Windows
     .trim();
+}
+
+/** Allowlist entry prefix for matching (strips optional trailing * wildcard). */
+export function allowlistMatchPrefix(allowed: string): string {
+  const norm = normalizeSsid(allowed).toLowerCase();
+  return norm.endsWith("*") ? norm.slice(0, -1) : norm;
 }
 
 export function isOfficeSsid(ssid: string | null | undefined, allowlist: string[]): boolean {
   if (!ssid) return false;
   const normalized = normalizeSsid(ssid).toLowerCase();
   return allowlist.some((allowed) => {
-    const normAllowed = normalizeSsid(allowed).toLowerCase();
-    return normAllowed === normalized || normalized.startsWith(normAllowed);
+    const prefix = allowlistMatchPrefix(allowed);
+    if (!prefix) return false;
+    return normalized === prefix || normalized.startsWith(prefix);
   });
 }

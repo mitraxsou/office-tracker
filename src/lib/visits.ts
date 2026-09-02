@@ -113,15 +113,17 @@ export function daySpanMsForDay(
   let lastOut: number | null = null;
 
   if (openVisit && isCurrentDay) {
-    const end = effectiveVisitEnd({
-      endAt: null,
-      updatedAt: openVisit.updatedAt ?? openVisit.startAt,
-      startAt: openVisit.startAt,
-      now: params.now,
-      staleMs: params.staleMs,
-      lastHeartbeatAt: params.lastHeartbeatAt,
-      dayEnd: params.dayEnd,
-    });
+    const end = isManualSource(openVisit.source)
+      ? params.now
+      : effectiveVisitEnd({
+          endAt: null,
+          updatedAt: openVisit.updatedAt ?? openVisit.startAt,
+          startAt: openVisit.startAt,
+          now: params.now,
+          staleMs: params.staleMs,
+          lastHeartbeatAt: params.lastHeartbeatAt,
+          dayEnd: params.dayEnd,
+        });
     lastOut = Math.min(end.getTime(), dayEndMs);
   } else if (latestManualEnd !== null) {
     lastOut = Math.min(latestManualEnd, dayEndMs);

@@ -6,7 +6,7 @@ import {
   normalizeSsid,
   parseDefaultSsidsFromEnv,
 } from "./constants";
-import { backfillHeartbeatsAndVisitsAfterAllowlistChange } from "./ssid-backfill";
+import { backfillHeartbeatsAndVisitsAfterAllowlistChange, hasHeartbeatAllowlistMismatches } from "./ssid-backfill";
 
 export const DEFAULT_PENDING_TOKEN_TTL_DAYS = 7;
 export const DEFAULT_HEARTBEAT_RETENTION_DAYS = 7;
@@ -43,6 +43,20 @@ export type AppConfigData = {
 };
 
 const CONFIG_ID = "global";
+let allowlistReconciliationChecked = false;
+
+async function reconcileHeartbeatsWithAllowlist(parsed: AppConfigData) {
+  if (allowlistReconciliationChecked) return;
+  allowlistReconciliationChecked = true;
+
+  const mismatched = await hasHeartbeatAllowlistMismatches(
+    parsed.officeSsids,
+    parsed.heartbeatRetentionDays,
+  );
+  if (mismatched) {
+    await backfillHeartbeatsAndVisitsAfterAllowlistChange(parsed.officeSsids);
+  }
+}
 
 function mergeMissingDefaultSsids(existing: string[]): string[] {
   const defaults = parseDefaultSsidsFromEnv();
@@ -78,6 +92,8 @@ export async function ensureAppConfig(): Promise<AppConfigData> {
           data: { officeSsids: JSON.stringify(merged) },
         });
         await backfillHeartbeatsAndVisitsAfterAllowlistChange(merged);
+      } else {
+        await reconcileHeartbeatsWithAllowlist(parsed);
       }
     }
     return parseConfig(config);

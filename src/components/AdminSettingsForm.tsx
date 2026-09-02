@@ -105,7 +105,21 @@ export function AdminSettingsForm({
       </section>
 
       <section className="card p-6">
-        <h2 className="mb-4 text-lg font-medium">Office Wi-Fi SSIDs (global)</h2>
+        <h2 className="mb-2 text-lg font-medium">Office Wi-Fi SSIDs (global)</h2>
+        <p className="mb-3 text-sm text-muted">
+          One SSID per line (or comma-separated). Matching is case-insensitive. Windows may append
+          band numbers or <code className="text-xs">(Unauthenticated)</code> to captive portal names;
+          the server strips those automatically. Prefix matching is supported:{" "}
+          <code className="text-xs">pwcglb.com</code> matches{" "}
+          <code className="text-xs">pwcglb.com 2 (Unauthenticated)</code>. Optional trailing{" "}
+          <code className="text-xs">*</code> is allowed (e.g. <code className="text-xs">pwcglb.com*</code>
+          ).
+        </p>
+        <p className="mb-3 text-xs text-muted">
+          Recommended defaults: <code>OfficeConnect</code>, <code>ExternalConnect</code>,{" "}
+          <code>pwcglb.com</code>. Set <code>DEFAULT_OFFICE_SSIDS</code> in Vercel env to seed new
+          installs; admin edits here apply immediately and backfill recent heartbeats.
+        </p>
         <textarea
           value={ssidText}
           onChange={(e) => setSsidText(e.target.value)}

@@ -12,12 +12,19 @@ import { ThemePreference } from "@/components/ThemeToggle";
 import type { EnrichedDevice } from "@/lib/device-enrichment";
 import type { InstallTokenForUser } from "@/lib/install-token-types";
 import type { TimezoneRequestSummary } from "@/lib/timezone-requests";
+import type { ProfileChangeRequestSummary } from "@/lib/profile-change-requests";
+import { ProfileChangeSection } from "@/components/ProfileChangeSection";
 
 type Device = EnrichedDevice;
 
 type TimezoneRequestState = {
   openRequest: TimezoneRequestSummary | null;
   latestRequest: TimezoneRequestSummary | null;
+};
+
+type ProfileChangeState = {
+  openRequest: ProfileChangeRequestSummary | null;
+  requests: ProfileChangeRequestSummary[];
 };
 
 type SettingsPageClientProps = {
@@ -31,6 +38,11 @@ type SettingsPageClientProps = {
   legacyBoundCount: number;
   localDevAgentPath?: string | null;
   timezoneRequestState: TimezoneRequestState;
+  profileChangeState: ProfileChangeState;
+  currentName: string | null;
+  currentEmail: string;
+  profileChangeBlocked?: boolean;
+  profileChangeBlockedMessage?: string | null;
   lockSettings?: boolean;
 };
 
@@ -45,6 +57,11 @@ export function SettingsPageClient({
   legacyBoundCount,
   localDevAgentPath,
   timezoneRequestState,
+  profileChangeState,
+  currentName,
+  currentEmail,
+  profileChangeBlocked,
+  profileChangeBlockedMessage,
   lockSettings,
 }: SettingsPageClientProps) {
   const [devices, setDevices] = useState(initialDevices);
@@ -92,6 +109,14 @@ export function SettingsPageClient({
         devices={devices}
         onDevicesChange={setDevices}
         timezoneRequestState={timezoneRequestState}
+      />
+
+      <ProfileChangeSection
+        currentName={currentName}
+        currentEmail={currentEmail}
+        profileChangeState={profileChangeState}
+        blocked={profileChangeBlocked}
+        blockedMessage={profileChangeBlockedMessage}
       />
 
       <NotificationPrefsForm />

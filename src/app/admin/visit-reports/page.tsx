@@ -6,6 +6,7 @@ import { AdminSubNav } from "@/components/AdminSubNav";
 import { AdminVisitReports } from "@/components/AdminVisitReports";
 import { AdminDeviceRemovalRequests } from "@/components/AdminDeviceRemovalRequests";
 import { AdminTimezoneChangeRequests } from "@/components/AdminTimezoneChangeRequests";
+import { AdminProfileChangeRequests } from "@/components/AdminProfileChangeRequests";
 
 export default async function AdminVisitReportsPage() {
   const admin = await requireAdmin();
@@ -19,11 +20,12 @@ export default async function AdminVisitReportsPage() {
         <div>
           <h1 className="text-2xl font-semibold">User requests</h1>
           <p className="text-sm text-muted">
-            Visit corrections, timezone changes, and laptop removal requests from users.
+            Visit corrections, timezone changes, profile changes, and laptop removal requests.
           </p>
         </div>
         <AdminSubNav active="corrections" />
         <AdminTimezoneChangeRequests />
+        <AdminProfileChangeRequests />
         <AdminDeviceRemovalRequests />
         <AdminVisitReports />
       </main>

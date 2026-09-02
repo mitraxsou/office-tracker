@@ -12,6 +12,7 @@ import { exportDailyTrendCsv, MonthReportToolbar } from "./reports/ReportToolbar
 import { currentMonthKey } from "@/lib/month-range";
 import { formatHours, formatTime } from "@/lib/visits";
 import { AdminResetPasswordButton } from "./AdminResetPasswordButton";
+import { AdminUserProfileChangeForm } from "./AdminUserProfileChangeForm";
 
 type UserReport = {
   user: {
@@ -84,7 +85,15 @@ type UserReport = {
   };
 };
 
-export function AdminUserReport({ userId }: { userId: string }) {
+export function AdminUserReport({
+  userId,
+  profileChangeBlocked,
+  profileChangeBlockedMessage,
+}: {
+  userId: string;
+  profileChangeBlocked?: boolean;
+  profileChangeBlockedMessage?: string | null;
+}) {
   const router = useRouter();
   const [monthKey, setMonthKey] = useState(() => currentMonthKey("Asia/Kolkata"));
   const [fromKey, setFromKey] = useState("");
@@ -389,6 +398,13 @@ export function AdminUserReport({ userId }: { userId: string }) {
           plain text.
         </p>
         <AdminResetPasswordButton userId={userId} userEmail={data.user.email} />
+        <AdminUserProfileChangeForm
+          userId={userId}
+          currentName={data.user.name}
+          currentEmail={data.user.email}
+          blocked={profileChangeBlocked}
+          blockedMessage={profileChangeBlockedMessage}
+        />
       </section>
 
       <div className="space-y-4">

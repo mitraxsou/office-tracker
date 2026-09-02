@@ -7,6 +7,10 @@ import { requireAuthenticatedUser } from "@/lib/session-guards";
 import { getUserHoursTarget, getAppConfig } from "@/lib/app-config";
 import { getEnrichedDevicesForUser } from "@/lib/device-enrichment";
 import { getUserTimezoneRequestState } from "@/lib/timezone-requests";
+import {
+  getProfileChangeBlockReason,
+  getUserProfileChangeRequestState,
+} from "@/lib/profile-change-requests";
 import { AppNav } from "@/components/AppNav";
 import { SettingsPageClient } from "@/components/SettingsPageClient";
 import { AGENT_PRODUCT_NAME } from "@/lib/agent-branding";
@@ -27,7 +31,9 @@ export default async function SettingsPage({
   const { installTokens, legacyBoundCount } = await getUserInstallTokenState(user.id, appUrl);
   const enrichedDevices = await getEnrichedDevicesForUser(user.id);
   const timezoneRequestState = await getUserTimezoneRequestState(user.id);
+  const profileChangeState = await getUserProfileChangeRequestState(user.id);
   const isBreakglass = isBreakglassEmail(user.email);
+  const profileChangeBlockedMessage = getProfileChangeBlockReason(user.email);
   const mustChangePassword =
     !isBreakglass && (user.mustChangePassword || params.mustChange === "1");
 
@@ -55,6 +61,11 @@ export default async function SettingsPage({
           legacyBoundCount={legacyBoundCount}
           localDevAgentPath={localDevAgentPath}
           timezoneRequestState={timezoneRequestState}
+          profileChangeState={profileChangeState}
+          currentName={user.name}
+          currentEmail={user.email}
+          profileChangeBlocked={!!profileChangeBlockedMessage}
+          profileChangeBlockedMessage={profileChangeBlockedMessage}
           lockSettings={mustChangePassword}
         />
       </main>

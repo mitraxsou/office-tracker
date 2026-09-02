@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { DEFAULT_OFFICE_SSIDS, isOfficeSsid } from "./constants";
+import { DEFAULT_OFFICE_SSIDS, isOfficeSsid, normalizeSsid } from "./constants";
 import { getAppConfig, getAgentStaleMs, agentHealthGraceMs } from "./app-config";
 import { heartbeatInOffice } from "./heartbeat-office";
 import { maybePurgeOldHeartbeats } from "./heartbeat-retention";
@@ -73,8 +73,9 @@ export async function processHeartbeat(params: {
   recordedAt: Date;
   allowlist: string[];
 }) {
-  const { userId, ssid, vpnGateway, recordedAt, allowlist } = params;
-  const inOffice = isOfficeSsid(ssid, allowlist);
+  const { userId, vpnGateway, recordedAt, allowlist } = params;
+  const storedSsid = params.ssid ? normalizeSsid(params.ssid) : null;
+  const inOffice = isOfficeSsid(storedSsid, allowlist);
 
   const config = await getAppConfig();
   void maybePurgeOldHeartbeats(config.heartbeatRetentionDays);
@@ -90,7 +91,7 @@ export async function processHeartbeat(params: {
   await prisma.heartbeat.create({
     data: {
       userId,
-      ssid,
+      ssid: storedSsid,
       vpnGateway: vpnGateway ?? null,
       inOffice,
       source: "wifi",
@@ -101,7 +102,7 @@ export async function processHeartbeat(params: {
   const staleMs = config.agentStaleMinutes * 60 * 1000;
 
   if (inOffice) {
-    await upsertOpenVisit(userId, recordedAt, ssid, staleMs);
+    await upsertOpenVisit(userId, recordedAt, storedSsid, staleMs);
   } else {
     await closeOpenVisit(userId, recordedAt);
   }
@@ -314,7 +315,7 @@ export async function getTodaySummary(
     hoursTarget,
     metTarget: totalHours >= hoursTarget,
     remainingHours: Math.max(0, hoursTarget - totalHours),
-    inOfficeNow: pulseRecent && openVisit !== undefined && lastPulseInOffice,
+    inOfficeNow: pulseRecent && lastPulseInOffice,
     visits,
     lastHeartbeat,
     agentHealthy,
