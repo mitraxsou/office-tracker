@@ -10,7 +10,13 @@ import { VisitCalendar } from "./reports/VisitCalendar";
 import { HoursTrendChart } from "./reports/ReportCharts";
 import { exportDailyTrendCsv, MonthReportToolbar } from "./reports/ReportToolbar";
 import { currentMonthKey } from "@/lib/month-range";
-import { formatHours, formatTime } from "@/lib/visits";
+import { dayKeyInTimezone, formatHours, formatTime } from "@/lib/visits";
+import {
+  describeResetRange,
+  resetRangeFromPeriod,
+  RESET_PERIOD_LABELS,
+  type ResetPeriod,
+} from "@/lib/data-reset";
 import { AdminResetPasswordButton } from "./AdminResetPasswordButton";
 import { AdminUserProfileChangeForm } from "./AdminUserProfileChangeForm";
 import { AdminGrantComplianceExemption } from "./AdminGrantComplianceExemption";
@@ -115,6 +121,13 @@ export function AdminUserReport({
   const [officeSsids, setOfficeSsids] = useState<string[]>([]);
   const [resetConfirm, setResetConfirm] = useState("");
   const [resetScope, setResetScope] = useState<"tracking" | "all">("tracking");
+  const [resetPeriod, setResetPeriod] = useState<ResetPeriod>("all");
+  const [resetDay, setResetDay] = useState("");
+  const [resetMonth, setResetMonth] = useState("");
+  const [resetYear, setResetYear] = useState("");
+  const [resetFrom, setResetFrom] = useState("");
+  const [resetTo, setResetTo] = useState("");
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [impersonating, setImpersonating] = useState(false);
 
@@ -152,26 +165,55 @@ export function AdminUserReport({
   const filteredVisits = useMemo(() => {
     if (!data) return [];
     if (!selectedDate) return data.visits;
-    return data.visits.filter((v) => v.startAt.startsWith(selectedDate));
+    return data.visits.filter(
+      (v) => dayKeyInTimezone(new Date(v.startAt), data.user.timezone) === selectedDate,
+    );
   }, [data, selectedDate]);
+
+  const resetRange = useMemo(
+    () =>
+      resetRangeFromPeriod(resetPeriod, {
+        day: resetDay,
+        month: resetMonth,
+        year: resetYear,
+        from: resetFrom,
+        to: resetTo,
+      }),
+    [resetPeriod, resetDay, resetMonth, resetYear, resetFrom, resetTo],
+  );
 
   async function handleReset() {
     if (resetConfirm !== "RESET") {
       setActionError('Type RESET to confirm');
       return;
     }
+    if (resetPeriod !== "all" && !resetRange) {
+      setActionError("Pick a valid date range to clear");
+      return;
+    }
+    if (!confirm(`Clear ${describeResetRange(resetRange)} for ${data?.user.email}?`)) return;
+
     setActionError(null);
+    setResetMessage(null);
     const res = await fetch(`/api/admin/users/${userId}/reset-data`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scope: resetScope, confirm: "RESET" }),
+      body: JSON.stringify({
+        scope: resetScope,
+        confirm: "RESET",
+        fromDayKey: resetRange?.fromDayKey,
+        toDayKey: resetRange?.toDayKey,
+      }),
     });
+    const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
       setActionError(body.error ?? "Reset failed");
       return;
     }
     setResetConfirm("");
+    setResetMessage(
+      `Cleared ${body.visitsDeleted ?? 0} visits and ${body.heartbeatsDeleted ?? 0} pulses for ${describeResetRange(resetRange)}.`,
+    );
     load(monthKey);
   }
 
@@ -315,7 +357,9 @@ export function AdminUserReport({
                   const durationMs = end ? end.getTime() - start.getTime() : 0;
                   return (
                     <tr key={v.id} className="border-b border-[var(--border)]">
-                      <td className="py-2 pr-4">{v.startAt.slice(0, 10)}</td>
+                      <td className="py-2 pr-4">
+                        {dayKeyInTimezone(start, data.user.timezone)}
+                      </td>
                       <td className="py-2 pr-4">{formatTime(start, data.user.timezone)}</td>
                       <td className="py-2 pr-4">
                         {end ? formatTime(end, data.user.timezone) : "open"}
@@ -347,7 +391,7 @@ export function AdminUserReport({
           </div>
           <div>
             <dt className="text-muted">Minutes since last pulse</dt>
-            <dd>{data.pulse.minutesSinceLastPulse ?? "—"}</dd>
+            <dd>{data.pulse.minutesSinceLastPulse ?? "-"}</dd>
           </div>
           <div>
             <dt className="text-muted">Laptop active today</dt>
@@ -393,7 +437,7 @@ export function AdminUserReport({
                   <tr key={h.id} className="border-b border-[var(--border)]">
                     <td className="py-1 pr-2">{new Date(h.recordedAt).toLocaleString("en-IN")}</td>
                     <td className="py-1 pr-2">{h.inOffice ? "Yes" : "No"}</td>
-                    <td className="py-1 font-mono">{h.ssid ?? "—"}</td>
+                    <td className="py-1 font-mono">{h.ssid ?? "-"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -463,42 +507,135 @@ export function AdminUserReport({
         <NotificationPrefsForm adminUserId={userId} />
       </div>
 
-      <AdminVisitManager userId={userId} officeSsids={officeSsids} onChanged={() => load(monthKey)} />
+      <AdminVisitManager
+        userId={userId}
+        officeSsids={officeSsids}
+        timezone={data.user.timezone}
+        onChanged={() => load(monthKey)}
+      />
 
       <section className="card border-red-500/30 p-6">
-        <h3 className="mb-2 text-lg font-medium text-red-400">Testing: reset or delete user</h3>
+        <h3 className="mb-2 text-lg font-medium text-red-400">Clear tracking data</h3>
         <p className="mb-4 text-sm text-muted">
-          Reset clears visits and heartbeats for testing. &quot;All data&quot; also revokes tokens and
-          removes devices. Delete removes the user account entirely.
+          Clear visits and pulses for a day, a month, a year, or a custom range when the data is
+          wrong. Deleting the user account removes everything permanently.
         </p>
-        <div className="mb-3 flex flex-wrap gap-4 text-sm">
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              checked={resetScope === "tracking"}
-              onChange={() => setResetScope("tracking")}
-            />
-            Tracking only (visits + heartbeats)
+
+        <div className="mb-4 grid gap-3 sm:grid-cols-2">
+          <label className="text-sm">
+            <span className="mb-1 block text-muted">What to clear</span>
+            <select
+              value={resetPeriod}
+              onChange={(e) => setResetPeriod(e.target.value as ResetPeriod)}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+            >
+              {(Object.keys(RESET_PERIOD_LABELS) as ResetPeriod[]).map((period) => (
+                <option key={period} value={period}>
+                  {RESET_PERIOD_LABELS[period]}
+                </option>
+              ))}
+            </select>
           </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="radio"
-              checked={resetScope === "all"}
-              onChange={() => setResetScope("all")}
-            />
-            All agent data (+ tokens + devices)
-          </label>
+
+          {resetPeriod === "day" && (
+            <label className="text-sm">
+              <span className="mb-1 block text-muted">Day</span>
+              <input
+                type="date"
+                value={resetDay}
+                onChange={(e) => setResetDay(e.target.value)}
+                className="picker-input w-full rounded-lg border px-3 py-2 text-sm"
+              />
+            </label>
+          )}
+
+          {resetPeriod === "month" && (
+            <label className="text-sm">
+              <span className="mb-1 block text-muted">Month</span>
+              <input
+                type="month"
+                value={resetMonth}
+                onChange={(e) => setResetMonth(e.target.value)}
+                className="picker-input w-full rounded-lg border px-3 py-2 text-sm"
+              />
+            </label>
+          )}
+
+          {resetPeriod === "year" && (
+            <label className="text-sm">
+              <span className="mb-1 block text-muted">Year</span>
+              <input
+                type="number"
+                min={2000}
+                max={2100}
+                placeholder="2026"
+                value={resetYear}
+                onChange={(e) => setResetYear(e.target.value)}
+                className="w-full rounded-lg border px-3 py-2 text-sm"
+              />
+            </label>
+          )}
+
+          {resetPeriod === "custom" && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm">
+                <span className="mb-1 block text-muted">From</span>
+                <input
+                  type="date"
+                  value={resetFrom}
+                  onChange={(e) => setResetFrom(e.target.value)}
+                  className="picker-input w-full rounded-lg border px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-muted">To</span>
+                <input
+                  type="date"
+                  value={resetTo}
+                  onChange={(e) => setResetTo(e.target.value)}
+                  className="picker-input w-full rounded-lg border px-3 py-2 text-sm"
+                />
+              </label>
+            </div>
+          )}
         </div>
+
+        {resetPeriod === "all" && (
+          <div className="mb-3 flex flex-wrap gap-4 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                checked={resetScope === "tracking"}
+                onChange={() => setResetScope("tracking")}
+              />
+              Tracking only (visits + pulses)
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="radio"
+                checked={resetScope === "all"}
+                onChange={() => setResetScope("all")}
+              />
+              All agent data (+ tokens + devices)
+            </label>
+          </div>
+        )}
+
+        <p className="mb-3 text-sm text-muted">
+          Will clear: <span className="text-foreground">{describeResetRange(resetRange)}</span>
+          {resetPeriod !== "all" && " (visits and pulses only, tokens and devices are kept)"}
+        </p>
+
         <input
           type="text"
-          placeholder='Type RESET to confirm'
+          placeholder="Type RESET to confirm"
           value={resetConfirm}
           onChange={(e) => setResetConfirm(e.target.value)}
           className="mb-3 w-full max-w-xs rounded-lg border px-3 py-2 text-sm"
         />
         <div className="flex flex-wrap gap-3">
           <button type="button" onClick={handleReset} className="btn-secondary px-4 py-2 text-sm">
-            Reset user data
+            Clear data
           </button>
           <button
             type="button"
@@ -508,6 +645,7 @@ export function AdminUserReport({
             Delete user account
           </button>
         </div>
+        {resetMessage && <p className="mt-3 text-sm text-green-400">{resetMessage}</p>}
         {actionError && <p className="mt-3 text-sm text-red-400">{actionError}</p>}
       </section>
     </div>

@@ -4,7 +4,7 @@ import { getAppConfig, updateAppConfig } from "@/lib/app-config";
 import { validateMonthlyDaysTarget } from "@/lib/monthly-progress";
 import { isValidMonthKey } from "@/lib/compliance-exemptions";
 import { validateSsids } from "@/lib/security";
-import { normalizeSsid } from "@/lib/constants";
+import { normalizeSsid, officeSsidAllowlistChanged } from "@/lib/constants";
 import { logAuditEvent } from "@/lib/audit-log";
 import { isRegistrationEnvLocked } from "@/lib/auth";
 import { backfillHeartbeatsAndVisitsAfterAllowlistChange } from "@/lib/ssid-backfill";
@@ -141,12 +141,11 @@ export async function PATCH(request: Request) {
 
   let backfill: Awaited<ReturnType<typeof backfillHeartbeatsAndVisitsAfterAllowlistChange>> | null =
     null;
-  if (update.officeSsids !== undefined) {
-    const prev = new Set(prevConfig.officeSsids.map((s) => s.toLowerCase()));
-    const added = update.officeSsids.some((s) => !prev.has(s.toLowerCase()));
-    if (added) {
-      backfill = await backfillHeartbeatsAndVisitsAfterAllowlistChange(config.officeSsids);
-    }
+  if (
+    update.officeSsids !== undefined &&
+    officeSsidAllowlistChanged(prevConfig.officeSsids, update.officeSsids)
+  ) {
+    backfill = await backfillHeartbeatsAndVisitsAfterAllowlistChange(config.officeSsids);
   }
 
   await logAuditEvent({

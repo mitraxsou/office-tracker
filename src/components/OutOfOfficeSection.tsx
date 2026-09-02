@@ -71,20 +71,26 @@ export function OutOfOfficeSection({ adminUserId }: { adminUserId?: string } = {
 
   async function updateToday(action: "mark" | "clear") {
     await postOoo({ action });
-    setMessage(action === "mark" ? "Marked out of office for today." : "Cleared out of office for today.");
+    setMessage(
+      action === "mark" ? "Set out of office for today." : "Cleared out of office for today.",
+    );
   }
 
   async function scheduleRange() {
-    if (!rangeStart || !rangeEnd) return;
+    if (!rangeStart || !rangeEnd || rangeStart > rangeEnd) return;
     await postOoo({ action: "add_range", startDate: rangeStart, endDate: rangeEnd });
-    setMessage("Out-of-office range scheduled.");
+    setMessage(
+      rangeStart === rangeEnd
+        ? `Scheduled out of office on ${rangeStart}.`
+        : `Scheduled out of office from ${rangeStart} to ${rangeEnd}.`,
+    );
     setRangeStart("");
     setRangeEnd("");
   }
 
   async function removeRange(rangeId: string) {
     await postOoo({ action: "remove", rangeId });
-    setMessage("Out-of-office range removed.");
+    setMessage("Removed scheduled out of office.");
   }
 
   if (loading) {
@@ -101,19 +107,26 @@ export function OutOfOfficeSection({ adminUserId }: { adminUserId?: string } = {
         {adminUserId ? "Out of office (admin)" : "Out of office"}
       </h2>
       <p className="mb-4 text-sm text-muted">
-        Schedule date ranges when you are away (leave, travel, WFH without laptop). No reminder or
-        agent health alerts are sent during those days. Alert emails and Teams messages include a
-        one-click link to mark yourself out for that day.
+        Mark days away from the office (leave, travel, WFH without the laptop). No reminders or
+        agent health alerts are sent on those days, and they do not count against compliance.
       </p>
 
-      <div className="rounded-lg border border-[var(--border)] p-4">
-        <p className="text-sm font-medium">Today ({todayKey})</p>
-        <p className="mt-1 text-sm text-muted">
-          {isOutToday
-            ? "You are out of office today - no alerts for today."
-            : "You are not out of office today."}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
+      <div
+        className={`rounded-lg border p-4 ${
+          isOutToday
+            ? "border-[var(--pwc-orange)]/50 bg-[var(--pwc-orange-muted)]/30"
+            : "border-[var(--border)]"
+        }`}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium">Today ({todayKey})</p>
+            <p className="mt-1 text-sm text-muted">
+              {isOutToday
+                ? "Marked out of office. No alerts today."
+                : "Not marked out of office."}
+            </p>
+          </div>
           {!isOutToday ? (
             <button
               type="button"
@@ -121,7 +134,7 @@ export function OutOfOfficeSection({ adminUserId }: { adminUserId?: string } = {
               onClick={() => updateToday("mark")}
               className="btn-primary px-3 py-1.5 text-sm disabled:opacity-50"
             >
-              Mark out today
+              Set out of office today
             </button>
           ) : (
             <button
@@ -130,47 +143,57 @@ export function OutOfOfficeSection({ adminUserId }: { adminUserId?: string } = {
               onClick={() => updateToday("clear")}
               className="btn-secondary px-3 py-1.5 text-sm disabled:opacity-50"
             >
-              Clear for today
+              Clear out of office
             </button>
           )}
         </div>
       </div>
 
-      <div className="mt-4">
-        <p className="mb-2 text-sm font-medium">Schedule a date range</p>
-        <div className="flex flex-wrap items-end gap-2">
+      <div className="mt-4 rounded-lg border border-[var(--border)] p-4">
+        <p className="text-sm font-medium">Schedule out of office</p>
+        <p className="mt-1 mb-3 text-xs text-muted">
+          Pick the first and last day you are away. Both days are included.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
           <label className="text-sm">
-            <span className="text-muted">From</span>
+            <span className="mb-1 block text-muted">First day away</span>
             <input
               type="date"
               value={rangeStart}
-              onChange={(e) => setRangeStart(e.target.value)}
-              className="picker-input mt-1 block rounded-lg border px-3 py-2"
+              onChange={(e) => {
+                setRangeStart(e.target.value);
+                if (rangeEnd && e.target.value > rangeEnd) setRangeEnd(e.target.value);
+              }}
+              className="picker-input block rounded-lg border px-3 py-2"
             />
           </label>
           <label className="text-sm">
-            <span className="text-muted">To</span>
+            <span className="mb-1 block text-muted">Last day away</span>
             <input
               type="date"
               value={rangeEnd}
+              min={rangeStart || undefined}
               onChange={(e) => setRangeEnd(e.target.value)}
-              className="picker-input mt-1 block rounded-lg border px-3 py-2"
+              className="picker-input block rounded-lg border px-3 py-2"
             />
           </label>
           <button
             type="button"
-            disabled={busy || !rangeStart || !rangeEnd}
+            disabled={busy || !rangeStart || !rangeEnd || rangeStart > rangeEnd}
             onClick={scheduleRange}
-            className="btn-secondary px-3 py-1.5 text-sm disabled:opacity-50"
+            className="btn-primary px-3 py-2 text-sm disabled:opacity-50"
           >
-            Schedule range
+            Schedule out of office
           </button>
         </div>
+        {rangeStart && rangeEnd && rangeStart > rangeEnd && (
+          <p className="mt-2 text-xs text-red-400">Last day must be on or after the first day.</p>
+        )}
       </div>
 
       {ranges.length > 0 && (
         <div className="mt-4">
-          <p className="mb-2 text-sm font-medium">Scheduled out-of-office ranges</p>
+          <p className="mb-2 text-sm font-medium">Scheduled days away</p>
           <ul className="divide-y divide-[var(--border)] rounded-lg border border-[var(--border)] text-sm">
             {ranges.map((r) => {
               const coversToday =

@@ -1,6 +1,6 @@
 import { prisma } from "./db";
 import { getAppConfig } from "./app-config";
-import { normalizeSsid, VISIT_GAP_MS } from "./constants";
+import { normalizeSsid, ssidsNoLongerAllowed, VISIT_GAP_MS } from "./constants";
 import { heartbeatInOffice } from "./heartbeat-office";
 import { mergeHeartbeatsIntoVisits } from "./visits";
 
@@ -8,6 +8,7 @@ export type AllowlistBackfillResult = {
   heartbeatsUpdated: number;
   usersRebuilt: number;
   visitsCreated: number;
+  visitsRemoved: number;
 };
 
 /** True when stored heartbeats no longer match the current allowlist or SSID normalization rules. */
@@ -22,20 +23,62 @@ export async function hasHeartbeatAllowlistMismatches(
     take: 1000,
   });
 
-  return heartbeats.some(
+  const heartbeatDrift = heartbeats.some(
     (hb) =>
       (hb.ssid !== null && normalizeSsid(hb.ssid) !== hb.ssid) ||
       heartbeatInOffice(hb, allowlist) !== hb.inOffice,
   );
+  if (heartbeatDrift) return true;
+
+  return (await findStaleWifiVisitSsids(allowlist)).length > 0;
 }
 
-/** After admin adds SSIDs, retroactively fix stored heartbeats and rebuild wifi visits in retention window. */
+/**
+ * Wi-Fi SSIDs still attached to stored visits that the allowlist no longer covers.
+ * Heartbeats are kept for a short retention window only, so visits are the only
+ * record of an SSID that was removed after the pulses behind them were purged.
+ */
+async function findStaleWifiVisitSsids(allowlist: string[]): Promise<string[]> {
+  const rows = await prisma.visit.findMany({
+    where: { source: "wifi", ssid: { not: null } },
+    select: { ssid: true },
+    distinct: ["ssid"],
+    take: 200,
+  });
+
+  return ssidsNoLongerAllowed(
+    rows.map((row) => row.ssid),
+    allowlist,
+  );
+}
+
+/**
+ * Drop Wi-Fi visits recorded on an SSID the admin has removed, at any age. Visit rebuild
+ * only reaches back as far as heartbeat retention, so without this an SSID removal would
+ * keep counting office time on older days.
+ */
+async function removeVisitsForDroppedSsids(allowlist: string[]): Promise<number> {
+  const staleSsids = await findStaleWifiVisitSsids(allowlist);
+  if (staleSsids.length === 0) return 0;
+
+  const result = await prisma.visit.deleteMany({
+    where: { source: "wifi", ssid: { in: staleSsids } },
+  });
+  return result.count;
+}
+
+/**
+ * After an admin adds or removes SSIDs, retroactively fix stored heartbeats and rebuild
+ * wifi visits in the retention window, and drop visits left on removed SSIDs at any age.
+ */
 export async function backfillHeartbeatsAndVisitsAfterAllowlistChange(
   allowlist: string[],
 ): Promise<AllowlistBackfillResult> {
   const config = await getAppConfig();
   const since = new Date(Date.now() - config.heartbeatRetentionDays * 24 * 60 * 60 * 1000);
   const staleMs = config.agentStaleMinutes * 60 * 1000;
+
+  const visitsRemoved = await removeVisitsForDroppedSsids(allowlist);
 
   const heartbeats = await prisma.heartbeat.findMany({
     where: { recordedAt: { gte: since } },
@@ -73,6 +116,7 @@ export async function backfillHeartbeatsAndVisitsAfterAllowlistChange(
     heartbeatsUpdated,
     usersRebuilt: affectedUserIds.size,
     visitsCreated,
+    visitsRemoved,
   };
 }
 

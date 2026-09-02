@@ -144,12 +144,28 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
   };
 }
 
+/**
+ * Clear tracking data for a user. A range limits the purge to visits that start inside it
+ * and heartbeats recorded inside it, so an admin can drop one bad day instead of everything.
+ * Token and device removal is only available on a full reset.
+ */
 export async function resetUserData(
   userId: string,
   scope: "tracking" | "all",
+  range?: { from: Date; to: Date },
 ) {
-  await prisma.visit.deleteMany({ where: { userId } });
-  await prisma.heartbeat.deleteMany({ where: { userId } });
+  if (range) {
+    const visits = await prisma.visit.deleteMany({
+      where: { userId, startAt: { gte: range.from, lte: range.to } },
+    });
+    const heartbeats = await prisma.heartbeat.deleteMany({
+      where: { userId, recordedAt: { gte: range.from, lte: range.to } },
+    });
+    return { visitsDeleted: visits.count, heartbeatsDeleted: heartbeats.count };
+  }
+
+  const visits = await prisma.visit.deleteMany({ where: { userId } });
+  const heartbeats = await prisma.heartbeat.deleteMany({ where: { userId } });
 
   if (scope === "all") {
     await prisma.agentToken.updateMany({
@@ -158,6 +174,8 @@ export async function resetUserData(
     });
     await prisma.agentDevice.deleteMany({ where: { userId } });
   }
+
+  return { visitsDeleted: visits.count, heartbeatsDeleted: heartbeats.count };
 }
 
 export { addDays, dayKeyForTimezone };

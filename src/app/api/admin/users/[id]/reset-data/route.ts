@@ -3,6 +3,8 @@ import { requireAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit-log";
 import { resetUserData } from "@/lib/user-reports";
+import { isValidDayKey } from "@/lib/data-reset";
+import { dayBoundsFromKey } from "@/lib/timezone-dates";
 
 export async function POST(
   request: Request,
@@ -19,7 +21,7 @@ export async function POST(
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  let body: { scope?: string; confirm?: string };
+  let body: { scope?: string; confirm?: string; fromDayKey?: string; toDayKey?: string };
   try {
     body = await request.json();
   } catch {
@@ -30,15 +32,29 @@ export async function POST(
     return NextResponse.json({ error: 'Type RESET to confirm' }, { status: 400 });
   }
 
-  const scope = body.scope === "all" ? "all" : "tracking";
-  await resetUserData(id, scope);
+  let range: { from: Date; to: Date } | undefined;
+  if (body.fromDayKey || body.toDayKey) {
+    const fromDayKey = body.fromDayKey ?? "";
+    const toDayKey = body.toDayKey ?? "";
+    if (!isValidDayKey(fromDayKey) || !isValidDayKey(toDayKey) || fromDayKey > toDayKey) {
+      return NextResponse.json({ error: "Invalid date range" }, { status: 400 });
+    }
+    range = {
+      from: dayBoundsFromKey(fromDayKey, target.timezone).start,
+      to: dayBoundsFromKey(toDayKey, target.timezone).end,
+    };
+  }
+
+  // Tokens and devices are only cleared by a full reset, never by a date range purge.
+  const scope = !range && body.scope === "all" ? "all" : "tracking";
+  const deleted = await resetUserData(id, scope, range);
 
   await logAuditEvent({
     actorId: admin.id,
     action: "user_data_reset",
     targetUserId: id,
-    details: { scope },
+    details: { scope, fromDayKey: body.fromDayKey, toDayKey: body.toDayKey, ...deleted },
   });
 
-  return NextResponse.json({ ok: true, scope });
+  return NextResponse.json({ ok: true, scope, ...deleted });
 }

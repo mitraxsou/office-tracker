@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { normalizeSsid, isOfficeSsid, allowlistMatchPrefix, parseDefaultSsidsFromEnv, DEFAULT_OFFICE_SSIDS } from "../src/lib/constants";
+import {
+  normalizeSsid,
+  isOfficeSsid,
+  allowlistMatchPrefix,
+  officeSsidAllowlistChanged,
+  parseDefaultSsidsFromEnv,
+  ssidsNoLongerAllowed,
+  DEFAULT_OFFICE_SSIDS,
+} from "../src/lib/constants";
 
 describe("parseDefaultSsidsFromEnv", () => {
   it("returns hardcoded defaults when env is unset", () => {
@@ -68,5 +76,43 @@ describe("isOfficeSsid", () => {
   it("exposes allowlist prefix without wildcard", () => {
     expect(allowlistMatchPrefix("pwcglb.com*")).toBe("pwcglb.com");
     expect(allowlistMatchPrefix("OfficeConnect")).toBe("officeconnect");
+  });
+});
+
+describe("officeSsidAllowlistChanged", () => {
+  const base = ["OfficeConnect", "ExternalConnect", "pwcglb.com"];
+
+  it("detects a removed SSID so the backfill runs", () => {
+    expect(officeSsidAllowlistChanged([...base, "Airtel_Abir"], base)).toBe(true);
+  });
+
+  it("detects an added SSID", () => {
+    expect(officeSsidAllowlistChanged(base, [...base, "Airtel_Abir"])).toBe(true);
+  });
+
+  it("detects a swap that keeps the list length", () => {
+    expect(officeSsidAllowlistChanged(base, ["OfficeConnect", "ExternalConnect", "GuestWiFi"])).toBe(
+      true,
+    );
+  });
+
+  it("ignores case, order, and whitespace", () => {
+    expect(officeSsidAllowlistChanged(base, ["pwcglb.com", " officeconnect ", "EXTERNALCONNECT"])).toBe(
+      false,
+    );
+  });
+});
+
+describe("ssidsNoLongerAllowed", () => {
+  it("returns visit SSIDs dropped from the allowlist", () => {
+    expect(
+      ssidsNoLongerAllowed(["Airtel_Abir", "pwcglb.com", null], ["OfficeConnect", "pwcglb.com"]),
+    ).toEqual(["Airtel_Abir"]);
+  });
+
+  it("returns nothing when every SSID is still allowed", () => {
+    expect(
+      ssidsNoLongerAllowed(["pwcglb.com 2", "OfficeConnect"], ["OfficeConnect", "pwcglb.com"]),
+    ).toEqual([]);
   });
 });

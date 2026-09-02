@@ -2,6 +2,7 @@ import { allDayKeysInMonth, daysInMonth, parseMonthKey } from "./month-range";
 import { aggregateHoursForDay } from "./user-reports";
 import type { ApprovedExemptions } from "./compliance-exemptions";
 import { DEFAULT_PILOT_START_MONTH_KEY } from "./app-config";
+import { prisma } from "./db";
 
 export function validateMonthlyDaysTarget(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 31) {
@@ -84,9 +85,11 @@ export type MonthlyProgress = {
 export type YearMonthComplianceStatus =
   | "earned"
   | "exemption"
-  | "pre_pilot"
+  | "no_data"
   | "pending"
   | "not_met";
+
+export type YearMonthNoDataReason = "pre_pilot" | "joined_late" | "no_visits";
 
 export type YearMonthCompliance = {
   monthKey: string;
@@ -94,11 +97,13 @@ export type YearMonthCompliance = {
   qualifyingDays: number;
   monthlyDaysTarget: number;
   status: YearMonthComplianceStatus;
+  noDataReason?: YearMonthNoDataReason;
   hasPendingExemption?: boolean;
 };
 
 export type YearCompliance = {
   year: number;
+  fiscalYearLabel: string;
   compliantMonths: number;
   monthsInYear: number;
   monthsElapsed: number;
@@ -114,6 +119,33 @@ export function monthKeysInYear(year: number): string[] {
     const month = String(index + 1).padStart(2, "0");
     return `${year}-${month}`;
   });
+}
+
+export function fiscalYearStartYear(
+  date: Date,
+  timezone: string,
+): number {
+  const monthKey = monthKeyInTimezone(date, timezone);
+  const calendarYear = Number(monthKey.slice(0, 4));
+  const calendarMonth = Number(monthKey.slice(5, 7));
+  return calendarMonth >= 5 ? calendarYear : calendarYear - 1;
+}
+
+export function monthKeysInFiscalYear(startYear: number): string[] {
+  return [
+    ...Array.from({ length: 8 }, (_, index) => {
+      const month = String(index + 5).padStart(2, "0");
+      return `${startYear}-${month}`;
+    }),
+    ...Array.from({ length: 4 }, (_, index) => {
+      const month = String(index + 1).padStart(2, "0");
+      return `${startYear + 1}-${month}`;
+    }),
+  ];
+}
+
+export function fiscalYearLabel(startYear: number): string {
+  return `FY ${startYear}-${String(startYear + 1).slice(-2)}`;
 }
 
 export function monthKeysInYearUpToMonth(
@@ -132,7 +164,7 @@ export function isPrePilotMonth(monthKey: string, pilotStartMonthKey: string): b
 }
 
 export function isCompliantYearMonthStatus(status: YearMonthComplianceStatus): boolean {
-  return status === "earned" || status === "exemption" || status === "pre_pilot";
+  return status === "earned" || status === "exemption";
 }
 
 export function yearMonthStatus(
@@ -293,12 +325,17 @@ export async function getYearCompliance(
   pendingExemptionMonthKeys: string[] = [],
   pilotStartMonthKey: string = DEFAULT_PILOT_START_MONTH_KEY,
 ): Promise<YearCompliance> {
-  const year = yearFromDate(referenceDate, timezone);
+  const year = fiscalYearStartYear(referenceDate, timezone);
   const currentMonthKey = monthKeyInTimezone(referenceDate, timezone);
-  const monthKeys = monthKeysInYear(year);
-  const monthsElapsed = monthKeysInYearUpToMonth(year, timezone, referenceDate).length;
+  const monthKeys = monthKeysInFiscalYear(year);
+  const monthsElapsed = monthKeys.filter((monthKey) => monthKey <= currentMonthKey).length;
   const exemptions = approvedExemptions ?? { monthKeys: [], dayKeys: [] };
   const pendingMonths = new Set(pendingExemptionMonthKeys);
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { createdAt: true },
+  });
+  const joinedMonthKey = user ? monthKeyInTimezone(user.createdAt, timezone) : null;
 
   const monthDetails = await Promise.all(
     monthKeys.map(async (monthKey) => {
@@ -313,21 +350,11 @@ export async function getYearCompliance(
         };
       }
 
-      if (isPrePilotMonth(monthKey, pilotStartMonthKey)) {
-        return {
-          monthKey,
-          metTarget: true,
-          qualifyingDays: 0,
-          monthlyDaysTarget,
-          status: "pre_pilot" as const,
-          hasPendingExemption: pendingMonths.has(monthKey),
-        };
-      }
-
       const dayKeys = dayKeysForMonth(monthKey, timezone, referenceDate);
       const dailyHours = await Promise.all(
         dayKeys.map((dayKey) => aggregateHoursForDay(userId, timezone, dayKey)),
       );
+      const hasOfficeData = dailyHours.some((hours) => hours > 0);
       const qualifyingDayKeys = new Set(
         dayKeys.filter((_, index) => dayQualifiesForTarget(dailyHours[index] ?? 0, hoursTarget)),
       );
@@ -346,6 +373,26 @@ export async function getYearCompliance(
         hasPendingExemption: pendingMonths.has(monthKey),
       });
 
+      if (!hasOfficeData && resolved.status !== "exemption") {
+        // Pre-pilot months used to count as compliant automatically. Empty months now stay
+        // truthful to recorded office data and never increase the fiscal year score.
+        const noDataReason: YearMonthNoDataReason =
+          joinedMonthKey && monthKey < joinedMonthKey
+            ? "joined_late"
+            : isPrePilotMonth(monthKey, pilotStartMonthKey)
+              ? "pre_pilot"
+              : "no_visits";
+        return {
+          monthKey,
+          metTarget: false,
+          qualifyingDays: 0,
+          monthlyDaysTarget,
+          status: "no_data" as const,
+          noDataReason,
+          hasPendingExemption: pendingMonths.has(monthKey),
+        };
+      }
+
       return {
         monthKey,
         monthlyDaysTarget,
@@ -356,6 +403,7 @@ export async function getYearCompliance(
 
   return {
     year,
+    fiscalYearLabel: fiscalYearLabel(year),
     compliantMonths: monthDetails.filter((month) => isCompliantYearMonthStatus(month.status)).length,
     monthsInYear: 12,
     monthsElapsed,

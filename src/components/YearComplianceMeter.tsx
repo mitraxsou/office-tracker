@@ -25,21 +25,27 @@ function monthChipTitle(
   if (month.status === "pending") {
     return `${label}: Not started yet`;
   }
-  if (month.status === "pre_pilot") {
-    return `${label}: Data not available - app not active`;
+  if (month.status === "no_data") {
+    if (month.noDataReason === "joined_late") {
+      return `${label}: No data - account was created after this month`;
+    }
+    if (month.noDataReason === "pre_pilot") {
+      return `${label}: No data - tracking pilot had not started`;
+    }
+    return `${label}: No data - no office visits or hours recorded`;
   }
   if (month.status === "exemption") {
     return `${label}: Exempted by admin (${month.qualifyingDays}/${month.monthlyDaysTarget} days logged)`;
   }
   if (month.status === "earned") {
-    return `${label}: ${month.qualifyingDays}/${month.monthlyDaysTarget} days`;
+    return `${label}: Compliant (${month.qualifyingDays}/${month.monthlyDaysTarget} days)`;
   }
-  return `${label}: ${month.qualifyingDays}/${month.monthlyDaysTarget} days`;
+  return `${label}: Non-compliant (${month.qualifyingDays}/${month.monthlyDaysTarget} days)`;
 }
 
 function monthChipClassName(month: YearCompliance["monthDetails"][number]): string {
-  if (month.status === "pre_pilot") {
-    return "bg-green-500/10 text-green-300/80 border border-dashed border-green-500/30";
+  if (month.status === "no_data") {
+    return "border border-dashed border-[var(--border)] text-muted";
   }
   if (month.status === "exemption") {
     return "bg-green-500/10 text-green-300 border border-dashed border-green-500/40";
@@ -53,7 +59,7 @@ function monthChipClassName(month: YearCompliance["monthDetails"][number]): stri
   if (month.status === "pending") {
     return "border border-dashed border-[var(--border)] text-muted/60";
   }
-  return "border border-[var(--border)] text-muted";
+  return "border border-red-500/40 bg-red-500/10 text-red-300";
 }
 
 export function YearComplianceMeter({ compliance, timezone }: YearComplianceMeterProps) {
@@ -136,7 +142,7 @@ export function YearComplianceMeter({ compliance, timezone }: YearComplianceMete
     <div className="card p-6">
       <div className="flex items-end justify-between">
         <div>
-          <p className="text-sm text-muted">Year compliance ({compliance.year})</p>
+          <p className="text-sm text-muted">Year compliance ({compliance.fiscalYearLabel})</p>
           <p className="mt-1 text-4xl font-bold">
             {compliance.compliantMonths}
             <span className="text-lg font-normal text-muted">
@@ -156,8 +162,9 @@ export function YearComplianceMeter({ compliance, timezone }: YearComplianceMete
         </span>
       </div>
       <p className="mt-2 text-xs text-muted">
-        Months where you hit the office-days target ({compliance.monthDetails[0]?.monthlyDaysTarget ?? 8}{" "}
-        qualifying days per month), including pre-pilot months and admin exemptions.
+        Based on recorded office hours ({compliance.monthDetails[0]?.monthlyDaysTarget ?? 8}{" "}
+        qualifying days per month). Empty months show No data and do not count as compliant.
+        Admin-approved exemptions count as compliant.
       </p>
       <div className="progress-track mt-4 h-3 overflow-hidden rounded-full">
         <div
@@ -170,7 +177,7 @@ export function YearComplianceMeter({ compliance, timezone }: YearComplianceMete
           {compliance.monthDetails.map((month) => {
             const pending = pendingForMonth(month.monthKey);
             const canRequest =
-              month.status === "not_met" &&
+              (month.status === "not_met" || month.status === "no_data") &&
               !pending;
             return (
               <span key={month.monthKey} className="inline-flex items-center gap-1">

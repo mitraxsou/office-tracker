@@ -19,7 +19,8 @@ import { AgentSetupBanner } from "@/components/AgentSetupBanner";
 import { AgentHealthBanner } from "@/components/AgentHealthBanner";
 import { RecentHeartbeats } from "@/components/RecentHeartbeats";
 import { LaptopActiveCard } from "@/components/LaptopActiveCard";
-import { formatTime } from "@/lib/visits";
+import { DashboardRefreshButton } from "@/components/DashboardRefreshButton";
+import { dayKeyInTimezone, formatTime } from "@/lib/visits";
 
 export default async function DashboardPage() {
   const user = await requireAuthenticatedUser();
@@ -57,6 +58,11 @@ export default async function DashboardPage() {
   );
   const pulse = await getPulseStats(user.id, graceHours);
   const isOutToday = await isUserOutOfOffice(user.id, summary.dayKey);
+  const lastHeartbeatToday =
+    summary.lastHeartbeat &&
+    dayKeyInTimezone(summary.lastHeartbeat.recordedAt, user.timezone) === summary.dayKey
+      ? summary.lastHeartbeat
+      : null;
   const agentNeverConnected = !summary.lastHeartbeat && user.agentDevices.length === 0;
   const agentStale = !isOutToday && !!summary.lastHeartbeat && !summary.agentHealthy;
   const agentLowPulses =
@@ -89,11 +95,14 @@ export default async function DashboardPage() {
     <>
       <AppNav />
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-8">
-        <div>
-          <h1 className="text-2xl font-semibold">Today</h1>
-          <p className="text-sm text-muted">
-            {summary.dayKey} · Your hours only
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold">Today</h1>
+            <p className="text-sm text-muted">
+              {summary.dayKey} · Your hours only
+            </p>
+          </div>
+          <DashboardRefreshButton />
         </div>
 
         {agentNeverConnected && <AgentSetupBanner />}
@@ -148,11 +157,11 @@ export default async function DashboardPage() {
           <StatusCard
             label="Last heartbeat"
             value={
-              summary.lastHeartbeat
-                ? new Date(summary.lastHeartbeat.recordedAt).toLocaleTimeString("en-IN", {
+              lastHeartbeatToday
+                ? new Date(lastHeartbeatToday.recordedAt).toLocaleTimeString("en-IN", {
                     timeZone: user.timezone,
                   })
-                : "Never"
+                : "None"
             }
           />
         </div>
@@ -179,10 +188,10 @@ export default async function DashboardPage() {
           </p>
         )}
 
-        {summary.lastHeartbeat && (
+        {lastHeartbeatToday && (
           <p className="text-xs text-muted">
-            Last SSID: {summary.lastHeartbeat.ssid ?? "none"} · VPN (diagnostic only):{" "}
-            {summary.lastHeartbeat.vpnGateway ?? "n/a"}. VPN does not count toward hours.
+            Last SSID: {lastHeartbeatToday.ssid ?? "none"} · VPN (diagnostic only):{" "}
+            {lastHeartbeatToday.vpnGateway ?? "n/a"}. VPN does not count toward hours.
           </p>
         )}
 

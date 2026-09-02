@@ -3,7 +3,6 @@ import { prisma } from "./db";
 import {
   DEFAULT_HOURS_TARGET,
   DEFAULT_MONTHLY_DAYS_TARGET,
-  normalizeSsid,
   parseDefaultSsidsFromEnv,
 } from "./constants";
 import { backfillHeartbeatsAndVisitsAfterAllowlistChange, hasHeartbeatAllowlistMismatches } from "./ssid-backfill";
@@ -74,13 +73,6 @@ async function reconcileHeartbeatsWithAllowlist(parsed: AppConfigData) {
   }
 }
 
-function mergeMissingDefaultSsids(existing: string[]): string[] {
-  const defaults = parseDefaultSsidsFromEnv();
-  const known = new Set(existing.map((s) => normalizeSsid(s).toLowerCase()));
-  const missing = defaults.filter((d) => !known.has(normalizeSsid(d).toLowerCase()));
-  return missing.length > 0 ? [...existing, ...missing] : existing;
-}
-
 export async function ensureAppConfig(): Promise<AppConfigData> {
   try {
     let config = await prisma.appConfig.findUnique({ where: { id: CONFIG_ID } });
@@ -102,17 +94,9 @@ export async function ensureAppConfig(): Promise<AppConfigData> {
         },
       });
     } else {
-      const parsed = parseConfig(config);
-      const merged = mergeMissingDefaultSsids(parsed.officeSsids);
-      if (merged.length !== parsed.officeSsids.length) {
-        config = await prisma.appConfig.update({
-          where: { id: CONFIG_ID },
-          data: { officeSsids: JSON.stringify(merged) },
-        });
-        await backfillHeartbeatsAndVisitsAfterAllowlistChange(merged);
-      } else {
-        await reconcileHeartbeatsWithAllowlist(parsed);
-      }
+      // DEFAULT_OFFICE_SSIDS seeds a new config only. Re-adding env defaults here would
+      // silently undo an SSID the admin removed in /admin/settings.
+      await reconcileHeartbeatsWithAllowlist(parseConfig(config));
     }
     return parseConfig(config);
   } catch (err) {

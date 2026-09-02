@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import { createManualVisit } from "@/lib/heartbeat-service";
 import { logAuditEvent } from "@/lib/audit-log";
 
+const MAX_BULK_DELETE = 500;
+
 export async function GET(request: Request) {
   const admin = await requireAdmin();
   if (!admin) {
@@ -128,6 +130,15 @@ export async function PATCH(request: Request) {
   if (body.endAt !== undefined) data.endAt = body.endAt ? new Date(body.endAt) : null;
   if (body.ssid !== undefined) data.ssid = body.ssid;
 
+  const nextStart = (data.startAt as Date | undefined) ?? existing.startAt;
+  const nextEnd = (data.endAt as Date | null | undefined) ?? existing.endAt;
+  if (Number.isNaN(nextStart.getTime())) {
+    return NextResponse.json({ error: "Invalid startAt" }, { status: 400 });
+  }
+  if (nextEnd && (Number.isNaN(nextEnd.getTime()) || nextEnd <= nextStart)) {
+    return NextResponse.json({ error: "Check-out must be after check-in" }, { status: 400 });
+  }
+
   const visit = await prisma.visit.update({
     where: { id: body.id },
     data,
@@ -150,24 +161,40 @@ export async function DELETE(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const id = searchParams.get("id");
-  if (!id) {
-    return NextResponse.json({ error: "id required" }, { status: 400 });
+  const idsParam = searchParams.get("ids");
+  const singleId = searchParams.get("id");
+  const ids = (idsParam ? idsParam.split(",") : singleId ? [singleId] : [])
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  if (ids.length === 0) {
+    return NextResponse.json({ error: "id or ids required" }, { status: 400 });
+  }
+  if (ids.length > MAX_BULK_DELETE) {
+    return NextResponse.json(
+      { error: `Select ${MAX_BULK_DELETE} visits or fewer` },
+      { status: 400 },
+    );
   }
 
-  const existing = await prisma.visit.findUnique({ where: { id } });
-  if (!existing) {
+  const existing = await prisma.visit.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, userId: true },
+  });
+  if (existing.length === 0) {
     return NextResponse.json({ error: "Visit not found" }, { status: 404 });
   }
 
-  await prisma.visit.delete({ where: { id } });
+  const result = await prisma.visit.deleteMany({
+    where: { id: { in: existing.map((v) => v.id) } },
+  });
 
   await logAuditEvent({
     actorId: admin.id,
     action: "visit_delete",
-    targetUserId: existing.userId,
-    details: { visitId: id },
+    targetUserId: existing[0].userId,
+    details: { visitIds: existing.map((v) => v.id), deleted: result.count },
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, deleted: result.count });
 }

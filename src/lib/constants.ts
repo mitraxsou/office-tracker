@@ -66,3 +66,17 @@ export function isOfficeSsid(ssid: string | null | undefined, allowlist: string[
     return normalized === prefix || normalized.startsWith(prefix);
   });
 }
+
+/** True when an SSID was added or removed. Case, order, and whitespace are not a change. */
+export function officeSsidAllowlistChanged(prev: string[], next: string[]): boolean {
+  const key = (ssid: string) => normalizeSsid(ssid).toLowerCase();
+  const before = new Set(prev.map(key));
+  const after = new Set(next.map(key));
+  if (before.size !== after.size) return true;
+  return [...after].some((ssid) => !before.has(ssid));
+}
+
+/** SSIDs stored on visits or heartbeats that the allowlist no longer covers. */
+export function ssidsNoLongerAllowed(ssids: Array<string | null>, allowlist: string[]): string[] {
+  return ssids.filter((ssid): ssid is string => ssid !== null && !isOfficeSsid(ssid, allowlist));
+}

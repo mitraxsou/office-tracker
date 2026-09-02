@@ -1,7 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { getDayBounds } from "../src/lib/timezone-dates";
-import { effectiveVisitEnd } from "../src/lib/visits";
+import { dayKeyInTimezone, effectiveVisitEnd } from "../src/lib/visits";
 import { VISIT_GAP_MS } from "../src/lib/constants";
+
+describe("visit date labels (Asia/Kolkata)", () => {
+  it("labels an after-midnight visit with the local day, not the UTC day", () => {
+    // 12:45 am IST on 3 Sept is still 2 Sept in UTC. Slicing the ISO string showed 09-02.
+    const startAt = new Date("2026-09-03T00:45:00+05:30");
+    expect(startAt.toISOString().slice(0, 10)).toBe("2026-09-02");
+    expect(dayKeyInTimezone(startAt, "Asia/Kolkata")).toBe("2026-09-03");
+  });
+
+  it("keeps daytime visits on the same day", () => {
+    const startAt = new Date("2026-09-02T11:46:00+05:30");
+    expect(dayKeyInTimezone(startAt, "Asia/Kolkata")).toBe("2026-09-02");
+  });
+});
 
 describe("timezone day bounds (Asia/Kolkata)", () => {
   it("uses local midnight not UTC for day start", () => {
