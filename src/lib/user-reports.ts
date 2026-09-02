@@ -5,6 +5,7 @@ import { summarizeAgentTokens } from "./auth";
 import { getLifecycleEventsForUser } from "./agent-lifecycle";
 import { revokeExpiredPendingTokens } from "./token-expiry";
 import { daySpanMsForDay } from "./visits";
+import { laptopActiveHoursForDay } from "./laptop-active";
 import { heartbeatInOffice } from "./heartbeat-office";
 
 function dayKeyForTimezone(date: Date, timezone: string) {
@@ -27,6 +28,15 @@ export async function aggregateHoursForDay(userId: string, timezone: string, day
   return daySpanMsForDay(visits, params) / (1000 * 60 * 60);
 }
 
+export async function aggregateLaptopActiveForDay(
+  userId: string,
+  timezone: string,
+  dayKey: string,
+) {
+  const { laptopActiveParams } = await loadDaySpanContext(userId, dayKey, timezone);
+  return laptopActiveHoursForDay(laptopActiveParams);
+}
+
 export async function getUserReport(userId: string, from: Date, to: Date) {
   await revokeExpiredPendingTokens();
 
@@ -46,7 +56,12 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
   const today = await getTodaySummary(user.id, user.timezone, hoursTarget, graceHours);
   const pulse = await getPulseStats(user.id, graceHours);
 
-  const dailyTrend: Array<{ date: string; totalHours: number; metTarget: boolean }> = [];
+  const dailyTrend: Array<{
+    date: string;
+    totalHours: number;
+    laptopActiveHours: number;
+    metTarget: boolean;
+  }> = [];
   const cursor = new Date(from);
   cursor.setHours(0, 0, 0, 0);
   const end = new Date(to);
@@ -54,10 +69,14 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
 
   while (cursor <= end) {
     const key = dayKeyForTimezone(cursor, user.timezone);
-    const hours = await aggregateHoursForDay(user.id, user.timezone, key);
+    const [hours, laptopHours] = await Promise.all([
+      aggregateHoursForDay(user.id, user.timezone, key),
+      aggregateLaptopActiveForDay(user.id, user.timezone, key),
+    ]);
     dailyTrend.push({
       date: key,
       totalHours: Math.round(hours * 10) / 10,
+      laptopActiveHours: Math.round(laptopHours * 10) / 10,
       metTarget: hours >= hoursTarget,
     });
     cursor.setDate(cursor.getDate() + 1);
@@ -92,6 +111,7 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
     },
     today: {
       totalHours: today.totalHours,
+      laptopActiveHours: today.laptopActiveHours,
       metTarget: today.metTarget,
       agentHealthy: today.agentHealthy,
       inOfficeNow: today.inOfficeNow,

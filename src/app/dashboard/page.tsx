@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireAuthenticatedUser, enforcePasswordChangeIfRequired } from "@/lib/session-guards";
 import { getTodaySummary, getPulseStats } from "@/lib/heartbeat-service";
 import { getUserHoursTarget, getAppConfig, getEffectiveAgentStaleGraceHours } from "@/lib/app-config";
-import { getMonthlyProgress } from "@/lib/monthly-progress";
+import { getMonthlyProgress, getYearCompliance } from "@/lib/monthly-progress";
 import { isUserOutOfOffice } from "@/lib/out-of-office";
 import { AppNav } from "@/components/AppNav";
 import { ProgressMeter } from "@/components/ProgressMeter";
@@ -10,9 +10,11 @@ import { MonthlyProgressMeter } from "@/components/MonthlyProgressMeter";
 import { VisitList } from "@/components/VisitList";
 import { ManualVisitForm } from "@/components/ManualVisitForm";
 import { QuickOfficeToggle } from "@/components/QuickOfficeToggle";
+import { YearComplianceMeter } from "@/components/YearComplianceMeter";
 import { AgentSetupBanner } from "@/components/AgentSetupBanner";
 import { AgentHealthBanner } from "@/components/AgentHealthBanner";
 import { RecentHeartbeats } from "@/components/RecentHeartbeats";
+import { LaptopActiveCard } from "@/components/LaptopActiveCard";
 import { formatTime } from "@/lib/visits";
 
 export default async function DashboardPage() {
@@ -34,6 +36,12 @@ export default async function DashboardPage() {
     hoursTarget,
     config.monthlyDaysTarget,
   );
+  const yearCompliance = await getYearCompliance(
+    user.id,
+    user.timezone,
+    hoursTarget,
+    config.monthlyDaysTarget,
+  );
   const pulse = await getPulseStats(user.id, graceHours);
   const isOutToday = await isUserOutOfOffice(user.id, summary.dayKey);
   const agentNeverConnected = !summary.lastHeartbeat && user.agentDevices.length === 0;
@@ -47,6 +55,22 @@ export default async function DashboardPage() {
   const ssidMissing =
     !!summary.lastHeartbeat && !summary.lastHeartbeat.ssid && summary.lastHeartbeat.inOffice === false;
   const openVisit = summary.visits.find((v) => v.endAt === null);
+  const firstCheckIn =
+    summary.visits.length > 0
+      ? summary.visits.reduce((earliest, visit) =>
+          visit.startAt < earliest.startAt ? visit : earliest,
+        ).startAt
+      : null;
+  const agentStatusValue = agentNeverConnected
+    ? "Not connected"
+    : summary.agentHealthy
+      ? "Healthy"
+      : "Stale / offline";
+  const agentStatusTone: StatusTone = agentNeverConnected
+    ? "neutral"
+    : summary.agentHealthy
+      ? "success"
+      : "warning";
 
   return (
     <>
@@ -75,30 +99,39 @@ export default async function DashboardPage() {
           metTarget={summary.metTarget}
         />
 
+        <LaptopActiveCard laptopActiveHours={summary.laptopActiveHours} />
+
+        <div className="card border border-green-500/30 p-4">
+          <p className="text-sm text-muted">First check-in today</p>
+          <p
+            className={`mt-1 text-2xl font-semibold ${firstCheckIn ? "text-green-400" : "text-muted"}`}
+          >
+            {firstCheckIn ? formatTime(firstCheckIn, user.timezone) : "No check-in yet"}
+          </p>
+          {firstCheckIn && (
+            <p className="mt-1 text-xs text-muted">
+              Earliest office session start for {summary.dayKey}.
+            </p>
+          )}
+        </div>
+
         <MonthlyProgressMeter
           qualifyingDays={monthlyProgress.qualifyingDays}
           monthlyDaysTarget={monthlyProgress.monthlyDaysTarget}
           metTarget={monthlyProgress.metTarget}
           monthKey={monthlyProgress.monthKey}
+          totalHours={monthlyProgress.totalHours}
         />
+
+        <YearComplianceMeter compliance={yearCompliance} timezone={user.timezone} />
 
         <div className="grid gap-4 md:grid-cols-3">
           <StatusCard
             label="In office now"
             value={summary.inOfficeNow ? "Yes" : "No"}
-            highlight={summary.inOfficeNow}
+            tone={summary.inOfficeNow ? "success" : "neutral"}
           />
-          <StatusCard
-            label="Agent status"
-            value={
-              agentNeverConnected
-                ? "Not connected"
-                : summary.agentHealthy
-                  ? "Healthy"
-                  : "Stale / offline"
-            }
-            highlight={summary.agentHealthy}
-          />
+          <StatusCard label="Agent status" value={agentStatusValue} tone={agentStatusTone} />
           <StatusCard
             label="Last heartbeat"
             value={
@@ -179,19 +212,28 @@ export default async function DashboardPage() {
   );
 }
 
+type StatusTone = "success" | "warning" | "neutral";
+
 function StatusCard({
   label,
   value,
-  highlight,
+  tone = "neutral",
 }: {
   label: string;
   value: string;
-  highlight?: boolean;
+  tone?: StatusTone;
 }) {
+  const valueClass =
+    tone === "success"
+      ? "text-green-400"
+      : tone === "warning"
+        ? "text-amber-400"
+        : "";
+
   return (
     <div className="card p-4">
       <p className="text-sm text-muted">{label}</p>
-      <p className={`mt-1 text-lg font-semibold ${highlight ? "text-accent" : ""}`}>{value}</p>
+      <p className={`mt-1 text-lg font-semibold ${valueClass}`}>{value}</p>
     </div>
   );
 }

@@ -45,6 +45,7 @@ export async function getAdminReports(options?: { days?: number; monthKey?: stri
         tokens: summarizeAgentTokens(user.agentTokens),
         today: {
           totalHours: summary.totalHours,
+          laptopActiveHours: summary.laptopActiveHours,
           metTarget: summary.metTarget,
           agentHealthy: summary.agentHealthy,
           inOfficeNow: summary.inOfficeNow,

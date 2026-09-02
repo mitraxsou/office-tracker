@@ -70,6 +70,7 @@ export type MonthlyProgress = {
   monthKey: string;
   qualifyingDays: number;
   officeVisitDays: number;
+  totalHours: number;
   daysInMonth: number;
   monthlyDaysTarget: number;
   metTarget: boolean;
@@ -77,6 +78,38 @@ export type MonthlyProgress = {
   daysElapsed: number;
   progressState: MonthlyProgressState;
 };
+
+export type YearMonthCompliance = {
+  monthKey: string;
+  metTarget: boolean;
+  qualifyingDays: number;
+  monthlyDaysTarget: number;
+};
+
+export type YearCompliance = {
+  year: number;
+  compliantMonths: number;
+  monthsElapsed: number;
+  monthDetails: YearMonthCompliance[];
+};
+
+export function yearFromDate(date: Date, timezone: string): number {
+  return Number(monthKeyInTimezone(date, timezone).slice(0, 4));
+}
+
+export function monthKeysInYearUpToMonth(
+  year: number,
+  timezone: string,
+  referenceDate: Date = new Date(),
+): string[] {
+  const currentYear = yearFromDate(referenceDate, timezone);
+  if (year > currentYear) return [];
+  const monthCount = year < currentYear ? 12 : Number(monthKeyInTimezone(referenceDate, timezone).slice(5, 7));
+  return Array.from({ length: monthCount }, (_, index) => {
+    const month = String(index + 1).padStart(2, "0");
+    return `${year}-${month}`;
+  });
+}
 
 export function dayKeysForMonth(
   monthKey: string,
@@ -108,6 +141,7 @@ export async function getMonthlyProgress(
   );
   const qualifyingDays = countQualifyingDays(dailyHours, hoursTarget);
   const officeVisitDays = countOfficeVisitDays(dailyHours);
+  const totalHours = dailyHours.reduce((sum, hours) => sum + hours, 0);
   const { year, month } = parseMonthKey(targetMonth);
   const daysInCalendarMonth = daysInMonth(year, month);
 
@@ -115,6 +149,7 @@ export async function getMonthlyProgress(
     monthKey: targetMonth,
     qualifyingDays,
     officeVisitDays,
+    totalHours: Math.round(totalHours * 10) / 10,
     daysInMonth: daysInCalendarMonth,
     monthlyDaysTarget,
     metTarget: qualifyingDays >= monthlyDaysTarget,
@@ -140,6 +175,42 @@ export async function countQualifyingDaysInMonth(
     dayKeys.map((dayKey) => aggregateHoursForDay(userId, timezone, dayKey)),
   );
   return countQualifyingDays(dailyHours, hoursTarget);
+}
+
+export async function getYearCompliance(
+  userId: string,
+  timezone: string,
+  hoursTarget: number,
+  monthlyDaysTarget: number,
+  referenceDate: Date = new Date(),
+): Promise<YearCompliance> {
+  const year = yearFromDate(referenceDate, timezone);
+  const monthKeys = monthKeysInYearUpToMonth(year, timezone, referenceDate);
+  const monthDetails = await Promise.all(
+    monthKeys.map(async (monthKey) => {
+      const progress = await getMonthlyProgress(
+        userId,
+        timezone,
+        hoursTarget,
+        monthlyDaysTarget,
+        referenceDate,
+        monthKey,
+      );
+      return {
+        monthKey,
+        metTarget: progress.metTarget,
+        qualifyingDays: progress.qualifyingDays,
+        monthlyDaysTarget,
+      };
+    }),
+  );
+
+  return {
+    year,
+    compliantMonths: monthDetails.filter((month) => month.metTarget).length,
+    monthsElapsed: monthKeys.length,
+    monthDetails,
+  };
 }
 
 export function monthDayKeysFromTrend(

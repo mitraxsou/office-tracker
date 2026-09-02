@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AgentPulseSparkline,
-  ComplianceTrendChart,
   HoursTrendChart,
   type DailyHoursPoint,
 } from "@/components/reports/ReportCharts";
+import { GroupedVisitList } from "@/components/reports/GroupedVisitList";
 import {
   exportDailyTrendCsv,
   MonthReportToolbar,
@@ -15,7 +15,7 @@ import {
 import { VisitCalendar } from "@/components/reports/VisitCalendar";
 import { currentMonthKey } from "@/lib/month-range";
 import type { MonthlyProgressState } from "@/lib/monthly-progress";
-import { formatHours, formatTime } from "@/lib/visits";
+import { formatHours } from "@/lib/visits";
 
 type UserReportData = {
   user: { timezone: string; hoursTarget: number };
@@ -32,7 +32,7 @@ type UserReportData = {
     daysElapsed: number;
     progressState: MonthlyProgressState;
   };
-  dailyTrend: Array<{ date: string; totalHours: number; metTarget: boolean }>;
+  dailyTrend: Array<{ date: string; totalHours: number; laptopActiveHours: number; metTarget: boolean }>;
   visits: Array<{
     id: string;
     startAt: string;
@@ -40,7 +40,7 @@ type UserReportData = {
     source: string;
     ssid: string | null;
   }>;
-  today: { totalHours: number; metTarget: boolean; agentHealthy: boolean };
+  today: { totalHours: number; laptopActiveHours: number; metTarget: boolean; agentHealthy: boolean };
   pulse: {
     pulsesLast24h: number;
     agentHealthy: boolean;
@@ -117,10 +117,14 @@ export function UserReportsDashboard() {
   const periodStats = useMemo(() => {
     if (!data) return null;
     const totalHours = data.dailyTrend.reduce((s, d) => s + d.totalHours, 0);
+    const totalLaptopHours = data.dailyTrend.reduce((s, d) => s + d.laptopActiveHours, 0);
     const avgHours = data.dailyTrend.length
       ? totalHours / data.dailyTrend.length
       : 0;
-    return { totalHours, avgHours };
+    const avgLaptopHours = data.dailyTrend.length
+      ? totalLaptopHours / data.dailyTrend.length
+      : 0;
+    return { totalHours, totalLaptopHours, avgHours, avgLaptopHours };
   }, [data]);
 
   if (loading && !data) {
@@ -159,7 +163,7 @@ export function UserReportsDashboard() {
       </div>
 
       {periodStats && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
           <KpiCard
             label="Days met 5h target"
             value={`${progress.qualifyingDays} / ${progress.monthlyDaysTarget}`}
@@ -173,15 +177,21 @@ export function UserReportsDashboard() {
             tone="neutral"
           />
           <KpiCard
-            label="Total hours"
+            label="Laptop active today"
+            value={formatHours(data.today.laptopActiveHours)}
+            tooltip="Time from your first agent pulse today to your last (or now if the agent is still running). Counts on any network, not only office Wi-Fi."
+            tone="neutral"
+          />
+          <KpiCard
+            label="Total office hours"
             value={formatHours(periodStats.totalHours)}
             tooltip="Total office time across all days in the selected month. Each day runs from first check-in to last check-out (gaps count). Last in-office heartbeat counts unless you checked out manually."
             tone="neutral"
           />
           <KpiCard
-            label="Avg hours / day"
-            value={formatHours(periodStats.avgHours)}
-            tooltip="Average daily office time in the selected month (first check-in to last check-out per day, gaps count). Last in-office heartbeat counts unless you checked out manually."
+            label="Total laptop active"
+            value={formatHours(periodStats.totalLaptopHours)}
+            tooltip="Total laptop active time this month: first to last agent pulse per day (any network). Proxy for laptop on with the agent running."
             tone="neutral"
           />
           <KpiCard
@@ -214,38 +224,32 @@ export function UserReportsDashboard() {
           />
         </section>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <section className="card p-6">
-            <HoursTrendChart
-              data={chartData}
-              targetHours={target}
-              title="Daily office hours"
-              selectedDate={selectedDate}
-              onBarClick={(date) => setSelectedDate((prev) => (prev === date ? null : date))}
-            />
-            {selectedDate && (
-              <p className="mt-2 text-xs text-muted">
-                Filtering visits for <strong className="text-accent">{selectedDate}</strong>.{" "}
-                <button
-                  type="button"
-                  onClick={() => setSelectedDate(null)}
-                  className="text-accent hover:underline"
-                >
-                  Clear
-                </button>
-              </p>
-            )}
-          </section>
-          <section className="card p-6">
-            <ComplianceTrendChart
-              data={chartData.map((d) => ({
-                ...d,
-                compliancePct: d.metTarget ? 100 : 0,
-              }))}
-              title="Target met per day"
-            />
-          </section>
-        </div>
+        <section className="card p-6">
+          <HoursTrendChart
+            data={chartData}
+            targetHours={target}
+            title="Daily office hours"
+            selectedDate={selectedDate}
+            onBarClick={(date) => setSelectedDate((prev) => (prev === date ? null : date))}
+            height={320}
+          />
+          {selectedDate && (
+            <p className="mt-2 text-xs text-muted">
+              Filtering visits for <strong className="text-accent">{selectedDate}</strong>.{" "}
+              <button
+                type="button"
+                onClick={() => setSelectedDate(null)}
+                className="text-accent hover:underline"
+              >
+                Clear
+              </button>
+            </p>
+          )}
+          <p className="mt-3 text-xs text-muted">
+            Orange bars meet the daily target. Amber bars are below target. Dashed line is your{" "}
+            {target}h goal.
+          </p>
+        </section>
       )}
 
       {viewMode === "charts" && (
@@ -265,52 +269,21 @@ export function UserReportsDashboard() {
           {filteredVisits.length === 0 ? (
             <p className="text-sm text-muted">No visits in this month.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--border)] text-left text-muted">
-                    <th className="py-2 pr-4">Date</th>
-                    <th className="py-2 pr-4">Start</th>
-                    <th className="py-2 pr-4">End</th>
-                    <th className="py-2 pr-4">Duration</th>
-                    <th className="py-2 pr-4">Source</th>
-                    <th className="py-2">SSID</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredVisits.map((v) => {
-                    const start = new Date(v.startAt);
-                    const end = v.endAt ? new Date(v.endAt) : null;
-                    const durationMs = end
-                      ? end.getTime() - start.getTime()
-                      : 0;
-                    return (
-                      <tr key={v.id} className="border-b border-[var(--border)]">
-                        <td className="py-2 pr-4">{v.startAt.slice(0, 10)}</td>
-                        <td className="py-2 pr-4">
-                          {formatTime(start, timezone)}
-                        </td>
-                        <td className="py-2 pr-4">
-                          {end ? formatTime(end, timezone) : "open"}
-                        </td>
-                        <td className="py-2 pr-4">
-                          {end ? formatHours(durationMs / (1000 * 60 * 60)) : "-"}
-                        </td>
-                        <td className="py-2 pr-4">{v.source}</td>
-                        <td className="py-2">{v.ssid ?? "-"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <GroupedVisitList
+              visits={filteredVisits}
+              dailyTrend={data.dailyTrend}
+              timezone={timezone}
+              hoursTarget={target}
+              selectedDate={selectedDate}
+              onSelectDate={setSelectedDate}
+            />
           )}
         </section>
       )}
 
       <p className="text-xs text-muted">
         {viewMode === "charts"
-          ? "Hover chart bars for details. Click a bar to filter the visits table."
+          ? "Hover chart bars for details. Click a bar or day row to filter visits."
           : "Click a calendar day to see visit details for that day."}{" "}
         <Link href="/dashboard" className="text-accent hover:underline">
           Back to today

@@ -3,6 +3,7 @@ type MonthlyProgressMeterProps = {
   monthlyDaysTarget: number;
   metTarget: boolean;
   monthKey: string;
+  totalHours?: number;
 };
 
 export function MonthlyProgressMeter({
@@ -10,6 +11,7 @@ export function MonthlyProgressMeter({
   monthlyDaysTarget,
   metTarget,
   monthKey,
+  totalHours,
 }: MonthlyProgressMeterProps) {
   const pct = Math.min(100, (qualifyingDays / monthlyDaysTarget) * 100);
   const remaining = Math.max(0, monthlyDaysTarget - qualifyingDays);
@@ -37,6 +39,12 @@ export function MonthlyProgressMeter({
       </div>
       <p className="mt-2 text-xs text-muted">
         A day counts when you meet the daily hours target in office.
+        {totalHours !== undefined && (
+          <>
+            {" "}
+            Total this month: <strong className="text-foreground">{totalHours.toFixed(1)}h</strong>.
+          </>
+        )}
       </p>
       <div className="progress-track mt-4 h-3 overflow-hidden rounded-full">
         <div

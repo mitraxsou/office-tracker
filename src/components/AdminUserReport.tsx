@@ -25,12 +25,18 @@ type UserReport = {
   };
   today: {
     totalHours: number;
+    laptopActiveHours: number;
     metTarget: boolean;
     agentHealthy: boolean;
     inOfficeNow: boolean;
     lastHeartbeat: string | null;
   };
-  dailyTrend: Array<{ date: string; totalHours: number; metTarget: boolean }>;
+  dailyTrend: Array<{
+    date: string;
+    totalHours: number;
+    laptopActiveHours: number;
+    metTarget: boolean;
+  }>;
   visits: Array<{
     id: string;
     startAt: string;
@@ -211,8 +217,12 @@ export function AdminUserReport({
         </button>
       </MonthReportToolbar>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <SummaryCard label="Today" value={`${data.today.totalHours.toFixed(1)}h / ${data.user.hoursTarget}h`} />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+        <SummaryCard label="Today (office)" value={`${data.today.totalHours.toFixed(1)}h / ${data.user.hoursTarget}h`} />
+        <SummaryCard
+          label="Laptop active"
+          value={`${data.today.laptopActiveHours.toFixed(1)}h`}
+        />
         <SummaryCard label="5h met" value={data.today.metTarget ? "Yes" : "No"} />
         <SummaryCard
           label="Office days"
@@ -311,6 +321,10 @@ export function AdminUserReport({
           <div>
             <dt className="text-muted">Minutes since last pulse</dt>
             <dd>{data.pulse.minutesSinceLastPulse ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted">Laptop active today</dt>
+            <dd>{data.today.laptopActiveHours.toFixed(1)}h</dd>
           </div>
           <div>
             <dt className="text-muted">In office now</dt>

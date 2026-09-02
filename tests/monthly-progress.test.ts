@@ -8,7 +8,9 @@ import {
   getMonthlyProgressState,
   monthKeyInTimezone,
   monthDayKeysFromTrend,
+  monthKeysInYearUpToMonth,
   validateMonthlyDaysTarget,
+  yearFromDate,
 } from "../src/lib/monthly-progress";
 
 describe("validateMonthlyDaysTarget", () => {
@@ -97,5 +99,28 @@ describe("monthDayKeysFromTrend", () => {
     expect(result.officeVisitDays).toBe(2);
     expect(result.daysInRange).toBe(2);
     expect(result.daysInMonth).toBe(30);
+  });
+});
+
+describe("year compliance helpers", () => {
+  it("returns month keys from January through the current month", () => {
+    const ref = new Date("2026-09-02T10:00:00+05:30");
+    expect(yearFromDate(ref, "Asia/Kolkata")).toBe(2026);
+    expect(monthKeysInYearUpToMonth(2026, "Asia/Kolkata", ref)).toEqual([
+      "2026-01",
+      "2026-02",
+      "2026-03",
+      "2026-04",
+      "2026-05",
+      "2026-06",
+      "2026-07",
+      "2026-08",
+      "2026-09",
+    ]);
+  });
+
+  it("returns all twelve months for a completed year", () => {
+    const ref = new Date("2026-09-02T10:00:00+05:30");
+    expect(monthKeysInYearUpToMonth(2025, "Asia/Kolkata", ref)).toHaveLength(12);
   });
 });

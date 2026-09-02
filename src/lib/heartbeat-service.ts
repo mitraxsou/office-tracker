@@ -3,6 +3,7 @@ import { DEFAULT_OFFICE_SSIDS, isOfficeSsid, normalizeSsid } from "./constants";
 import { getAppConfig, getAgentStaleMs, agentHealthGraceMs } from "./app-config";
 import { heartbeatInOffice } from "./heartbeat-office";
 import { maybePurgeOldHeartbeats } from "./heartbeat-retention";
+import { laptopActiveHoursForDay, type LaptopActiveParams } from "./laptop-active";
 import { daySpanMsForDay, dayKeyInTimezone, effectiveVisitEnd, type DaySpanParams } from "./visits";
 import { dayBoundsFromKey, getDayBounds } from "./timezone-dates";
 
@@ -14,6 +15,7 @@ export async function loadDaySpanContext(
   visits: Awaited<ReturnType<typeof prisma.visit.findMany>>;
   params: DaySpanParams;
   lastHeartbeat: Awaited<ReturnType<typeof prisma.heartbeat.findFirst>>;
+  laptopActiveParams: LaptopActiveParams;
 }> {
   const config = await getAppConfig();
   const allowlist = config.officeSsids;
@@ -50,6 +52,8 @@ export async function loadDaySpanContext(
   const inOfficeToday = dayHeartbeats.filter((h) => heartbeatInOffice(h, allowlist));
   const firstInOfficeHeartbeatAt = inOfficeToday[0]?.recordedAt ?? null;
   const lastInOfficeHeartbeatAt = inOfficeToday[inOfficeToday.length - 1]?.recordedAt ?? null;
+  const firstHeartbeatAt = dayHeartbeats[0]?.recordedAt ?? null;
+  const lastHeartbeatOnDay = dayHeartbeats[dayHeartbeats.length - 1]?.recordedAt ?? null;
 
   return {
     visits,
@@ -62,6 +66,15 @@ export async function loadDaySpanContext(
       lastHeartbeatAt: lastHeartbeat?.recordedAt ?? null,
       firstInOfficeHeartbeatAt,
       lastInOfficeHeartbeatAt,
+    },
+    laptopActiveParams: {
+      dayStart,
+      dayEnd,
+      now,
+      staleMs,
+      firstHeartbeatAt,
+      lastHeartbeatAt: lastHeartbeatOnDay,
+      lastHeartbeatOverall: lastHeartbeat?.recordedAt ?? null,
     },
   };
 }
@@ -290,7 +303,11 @@ export async function getTodaySummary(
 ) {
   const now = new Date();
   const { dayKey } = getDayBounds(now, timezone);
-  const { visits, params, lastHeartbeat } = await loadDaySpanContext(userId, dayKey, timezone);
+  const { visits, params, lastHeartbeat, laptopActiveParams } = await loadDaySpanContext(
+    userId,
+    dayKey,
+    timezone,
+  );
 
   const config = await getAppConfig();
   const effectiveGraceHours = graceHours ?? config.agentStaleGraceHours;
@@ -304,6 +321,7 @@ export async function getTodaySummary(
 
   const totalMs = daySpanMsForDay(visits, params);
   const totalHours = totalMs / (1000 * 60 * 60);
+  const laptopActiveHours = laptopActiveHoursForDay(laptopActiveParams);
   const lastPulseInOffice = lastHeartbeat
     ? heartbeatInOffice(lastHeartbeat, config.officeSsids)
     : false;
@@ -311,6 +329,7 @@ export async function getTodaySummary(
   return {
     dayKey,
     totalHours,
+    laptopActiveHours,
     hoursTarget,
     metTarget: totalHours >= hoursTarget,
     remainingHours: Math.max(0, hoursTarget - totalHours),
@@ -319,6 +338,12 @@ export async function getTodaySummary(
     lastHeartbeat,
     agentHealthy,
   };
+}
+
+export function laptopActiveHoursFromContext(
+  laptopActiveParams: LaptopActiveParams,
+): number {
+  return laptopActiveHoursForDay(laptopActiveParams);
 }
 
 export async function getPulseStats(userId: string, graceHours: number) {
