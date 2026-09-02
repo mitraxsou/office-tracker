@@ -113,6 +113,7 @@ export function AdminUserReport({
   const [resetConfirm, setResetConfirm] = useState("");
   const [resetScope, setResetScope] = useState<"tracking" | "all">("tracking");
   const [actionError, setActionError] = useState<string | null>(null);
+  const [impersonating, setImpersonating] = useState(false);
 
   const load = useCallback(async (month: string) => {
     setLoading(true);
@@ -182,6 +183,20 @@ export function AdminUserReport({
     router.push("/admin");
   }
 
+  async function handleViewAsUser() {
+    setImpersonating(true);
+    setActionError(null);
+    const res = await fetch(`/api/admin/users/${userId}/impersonate`, { method: "POST" });
+    const body = await res.json().catch(() => ({}));
+    setImpersonating(false);
+    if (!res.ok) {
+      setActionError(body.error ?? "Failed to start view-as mode");
+      return;
+    }
+    router.push(body.redirectTo ?? "/dashboard");
+    router.refresh();
+  }
+
   if (loading && !data) return <p className="text-muted">Loading user report...</p>;
   if (error && !data) return <p className="text-red-400">{error}</p>;
   if (!data) return null;
@@ -196,6 +211,14 @@ export function AdminUserReport({
           <h2 className="mt-1 text-xl font-medium">{data.user.email}</h2>
           {data.user.name && <p className="text-sm text-muted">{data.user.name}</p>}
         </div>
+        <button
+          type="button"
+          onClick={() => void handleViewAsUser()}
+          disabled={impersonating}
+          className="btn-secondary px-3 py-1.5 text-sm"
+        >
+          {impersonating ? "Starting..." : "View as user"}
+        </button>
       </div>
 
       <MonthReportToolbar

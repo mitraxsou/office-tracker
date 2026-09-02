@@ -129,13 +129,25 @@ export async function clearLoginAttempts() {
   cookieStore.delete(LOGIN_ATTEMPTS_COOKIE);
 }
 
-export async function createSession(userId: string) {
-  const token = await new SignJWT({ userId })
+type SessionPayload = {
+  userId: string;
+  impersonatingUserId?: string;
+};
+
+async function signSessionPayload(payload: SessionPayload) {
+  const jwtPayload: Record<string, string> = { userId: payload.userId };
+  if (payload.impersonatingUserId) {
+    jwtPayload.impersonatingUserId = payload.impersonatingUserId;
+  }
+
+  return new SignJWT(jwtPayload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_MAX_AGE}s`)
     .sign(getSecret());
+}
 
+async function writeSessionCookie(token: string) {
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
@@ -146,27 +158,62 @@ export async function createSession(userId: string) {
   });
 }
 
-export async function destroySession() {
-  const cookieStore = await cookies();
-  cookieStore.delete(SESSION_COOKIE);
-}
-
-export async function getSessionUserId(): Promise<string | null> {
+async function readSessionPayload(): Promise<SessionPayload | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
   try {
     const { payload } = await jwtVerify(token, getSecret());
-    return typeof payload.userId === "string" ? payload.userId : null;
+    const userId = typeof payload.userId === "string" ? payload.userId : null;
+    if (!userId) return null;
+
+    const impersonatingUserId =
+      typeof payload.impersonatingUserId === "string" ? payload.impersonatingUserId : undefined;
+
+    return { userId, impersonatingUserId };
   } catch {
     return null;
   }
 }
 
-export async function getCurrentUser() {
-  const userId = await getSessionUserId();
-  if (!userId) return null;
+export async function createSession(userId: string) {
+  const token = await signSessionPayload({ userId });
+  await writeSessionCookie(token);
+}
+
+export async function setImpersonationSession(adminUserId: string, impersonatingUserId: string) {
+  const token = await signSessionPayload({ userId: adminUserId, impersonatingUserId });
+  await writeSessionCookie(token);
+}
+
+export async function clearImpersonationSession(adminUserId: string) {
+  const token = await signSessionPayload({ userId: adminUserId });
+  await writeSessionCookie(token);
+}
+
+export async function destroySession() {
+  const cookieStore = await cookies();
+  cookieStore.delete(SESSION_COOKIE);
+}
+
+export async function getRealSessionUserId(): Promise<string | null> {
+  const payload = await readSessionPayload();
+  return payload?.userId ?? null;
+}
+
+export async function getImpersonatingUserId(): Promise<string | null> {
+  const payload = await readSessionPayload();
+  return payload?.impersonatingUserId ?? null;
+}
+
+export async function getSessionUserId(): Promise<string | null> {
+  const payload = await readSessionPayload();
+  if (!payload) return null;
+  return payload.impersonatingUserId ?? payload.userId;
+}
+
+async function loadUserById(userId: string) {
   return prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -177,6 +224,29 @@ export async function getCurrentUser() {
       agentDevices: { orderBy: { lastSeenAt: "desc" } },
     },
   });
+}
+
+export async function getRealCurrentUser() {
+  const userId = await getRealSessionUserId();
+  if (!userId) return null;
+  return loadUserById(userId);
+}
+
+export async function getCurrentUser() {
+  const userId = await getSessionUserId();
+  if (!userId) return null;
+  return loadUserById(userId);
+}
+
+export async function getImpersonationContext() {
+  const impersonatingUserId = await getImpersonatingUserId();
+  if (!impersonatingUserId) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: impersonatingUserId },
+    select: { id: true, email: true, name: true },
+  });
+  return user;
 }
 
 export function generateAgentToken() {

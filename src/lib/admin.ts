@@ -1,7 +1,7 @@
-import { getCurrentUser } from "./auth";
+import { getRealCurrentUser } from "./auth";
 
 export async function requireAdmin() {
-  const user = await getCurrentUser();
+  const user = await getRealCurrentUser();
   if (!user || user.role !== "admin") {
     return null;
   }

@@ -47,7 +47,9 @@ export type AuditAction =
   | "compliance_exemption_request"
   | "compliance_exemption_cancel"
   | "compliance_exemption_approve"
-  | "compliance_exemption_reject";
+  | "compliance_exemption_reject"
+  | "impersonate_start"
+  | "impersonate_end";
 
 export async function logAuditEvent(params: {
   actorId: string;
