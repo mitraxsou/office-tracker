@@ -37,6 +37,7 @@ export async function PATCH(request: Request) {
     heartbeatRetentionDays?: number;
     agentStaleMinutes?: number;
     agentStaleGraceHours?: number;
+    complianceExemptionRequiresApproval?: boolean;
   };
 
   try {
@@ -118,6 +119,13 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "agentStaleGraceHours must be 1-168" }, { status: 400 });
     }
     update.agentStaleGraceHours = body.agentStaleGraceHours;
+  }
+
+  if (body.complianceExemptionRequiresApproval !== undefined) {
+    if (typeof body.complianceExemptionRequiresApproval !== "boolean") {
+      return NextResponse.json({ error: "Invalid complianceExemptionRequiresApproval" }, { status: 400 });
+    }
+    update.complianceExemptionRequiresApproval = body.complianceExemptionRequiresApproval;
   }
 
   const config = await updateAppConfig(update);

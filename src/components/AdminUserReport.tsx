@@ -13,6 +13,7 @@ import { currentMonthKey } from "@/lib/month-range";
 import { formatHours, formatTime } from "@/lib/visits";
 import { AdminResetPasswordButton } from "./AdminResetPasswordButton";
 import { AdminUserProfileChangeForm } from "./AdminUserProfileChangeForm";
+import { AdminGrantComplianceExemption } from "./AdminGrantComplianceExemption";
 
 type UserReport = {
   user: {
@@ -420,6 +421,8 @@ export function AdminUserReport({
           blockedMessage={profileChangeBlockedMessage}
         />
       </section>
+
+      <AdminGrantComplianceExemption userId={userId} />
 
       <div className="space-y-4">
         <div>

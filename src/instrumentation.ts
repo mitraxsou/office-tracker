@@ -288,6 +288,38 @@ export async function register() {
     await prisma.$executeRawUnsafe(
       'CREATE INDEX IF NOT EXISTS "AgentLifecycleEvent_eventType_createdAt_idx" ON "AgentLifecycleEvent"("eventType", "createdAt");'
     );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "complianceExemptionRequiresApproval" BOOLEAN NOT NULL DEFAULT true;'
+    );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "ComplianceExemptionRequest" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "type" TEXT NOT NULL,
+        "monthKey" TEXT,
+        "dayKey" TEXT,
+        "message" TEXT,
+        "status" TEXT NOT NULL DEFAULT 'open',
+        "adminNote" TEXT,
+        "reviewedAt" TIMESTAMP(3),
+        "reviewedById" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "ComplianceExemptionRequest_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "ComplianceExemptionRequest_status_createdAt_idx" ON "ComplianceExemptionRequest"("status", "createdAt");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "ComplianceExemptionRequest_userId_idx" ON "ComplianceExemptionRequest"("userId");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "ComplianceExemptionRequest_userId_monthKey_idx" ON "ComplianceExemptionRequest"("userId", "monthKey");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "ComplianceExemptionRequest_userId_dayKey_idx" ON "ComplianceExemptionRequest"("userId", "dayKey");'
+    );
     await ensureAppConfig();
     await ensureBreakglassAdmin();
   } catch (err) {

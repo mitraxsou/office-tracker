@@ -40,6 +40,7 @@ export type AppConfigData = {
   heartbeatRetentionDays: number;
   agentStaleMinutes: number;
   agentStaleGraceHours: number;
+  complianceExemptionRequiresApproval: boolean;
 };
 
 const CONFIG_ID = "global";
@@ -81,6 +82,7 @@ export async function ensureAppConfig(): Promise<AppConfigData> {
           heartbeatRetentionDays: DEFAULT_HEARTBEAT_RETENTION_DAYS,
           agentStaleMinutes: DEFAULT_AGENT_STALE_MINUTES,
           agentStaleGraceHours: DEFAULT_AGENT_STALE_GRACE_HOURS,
+          complianceExemptionRequiresApproval: true,
         },
       });
     } else {
@@ -119,6 +121,9 @@ export async function updateAppConfig(data: Partial<AppConfigData>) {
   if (data.heartbeatRetentionDays !== undefined) update.heartbeatRetentionDays = data.heartbeatRetentionDays;
   if (data.agentStaleMinutes !== undefined) update.agentStaleMinutes = data.agentStaleMinutes;
   if (data.agentStaleGraceHours !== undefined) update.agentStaleGraceHours = data.agentStaleGraceHours;
+  if (data.complianceExemptionRequiresApproval !== undefined) {
+    update.complianceExemptionRequiresApproval = data.complianceExemptionRequiresApproval;
+  }
 
   const config = await prisma.appConfig.update({
     where: { id: CONFIG_ID },
@@ -158,6 +163,7 @@ function parseConfig(config: {
   heartbeatRetentionDays?: number;
   agentStaleMinutes?: number;
   agentStaleGraceHours?: number;
+  complianceExemptionRequiresApproval?: boolean;
 }): AppConfigData {
   let ssids: string[] = parseDefaultSsidsFromEnv();
   try {
@@ -176,5 +182,6 @@ function parseConfig(config: {
     heartbeatRetentionDays: config.heartbeatRetentionDays ?? DEFAULT_HEARTBEAT_RETENTION_DAYS,
     agentStaleMinutes: config.agentStaleMinutes ?? DEFAULT_AGENT_STALE_MINUTES,
     agentStaleGraceHours: config.agentStaleGraceHours ?? DEFAULT_AGENT_STALE_GRACE_HOURS,
+    complianceExemptionRequiresApproval: config.complianceExemptionRequiresApproval ?? true,
   };
 }

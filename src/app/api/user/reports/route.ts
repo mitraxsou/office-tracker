@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getUserHoursTarget, getAppConfig } from "@/lib/app-config";
 import { getUserReport } from "@/lib/user-reports";
 import { getMonthlyProgress } from "@/lib/monthly-progress";
+import { getApprovedExemptionsForUser } from "@/lib/compliance-exemptions";
 import { parseReportRange } from "@/lib/report-range";
 import { currentMonthKey } from "@/lib/month-range";
 
@@ -21,6 +22,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
+  const approvedExemptions = await getApprovedExemptionsForUser(user.id);
   const monthlyProgress = await getMonthlyProgress(
     user.id,
     user.timezone,
@@ -28,6 +30,7 @@ export async function GET(request: Request) {
     config.monthlyDaysTarget,
     new Date(),
     range.monthKey,
+    approvedExemptions,
   );
 
   return NextResponse.json({

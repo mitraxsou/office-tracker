@@ -43,7 +43,11 @@ export type AuditAction =
   | "password_reset"
   | "agent_update_push"
   | "admin_agent_grace_update"
-  | "admin_profile_edit";
+  | "admin_profile_edit"
+  | "compliance_exemption_request"
+  | "compliance_exemption_cancel"
+  | "compliance_exemption_approve"
+  | "compliance_exemption_reject";
 
 export async function logAuditEvent(params: {
   actorId: string;

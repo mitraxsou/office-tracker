@@ -4,6 +4,7 @@ import { enforcePasswordChangeIfRequired } from "@/lib/session-guards";
 import { AppNav } from "@/components/AppNav";
 import { AdminSubNav } from "@/components/AdminSubNav";
 import { AdminVisitReports } from "@/components/AdminVisitReports";
+import { AdminComplianceExemptionRequests } from "@/components/AdminComplianceExemptionRequests";
 import { AdminDeviceRemovalRequests } from "@/components/AdminDeviceRemovalRequests";
 import { AdminTimezoneChangeRequests } from "@/components/AdminTimezoneChangeRequests";
 import { AdminProfileChangeRequests } from "@/components/AdminProfileChangeRequests";
@@ -20,12 +21,13 @@ export default async function AdminVisitReportsPage() {
         <div>
           <h1 className="text-2xl font-semibold">User requests</h1>
           <p className="text-sm text-muted">
-            Visit corrections, timezone changes, profile changes, and laptop removal requests.
+            Visit corrections, timezone changes, profile changes, compliance exemptions, and laptop removal requests.
           </p>
         </div>
         <AdminSubNav active="corrections" />
         <AdminTimezoneChangeRequests />
         <AdminProfileChangeRequests />
+        <AdminComplianceExemptionRequests />
         <AdminDeviceRemovalRequests />
         <AdminVisitReports />
       </main>

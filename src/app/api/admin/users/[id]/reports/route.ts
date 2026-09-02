@@ -5,6 +5,7 @@ import { parseReportRange } from "@/lib/report-range";
 import { currentMonthKey } from "@/lib/month-range";
 import { getAppConfig, getUserHoursTarget } from "@/lib/app-config";
 import { getMonthlyProgress } from "@/lib/monthly-progress";
+import { getApprovedExemptionsForUser } from "@/lib/compliance-exemptions";
 import { prisma } from "@/lib/db";
 
 export async function GET(
@@ -31,6 +32,7 @@ export async function GET(
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
+  const approvedExemptions = await getApprovedExemptionsForUser(user.id);
   const monthlyProgress = await getMonthlyProgress(
     user.id,
     user.timezone,
@@ -38,6 +40,7 @@ export async function GET(
     config.monthlyDaysTarget,
     new Date(),
     range.monthKey,
+    approvedExemptions,
   );
 
   return NextResponse.json({

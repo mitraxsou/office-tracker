@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  countExemptQualifyingDays,
+  resolveMonthCompliance,
   countQualifyingDays,
   countOfficeVisitDays,
   dayKeysForMonth,
@@ -148,5 +150,25 @@ describe("year compliance helpers", () => {
     expect(yearMonthStatus("2026-08", "2026-09", false)).toBe("not_met");
     expect(yearMonthStatus("2026-09", "2026-09", false)).toBe("not_met");
     expect(yearMonthStatus("2026-10", "2026-09", false)).toBe("pending");
+  });
+
+  it("counts exempt qualifying days without double counting", () => {
+    const keys = new Set(["2026-09-01", "2026-09-02"]);
+    expect(countExemptQualifyingDays(keys, ["2026-09-03"])).toBe(3);
+    expect(countExemptQualifyingDays(keys, ["2026-09-01"])).toBe(2);
+  });
+
+  it("resolves month compliance with exemption metVia", () => {
+    const resolved = resolveMonthCompliance({
+      monthKey: "2026-08",
+      currentMonthKey: "2026-09",
+      qualifyingDays: 3,
+      monthlyDaysTarget: 8,
+      hasMonthExemption: true,
+      exemptDayKeysInMonth: [],
+      qualifyingDayKeys: new Set(),
+    });
+    expect(resolved.metTarget).toBe(true);
+    expect(resolved.metVia).toBe("exemption");
   });
 });

@@ -7,6 +7,7 @@ import { AppNav } from "@/components/AppNav";
 import { AdminSettingsForm } from "@/components/AdminSettingsForm";
 import { AdminPilotControls } from "@/components/AdminPilotControls";
 import { AdminSubNav } from "@/components/AdminSubNav";
+import { AdminComplianceExemptionControls } from "@/components/AdminComplianceExemptionControls";
 import { AdminIntegrationKeys } from "@/components/AdminIntegrationKeys";
 import { AdminMaintenance } from "@/components/AdminMaintenance";
 import { listIntegrationApiKeys } from "@/lib/integration-api-keys";
@@ -37,6 +38,9 @@ export default async function AdminSettingsPage() {
           heartbeatRetentionDays={config.heartbeatRetentionDays}
           agentStaleMinutes={config.agentStaleMinutes}
           agentStaleGraceHours={config.agentStaleGraceHours}
+        />
+        <AdminComplianceExemptionControls
+          complianceExemptionRequiresApproval={config.complianceExemptionRequiresApproval}
         />
         <AdminIntegrationKeys initialKeys={integrationKeys} />
         <AdminMaintenance />

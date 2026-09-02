@@ -3,6 +3,10 @@ import { requireAuthenticatedUser, enforcePasswordChangeIfRequired } from "@/lib
 import { getTodaySummary, getPulseStats } from "@/lib/heartbeat-service";
 import { getUserHoursTarget, getAppConfig, getEffectiveAgentStaleGraceHours } from "@/lib/app-config";
 import { getMonthlyProgress, getYearCompliance } from "@/lib/monthly-progress";
+import {
+  getApprovedExemptionsForUser,
+  getPendingExemptionMonthKeys,
+} from "@/lib/compliance-exemptions";
 import { isUserOutOfOffice } from "@/lib/out-of-office";
 import { AppNav } from "@/components/AppNav";
 import { ProgressMeter } from "@/components/ProgressMeter";
@@ -30,17 +34,25 @@ export default async function DashboardPage() {
     hoursTarget,
     graceHours,
   );
+  const approvedExemptions = await getApprovedExemptionsForUser(user.id);
+  const pendingExemptionMonthKeys = await getPendingExemptionMonthKeys(user.id);
   const monthlyProgress = await getMonthlyProgress(
     user.id,
     user.timezone,
     hoursTarget,
     config.monthlyDaysTarget,
+    new Date(),
+    undefined,
+    approvedExemptions,
   );
   const yearCompliance = await getYearCompliance(
     user.id,
     user.timezone,
     hoursTarget,
     config.monthlyDaysTarget,
+    new Date(),
+    approvedExemptions,
+    pendingExemptionMonthKeys,
   );
   const pulse = await getPulseStats(user.id, graceHours);
   const isOutToday = await isUserOutOfOffice(user.id, summary.dayKey);
