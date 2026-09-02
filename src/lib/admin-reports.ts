@@ -1,41 +1,14 @@
 import { summarizeAgentTokens } from "./auth";
 import { prisma } from "./db";
 import { getAppConfig, getUserHoursTarget } from "./app-config";
-import { getTodaySummary, closeStaleOpenVisits, closeEndOfDayOpenVisits } from "./heartbeat-service";
+import { getTodaySummary, loadDaySpanContext } from "./heartbeat-service";
 import { allDayKeysInMonth, currentMonthKey } from "./month-range";
 import { revokeExpiredPendingTokens } from "./token-expiry";
 import { daySpanMsForDay, roundHours } from "./visits";
-import { dayBoundsFromKey } from "./timezone-dates";
 
 async function aggregateHoursForDay(userId: string, timezone: string, dayKey: string) {
-  const config = await getAppConfig();
-  const staleMs = config.agentStaleMinutes * 60 * 1000;
-  await closeEndOfDayOpenVisits(userId, timezone);
-  await closeStaleOpenVisits(userId, staleMs);
-
-  const { start: dayStart, end: dayEnd } = dayBoundsFromKey(dayKey, timezone);
-
-  const visits = await prisma.visit.findMany({
-    where: {
-      userId,
-      startAt: { lte: dayEnd },
-      OR: [{ endAt: null }, { endAt: { gte: dayStart } }],
-    },
-  });
-
-  const lastHeartbeat = await prisma.heartbeat.findFirst({
-    where: { userId },
-    orderBy: { recordedAt: "desc" },
-  });
-
-  const now = new Date();
-  return daySpanMsForDay(visits, {
-    dayStart,
-    dayEnd,
-    now,
-    staleMs,
-    lastHeartbeatAt: lastHeartbeat?.recordedAt ?? null,
-  });
+  const { visits, params } = await loadDaySpanContext(userId, dayKey, timezone);
+  return daySpanMsForDay(visits, params);
 }
 
 export async function getAdminReports(options?: { days?: number; monthKey?: string }) {

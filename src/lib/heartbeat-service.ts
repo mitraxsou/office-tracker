@@ -2,8 +2,72 @@ import { prisma } from "./db";
 import { DEFAULT_OFFICE_SSIDS, isOfficeSsid } from "./constants";
 import { getAppConfig, getAgentStaleMs } from "./app-config";
 import { maybePurgeOldHeartbeats } from "./heartbeat-retention";
-import { daySpanMsForDay, dayKeyInTimezone, effectiveVisitEnd } from "./visits";
+import { daySpanMsForDay, dayKeyInTimezone, effectiveVisitEnd, type DaySpanParams } from "./visits";
 import { dayBoundsFromKey, getDayBounds } from "./timezone-dates";
+
+export async function loadDaySpanContext(
+  userId: string,
+  dayKey: string,
+  timezone: string,
+): Promise<{
+  visits: Awaited<ReturnType<typeof prisma.visit.findMany>>;
+  params: DaySpanParams;
+  lastHeartbeat: Awaited<ReturnType<typeof prisma.heartbeat.findFirst>>;
+}> {
+  const config = await getAppConfig();
+  const staleMs = config.agentStaleMinutes * 60 * 1000;
+  await closeEndOfDayOpenVisits(userId, timezone);
+  await closeStaleOpenVisits(userId, staleMs);
+
+  const { start: dayStart, end: dayEnd } = dayBoundsFromKey(dayKey, timezone);
+  const now = new Date();
+
+  const [visits, firstInOfficeHeartbeat, lastInOfficeHeartbeat, lastHeartbeat] =
+    await Promise.all([
+      prisma.visit.findMany({
+        where: {
+          userId,
+          startAt: { lte: dayEnd },
+          OR: [{ endAt: null }, { endAt: { gte: dayStart } }],
+        },
+        orderBy: { startAt: "asc" },
+      }),
+      prisma.heartbeat.findFirst({
+        where: {
+          userId,
+          inOffice: true,
+          recordedAt: { gte: dayStart, lte: dayEnd },
+        },
+        orderBy: { recordedAt: "asc" },
+      }),
+      prisma.heartbeat.findFirst({
+        where: {
+          userId,
+          inOffice: true,
+          recordedAt: { gte: dayStart, lte: dayEnd },
+        },
+        orderBy: { recordedAt: "desc" },
+      }),
+      prisma.heartbeat.findFirst({
+        where: { userId },
+        orderBy: { recordedAt: "desc" },
+      }),
+    ]);
+
+  return {
+    visits,
+    lastHeartbeat,
+    params: {
+      dayStart,
+      dayEnd,
+      now,
+      staleMs,
+      lastHeartbeatAt: lastHeartbeat?.recordedAt ?? null,
+      firstInOfficeHeartbeatAt: firstInOfficeHeartbeat?.recordedAt ?? null,
+      lastInOfficeHeartbeatAt: lastInOfficeHeartbeat?.recordedAt ?? null,
+    },
+  };
+}
 
 export async function processHeartbeat(params: {
   userId: string;
@@ -219,38 +283,15 @@ export async function checkOutOffice(userId: string) {
 
 export async function getTodaySummary(userId: string, timezone: string, hoursTarget: number) {
   const now = new Date();
-  const staleMs = await getAgentStaleMs();
-  await closeEndOfDayOpenVisits(userId, timezone);
-  await closeStaleOpenVisits(userId, staleMs);
-
-  const { dayKey, start: dayStart, end: dayEnd } = getDayBounds(now, timezone);
-
-  const visits = await prisma.visit.findMany({
-    where: {
-      userId,
-      startAt: { lte: dayEnd },
-      OR: [{ endAt: null }, { endAt: { gte: dayStart } }],
-    },
-    orderBy: { startAt: "asc" },
-  });
-
-  const lastHeartbeat = await prisma.heartbeat.findFirst({
-    where: { userId },
-    orderBy: { recordedAt: "desc" },
-  });
+  const { dayKey } = getDayBounds(now, timezone);
+  const { visits, params, lastHeartbeat } = await loadDaySpanContext(userId, dayKey, timezone);
 
   const agentHealthy =
-    lastHeartbeat !== null && now.getTime() - lastHeartbeat.recordedAt.getTime() <= staleMs;
+    params.lastHeartbeatAt !== null &&
+    now.getTime() - params.lastHeartbeatAt.getTime() <= params.staleMs;
 
   const openVisit = visits.find((v) => v.endAt === null);
-  const totalMs = daySpanMsForDay(visits, {
-    dayStart,
-    dayEnd,
-    now,
-    staleMs,
-    lastHeartbeatAt: lastHeartbeat?.recordedAt ?? null,
-  });
-
+  const totalMs = daySpanMsForDay(visits, params);
   const totalHours = totalMs / (1000 * 60 * 60);
 
   return {

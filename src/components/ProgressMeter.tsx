@@ -12,7 +12,7 @@ export function ProgressMeter({ totalHours, targetHours, metTarget }: ProgressMe
     <div className="card p-6">
       <div className="flex items-end justify-between">
         <div>
-          <p className="text-sm text-muted">Today&apos;s office time (first in to last out)</p>
+          <p className="text-sm text-muted">Today&apos;s office time (first check-in to last check-out)</p>
           <p className="mt-1 text-4xl font-bold">
             {totalHours.toFixed(1)}
             <span className="text-lg font-normal text-muted"> / {targetHours}h</span>

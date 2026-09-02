@@ -57,7 +57,9 @@ function HoursTooltip({
       {point?.compliancePct !== undefined && (
         <p className="text-muted">Compliance: {point.compliancePct}%</p>
       )}
-      <p className="mt-1 text-xs text-muted">Click bar to filter table</p>
+      <p className="mt-1 text-xs text-muted">
+        First check-in to last check-out. Last heartbeat counts unless manual checkout.
+      </p>
     </div>
   );
 }

@@ -32,46 +32,121 @@ export type VisitForDaySpan = VisitPoint & {
   updatedAt?: Date;
 };
 
+export type DaySpanParams = {
+  dayStart: Date;
+  dayEnd: Date;
+  now: Date;
+  staleMs: number;
+  /** Latest heartbeat overall (agent health / open visit stale detection). */
+  lastHeartbeatAt: Date | null;
+  /** First in-office heartbeat on this calendar day. */
+  firstInOfficeHeartbeatAt?: Date | null;
+  /** Last in-office heartbeat on this calendar day (implicit wifi checkout). */
+  lastInOfficeHeartbeatAt?: Date | null;
+};
+
+function clipToDay(ts: number, dayStart: Date, dayEnd: Date): number | null {
+  const clipped = Math.max(ts, dayStart.getTime());
+  if (clipped > dayEnd.getTime()) return null;
+  return clipped;
+}
+
+function isManualSource(source: string): boolean {
+  return source === "manual";
+}
+
 /**
  * Daily total: first check-in to last check-out on the day (gaps between visits count).
- * Uses effectiveVisitEnd for open visits. Capped at 24 hours.
+ * Last in-office heartbeat extends wifi days unless manual check-out caps the day.
+ * Open visits on the current day extend to now (or effectiveVisitEnd). Capped at 24 hours.
  */
 export function daySpanMsForDay(
   visits: VisitForDaySpan[],
-  params: {
-    dayStart: Date;
-    dayEnd: Date;
-    now: Date;
-    staleMs: number;
-    lastHeartbeatAt: Date | null;
-  }
+  params: DaySpanParams
 ): number {
-  if (visits.length === 0) return 0;
+  const dayStartMs = params.dayStart.getTime();
+  const dayEndMs = params.dayEnd.getTime();
+  const firstHb = params.firstInOfficeHeartbeatAt ?? null;
+  const lastHb =
+    params.lastInOfficeHeartbeatAt ??
+    (params.lastHeartbeatAt &&
+    params.lastHeartbeatAt.getTime() >= dayStartMs &&
+    params.lastHeartbeatAt.getTime() <= dayEndMs
+      ? params.lastHeartbeatAt
+      : null);
 
   let firstIn: number | null = null;
-  let lastOut: number | null = null;
 
   for (const v of visits) {
+    const start = clipToDay(v.startAt.getTime(), params.dayStart, params.dayEnd);
+    if (start === null) continue;
+    if (firstIn === null || start < firstIn) firstIn = start;
+  }
+
+  if (firstHb) {
+    const hbStart = clipToDay(firstHb.getTime(), params.dayStart, params.dayEnd);
+    if (hbStart !== null && (firstIn === null || hbStart < firstIn)) {
+      firstIn = hbStart;
+    }
+  }
+
+  if (firstIn === null) return 0;
+
+  const manualEndsOnDay = visits
+    .filter(
+      (v) =>
+        isManualSource(v.source) &&
+        v.endAt !== null &&
+        v.endAt.getTime() >= dayStartMs &&
+        v.endAt.getTime() <= dayEndMs
+    )
+    .map((v) => v.endAt!.getTime());
+
+  const latestManualEnd =
+    manualEndsOnDay.length > 0 ? Math.max(...manualEndsOnDay) : null;
+
+  const openVisit = visits.find((v) => v.endAt === null);
+  const isCurrentDay = params.now.getTime() <= dayEndMs;
+
+  let lastOut: number | null = null;
+
+  if (latestManualEnd !== null) {
+    lastOut = Math.min(latestManualEnd, dayEndMs);
+  } else if (openVisit && isCurrentDay) {
     const end = effectiveVisitEnd({
-      endAt: v.endAt,
-      updatedAt: v.updatedAt ?? v.startAt,
-      startAt: v.startAt,
+      endAt: null,
+      updatedAt: openVisit.updatedAt ?? openVisit.startAt,
+      startAt: openVisit.startAt,
       now: params.now,
       staleMs: params.staleMs,
       lastHeartbeatAt: params.lastHeartbeatAt,
       dayEnd: params.dayEnd,
     });
+    lastOut = Math.min(end.getTime(), dayEndMs);
+  } else {
+    for (const v of visits) {
+      const end = effectiveVisitEnd({
+        endAt: v.endAt,
+        updatedAt: v.updatedAt ?? v.startAt,
+        startAt: v.startAt,
+        now: params.now,
+        staleMs: params.staleMs,
+        lastHeartbeatAt: params.lastHeartbeatAt,
+        dayEnd: params.dayEnd,
+      });
+      const clippedEnd = Math.min(end.getTime(), dayEndMs);
+      const start = clipToDay(v.startAt.getTime(), params.dayStart, params.dayEnd);
+      if (start === null || clippedEnd < start) continue;
+      if (lastOut === null || clippedEnd > lastOut) lastOut = clippedEnd;
+    }
 
-    const start = Math.max(v.startAt.getTime(), params.dayStart.getTime());
-    const clippedEnd = Math.min(end.getTime(), params.dayEnd.getTime());
-
-    if (clippedEnd < start) continue;
-
-    if (firstIn === null || start < firstIn) firstIn = start;
-    if (lastOut === null || clippedEnd > lastOut) lastOut = clippedEnd;
+    if (lastHb) {
+      const hbEnd = Math.min(lastHb.getTime(), dayEndMs);
+      if (lastOut === null || hbEnd > lastOut) lastOut = hbEnd;
+    }
   }
 
-  if (firstIn === null || lastOut === null) return 0;
+  if (lastOut === null) return 0;
 
   const spanMs = Math.max(0, lastOut - firstIn);
   return Math.min(spanMs, MS_PER_DAY);
@@ -79,9 +154,17 @@ export function daySpanMsForDay(
 
 export function daySpanHoursForDay(
   visits: VisitForDaySpan[],
-  params: Parameters<typeof daySpanMsForDay>[1]
+  params: DaySpanParams
 ): number {
   return daySpanMsForDay(visits, params) / MS_PER_HOUR;
+}
+
+/** Alias for report and dashboard daily hour totals. */
+export function dailyOfficeHours(
+  visits: VisitForDaySpan[],
+  params: DaySpanParams
+): number {
+  return daySpanHoursForDay(visits, params);
 }
 
 /**
