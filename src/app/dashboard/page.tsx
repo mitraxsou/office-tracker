@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { requireAuthenticatedUser, enforcePasswordChangeIfRequired } from "@/lib/session-guards";
 import { getTodaySummary, getPulseStats } from "@/lib/heartbeat-service";
-import { getUserHoursTarget, getAppConfig } from "@/lib/app-config";
+import { getUserHoursTarget, getAppConfig, getEffectiveAgentStaleGraceHours } from "@/lib/app-config";
 import { getMonthlyProgress } from "@/lib/monthly-progress";
+import { isUserOutOfOffice } from "@/lib/out-of-office";
 import { AppNav } from "@/components/AppNav";
 import { ProgressMeter } from "@/components/ProgressMeter";
 import { MonthlyProgressMeter } from "@/components/MonthlyProgressMeter";
@@ -18,23 +19,27 @@ export default async function DashboardPage() {
   const user = await requireAuthenticatedUser();
   enforcePasswordChangeIfRequired(user);
 
+  const config = await getAppConfig();
+  const hoursTarget = await getUserHoursTarget(user);
+  const graceHours = await getEffectiveAgentStaleGraceHours(user);
   const summary = await getTodaySummary(
     user.id,
     user.timezone,
-    await getUserHoursTarget(user)
+    hoursTarget,
+    graceHours,
   );
-  const config = await getAppConfig();
-  const hoursTarget = await getUserHoursTarget(user);
   const monthlyProgress = await getMonthlyProgress(
     user.id,
     user.timezone,
     hoursTarget,
     config.monthlyDaysTarget,
   );
-  const pulse = await getPulseStats(user.id, config.agentStaleMinutes);
+  const pulse = await getPulseStats(user.id, graceHours);
+  const isOutToday = await isUserOutOfOffice(user.id, summary.dayKey);
   const agentNeverConnected = !summary.lastHeartbeat && user.agentDevices.length === 0;
-  const agentStale = !!summary.lastHeartbeat && !summary.agentHealthy;
+  const agentStale = !isOutToday && !!summary.lastHeartbeat && !summary.agentHealthy;
   const agentLowPulses =
+    !isOutToday &&
     user.agentDevices.length > 0 &&
     !!pulse.lastHeartbeat &&
     pulse.agentHealthy &&

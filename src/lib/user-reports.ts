@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { getAppConfig, getUserHoursTarget } from "./app-config";
+import { getAppConfig, getUserHoursTarget, getEffectiveAgentStaleGraceHours } from "./app-config";
 import { getTodaySummary, getPulseStats, loadDaySpanContext } from "./heartbeat-service";
 import { summarizeAgentTokens } from "./auth";
 import { getLifecycleEventsForUser } from "./agent-lifecycle";
@@ -42,8 +42,9 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
 
   const config = await getAppConfig();
   const hoursTarget = await getUserHoursTarget(user);
-  const today = await getTodaySummary(user.id, user.timezone, hoursTarget);
-  const pulse = await getPulseStats(user.id, config.agentStaleMinutes);
+  const graceHours = await getEffectiveAgentStaleGraceHours(user);
+  const today = await getTodaySummary(user.id, user.timezone, hoursTarget, graceHours);
+  const pulse = await getPulseStats(user.id, graceHours);
 
   const dailyTrend: Array<{ date: string; totalHours: number; metTarget: boolean }> = [];
   const cursor = new Date(from);

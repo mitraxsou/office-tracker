@@ -1,8 +1,10 @@
 import { prisma } from "./db";
-import { getAppConfig } from "./app-config";
+import { getAppConfig, getEffectiveAgentStaleGraceHours } from "./app-config";
 import { getPulseStats } from "./heartbeat-service";
 import { logAuditEvent } from "./audit-log";
 import { userHasActiveInstalledDevice } from "./agent-lifecycle";
+import { isUserOutOfOffice } from "./out-of-office";
+import { dayKeyInTimezone } from "./notification-prefs";
 
 const ALERT_ACTION = "agent_stale_email";
 
@@ -121,7 +123,7 @@ export async function notifyStaleAgents() {
   }
 
   const config = await getAppConfig();
-  const staleThresholdMinutes = Math.max(30, config.agentStaleMinutes * 2);
+  const staleThresholdMinutes = config.agentStaleGraceHours * 60;
   const actor = await prisma.user.findFirst({ where: { role: "admin" } });
   if (!actor) {
     return { ok: false, error: "no_admin_actor" };
@@ -130,13 +132,16 @@ export async function notifyStaleAgents() {
   const dayKey = new Date().toISOString().slice(0, 10);
   const users = await prisma.user.findMany({
     where: { agentDevices: { some: {} } },
-    select: { id: true, email: true },
+    select: { id: true, email: true, timezone: true, agentStaleGraceHours: true },
   });
 
   let sent = 0;
   for (const user of users) {
     if (!(await userHasActiveInstalledDevice(user.id))) continue;
-    const pulse = await getPulseStats(user.id, config.agentStaleMinutes);
+    const userDayKey = dayKeyInTimezone(new Date(), user.timezone);
+    if (await isUserOutOfOffice(user.id, userDayKey)) continue;
+    const graceHours = await getEffectiveAgentStaleGraceHours(user);
+    const pulse = await getPulseStats(user.id, graceHours);
     if (pulse.agentHealthy) continue;
     if (
       pulse.minutesSinceLastPulse !== null &&

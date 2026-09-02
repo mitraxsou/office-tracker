@@ -50,6 +50,12 @@ export async function register() {
       'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "agentStaleMinutes" INTEGER NOT NULL DEFAULT 8;'
     );
     await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "agentStaleGraceHours" INTEGER NOT NULL DEFAULT 24;'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "agentStaleGraceHours" INTEGER;'
+    );
+    await prisma.$executeRawUnsafe(
       'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "monthlyDaysTarget" INTEGER NOT NULL DEFAULT 8;'
     );
     await prisma.$executeRawUnsafe(`
@@ -124,17 +130,33 @@ export async function register() {
       CREATE TABLE IF NOT EXISTS "UserOutOfOffice" (
         "id" TEXT NOT NULL,
         "userId" TEXT NOT NULL,
-        "dayKey" TEXT NOT NULL,
+        "startDate" TEXT NOT NULL,
+        "endDate" TEXT NOT NULL,
         "source" TEXT NOT NULL DEFAULT 'settings',
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT "UserOutOfOffice_pkey" PRIMARY KEY ("id")
       );
     `);
     await prisma.$executeRawUnsafe(
-      'CREATE UNIQUE INDEX IF NOT EXISTS "UserOutOfOffice_userId_dayKey_key" ON "UserOutOfOffice"("userId", "dayKey");'
+      'ALTER TABLE "UserOutOfOffice" ADD COLUMN IF NOT EXISTS "startDate" TEXT;'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "UserOutOfOffice" ADD COLUMN IF NOT EXISTS "endDate" TEXT;'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "UserOutOfOffice" ADD COLUMN IF NOT EXISTS "dayKey" TEXT;'
+    );
+    await prisma.$executeRawUnsafe(
+      'UPDATE "UserOutOfOffice" SET "startDate" = "dayKey", "endDate" = "dayKey" WHERE "startDate" IS NULL AND "dayKey" IS NOT NULL;'
+    );
+    await prisma.$executeRawUnsafe(
+      'DROP INDEX IF EXISTS "UserOutOfOffice_userId_dayKey_key";'
     );
     await prisma.$executeRawUnsafe(
       'CREATE INDEX IF NOT EXISTS "UserOutOfOffice_userId_idx" ON "UserOutOfOffice"("userId");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "UserOutOfOffice_userId_startDate_idx" ON "UserOutOfOffice"("userId", "startDate");'
     );
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "DeviceRemovalRequest" (

@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { getAppConfig } from "./app-config";
+import { getEffectiveAgentStaleGraceHours } from "./app-config";
 import {
   agentStatusClass,
   agentStatusLabel,
@@ -23,7 +23,15 @@ export type EnrichedDevice = {
 };
 
 export async function getEnrichedDevicesForUser(userId: string): Promise<EnrichedDevice[]> {
-  const config = await getAppConfig();
+  const [user] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { agentStaleGraceHours: true },
+    }),
+  ]);
+  const graceHours = await getEffectiveAgentStaleGraceHours(
+    user ?? { agentStaleGraceHours: null },
+  );
   const [devices, openRequests, boundTokens] = await Promise.all([
     prisma.agentDevice.findMany({
       where: { userId },
@@ -50,7 +58,7 @@ export async function getEnrichedDevicesForUser(userId: string): Promise<Enriche
     const isUninstalled = d.uninstalledAt !== null;
     const agentStatus = isUninstalled
       ? "never"
-      : computeDeviceAgentStatus(d.lastSeenAt, config.agentStaleMinutes);
+      : computeDeviceAgentStatus(d.lastSeenAt, graceHours);
     return {
       id: d.id,
       serialNumber: d.serialNumber,

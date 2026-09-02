@@ -1,16 +1,17 @@
 export type AgentDeviceStatus = "healthy" | "stale" | "offline" | "never";
 
+/** Agent health uses grace hours (default 24h). Visit gaps still use agentStaleMinutes. */
 export function computeDeviceAgentStatus(
   lastSeenAt: Date | string | null | undefined,
-  staleMinutes: number,
+  graceHours: number,
   now: Date = new Date(),
 ): AgentDeviceStatus {
   if (!lastSeenAt) return "never";
   const seen = lastSeenAt instanceof Date ? lastSeenAt : new Date(lastSeenAt);
   const ms = now.getTime() - seen.getTime();
-  const staleMs = staleMinutes * 60 * 1000;
-  if (ms <= staleMs) return "healthy";
-  if (ms <= 24 * 60 * 60 * 1000) return "stale";
+  const graceMs = graceHours * 60 * 60 * 1000;
+  if (ms <= graceMs) return "healthy";
+  if (ms <= 7 * 24 * 60 * 60 * 1000) return "stale";
   return "offline";
 }
 

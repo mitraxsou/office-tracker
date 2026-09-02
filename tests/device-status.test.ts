@@ -3,25 +3,25 @@ import { computeDeviceAgentStatus, agentStatusLabel } from "../src/lib/device-st
 
 describe("device agent status", () => {
   const now = new Date("2026-09-02T10:00:00+05:30");
-  const staleMinutes = 8;
+  const graceHours = 24;
 
   it("returns never when no lastSeenAt", () => {
-    expect(computeDeviceAgentStatus(null, staleMinutes, now)).toBe("never");
+    expect(computeDeviceAgentStatus(null, graceHours, now)).toBe("never");
   });
 
-  it("returns healthy within stale window", () => {
-    const lastSeen = new Date(now.getTime() - 5 * 60 * 1000);
-    expect(computeDeviceAgentStatus(lastSeen, staleMinutes, now)).toBe("healthy");
+  it("returns healthy within grace window", () => {
+    const lastSeen = new Date(now.getTime() - 5 * 60 * 60 * 1000);
+    expect(computeDeviceAgentStatus(lastSeen, graceHours, now)).toBe("healthy");
   });
 
-  it("returns stale after stale window but within 24h", () => {
-    const lastSeen = new Date(now.getTime() - 30 * 60 * 1000);
-    expect(computeDeviceAgentStatus(lastSeen, staleMinutes, now)).toBe("stale");
+  it("returns stale after grace window but within 7 days", () => {
+    const lastSeen = new Date(now.getTime() - 30 * 60 * 60 * 1000);
+    expect(computeDeviceAgentStatus(lastSeen, graceHours, now)).toBe("stale");
   });
 
-  it("returns offline after 24h", () => {
-    const lastSeen = new Date(now.getTime() - 25 * 60 * 60 * 1000);
-    expect(computeDeviceAgentStatus(lastSeen, staleMinutes, now)).toBe("offline");
+  it("returns offline after 7 days", () => {
+    const lastSeen = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000);
+    expect(computeDeviceAgentStatus(lastSeen, graceHours, now)).toBe("offline");
   });
 
   it("labels statuses", () => {

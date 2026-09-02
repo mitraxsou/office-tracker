@@ -36,6 +36,7 @@ export default async function AdminSettingsPage() {
           pendingTokenTtlDays={config.pendingTokenTtlDays}
           heartbeatRetentionDays={config.heartbeatRetentionDays}
           agentStaleMinutes={config.agentStaleMinutes}
+          agentStaleGraceHours={config.agentStaleGraceHours}
         />
         <AdminIntegrationKeys initialKeys={integrationKeys} />
         <AdminMaintenance />

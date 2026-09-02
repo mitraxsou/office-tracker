@@ -11,6 +11,7 @@ export function AdminSettingsForm({
   pendingTokenTtlDays,
   heartbeatRetentionDays,
   agentStaleMinutes,
+  agentStaleGraceHours,
 }: {
   hoursTarget: number;
   monthlyDaysTarget: number;
@@ -19,6 +20,7 @@ export function AdminSettingsForm({
   pendingTokenTtlDays: number;
   heartbeatRetentionDays: number;
   agentStaleMinutes: number;
+  agentStaleGraceHours: number;
 }) {
   const router = useRouter();
   const [target, setTarget] = useState(hoursTarget);
@@ -28,6 +30,7 @@ export function AdminSettingsForm({
   const [tokenTtl, setTokenTtl] = useState(pendingTokenTtlDays);
   const [heartbeatRetention, setHeartbeatRetention] = useState(heartbeatRetentionDays);
   const [staleMinutes, setStaleMinutes] = useState(agentStaleMinutes);
+  const [graceHours, setGraceHours] = useState(agentStaleGraceHours);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -54,6 +57,7 @@ export function AdminSettingsForm({
         pendingTokenTtlDays: tokenTtl,
         heartbeatRetentionDays: heartbeatRetention,
         agentStaleMinutes: staleMinutes,
+        agentStaleGraceHours: graceHours,
       }),
     });
 
@@ -128,7 +132,7 @@ export function AdminSettingsForm({
           Pending install tokens auto-revoke if never bound. Raw heartbeats are purged after the
           retention window (visits are kept).
         </p>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <label className="block text-sm">
             <span className="text-muted">Pending token TTL (days)</span>
             <input
@@ -152,7 +156,7 @@ export function AdminSettingsForm({
             />
           </label>
           <label className="block text-sm">
-            <span className="text-muted">Agent stale after (minutes)</span>
+            <span className="text-muted">Visit gap (minutes)</span>
             <input
               type="number"
               min={2}
@@ -162,7 +166,22 @@ export function AdminSettingsForm({
               className="mt-1 w-full rounded-lg border px-3 py-2"
             />
           </label>
+          <label className="block text-sm">
+            <span className="text-muted">Agent health grace (hours)</span>
+            <input
+              type="number"
+              min={1}
+              max={168}
+              value={graceHours}
+              onChange={(e) => setGraceHours(Number(e.target.value))}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
         </div>
+        <p className="mt-2 text-xs text-muted">
+          Visit gap ends office visits when heartbeats stop. Health grace (default 24h) flags stale
+          agents when no pulse for that long and the user is not out of office.
+        </p>
       </section>
 
       {error && <p className="text-sm text-red-400">{error}</p>}

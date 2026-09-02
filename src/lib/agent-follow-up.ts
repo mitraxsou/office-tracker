@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { getAppConfig } from "./app-config";
+import { getAppConfig, getEffectiveAgentStaleGraceHours } from "./app-config";
 import {
   agentStatusLabel,
   computeDeviceAgentStatus,
@@ -10,6 +10,8 @@ import {
   getLatestLifecycleEventByDevice,
   isDeviceExcludedFromFollowUp,
 } from "./agent-lifecycle";
+import { isUserOutOfOffice } from "./out-of-office";
+import { dayKeyInTimezone } from "./notification-prefs";
 
 export type AgentFollowUpStatusFilter = "all" | "stale" | "offline";
 
@@ -94,7 +96,7 @@ export async function getAgentFollowUpReport(options?: {
   now?: Date;
 }): Promise<{
   count: number;
-  staleThresholdMinutes: number;
+  staleThresholdHours: number;
   updatedAt: string;
   users: AgentFollowUpRow[];
 }> {
@@ -105,7 +107,9 @@ export async function getAgentFollowUpReport(options?: {
   const [devices, openRequests, boundTokens] = await Promise.all([
     prisma.agentDevice.findMany({
       include: {
-        user: { select: { id: true, email: true, name: true } },
+        user: {
+          select: { id: true, email: true, name: true, timezone: true, agentStaleGraceHours: true },
+        },
       },
       orderBy: { lastSeenAt: "asc" },
     }),
@@ -133,10 +137,20 @@ export async function getAgentFollowUpReport(options?: {
   }
 
   const rowsByUser = new Map<string, AgentFollowUpRow>();
+  const oooCache = new Map<string, boolean>();
 
   for (const device of devices) {
+    const userDayKey = dayKeyInTimezone(now, device.user.timezone);
+    let isOoo = oooCache.get(device.userId);
+    if (isOoo === undefined) {
+      isOoo = await isUserOutOfOffice(device.userId, userDayKey);
+      oooCache.set(device.userId, isOoo);
+    }
+    if (isOoo) continue;
+
+    const graceHours = await getEffectiveAgentStaleGraceHours(device.user);
     const pendingRemoval = pendingDeviceIds.has(device.id);
-    const agentStatus = computeDeviceAgentStatus(device.lastSeenAt, config.agentStaleMinutes, now);
+    const agentStatus = computeDeviceAgentStatus(device.lastSeenAt, graceHours, now);
 
     if (
       !shouldIncludeDeviceForFollowUp({
@@ -196,7 +210,7 @@ export async function getAgentFollowUpReport(options?: {
 
   return {
     count: users.length,
-    staleThresholdMinutes: config.agentStaleMinutes,
+    staleThresholdHours: config.agentStaleGraceHours,
     updatedAt: now.toISOString(),
     users,
   };

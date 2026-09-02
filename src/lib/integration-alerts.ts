@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { getAppConfig, getUserHoursTarget } from "./app-config";
+import { getAppConfig, getUserHoursTarget, getEffectiveAgentStaleGraceHours } from "./app-config";
 import { getTodaySummary, getPulseStats } from "./heartbeat-service";
 import { dayBoundsFromKey, dayKeyInTimezone } from "./timezone-dates";
 import { roundHours } from "./visits";
@@ -119,6 +119,7 @@ async function evaluateUserAlerts(
     name: string | null;
     timezone: string;
     hoursTarget: number | null;
+    agentStaleGraceHours: number | null;
   },
   types: Set<IntegrationAlertType>,
   now: Date,
@@ -128,9 +129,10 @@ async function evaluateUserAlerts(
   if (!prefs.notifyTeams && !prefs.notifyEmail) return [];
 
   const hoursTarget = await getUserHoursTarget(user);
-  const summary = await getTodaySummary(user.id, user.timezone, hoursTarget);
+  const graceHours = await getEffectiveAgentStaleGraceHours(user);
+  const summary = await getTodaySummary(user.id, user.timezone, hoursTarget, graceHours);
   const config = await getAppConfig();
-  const pulse = await getPulseStats(user.id, config.agentStaleMinutes);
+  const pulse = await getPulseStats(user.id, graceHours);
 
   const dayKey = dayKeyInTimezone(now, user.timezone);
   if (await isUserOutOfOffice(user.id, dayKey)) return [];
@@ -228,7 +230,14 @@ export async function getIntegrationAlerts(typesParam?: string | null): Promise<
 
   const now = new Date();
   const users = await prisma.user.findMany({
-    select: { id: true, email: true, name: true, timezone: true, hoursTarget: true },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      timezone: true,
+      hoursTarget: true,
+      agentStaleGraceHours: true,
+    },
   });
 
   const alerts: IntegrationAlert[] = [];

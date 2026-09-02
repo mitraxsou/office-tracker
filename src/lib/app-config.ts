@@ -11,6 +11,7 @@ import { backfillHeartbeatsAndVisitsAfterAllowlistChange } from "./ssid-backfill
 export const DEFAULT_PENDING_TOKEN_TTL_DAYS = 7;
 export const DEFAULT_HEARTBEAT_RETENTION_DAYS = 7;
 export const DEFAULT_AGENT_STALE_MINUTES = 8;
+export const DEFAULT_AGENT_STALE_GRACE_HOURS = 24;
 
 export function logAppConfigSchemaDriftIfNeeded(err: unknown): boolean {
   const isMissingColumn =
@@ -38,6 +39,7 @@ export type AppConfigData = {
   pendingTokenTtlDays: number;
   heartbeatRetentionDays: number;
   agentStaleMinutes: number;
+  agentStaleGraceHours: number;
 };
 
 const CONFIG_ID = "global";
@@ -64,6 +66,7 @@ export async function ensureAppConfig(): Promise<AppConfigData> {
           pendingTokenTtlDays: DEFAULT_PENDING_TOKEN_TTL_DAYS,
           heartbeatRetentionDays: DEFAULT_HEARTBEAT_RETENTION_DAYS,
           agentStaleMinutes: DEFAULT_AGENT_STALE_MINUTES,
+          agentStaleGraceHours: DEFAULT_AGENT_STALE_GRACE_HOURS,
         },
       });
     } else {
@@ -99,6 +102,7 @@ export async function updateAppConfig(data: Partial<AppConfigData>) {
   if (data.pendingTokenTtlDays !== undefined) update.pendingTokenTtlDays = data.pendingTokenTtlDays;
   if (data.heartbeatRetentionDays !== undefined) update.heartbeatRetentionDays = data.heartbeatRetentionDays;
   if (data.agentStaleMinutes !== undefined) update.agentStaleMinutes = data.agentStaleMinutes;
+  if (data.agentStaleGraceHours !== undefined) update.agentStaleGraceHours = data.agentStaleGraceHours;
 
   const config = await prisma.appConfig.update({
     where: { id: CONFIG_ID },
@@ -117,6 +121,17 @@ export async function getAgentStaleMs() {
   return config.agentStaleMinutes * 60 * 1000;
 }
 
+export async function getEffectiveAgentStaleGraceHours(user: {
+  agentStaleGraceHours: number | null;
+}) {
+  const global = await getAppConfig();
+  return user.agentStaleGraceHours ?? global.agentStaleGraceHours;
+}
+
+export function agentHealthGraceMs(graceHours: number) {
+  return graceHours * 60 * 60 * 1000;
+}
+
 function parseConfig(config: {
   hoursTarget: number;
   monthlyDaysTarget?: number;
@@ -126,6 +141,7 @@ function parseConfig(config: {
   pendingTokenTtlDays?: number;
   heartbeatRetentionDays?: number;
   agentStaleMinutes?: number;
+  agentStaleGraceHours?: number;
 }): AppConfigData {
   let ssids: string[] = parseDefaultSsidsFromEnv();
   try {
@@ -143,5 +159,6 @@ function parseConfig(config: {
     pendingTokenTtlDays: config.pendingTokenTtlDays ?? DEFAULT_PENDING_TOKEN_TTL_DAYS,
     heartbeatRetentionDays: config.heartbeatRetentionDays ?? DEFAULT_HEARTBEAT_RETENTION_DAYS,
     agentStaleMinutes: config.agentStaleMinutes ?? DEFAULT_AGENT_STALE_MINUTES,
+    agentStaleGraceHours: config.agentStaleGraceHours ?? DEFAULT_AGENT_STALE_GRACE_HOURS,
   };
 }

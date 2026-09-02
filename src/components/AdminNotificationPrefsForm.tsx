@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { NotificationPrefsForm } from "./NotificationPrefsForm";
 import { OutOfOfficeSection } from "./OutOfOfficeSection";
+import { AgentGraceSection } from "./AgentGraceSection";
 
 type Props = {
   userId: string;
@@ -31,6 +32,7 @@ export function AdminNotificationPrefsForm({ userId, userEmail }: Props) {
       {open && (
         <div className="mt-4 space-y-4">
           <OutOfOfficeSection adminUserId={userId} />
+          <AgentGraceSection adminUserId={userId} />
           <NotificationPrefsForm adminUserId={userId} />
         </div>
       )}

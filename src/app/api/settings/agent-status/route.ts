@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { getTodaySummary, getPulseStats } from "@/lib/heartbeat-service";
-import { getAppConfig, getUserHoursTarget } from "@/lib/app-config";
+import { getAppConfig, getUserHoursTarget, getEffectiveAgentStaleGraceHours } from "@/lib/app-config";
+import { isUserOutOfOffice } from "@/lib/out-of-office";
+import { dayKeyInTimezone } from "@/lib/notification-prefs";
 import { isTokenExpired } from "@/lib/token-expiry";
 
 export async function GET() {
@@ -12,8 +14,11 @@ export async function GET() {
 
   const config = await getAppConfig();
   const hoursTarget = await getUserHoursTarget(user);
-  const summary = await getTodaySummary(user.id, user.timezone, hoursTarget);
-  const pulse = await getPulseStats(user.id, config.agentStaleMinutes);
+  const graceHours = await getEffectiveAgentStaleGraceHours(user);
+  const summary = await getTodaySummary(user.id, user.timezone, hoursTarget, graceHours);
+  const pulse = await getPulseStats(user.id, graceHours);
+  const dayKey = dayKeyInTimezone(new Date(), user.timezone);
+  const isOutToday = await isUserOutOfOffice(user.id, dayKey);
 
   const pendingTokens = user.agentTokens.filter(
     (t) => !t.boundSerialNumber && !isTokenExpired(t),
@@ -31,12 +36,12 @@ export async function GET() {
 
   let pulseStatus: "healthy" | "stale" | "none" = "none";
   if (pulse.lastHeartbeat) {
-    pulseStatus = pulse.agentHealthy ? "healthy" : "stale";
+    pulseStatus = isOutToday || pulse.agentHealthy ? "healthy" : "stale";
   }
 
   return NextResponse.json({
     installStatus,
-    agentHealthy: pulse.agentHealthy,
+    agentHealthy: isOutToday || pulse.agentHealthy,
     pulseStatus,
     lastHeartbeat: pulse.lastHeartbeat,
     inOfficeNow: summary.inOfficeNow,

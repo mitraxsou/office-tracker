@@ -1,6 +1,6 @@
 import { prisma } from "./db";
 import { DEFAULT_OFFICE_SSIDS, isOfficeSsid } from "./constants";
-import { getAppConfig, getAgentStaleMs } from "./app-config";
+import { getAppConfig, getAgentStaleMs, agentHealthGraceMs } from "./app-config";
 import { heartbeatInOffice } from "./heartbeat-office";
 import { maybePurgeOldHeartbeats } from "./heartbeat-retention";
 import { daySpanMsForDay, dayKeyInTimezone, effectiveVisitEnd, type DaySpanParams } from "./visits";
@@ -281,16 +281,26 @@ export async function checkOutOffice(userId: string) {
   });
 }
 
-export async function getTodaySummary(userId: string, timezone: string, hoursTarget: number) {
+export async function getTodaySummary(
+  userId: string,
+  timezone: string,
+  hoursTarget: number,
+  graceHours?: number,
+) {
   const now = new Date();
   const { dayKey } = getDayBounds(now, timezone);
   const { visits, params, lastHeartbeat } = await loadDaySpanContext(userId, dayKey, timezone);
 
-  const agentHealthy =
+  const config = await getAppConfig();
+  const effectiveGraceHours = graceHours ?? config.agentStaleGraceHours;
+  const graceMs = agentHealthGraceMs(effectiveGraceHours);
+  const pulseRecent =
     params.lastHeartbeatAt !== null &&
     now.getTime() - params.lastHeartbeatAt.getTime() <= params.staleMs;
+  const agentHealthy =
+    params.lastHeartbeatAt !== null &&
+    now.getTime() - params.lastHeartbeatAt.getTime() <= graceMs;
 
-  const config = await getAppConfig();
   const openVisit = visits.find((v) => v.endAt === null);
   const totalMs = daySpanMsForDay(visits, params);
   const totalHours = totalMs / (1000 * 60 * 60);
@@ -304,14 +314,14 @@ export async function getTodaySummary(userId: string, timezone: string, hoursTar
     hoursTarget,
     metTarget: totalHours >= hoursTarget,
     remainingHours: Math.max(0, hoursTarget - totalHours),
-    inOfficeNow: agentHealthy && openVisit !== undefined && lastPulseInOffice,
+    inOfficeNow: pulseRecent && openVisit !== undefined && lastPulseInOffice,
     visits,
     lastHeartbeat,
     agentHealthy,
   };
 }
 
-export async function getPulseStats(userId: string, staleMinutes: number) {
+export async function getPulseStats(userId: string, graceHours: number) {
   const now = new Date();
   const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
@@ -342,7 +352,7 @@ export async function getPulseStats(userId: string, staleMinutes: number) {
 
   const agentHealthy =
     lastHeartbeat !== null &&
-    now.getTime() - lastHeartbeat.recordedAt.getTime() <= staleMinutes * 60 * 1000;
+    now.getTime() - lastHeartbeat.recordedAt.getTime() <= graceHours * 60 * 60 * 1000;
 
   const { officeSsids } = await getAppConfig();
 

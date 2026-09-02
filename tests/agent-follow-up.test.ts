@@ -9,11 +9,11 @@ import { computeDeviceAgentStatus } from "../src/lib/device-status";
 
 describe("agent follow-up criteria", () => {
   const now = new Date("2026-09-02T10:00:00+05:30");
-  const staleMinutes = 8;
+  const graceHours = 24;
 
   it("includes stale devices that had heartbeats and are not pending removal", () => {
-    const lastSeen = new Date(now.getTime() - 30 * 60 * 1000);
-    const status = computeDeviceAgentStatus(lastSeen, staleMinutes, now);
+    const lastSeen = new Date(now.getTime() - 30 * 60 * 60 * 1000);
+    const status = computeDeviceAgentStatus(lastSeen, graceHours, now);
     expect(status).toBe("stale");
     expect(
       shouldIncludeDeviceForFollowUp({
@@ -28,8 +28,8 @@ describe("agent follow-up criteria", () => {
   });
 
   it("includes offline devices that had heartbeats", () => {
-    const lastSeen = new Date(now.getTime() - 25 * 60 * 60 * 1000);
-    const status = computeDeviceAgentStatus(lastSeen, staleMinutes, now);
+    const lastSeen = new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000);
+    const status = computeDeviceAgentStatus(lastSeen, graceHours, now);
     expect(status).toBe("offline");
     expect(
       shouldIncludeDeviceForFollowUp({
@@ -44,8 +44,8 @@ describe("agent follow-up criteria", () => {
   });
 
   it("excludes healthy devices", () => {
-    const lastSeen = new Date(now.getTime() - 5 * 60 * 1000);
-    const status = computeDeviceAgentStatus(lastSeen, staleMinutes, now);
+    const lastSeen = new Date(now.getTime() - 5 * 60 * 60 * 1000);
+    const status = computeDeviceAgentStatus(lastSeen, graceHours, now);
     expect(
       shouldIncludeDeviceForFollowUp({
         lastSeenAt: lastSeen,

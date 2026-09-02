@@ -26,7 +26,7 @@ type FollowUpUser = {
 
 type PanelData = {
   count: number;
-  staleThresholdMinutes: number;
+  staleThresholdHours: number;
   updatedAt: string;
   users: FollowUpUser[];
 };
@@ -75,7 +75,7 @@ export function AgentFollowUpPanel({
 }) {
   const [data, setData] = useState<PanelData | null>(
     initialCount !== undefined
-      ? { count: initialCount, staleThresholdMinutes: 8, updatedAt: "", users: [] }
+      ? { count: initialCount, staleThresholdHours: 24, updatedAt: "", users: [] }
       : null,
   );
   const [loading, setLoading] = useState(false);
@@ -288,7 +288,7 @@ export function AgentFollowUpPanel({
 
         {data?.updatedAt && (
           <footer className="border-t border-[var(--border)] px-5 py-3 text-xs text-muted">
-            Stale threshold: {data.staleThresholdMinutes} min without pulse. Last updated{" "}
+            Stale threshold: {data.staleThresholdHours}h without pulse. Last updated{" "}
             {new Date(data.updatedAt).toLocaleTimeString("en-IN")}. Auto-refreshes every 60s.
           </footer>
         )}

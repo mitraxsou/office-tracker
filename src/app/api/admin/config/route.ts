@@ -36,6 +36,7 @@ export async function PATCH(request: Request) {
     pendingTokenTtlDays?: number;
     heartbeatRetentionDays?: number;
     agentStaleMinutes?: number;
+    agentStaleGraceHours?: number;
   };
 
   try {
@@ -107,9 +108,16 @@ export async function PATCH(request: Request) {
 
   if (body.agentStaleMinutes !== undefined) {
     if (body.agentStaleMinutes < 2 || body.agentStaleMinutes > 60) {
-      return NextResponse.json({ error: "agentStaleMinutes must be 2–60" }, { status: 400 });
+      return NextResponse.json({ error: "agentStaleMinutes must be 2-60" }, { status: 400 });
     }
     update.agentStaleMinutes = body.agentStaleMinutes;
+  }
+
+  if (body.agentStaleGraceHours !== undefined) {
+    if (body.agentStaleGraceHours < 1 || body.agentStaleGraceHours > 168) {
+      return NextResponse.json({ error: "agentStaleGraceHours must be 1-168" }, { status: 400 });
+    }
+    update.agentStaleGraceHours = body.agentStaleGraceHours;
   }
 
   const config = await updateAppConfig(update);
