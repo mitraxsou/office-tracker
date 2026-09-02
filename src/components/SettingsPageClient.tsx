@@ -6,6 +6,7 @@ import { AgentStatusPanel } from "@/components/AgentStatusPanel";
 import { UserSettingsForm } from "@/components/UserSettingsForm";
 import { NotificationPrefsForm } from "@/components/NotificationPrefsForm";
 import { OutOfOfficeSection } from "@/components/OutOfOfficeSection";
+import { AgentGraceSection } from "@/components/AgentGraceSection";
 import { AgentSetupPanel } from "@/components/AgentSetupPanel";
 import { ThemePreference } from "@/components/ThemeToggle";
 import type { EnrichedDevice } from "@/lib/device-enrichment";
@@ -96,6 +97,8 @@ export function SettingsPageClient({
       <NotificationPrefsForm />
 
       <OutOfOfficeSection />
+
+      <AgentGraceSection />
         </>
       )}
     </>

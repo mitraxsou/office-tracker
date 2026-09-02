@@ -35,6 +35,11 @@ export type AuditAction =
   | "timezone_change_cancel"
   | "timezone_change_approve"
   | "timezone_change_reject"
+  | "profile_change_request"
+  | "profile_change_request_admin"
+  | "profile_change_cancel"
+  | "profile_change_approve"
+  | "profile_change_reject"
   | "password_reset"
   | "agent_update_push";
 

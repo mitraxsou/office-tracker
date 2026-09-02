@@ -36,6 +36,8 @@ model User {
   resolvedDeviceRemovals DeviceRemovalRequest[] @relation("DeviceRemovalResolver")
   timezoneChangeRequests TimezoneChangeRequest[]
   reviewedTimezoneRequests TimezoneChangeRequest[] @relation("TimezoneRequestReviewer")
+  profileChangeRequests ProfileChangeRequest[]
+  reviewedProfileChangeRequests ProfileChangeRequest[] @relation("ProfileChangeReviewer")
   agentLifecycleEvents AgentLifecycleEvent[]
 }
 
@@ -162,6 +164,27 @@ model TimezoneChangeRequest {
   @@index([userId])
 }
 
+model ProfileChangeRequest {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentName    String?
+  currentEmail   String
+  requestedName  String?
+  requestedEmail String?
+  message        String?
+  status         String   @default("open")
+  adminNote      String?
+  reviewedAt     DateTime?
+  reviewedById   String?
+  reviewedBy     User?    @relation("ProfileChangeReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
 model DeviceRemovalRequest {
   id           String      @id @default(cuid())
   userId       String
@@ -192,6 +215,7 @@ model AppConfig {
   pendingTokenTtlDays   Int      @default(7)
   heartbeatRetentionDays Int     @default(1)
   agentStaleMinutes     Int      @default(8)
+  agentStaleGraceHours  Int      @default(24)
   updatedAt             DateTime @updatedAt
 }
 
