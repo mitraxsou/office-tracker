@@ -6,6 +6,7 @@ import { validateSsids } from "@/lib/security";
 import { normalizeSsid } from "@/lib/constants";
 import { logAuditEvent } from "@/lib/audit-log";
 import { isRegistrationEnvLocked } from "@/lib/auth";
+import { backfillHeartbeatsAndVisitsAfterAllowlistChange } from "@/lib/ssid-backfill";
 
 export async function GET() {
   const admin = await requireAdmin();
@@ -42,6 +43,8 @@ export async function PATCH(request: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
+
+  const prevConfig = await getAppConfig();
 
   const update: Parameters<typeof updateAppConfig>[0] = {};
 
@@ -111,11 +114,21 @@ export async function PATCH(request: Request) {
 
   const config = await updateAppConfig(update);
 
+  let backfill: Awaited<ReturnType<typeof backfillHeartbeatsAndVisitsAfterAllowlistChange>> | null =
+    null;
+  if (update.officeSsids !== undefined) {
+    const prev = new Set(prevConfig.officeSsids.map((s) => s.toLowerCase()));
+    const added = update.officeSsids.some((s) => !prev.has(s.toLowerCase()));
+    if (added) {
+      backfill = await backfillHeartbeatsAndVisitsAfterAllowlistChange(config.officeSsids);
+    }
+  }
+
   await logAuditEvent({
     actorId: admin.id,
     action: "config_update",
-    details: update as Record<string, unknown>,
+    details: { ...update, backfill } as Record<string, unknown>,
   });
 
-  return NextResponse.json({ config });
+  return NextResponse.json({ config, backfill });
 }

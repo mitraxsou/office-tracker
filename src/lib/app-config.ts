@@ -6,6 +6,7 @@ import {
   normalizeSsid,
   parseDefaultSsidsFromEnv,
 } from "./constants";
+import { backfillHeartbeatsAndVisitsAfterAllowlistChange } from "./ssid-backfill";
 
 export const DEFAULT_PENDING_TOKEN_TTL_DAYS = 7;
 export const DEFAULT_HEARTBEAT_RETENTION_DAYS = 7;
@@ -73,6 +74,7 @@ export async function ensureAppConfig(): Promise<AppConfigData> {
           where: { id: CONFIG_ID },
           data: { officeSsids: JSON.stringify(merged) },
         });
+        await backfillHeartbeatsAndVisitsAfterAllowlistChange(merged);
       }
     }
     return parseConfig(config);

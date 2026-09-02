@@ -12,6 +12,7 @@ import {
 } from "./notification-prefs";
 import { buildOutOfOfficeLinkUrl, isUserOutOfOffice } from "./out-of-office";
 import { userHasActiveInstalledDevice } from "./agent-lifecycle";
+import { heartbeatInOffice } from "./heartbeat-office";
 
 export type IntegrationAlertType = "absent" | "stale" | "behind";
 
@@ -84,11 +85,16 @@ export async function acknowledgeIntegrationAlerts(
   }
 }
 
-async function hadInOfficeHeartbeatToday(userId: string, dayStart: Date): Promise<boolean> {
-  const beat = await prisma.heartbeat.findFirst({
-    where: { userId, recordedAt: { gte: dayStart }, inOffice: true },
+async function hadInOfficeHeartbeatToday(
+  userId: string,
+  dayStart: Date,
+  allowlist: string[],
+): Promise<boolean> {
+  const beats = await prisma.heartbeat.findMany({
+    where: { userId, recordedAt: { gte: dayStart } },
+    select: { ssid: true, inOffice: true },
   });
-  return beat !== null;
+  return beats.some((b) => heartbeatInOffice(b, allowlist));
 }
 
 function buildAbsentMessage(prefs: NotificationPrefsData): string {
@@ -169,7 +175,7 @@ async function evaluateUserAlerts(
   if (types.has("absent") && prefs.alertIfNotInOffice && workDay) {
     const startMinutes = parseTimeToMinutes(prefs.officeStartTime) + prefs.graceMinutes;
     if (nowMinutes >= startMinutes) {
-      const inOfficeToday = await hadInOfficeHeartbeatToday(user.id, dayStart);
+      const inOfficeToday = await hadInOfficeHeartbeatToday(user.id, dayStart, config.officeSsids);
       if (
         !inOfficeToday &&
         !summary.inOfficeNow &&

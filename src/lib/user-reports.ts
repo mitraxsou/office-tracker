@@ -5,6 +5,7 @@ import { summarizeAgentTokens } from "./auth";
 import { getLifecycleEventsForUser } from "./agent-lifecycle";
 import { revokeExpiredPendingTokens } from "./token-expiry";
 import { daySpanMsForDay } from "./visits";
+import { heartbeatInOffice } from "./heartbeat-office";
 
 function dayKeyForTimezone(date: Date, timezone: string) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -106,7 +107,7 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
     heartbeats: heartbeats.map((h) => ({
       id: h.id,
       recordedAt: h.recordedAt.toISOString(),
-      inOffice: h.inOffice,
+      inOffice: heartbeatInOffice(h, config.officeSsids),
       ssid: h.ssid,
     })),
     pulse,
