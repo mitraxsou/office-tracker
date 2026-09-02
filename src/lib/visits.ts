@@ -276,6 +276,15 @@ export function roundHours(hours: number): number {
   return Math.round(hours * 10) / 10;
 }
 
+/**
+ * Round to the nearest minute. Use this for totals shown as "Xh Ym" so the total
+ * matches the check-in and check-out times on screen. Rounding to 0.1 h first
+ * shifts a total by up to 3 minutes.
+ */
+export function roundHoursToMinute(hours: number): number {
+  return Math.round(hours * 60) / 60;
+}
+
 export function formatHours(hours: number): string {
   const h = Math.floor(hours);
   const m = Math.round((hours - h) * 60);

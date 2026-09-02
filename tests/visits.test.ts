@@ -4,10 +4,12 @@ import {
   daySpanHoursForDay,
   daySpanMsForDay,
   effectiveVisitEnd,
+  formatHours,
   mergeHeartbeatsIntoVisits,
   meetsHoursTarget,
   remainingHours,
   roundHours,
+  roundHoursToMinute,
   totalHoursFromVisits,
   visitDurationMs,
   visitsForDay,
@@ -449,5 +451,27 @@ describe("roundHours", () => {
     expect(roundHours(1.7992508333333332)).toBe(1.8);
     expect(roundHours(4.949)).toBe(4.9);
     expect(roundHours(5)).toBe(5);
+  });
+});
+
+describe("roundHoursToMinute", () => {
+  it("keeps the displayed total equal to the check-in to check-out span", () => {
+    // 03:31 pm to 05:56 pm is 145 minutes. Rounding to 0.1 h first showed 2h 24m.
+    const spanHours = 145 / 60;
+    expect(formatHours(roundHoursToMinute(spanHours))).toBe("2h 25m");
+    expect(formatHours(roundHours(spanHours))).toBe("2h 24m");
+  });
+
+  it("never shifts a total by more than 30 seconds", () => {
+    for (let minutes = 0; minutes <= 24 * 60; minutes += 1) {
+      const hours = minutes / 60 + 1 / 3600;
+      const driftSeconds = Math.abs(roundHoursToMinute(hours) - hours) * 3600;
+      expect(driftSeconds).toBeLessThanOrEqual(30);
+    }
+  });
+
+  it("leaves whole minutes untouched", () => {
+    expect(roundHoursToMinute(5)).toBe(5);
+    expect(roundHoursToMinute(2.5)).toBe(2.5);
   });
 });

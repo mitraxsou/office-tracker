@@ -4,7 +4,7 @@ import { getAppConfig, getUserHoursTarget } from "./app-config";
 import { getTodaySummary, loadDaySpanContext } from "./heartbeat-service";
 import { allDayKeysInMonth, currentMonthKey } from "./month-range";
 import { revokeExpiredPendingTokens } from "./token-expiry";
-import { daySpanMsForDay, roundHours } from "./visits";
+import { daySpanMsForDay, roundHours, roundHoursToMinute } from "./visits";
 
 async function aggregateHoursForDay(userId: string, timezone: string, dayKey: string) {
   const { visits, params } = await loadDaySpanContext(userId, dayKey, timezone);
@@ -85,7 +85,7 @@ export async function getAdminReports(options?: { days?: number; monthKey?: stri
 
     dailyTrend.push({
       date: key,
-      totalHours: Math.round((dayTotalMs / (1000 * 60 * 60)) * 10) / 10,
+      totalHours: roundHoursToMinute(dayTotalMs / (1000 * 60 * 60)),
       compliancePct:
         users.length > 0 ? Math.round((metCount / users.length) * 100) : 0,
       activeUsers: users.length,
@@ -178,7 +178,7 @@ export async function getAdminDayDetail(dateKey: string) {
         userId: user.id,
         email: user.email,
         name: user.name,
-        hours: Math.round(hours * 10) / 10,
+        hours: roundHoursToMinute(hours),
         hoursTarget,
         metTarget: hours >= hoursTarget,
       };

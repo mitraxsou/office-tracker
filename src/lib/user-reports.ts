@@ -4,7 +4,7 @@ import { getTodaySummary, getPulseStats, loadDaySpanContext } from "./heartbeat-
 import { summarizeAgentTokens } from "./auth";
 import { getLifecycleEventsForUser } from "./agent-lifecycle";
 import { revokeExpiredPendingTokens } from "./token-expiry";
-import { daySpanMsForDay } from "./visits";
+import { daySpanMsForDay, roundHoursToMinute } from "./visits";
 import { laptopActiveHoursForDay } from "./laptop-active";
 import { heartbeatInOffice } from "./heartbeat-office";
 
@@ -75,8 +75,8 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
     ]);
     dailyTrend.push({
       date: key,
-      totalHours: Math.round(hours * 10) / 10,
-      laptopActiveHours: Math.round(laptopHours * 10) / 10,
+      totalHours: roundHoursToMinute(hours),
+      laptopActiveHours: roundHoursToMinute(laptopHours),
       metTarget: hours >= hoursTarget,
     });
     cursor.setDate(cursor.getDate() + 1);
