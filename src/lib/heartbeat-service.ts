@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { isOfficeSsid } from "./constants";
+import { DEFAULT_OFFICE_SSIDS, isOfficeSsid } from "./constants";
 import { getAppConfig, getAgentStaleMs } from "./app-config";
 import { heartbeatInOffice } from "./heartbeat-office";
 import { maybePurgeOldHeartbeats } from "./heartbeat-retention";
@@ -44,7 +44,6 @@ export async function loadDaySpanContext(
     prisma.heartbeat.findFirst({
       where: { userId },
       orderBy: { recordedAt: "desc" },
-      select: { recordedAt: true, ssid: true, inOffice: true },
     }),
   ]);
 
