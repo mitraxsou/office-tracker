@@ -9,6 +9,7 @@ import {
   MAX_LOGIN_ATTEMPTS,
   recordFailedLoginAttempt,
 } from "@/lib/auth";
+import { isBreakglassEmail } from "@/lib/breakglass";
 
 const LOCKOUT_MESSAGE =
   "Too many failed attempts. Contact your pilot admin to reset your password.";
@@ -44,7 +45,7 @@ async function LoginForm({
     }
     await clearLoginAttempts();
     await createSession(user.id);
-    if (user.mustChangePassword) {
+    if (user.mustChangePassword && !isBreakglassEmail(user.email)) {
       redirect("/settings?mustChange=1");
     }
     redirect("/dashboard");

@@ -27,8 +27,9 @@ export default async function SettingsPage({
   const { installTokens, legacyBoundCount } = await getUserInstallTokenState(user.id, appUrl);
   const enrichedDevices = await getEnrichedDevicesForUser(user.id);
   const timezoneRequestState = await getUserTimezoneRequestState(user.id);
-  const mustChangePassword = user.mustChangePassword || params.mustChange === "1";
   const isBreakglass = isBreakglassEmail(user.email);
+  const mustChangePassword =
+    !isBreakglass && (user.mustChangePassword || params.mustChange === "1");
 
   return (
     <>

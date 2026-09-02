@@ -120,6 +120,17 @@ Before calling work done:
 5. User vs admin permissions unchanged unless requested
 6. Copy/install commands use `NEXT_PUBLIC_APP_URL`
 
+## Git commits / deploy
+
+Vercel blocks commits not authored by **mitraxsou**. Always commit with:
+
+```bash
+git -c user.name="mitraxsou" -c user.email="16998608+mitraxsou@users.noreply.github.com" commit -m "your message"
+```
+
+- Never use `SoumitraPWC` or other authors for production pushes
+- Do **not** permanently update `git config user.name` / `user.email` in this repo
+
 ## Deploy checklist (Vercel)
 
 1. Push to GitHub (private repo ok)

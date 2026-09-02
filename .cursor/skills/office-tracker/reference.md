@@ -56,3 +56,14 @@
 ## Pilot policy
 
 Opt-in only. Colleagues on PwC laptops. Collect SSID + timestamps + serial only. Not HR/badge integration.
+
+## Git commits / deploy
+
+Vercel blocks commits not authored by **mitraxsou**. Always commit with:
+
+```bash
+git -c user.name="mitraxsou" -c user.email="16998608+mitraxsou@users.noreply.github.com" commit -m "your message"
+```
+
+- Never use `SoumitraPWC` or other authors for production pushes
+- Do **not** permanently update `git config user.name` / `user.email` in this repo
