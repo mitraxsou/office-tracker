@@ -57,8 +57,10 @@ function isManualSource(source: string): boolean {
 
 /**
  * Daily total: first check-in to last check-out on the day (gaps between visits count).
- * Last in-office heartbeat extends wifi days unless manual check-out caps the day.
- * Open visits on the current day extend to now (or effectiveVisitEnd). Capped at 24 hours.
+ * Open visits on the current day extend to now (or effectiveVisitEnd).
+ * Manual check-out caps the day only when there is no open visit (user left office).
+ * Last in-office heartbeat extends wifi days when no open visit and no manual cap.
+ * Capped at 24 hours.
  */
 export function daySpanMsForDay(
   visits: VisitForDaySpan[],
@@ -110,9 +112,7 @@ export function daySpanMsForDay(
 
   let lastOut: number | null = null;
 
-  if (latestManualEnd !== null) {
-    lastOut = Math.min(latestManualEnd, dayEndMs);
-  } else if (openVisit && isCurrentDay) {
+  if (openVisit && isCurrentDay) {
     const end = effectiveVisitEnd({
       endAt: null,
       updatedAt: openVisit.updatedAt ?? openVisit.startAt,
@@ -123,6 +123,8 @@ export function daySpanMsForDay(
       dayEnd: params.dayEnd,
     });
     lastOut = Math.min(end.getTime(), dayEndMs);
+  } else if (latestManualEnd !== null) {
+    lastOut = Math.min(latestManualEnd, dayEndMs);
   } else {
     for (const v of visits) {
       const end = effectiveVisitEnd({

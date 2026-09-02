@@ -35,7 +35,8 @@ export type AuditAction =
   | "timezone_change_cancel"
   | "timezone_change_approve"
   | "timezone_change_reject"
-  | "password_reset";
+  | "password_reset"
+  | "agent_update_push";
 
 export async function logAuditEvent(params: {
   actorId: string;

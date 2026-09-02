@@ -47,7 +47,7 @@ export function AdminVisitForm() {
       body: JSON.stringify({
         userId,
         startAt: dateTimeLocalToIso(startAt),
-        endAt: dateTimeLocalToIso(endAt),
+        endAt: endAt ? dateTimeLocalToIso(endAt) : null,
         ssid: ssid || null,
       }),
     });
@@ -93,7 +93,7 @@ export function AdminVisitForm() {
           />
         </div>
         <DateTimeField label="Start" value={startAt} onChange={setStartAt} required />
-        <DateTimeField label="End" value={endAt} onChange={setEndAt} required />
+        <DateTimeField label="End (optional)" value={endAt} onChange={setEndAt} />
       </div>
       <button type="submit" disabled={loading} className="btn-primary px-4 py-2 disabled:opacity-50">
         {loading ? "Adding..." : "Add visit"}

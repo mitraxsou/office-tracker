@@ -74,6 +74,13 @@ export function sanitizeSerialNumber(value: unknown): string | null {
   return trimmed;
 }
 
+export function sanitizeScriptVersion(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim().slice(0, 32);
+  if (!trimmed || !/^\d+(\.\d+){0,3}$/.test(trimmed)) return null;
+  return trimmed;
+}
+
 export function validateTimezone(value: string): boolean {
   if (!value || value.length > MAX_TIMEZONE_LENGTH) return false;
   try {

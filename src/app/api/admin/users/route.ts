@@ -11,6 +11,8 @@ import {
 import { revokeExpiredPendingTokens } from "@/lib/token-expiry";
 import { logAuditEvent } from "@/lib/audit-log";
 import { buildInstallCommand } from "@/lib/agent-branding";
+import { getAgentVersion } from "@/lib/agent-version";
+import { isDeviceAgentVersionStale } from "@/lib/agent-update";
 
 function appUrl() {
   return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "http://localhost:3000";
@@ -23,6 +25,8 @@ export async function GET() {
   }
 
   await revokeExpiredPendingTokens();
+
+  const serverAgentVersion = getAgentVersion();
 
   const users = await prisma.user.findMany({
     include: {
@@ -43,7 +47,16 @@ export async function GET() {
         role: user.role,
         timezone: user.timezone,
         hoursTarget,
-        devices: user.agentDevices,
+        devices: user.agentDevices.map((d) => ({
+          id: d.id,
+          serialNumber: d.serialNumber,
+          lastSeenAt: d.lastSeenAt,
+          agentScriptVersion: d.agentScriptVersion,
+          agentVersionReportedAt: d.agentVersionReportedAt,
+          forceAgentUpdate: d.forceAgentUpdate,
+          agentVersionStale: isDeviceAgentVersionStale(d.agentScriptVersion, serverAgentVersion),
+        })),
+        serverAgentVersion,
         tokens: summarizeAgentTokens(user.agentTokens),
         today: {
           totalHours: summary.totalHours,

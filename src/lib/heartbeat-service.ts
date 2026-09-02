@@ -234,14 +234,17 @@ export async function closeEndOfDayOpenVisits(userId: string, timezone: string) 
 export async function createManualVisit(params: {
   userId: string;
   startAt: Date;
-  endAt: Date;
+  endAt?: Date | null;
   ssid?: string | null;
 }) {
+  if (params.endAt && params.endAt <= params.startAt) {
+    throw new Error("endAt must be after startAt");
+  }
   return prisma.visit.create({
     data: {
       userId: params.userId,
       startAt: params.startAt,
-      endAt: params.endAt,
+      endAt: params.endAt ?? null,
       source: "manual",
       ssid: params.ssid ?? null,
     },

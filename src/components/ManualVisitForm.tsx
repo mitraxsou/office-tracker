@@ -29,7 +29,7 @@ export function ManualVisitForm({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         startAt: dateTimeLocalToIso(startAt),
-        endAt: dateTimeLocalToIso(endAt),
+        endAt: endAt ? dateTimeLocalToIso(endAt) : null,
         ssid: ssid || null,
       }),
     });
@@ -58,7 +58,7 @@ export function ManualVisitForm({
       )}
       <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
         <DateTimeField label="Check-in" value={startAt} onChange={setStartAt} required />
-        <DateTimeField label="Check-out" value={endAt} onChange={setEndAt} required />
+        <DateTimeField label="Check-out (optional)" value={endAt} onChange={setEndAt} />
         <div className="md:col-span-2">
           <label className="mb-1 block text-sm text-muted">Office Wi-Fi (SSID)</label>
           <SsidSelect

@@ -71,14 +71,21 @@ export async function POST(request: Request) {
   }
 
   const { userId, startAt, endAt, ssid } = body;
-  if (!userId || !startAt || !endAt) {
-    return NextResponse.json({ error: "userId, startAt, endAt required" }, { status: 400 });
+  if (!userId || !startAt) {
+    return NextResponse.json({ error: "userId and startAt required" }, { status: 400 });
   }
 
   const start = new Date(startAt);
-  const end = new Date(endAt);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
-    return NextResponse.json({ error: "Invalid dates" }, { status: 400 });
+  if (Number.isNaN(start.getTime())) {
+    return NextResponse.json({ error: "Invalid startAt" }, { status: 400 });
+  }
+
+  let end: Date | null = null;
+  if (endAt) {
+    end = new Date(endAt);
+    if (Number.isNaN(end.getTime()) || end <= start) {
+      return NextResponse.json({ error: "Invalid endAt" }, { status: 400 });
+    }
   }
 
   const visit = await createManualVisit({ userId, startAt: start, endAt: end, ssid: ssid ?? null });

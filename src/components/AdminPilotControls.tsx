@@ -21,6 +21,22 @@ export function AdminPilotControls({
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetDone, setResetDone] = useState(false);
 
+  const [agentPushLoading, setAgentPushLoading] = useState(false);
+  const [agentPushMessage, setAgentPushMessage] = useState<string | null>(null);
+
+  async function handlePushAllAgentUpdates() {
+    setAgentPushLoading(true);
+    setAgentPushMessage(null);
+    const res = await fetch("/api/admin/agent-update", { method: "POST" });
+    setAgentPushLoading(false);
+    if (!res.ok) {
+      setAgentPushMessage("Failed to queue agent updates");
+      return;
+    }
+    const data = await res.json();
+    setAgentPushMessage(`Queued update for ${data.deviceCount ?? 0} device(s).`);
+  }
+
   async function handleRegistrationToggle() {
     const next = !registrationEnabled;
     setRegLoading(true);
@@ -110,6 +126,23 @@ export function AdminPilotControls({
 
         {regError && <p className="mt-3 text-sm text-red-400">{regError}</p>}
         {regSaved && <p className="mt-3 text-sm text-green-400">Registration setting saved.</p>}
+      </section>
+
+      <section className="card p-6">
+        <h2 className="mb-1 text-lg font-medium">Agent updates</h2>
+        <p className="mb-4 text-sm text-muted">
+          Queue an agent upgrade for every bound laptop. Each device picks it up on the next heartbeat
+          (about every 2 minutes).
+        </p>
+        <button
+          type="button"
+          onClick={handlePushAllAgentUpdates}
+          disabled={agentPushLoading}
+          className="btn-primary px-4 py-2 disabled:opacity-50"
+        >
+          {agentPushLoading ? "Queuing…" : "Push agent update to all devices"}
+        </button>
+        {agentPushMessage && <p className="mt-3 text-sm text-green-400">{agentPushMessage}</p>}
       </section>
 
       <section className="card border border-red-500/40 p-6">

@@ -208,6 +208,15 @@ export async function register() {
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "AgentDevice" ADD COLUMN IF NOT EXISTS "uninstalledAt" TIMESTAMP(3);'
     );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AgentDevice" ADD COLUMN IF NOT EXISTS "agentScriptVersion" TEXT;'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AgentDevice" ADD COLUMN IF NOT EXISTS "agentVersionReportedAt" TIMESTAMP(3);'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AgentDevice" ADD COLUMN IF NOT EXISTS "forceAgentUpdate" BOOLEAN NOT NULL DEFAULT false;'
+    );
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "AgentLifecycleEvent" (
         "id" TEXT NOT NULL,

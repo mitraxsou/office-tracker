@@ -13,10 +13,12 @@ import {
   checkRateLimit,
   extractTokenFromBody,
   parseTimestamp,
+  sanitizeScriptVersion,
   sanitizeSsid,
   sanitizeSerialNumber,
   sanitizeVpnGateway,
 } from "@/lib/security";
+import { recordDeviceScriptVersion } from "@/lib/agent-update";
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -74,6 +76,11 @@ export async function POST(request: Request) {
     registered: deviceResult.registered,
     tokenPrefix: auth.agentToken.tokenPrefix,
   });
+
+  const scriptVersion = sanitizeScriptVersion(body.scriptVersion);
+  if (scriptVersion) {
+    await recordDeviceScriptVersion(auth.userId, serialNumber, scriptVersion);
+  }
 
   const user = await getUserByAgentToken(token);
   if (!user) {

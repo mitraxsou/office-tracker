@@ -115,6 +115,9 @@ model AgentDevice {
   lastSeenAt   DateTime?
   installedAt  DateTime?
   uninstalledAt DateTime?
+  agentScriptVersion String?
+  agentVersionReportedAt DateTime?
+  forceAgentUpdate Boolean @default(false)
   createdAt    DateTime    @default(now())
   removalRequests DeviceRemovalRequest[]
   lifecycleEvents AgentLifecycleEvent[]

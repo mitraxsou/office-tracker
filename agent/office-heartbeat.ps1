@@ -87,6 +87,7 @@ function Compare-AgentVersion {
 }
 
 function Test-NeedsAgentUpdate($ServerConfig) {
+    if ($ServerConfig.forceAgentUpdate) { return $true }
     if (-not $ServerConfig.agentScriptVersion) { return $false }
     $local = Get-LocalAgentVersion
     return (Compare-AgentVersion $ServerConfig.agentScriptVersion $local) -gt 0
@@ -318,23 +319,28 @@ function Set-RunCounter([int]$Value) {
     Set-Content -Path (Get-RunCounterPath) -Value $Value -Encoding UTF8
 }
 
-function Fetch-ServerConfig([string]$ApiUrl, [string]$Token) {
+function Fetch-ServerConfig([string]$ApiUrl, [string]$Token, [string]$SerialNumber) {
     $headers = @{ Authorization = "Bearer $Token" }
-    $response = Invoke-RestMethod -Uri "$ApiUrl/api/agent/config" -Method GET `
+    $uri = "$ApiUrl/api/agent/config"
+    if ($SerialNumber) {
+        $encoded = [Uri]::EscapeDataString($SerialNumber)
+        $uri = "$uri?serialNumber=$encoded"
+    }
+    $response = Invoke-RestMethod -Uri $uri -Method GET `
         -Headers $headers -TimeoutSec 30
     $cachePath = Get-CachePath
     $response | ConvertTo-Json -Compress | Set-Content -Path $cachePath -Encoding UTF8
     return $response
 }
 
-function Get-ServerConfig([string]$ApiUrl, [string]$Token, [switch]$Force) {
+function Get-ServerConfig([string]$ApiUrl, [string]$Token, [string]$SerialNumber, [switch]$Force) {
     $cachePath = Get-CachePath
     $counter = Get-RunCounter
     $shouldFetch = $Force -or $counter -eq 0 -or ($counter % $ConfigFetchIntervalRuns -eq 0)
 
     if ($shouldFetch) {
         try {
-            return Fetch-ServerConfig -ApiUrl $ApiUrl -Token $Token
+            return Fetch-ServerConfig -ApiUrl $ApiUrl -Token $Token -SerialNumber $SerialNumber
         } catch {
             Write-Log "WARN config fetch failed: $($_.Exception.Message)"
             if (Test-Path $cachePath) {
@@ -348,7 +354,7 @@ function Get-ServerConfig([string]$ApiUrl, [string]$Token, [switch]$Force) {
         return Get-Content $cachePath -Raw | ConvertFrom-Json
     }
 
-    return Fetch-ServerConfig -ApiUrl $ApiUrl -Token $Token
+    return Fetch-ServerConfig -ApiUrl $ApiUrl -Token $Token -SerialNumber $SerialNumber
 }
 
 $configPath = Get-ConfigPath
@@ -370,13 +376,18 @@ $localConfig = Get-Content $configPath -Raw | ConvertFrom-Json
 $apiUrl = $localConfig.apiUrl.TrimEnd("/")
 $token = $localConfig.token
 
+$serialNumber = Get-LaptopSerial
+if (-not $serialNumber -and $localConfig.serialNumber) {
+    $serialNumber = $localConfig.serialNumber
+}
+
 $networkWaitSec = if ($isResumeRun) { 90 } else { 60 }
 Wait-NetworkReady -ApiUrl $apiUrl -MaxWaitSec $networkWaitSec | Out-Null
 
 $hourlyUpdateCheck = Test-ShouldRunHourlyUpdateCheck
 
 try {
-    $serverConfig = Get-ServerConfig -ApiUrl $apiUrl -Token $token -Force:$hourlyUpdateCheck
+    $serverConfig = Get-ServerConfig -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber -Force:$hourlyUpdateCheck
 } catch {
     Write-Log "ERROR: Cannot fetch server config"
     if ($DryRun) { Write-Host "ERROR: Cannot fetch server config: $($_.Exception.Message)"; exit 1 }
@@ -396,20 +407,18 @@ Set-RunCounter ((Get-RunCounter) + 1)
 $ssidResult = Get-CurrentWifiSsidWithRetry
 $ssid = $ssidResult.Ssid
 $ssidMethod = $ssidResult.Method
-$serialNumber = Get-LaptopSerial
-if (-not $serialNumber -and $localConfig.serialNumber) {
-    $serialNumber = $localConfig.serialNumber
-}
 $vpnGateway = Get-VpnGatewayDiagnostic
 $recordedAt = (Get-Date).ToUniversalTime().ToString("o")
+$scriptVersion = Get-LocalAgentVersion
 
 $payload = @{
-    token        = $token
-    serialNumber = $serialNumber
-    ssid         = $ssid
-    at           = $recordedAt
-    source       = "wifi"
-    vpnGateway   = $vpnGateway
+    token          = $token
+    serialNumber   = $serialNumber
+    ssid           = $ssid
+    at             = $recordedAt
+    source         = "wifi"
+    vpnGateway     = $vpnGateway
+    scriptVersion  = $scriptVersion
 } | ConvertTo-Json -Compress
 
 if ($DryRun) {
