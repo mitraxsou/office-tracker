@@ -31,8 +31,8 @@ export function timezoneOptionsForUser(currentTimezone: string) {
   return USER_TIMEZONE_OPTIONS;
 }
 
-/** PwC office Wi-Fi SSIDs — both denote in-office for auto-detection */
-export const DEFAULT_OFFICE_SSIDS = ["OfficeConnect", "ExternalConnect"];
+/** PwC office Wi-Fi SSIDs — all denote in-office for auto-detection */
+export const DEFAULT_OFFICE_SSIDS = ["OfficeConnect", "ExternalConnect", "pwcglb.com"];
 
 export function parseDefaultSsidsFromEnv(): string[] {
   const raw = process.env.DEFAULT_OFFICE_SSIDS;
@@ -52,9 +52,9 @@ export function normalizeSsid(ssid: string): string {
 
 export function isOfficeSsid(ssid: string | null | undefined, allowlist: string[]): boolean {
   if (!ssid) return false;
-  const normalized = normalizeSsid(ssid);
+  const normalized = normalizeSsid(ssid).toLowerCase();
   return allowlist.some((allowed) => {
-    const normAllowed = normalizeSsid(allowed);
+    const normAllowed = normalizeSsid(allowed).toLowerCase();
     return normAllowed === normalized || normalized.startsWith(normAllowed);
   });
 }

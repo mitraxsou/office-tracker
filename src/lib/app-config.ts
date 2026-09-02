@@ -1,6 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
-import { DEFAULT_HOURS_TARGET, DEFAULT_MONTHLY_DAYS_TARGET, parseDefaultSsidsFromEnv } from "./constants";
+import {
+  DEFAULT_HOURS_TARGET,
+  DEFAULT_MONTHLY_DAYS_TARGET,
+  normalizeSsid,
+  parseDefaultSsidsFromEnv,
+} from "./constants";
 
 export const DEFAULT_PENDING_TOKEN_TTL_DAYS = 7;
 export const DEFAULT_HEARTBEAT_RETENTION_DAYS = 7;
@@ -36,6 +41,13 @@ export type AppConfigData = {
 
 const CONFIG_ID = "global";
 
+function mergeMissingDefaultSsids(existing: string[]): string[] {
+  const defaults = parseDefaultSsidsFromEnv();
+  const known = new Set(existing.map((s) => normalizeSsid(s).toLowerCase()));
+  const missing = defaults.filter((d) => !known.has(normalizeSsid(d).toLowerCase()));
+  return missing.length > 0 ? [...existing, ...missing] : existing;
+}
+
 export async function ensureAppConfig(): Promise<AppConfigData> {
   try {
     let config = await prisma.appConfig.findUnique({ where: { id: CONFIG_ID } });
@@ -53,6 +65,15 @@ export async function ensureAppConfig(): Promise<AppConfigData> {
           agentStaleMinutes: DEFAULT_AGENT_STALE_MINUTES,
         },
       });
+    } else {
+      const parsed = parseConfig(config);
+      const merged = mergeMissingDefaultSsids(parsed.officeSsids);
+      if (merged.length !== parsed.officeSsids.length) {
+        config = await prisma.appConfig.update({
+          where: { id: CONFIG_ID },
+          data: { officeSsids: JSON.stringify(merged) },
+        });
+      }
     }
     return parseConfig(config);
   } catch (err) {

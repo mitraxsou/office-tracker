@@ -27,7 +27,7 @@ Config: GET /api/agent/config (Bearer token) — SSIDs & hours target server-sid
 
 | Counts as in-office | Does NOT count |
 |---|---|
-| Wi-Fi SSID **OfficeConnect** or **ExternalConnect** (admin global allowlist) | GlobalProtect/VPN (always on at home and office) |
+| Wi-Fi SSID **OfficeConnect**, **ExternalConnect**, or **pwcglb.com** (admin global allowlist) | GlobalProtect/VPN (always on at home and office) |
 | Manual visit / quick check-in | Public IP, gateway name |
 | Admin-corrected visits | Unknown SSID |
 

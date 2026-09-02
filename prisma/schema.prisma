@@ -183,7 +183,7 @@ model AppConfig {
   id                String   @id @default("global")
   hoursTarget       Float    @default(5.0)
   monthlyDaysTarget Int      @default(8)
-  officeSsids       String   @default("[\"OfficeConnect\",\"ExternalConnect\"]")
+  officeSsids       String   @default("[\"OfficeConnect\",\"ExternalConnect\",\"pwcglb.com\"]")
   maxDevicesPerUser Int      @default(10)
   allowRegistration     Boolean  @default(false)
   pendingTokenTtlDays   Int      @default(7)

@@ -10,7 +10,7 @@
 | `DATABASE_URL_*` | Misconfigured Storage prefix vars — auto-mapped; reconnect Storage with no prefix |
 | `AUTH_SECRET` | Session JWT (32+ chars) |
 | `NEXT_PUBLIC_APP_URL` | Public URL for install commands and agent |
-| `DEFAULT_OFFICE_SSIDS` | Seed value; admin manages via AppConfig in prod |
+| `DEFAULT_OFFICE_SSIDS` | Seed value (`OfficeConnect`, `ExternalConnect`, `pwcglb.com`); admin manages via AppConfig in prod; startup merges missing defaults |
 | `ADMIN_EMAIL` | Promote user to admin on seed |
 | `BREAKGLASS_EMAIL` | Recovery admin email (with password) |
 | `BREAKGLASS_PASSWORD` | Recovery admin password |

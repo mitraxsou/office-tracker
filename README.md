@@ -86,7 +86,7 @@ If Vercel shows vars like `DATABASE_URL_POSTGRES_URL`, `DATABASE_URL_DATABASE_UR
 | `BREAKGLASS_EMAIL` | `admin@pwc.office` |
 | `BREAKGLASS_PASSWORD` | Your secure password |
 | `ALLOW_REGISTRATION` | `false` |
-| `DEFAULT_OFFICE_SSIDS` | `OfficeConnect,ExternalConnect` |
+| `DEFAULT_OFFICE_SSIDS` | `OfficeConnect,ExternalConnect,pwcglb.com` |
 | `INTEGRATION_API_KEY` | (optional) Secures `/api/integrations/alerts` for Power Automate — see [docs/power-automate.md](docs/power-automate.md) |
 
 6. Deploy
