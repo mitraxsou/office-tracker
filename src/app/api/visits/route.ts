@@ -49,11 +49,13 @@ export async function POST(request: Request) {
     }
   }
 
+  const resolvedSsid = typeof ssid === "string" && ssid.trim() ? ssid.trim() : "manual";
+
   const visit = await createManualVisit({
     userId: user.id,
     startAt: start,
     endAt: end,
-    ssid: ssid ?? null,
+    ssid: resolvedSsid,
   });
 
   return NextResponse.json({ visit }, { status: 201 });

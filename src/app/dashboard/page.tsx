@@ -206,7 +206,7 @@ export default async function DashboardPage() {
           <VisitList visits={summary.visits} timezone={user.timezone} />
         </section>
 
-        <ManualVisitForm timezone={user.timezone} officeSsids={config.officeSsids} />
+        <ManualVisitForm timezone={user.timezone} />
       </main>
     </>
   );

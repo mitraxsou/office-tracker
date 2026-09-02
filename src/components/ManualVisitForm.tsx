@@ -1,9 +1,8 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DateTimeField, dateTimeLocalToIso } from "@/components/DateTimeField";
-import { SsidManualInput } from "@/components/SsidManualInput";
 
 function CheckInIcon() {
   return (
@@ -35,39 +34,12 @@ function CheckOutIcon() {
   );
 }
 
-function WifiIcon() {
-  return (
-    <svg
-      aria-hidden
-      className="h-4 w-4 text-accent"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={2}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01M4.222 12.404a9.5 9.5 0 0115.556 0M2 8.5a14.5 14.5 0 0120 0"
-      />
-    </svg>
-  );
-}
-
-export function ManualVisitForm({
-  timezone,
-  officeSsids,
-}: {
-  timezone: string;
-  officeSsids: string[];
-}) {
+export function ManualVisitForm({ timezone }: { timezone: string }) {
   const router = useRouter();
-  const ssidInputId = useId();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
-  const [ssid, setSsid] = useState("");
   const [includeCheckout, setIncludeCheckout] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -81,7 +53,6 @@ export function ManualVisitForm({
       body: JSON.stringify({
         startAt: dateTimeLocalToIso(startAt),
         endAt: includeCheckout && endAt ? dateTimeLocalToIso(endAt) : null,
-        ssid: ssid.trim() || null,
       }),
     });
 
@@ -93,7 +64,6 @@ export function ManualVisitForm({
     }
     setStartAt("");
     setEndAt("");
-    setSsid("");
     setIncludeCheckout(false);
     router.refresh();
   }
@@ -157,19 +127,6 @@ export function ManualVisitForm({
             <DateTimeField label="When you left" value={endAt} onChange={setEndAt} />
           </div>
         )}
-
-        <div className="rounded-lg border border-[var(--border)] p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <WifiIcon />
-            <p className="text-sm font-medium">Connection</p>
-          </div>
-          <SsidManualInput
-            id={ssidInputId}
-            value={ssid}
-            onChange={setSsid}
-            officeSsids={officeSsids}
-          />
-        </div>
 
         <div className="flex flex-wrap items-center gap-3 pt-1">
           <button
