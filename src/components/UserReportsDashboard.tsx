@@ -175,13 +175,13 @@ export function UserReportsDashboard() {
           <KpiCard
             label="Total hours"
             value={formatHours(periodStats.totalHours)}
-            tooltip="Sum of office hours across all days in the selected month."
+            tooltip="Total office time across all days in the selected month (each day is first check-in to last check-out, including gaps)."
             tone="neutral"
           />
           <KpiCard
             label="Avg hours / day"
             value={formatHours(periodStats.avgHours)}
-            tooltip="Average office hours per calendar day in the selected month, including days with zero hours."
+            tooltip="Average daily office time in the selected month (first check-in to last check-out per day), including days with zero hours."
             tone="neutral"
           />
           <KpiCard

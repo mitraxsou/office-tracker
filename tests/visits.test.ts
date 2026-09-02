@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_HOURS_TARGET, VISIT_GAP_MS } from "../src/lib/constants";
 import {
+  daySpanHoursForDay,
+  daySpanMsForDay,
   effectiveVisitEnd,
   mergeHeartbeatsIntoVisits,
   meetsHoursTarget,
   remainingHours,
   roundHours,
   totalHoursFromVisits,
+  visitDurationMs,
   visitsForDay,
 } from "../src/lib/visits";
 
@@ -128,7 +131,7 @@ describe("mergeHeartbeatsIntoVisits", () => {
 });
 
 describe("hours calculations", () => {
-  it("calculates total hours from visits", () => {
+  it("calculates total hours from a single visit", () => {
     const visits = [
       {
         id: "1",
@@ -138,6 +141,64 @@ describe("hours calculations", () => {
       },
     ];
     expect(totalHoursFromVisits(visits)).toBeCloseTo(3, 1);
+    expect(visitDurationMs(visits[0])).toBeCloseTo(3 * ms(60), 0);
+  });
+
+  it("uses first in to last out for daily total across gaps", () => {
+    const visits = [
+      {
+        id: "1",
+        startAt: new Date("2026-08-27T09:00:00+05:30"),
+        endAt: new Date("2026-08-27T12:00:00+05:30"),
+        source: "wifi",
+      },
+      {
+        id: "2",
+        startAt: new Date("2026-08-27T13:00:00+05:30"),
+        endAt: new Date("2026-08-27T18:00:00+05:30"),
+        source: "wifi",
+      },
+    ];
+    expect(totalHoursFromVisits(visits)).toBeCloseTo(9, 1);
+    const segmentSum =
+      visitDurationMs(visits[0]) + visitDurationMs(visits[1]);
+    expect(segmentSum).toBeCloseTo(8 * ms(60), 0);
+  });
+
+  it("daySpanMsForDay spans first check-in to last check-out", () => {
+    const dayStart = new Date("2026-08-27T00:00:00+05:30");
+    const dayEnd = new Date("2026-08-27T23:59:59.999+05:30");
+    const visits = [
+      {
+        id: "1",
+        startAt: new Date("2026-08-27T09:00:00+05:30"),
+        endAt: new Date("2026-08-27T12:00:00+05:30"),
+        source: "wifi",
+        updatedAt: new Date("2026-08-27T12:00:00+05:30"),
+      },
+      {
+        id: "2",
+        startAt: new Date("2026-08-27T13:00:00+05:30"),
+        endAt: new Date("2026-08-27T18:00:00+05:30"),
+        source: "wifi",
+        updatedAt: new Date("2026-08-27T18:00:00+05:30"),
+      },
+    ];
+    const spanMs = daySpanMsForDay(visits, {
+      dayStart,
+      dayEnd,
+      now: new Date("2026-08-27T20:00:00+05:30"),
+      staleMs: VISIT_GAP_MS,
+      lastHeartbeatAt: new Date("2026-08-27T18:00:00+05:30"),
+    });
+    expect(spanMs).toBeCloseTo(9 * ms(60), 0);
+    expect(daySpanHoursForDay(visits, {
+      dayStart,
+      dayEnd,
+      now: new Date("2026-08-27T20:00:00+05:30"),
+      staleMs: VISIT_GAP_MS,
+      lastHeartbeatAt: new Date("2026-08-27T18:00:00+05:30"),
+    })).toBeCloseTo(9, 1);
   });
 
   it("detects 5h target met", () => {

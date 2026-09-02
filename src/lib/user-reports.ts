@@ -4,7 +4,7 @@ import { getTodaySummary, getPulseStats, closeStaleOpenVisits, closeEndOfDayOpen
 import { summarizeAgentTokens } from "./auth";
 import { getLifecycleEventsForUser } from "./agent-lifecycle";
 import { revokeExpiredPendingTokens } from "./token-expiry";
-import { effectiveVisitEnd } from "./visits";
+import { daySpanMsForDay } from "./visits";
 import { dayBoundsFromKey } from "./timezone-dates";
 
 function dayKeyForTimezone(date: Date, timezone: string) {
@@ -44,20 +44,13 @@ export async function aggregateHoursForDay(userId: string, timezone: string, day
   });
 
   const now = new Date();
-  const totalMs = visits.reduce((sum, v) => {
-    const start = v.startAt < dayStart ? dayStart : v.startAt;
-    const end = effectiveVisitEnd({
-      endAt: v.endAt,
-      updatedAt: v.updatedAt,
-      startAt: v.startAt,
-      now,
-      staleMs,
-      lastHeartbeatAt: lastHeartbeat?.recordedAt ?? null,
-      dayEnd,
-    });
-    const clippedEnd = end > dayEnd ? dayEnd : end;
-    return sum + Math.max(0, clippedEnd.getTime() - start.getTime());
-  }, 0);
+  const totalMs = daySpanMsForDay(visits, {
+    dayStart,
+    dayEnd,
+    now,
+    staleMs,
+    lastHeartbeatAt: lastHeartbeat?.recordedAt ?? null,
+  });
 
   return totalMs / (1000 * 60 * 60);
 }

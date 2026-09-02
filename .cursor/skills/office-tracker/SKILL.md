@@ -50,9 +50,11 @@ Config: GET /api/agent/config (Bearer token) — SSIDs & hours target server-sid
 **Scheduled task:** `PwCOfficePulse` runs `wscript.exe //B //Nologo run-heartbeat.vbs` every 2 min + Startup shortcut at logon.
 
 **SSID detection order** (PwC laptops often block Location by admin):
-1. `netsh wlan show interfaces`
-2. **`Get-NetConnectionProfile`** (works without Location; normalize `OfficeConnect 11` → `OfficeConnect`)
+1. `netsh wlan show interfaces` (actual WLAN SSID; prefer connected interface)
+2. **`Get-NetConnectionProfile`** only when netsh has no valid SSID (may show captive portal domain like `pwcglb.com`, not the WLAN name `ExternalConnect`)
 3. WMI fallback if needed
+
+Normalize before send: strip ` (Unauthenticated)`, band suffixes (` 2`, ` 5`), and skip transient names like `Identifying...`.
 
 **Identity on agent:** `token` + `serialNumber` (BIOS via `Get-CimInstance Win32_Bios`). Multiple laptops per user via `AgentDevice` table (auto-register, admin can remove).
 

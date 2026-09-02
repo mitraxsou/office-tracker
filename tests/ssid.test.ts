@@ -21,6 +21,11 @@ describe("normalizeSsid", () => {
     expect(isOfficeSsid("OfficeConnect 11", ["OfficeConnect", "ExternalConnect"])).toBe(true);
   });
 
+  it("strips captive portal unauthenticated suffix", () => {
+    expect(normalizeSsid("pwcglb.com 2 (Unauthenticated)")).toBe("pwcglb.com");
+    expect(normalizeSsid("pwcglb.com (unauthenticated)")).toBe("pwcglb.com");
+  });
+
   it("trims whitespace", () => {
     expect(normalizeSsid("  pwcglb.com  ")).toBe("pwcglb.com");
     expect(isOfficeSsid("  pwcglb.com  ", ["pwcglb.com"])).toBe(true);
@@ -37,6 +42,16 @@ describe("isOfficeSsid", () => {
   it("matches pwcglb.com case-insensitively", () => {
     expect(isOfficeSsid("PwCGLB.com", allowlist)).toBe(true);
     expect(isOfficeSsid("PWCGLB.COM", allowlist)).toBe(true);
+  });
+
+  it("matches captive portal profile variants", () => {
+    expect(isOfficeSsid("pwcglb.com 2 (Unauthenticated)", allowlist)).toBe(true);
+    expect(isOfficeSsid("pwcglb.com 5 (Unauthenticated)", allowlist)).toBe(true);
+  });
+
+  it("matches ExternalConnect", () => {
+    expect(isOfficeSsid("ExternalConnect", allowlist)).toBe(true);
+    expect(isOfficeSsid("ExternalConnect 2", allowlist)).toBe(true);
   });
 
   it("rejects unknown SSIDs", () => {

@@ -122,28 +122,84 @@ function Get-LaptopSerial {
     return $null
 }
 
-function Get-CurrentWifiSsid {
-    # Method 1: netsh (needs Location services; often blocked on corp laptops)
+function Test-ValidWifiSsid([string]$Ssid) {
+    if (-not $Ssid) { return $false }
+    $t = $Ssid.Trim()
+    if (-not $t) { return $false }
+    if ($t -match '^(?i)identifying\.{0,3}$') { return $false }
+    if ($t -match '^(?i)unidentified network$') { return $false }
+    return $true
+}
+
+function Normalize-WifiSsid([string]$Ssid) {
+    if (-not (Test-ValidWifiSsid $Ssid)) { return $null }
+    $normalized = $Ssid.Trim()
+    $normalized = $normalized -replace '(?i)\s*\(unauthenticated\)\s*$', ''
+    $normalized = $normalized -replace '\s+\d+$', ''
+    $normalized = $normalized.Trim()
+    if (-not $normalized) { return $null }
+    return $normalized
+}
+
+function Get-WifiSsidFromNetsh {
     try {
         $output = netsh wlan show interfaces 2>$null
-        if ($output) {
-            foreach ($line in $output) {
-                if ($line -match '^\s*SSID\s*:\s*(.+)$' -and $line -notmatch 'BSSID') {
-                    $ssid = $Matches[1].Trim()
-                    if ($ssid) { return @{ Ssid = $ssid; Method = "netsh" } }
+        if (-not $output) { return $null }
+
+        $blocks = @()
+        $currentBlock = @()
+        foreach ($line in $output) {
+            if ($line -match '^\s*$') {
+                if ($currentBlock.Count -gt 0) {
+                    $blocks += ,@($currentBlock)
+                    $currentBlock = @()
                 }
+                continue
+            }
+            $currentBlock += $line
+        }
+        if ($currentBlock.Count -gt 0) { $blocks += ,@($currentBlock) }
+
+        foreach ($block in $blocks) {
+            $state = $null
+            $ssid = $null
+            foreach ($line in $block) {
+                if ($line -match '^\s*State\s*:\s*(.+)$') { $state = $Matches[1].Trim() }
+                if ($line -match '^\s*SSID\s*:\s*(.*)$' -and $line -notmatch 'BSSID') {
+                    $ssid = $Matches[1].Trim()
+                }
+            }
+            if ($state -match '(?i)connected' -and (Test-ValidWifiSsid $ssid)) {
+                return $ssid
+            }
+        }
+
+        foreach ($line in $output) {
+            if ($line -match '^\s*SSID\s*:\s*(.+)$' -and $line -notmatch 'BSSID') {
+                $ssid = $Matches[1].Trim()
+                if (Test-ValidWifiSsid $ssid) { return $ssid }
             }
         }
     } catch {}
+    return $null
+}
 
-    # Method 2: Get-NetConnectionProfile (works WITHOUT Location on many corp laptops)
+function Get-CurrentWifiSsid {
+    # Method 1: netsh wlan (actual WLAN SSID; prefer over connection profile name)
+    $netshSsid = Get-WifiSsidFromNetsh
+    if ($netshSsid) {
+        $normalized = Normalize-WifiSsid $netshSsid
+        if ($normalized) { return @{ Ssid = $normalized; Method = "netsh" } }
+    }
+
+    # Method 2: Get-NetConnectionProfile (fallback; may show captive portal domain, not WLAN SSID)
     try {
         $profile = Get-NetConnectionProfile -ErrorAction Stop |
             Where-Object { $_.InterfaceAlias -like '*Wi-Fi*' -or $_.InterfaceAlias -like '*Wireless*' } |
             Select-Object -First 1
         if ($profile -and $profile.Name) {
-            $ssid = $profile.Name.Trim() -replace '\s+\d+$', ''
-            if ($ssid) { return @{ Ssid = $ssid; Method = "NetConnectionProfile" } }
+            $normalized = Normalize-WifiSsid $profile.Name
+            if ($normalized) { return @{ Ssid = $normalized; Method = "NetConnectionProfile" } }
         }
     } catch {}
 
@@ -152,21 +208,11 @@ function Get-CurrentWifiSsid {
         $wmi = Get-CimInstance -Namespace root/wmi -ClassName MSNdis_80211_ServiceSetIdentifier -ErrorAction Stop |
             Select-Object -First 1
         if ($wmi -and $wmi.Ndis80211Ssid.Ssid) {
-            $ssid = -join ($wmi.Ndis80211Ssid.Ssid | ForEach-Object {
+            $raw = -join ($wmi.Ndis80211Ssid.Ssid | ForEach-Object {
                 if ($_ -ge 32 -and $_ -le 126) { [char]$_ }
             })
-            $ssid = $ssid.Trim() -replace '\s+\d+$', ''
-            if ($ssid) { return @{ Ssid = $ssid; Method = "WMI" } }
-        }
-    } catch {}
-
-    # Method 4: netsh piped to Select-String (last resort)
-    try {
-        $match = netsh wlan show interfaces 2>$null | Select-String -Pattern '^\s*SSID\s*:\s*(.+)$' |
-            Where-Object { $_.Line -notmatch 'BSSID' } | Select-Object -First 1
-        if ($match -and $match.Matches[0].Groups[1].Value) {
-            $ssid = $match.Matches[0].Groups[1].Value.Trim()
-            if ($ssid) { return @{ Ssid = $ssid; Method = "netsh-SelectString" } }
+            $normalized = Normalize-WifiSsid $raw
+            if ($normalized) { return @{ Ssid = $normalized; Method = "WMI" } }
         }
     } catch {}
 
@@ -325,8 +371,8 @@ if ($DryRun) {
     Write-Host "SSID detected: $(if ($ssid) { $ssid } else { '(none)' }) via $ssidMethod"
     if (-not $ssid -and $ssidMethod -eq "none") {
         Write-Host ""
-        Write-Host "Location may be blocked on corp laptops."
-        Write-Host "Agent also tries Get-NetConnectionProfile."
+        Write-Host "WLAN SSID unavailable (Identifying... or Wi-Fi still connecting)."
+        Write-Host "Agent prefers netsh WLAN SSID, then Get-NetConnectionProfile."
         Write-Host "Use dashboard Check in if SSID is still missing."
     }
     Write-Host "VPN (diag):    $(if ($vpnGateway) { $vpnGateway } else { '(not connected)' })"

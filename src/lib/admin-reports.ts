@@ -4,7 +4,7 @@ import { getAppConfig, getUserHoursTarget } from "./app-config";
 import { getTodaySummary, closeStaleOpenVisits, closeEndOfDayOpenVisits } from "./heartbeat-service";
 import { allDayKeysInMonth, currentMonthKey } from "./month-range";
 import { revokeExpiredPendingTokens } from "./token-expiry";
-import { effectiveVisitEnd, roundHours } from "./visits";
+import { daySpanMsForDay, roundHours } from "./visits";
 import { dayBoundsFromKey } from "./timezone-dates";
 
 async function aggregateHoursForDay(userId: string, timezone: string, dayKey: string) {
@@ -29,20 +29,13 @@ async function aggregateHoursForDay(userId: string, timezone: string, dayKey: st
   });
 
   const now = new Date();
-  return visits.reduce((sum, v) => {
-    const start = v.startAt < dayStart ? dayStart : v.startAt;
-    const end = effectiveVisitEnd({
-      endAt: v.endAt,
-      updatedAt: v.updatedAt,
-      startAt: v.startAt,
-      now,
-      staleMs,
-      lastHeartbeatAt: lastHeartbeat?.recordedAt ?? null,
-      dayEnd,
-    });
-    const clippedEnd = end > dayEnd ? dayEnd : end;
-    return sum + Math.max(0, clippedEnd.getTime() - start.getTime());
-  }, 0);
+  return daySpanMsForDay(visits, {
+    dayStart,
+    dayEnd,
+    now,
+    staleMs,
+    lastHeartbeatAt: lastHeartbeat?.recordedAt ?? null,
+  });
 }
 
 export async function getAdminReports(options?: { days?: number; monthKey?: string }) {

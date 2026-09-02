@@ -46,6 +46,7 @@ export function parseDefaultSsidsFromEnv(): string[] {
 export function normalizeSsid(ssid: string): string {
   return ssid
     .trim()
+    .replace(/\s*\(unauthenticated\)\s*$/i, "") // captive portal profile name
     .replace(/\s+\d+$/, "") // "OfficeConnect 11" -> "OfficeConnect" (Get-NetConnectionProfile)
     .trim();
 }

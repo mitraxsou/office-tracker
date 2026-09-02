@@ -20,9 +20,68 @@ export type HeartbeatPoint = {
   inOffice: boolean;
 };
 
+const MS_PER_HOUR = 1000 * 60 * 60;
+const MS_PER_DAY = 24 * MS_PER_HOUR;
+
 export function visitDurationMs(visit: VisitPoint, now = new Date()): number {
   const end = visit.endAt ?? now;
   return Math.max(0, end.getTime() - visit.startAt.getTime());
+}
+
+export type VisitForDaySpan = VisitPoint & {
+  updatedAt?: Date;
+};
+
+/**
+ * Daily total: first check-in to last check-out on the day (gaps between visits count).
+ * Uses effectiveVisitEnd for open visits. Capped at 24 hours.
+ */
+export function daySpanMsForDay(
+  visits: VisitForDaySpan[],
+  params: {
+    dayStart: Date;
+    dayEnd: Date;
+    now: Date;
+    staleMs: number;
+    lastHeartbeatAt: Date | null;
+  }
+): number {
+  if (visits.length === 0) return 0;
+
+  let firstIn: number | null = null;
+  let lastOut: number | null = null;
+
+  for (const v of visits) {
+    const end = effectiveVisitEnd({
+      endAt: v.endAt,
+      updatedAt: v.updatedAt ?? v.startAt,
+      startAt: v.startAt,
+      now: params.now,
+      staleMs: params.staleMs,
+      lastHeartbeatAt: params.lastHeartbeatAt,
+      dayEnd: params.dayEnd,
+    });
+
+    const start = Math.max(v.startAt.getTime(), params.dayStart.getTime());
+    const clippedEnd = Math.min(end.getTime(), params.dayEnd.getTime());
+
+    if (clippedEnd < start) continue;
+
+    if (firstIn === null || start < firstIn) firstIn = start;
+    if (lastOut === null || clippedEnd > lastOut) lastOut = clippedEnd;
+  }
+
+  if (firstIn === null || lastOut === null) return 0;
+
+  const spanMs = Math.max(0, lastOut - firstIn);
+  return Math.min(spanMs, MS_PER_DAY);
+}
+
+export function daySpanHoursForDay(
+  visits: VisitForDaySpan[],
+  params: Parameters<typeof daySpanMsForDay>[1]
+): number {
+  return daySpanMsForDay(visits, params) / MS_PER_HOUR;
 }
 
 /**
@@ -62,9 +121,13 @@ export function effectiveVisitEnd(params: {
   return new Date(lastActivity.getTime() + params.staleMs);
 }
 
+/** Daily total for visits already scoped to one day: first in to last out. */
 export function totalHoursFromVisits(visits: VisitPoint[], now = new Date()): number {
-  const totalMs = visits.reduce((sum, v) => sum + visitDurationMs(v, now), 0);
-  return totalMs / (1000 * 60 * 60);
+  if (visits.length === 0) return 0;
+  const firstIn = Math.min(...visits.map((v) => v.startAt.getTime()));
+  const lastOut = Math.max(...visits.map((v) => (v.endAt ?? now).getTime()));
+  const spanMs = Math.max(0, lastOut - firstIn);
+  return Math.min(spanMs, MS_PER_DAY) / MS_PER_HOUR;
 }
 
 export function meetsHoursTarget(

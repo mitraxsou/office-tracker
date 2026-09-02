@@ -149,8 +149,8 @@ export function VisitCalendar({
       </div>
 
       <p className="text-xs text-muted">
-        Green = daily target met ({hoursTarget}h). Orange tint = visits but below target. Click a
-        day for visit details.
+        Green = daily target met ({hoursTarget}h). Orange tint = visits but below target. Daily
+        total is first check-in to last check-out (gaps count). Click a day for visit details.
       </p>
 
       {selectedDate && (
@@ -199,7 +199,7 @@ function VisitDayDetail({
         <div>
           <h3 className="font-medium text-accent">{dayLabel}</h3>
           <p className="mt-1 text-sm text-muted">
-            Total: {formatHours(totalHours)} / {hoursTarget}h target
+            Total: {formatHours(totalHours)} / {hoursTarget}h target (first in to last out)
             {" · "}
             <span className={metTarget ? "text-green-400" : "text-accent"}>
               {metTarget ? "Target met" : "Below target"}

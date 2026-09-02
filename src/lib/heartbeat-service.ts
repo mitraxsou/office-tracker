@@ -2,7 +2,7 @@ import { prisma } from "./db";
 import { DEFAULT_OFFICE_SSIDS, isOfficeSsid } from "./constants";
 import { getAppConfig, getAgentStaleMs } from "./app-config";
 import { maybePurgeOldHeartbeats } from "./heartbeat-retention";
-import { effectiveVisitEnd, dayKeyInTimezone } from "./visits";
+import { daySpanMsForDay, dayKeyInTimezone, effectiveVisitEnd } from "./visits";
 import { dayBoundsFromKey, getDayBounds } from "./timezone-dates";
 
 export async function processHeartbeat(params: {
@@ -243,20 +243,13 @@ export async function getTodaySummary(userId: string, timezone: string, hoursTar
     lastHeartbeat !== null && now.getTime() - lastHeartbeat.recordedAt.getTime() <= staleMs;
 
   const openVisit = visits.find((v) => v.endAt === null);
-  const totalMs = visits.reduce((sum, v) => {
-    const start = v.startAt < dayStart ? dayStart : v.startAt;
-    const end = effectiveVisitEnd({
-      endAt: v.endAt,
-      updatedAt: v.updatedAt,
-      startAt: v.startAt,
-      now,
-      staleMs,
-      lastHeartbeatAt: lastHeartbeat?.recordedAt ?? null,
-      dayEnd,
-    });
-    const clippedEnd = end > dayEnd ? dayEnd : end;
-    return sum + Math.max(0, clippedEnd.getTime() - start.getTime());
-  }, 0);
+  const totalMs = daySpanMsForDay(visits, {
+    dayStart,
+    dayEnd,
+    now,
+    staleMs,
+    lastHeartbeatAt: lastHeartbeat?.recordedAt ?? null,
+  });
 
   const totalHours = totalMs / (1000 * 60 * 60);
 
