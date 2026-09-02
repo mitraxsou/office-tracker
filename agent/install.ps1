@@ -2,6 +2,7 @@
 #
 # Installs to:  %LOCALAPPDATA%\OfficeTracker\
 # Scheduled:   PwCOfficePulse task every 2 minutes (hidden via VBS wrapper)
+#               PwCOfficePulseUpdate task every hour (agent update check)
 # Startup:     shortcut in user Startup folder
 #
 # Safe to re-run: detects an existing install and refreshes files + task silently.
@@ -21,7 +22,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 $TaskName = "PwCOfficePulse"
+$UpdateTaskName = "PwCOfficePulseUpdate"
 $TaskDescription = "PwC Office Pulse - office hours tracker"
+$UpdateTaskDescription = "PwC Office Pulse - hourly agent update check"
 $LegacyTaskNames = @("OfficeTrackerHeartbeat", "PwCOfficePulse")
 
 function Test-IsAdmin {
@@ -169,6 +172,50 @@ function Register-HiddenTask {
     $shortcut.Save()
 }
 
+function New-UpdateHiddenRunner {
+    param(
+        [string]$ScriptPath,
+        [string]$Dir
+    )
+    $txtPath = Publish-AgentScriptTxt -Ps1Path $ScriptPath
+    $vbsPath = Join-Path $Dir "run-update.vbs"
+    $vbsContent = @"
+CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""& { `$Silent=`$true; `$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s }""", 0, False
+"@
+    Set-Content -Path $vbsPath -Value $vbsContent -Encoding ASCII
+    return $vbsPath
+}
+
+function Register-HourlyUpdateTask {
+    param([string]$InstallDir)
+
+    $updateScript = Join-Path $InstallDir "update.ps1"
+    if (-not (Test-Path $updateScript)) { return }
+
+    $vbsPath = New-UpdateHiddenRunner -ScriptPath $updateScript -Dir $InstallDir
+    $wscript = (Get-Command wscript.exe).Source
+    $actionArgs = "//B //Nologo `"$vbsPath`""
+    $action = New-ScheduledTaskAction -Execute $wscript -Argument $actionArgs
+    $hourlyTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
+        -RepetitionInterval (New-TimeSpan -Hours 1) `
+        -RepetitionDuration (New-TimeSpan -Days 3650)
+    $logonTrigger = New-ScheduledTaskTrigger -AtLogOn
+    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
+        -LogonType Interactive -RunLevel Limited
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+        -StartWhenAvailable -MultipleInstances IgnoreNew
+
+    try {
+        Register-ScheduledTask -TaskName $UpdateTaskName -Action $action `
+            -Trigger @($hourlyTrigger, $logonTrigger) -Principal $principal -Settings $settings `
+            -Description $UpdateTaskDescription -Force | Out-Null
+    } catch {
+        Register-ScheduledTask -TaskName $UpdateTaskName -Action $action `
+            -Trigger $hourlyTrigger -Principal $principal -Settings $settings `
+            -Description $UpdateTaskDescription -Force | Out-Null
+    }
+}
+
 function Copy-AgentScripts {
     param(
         [string]$SourceDir,
@@ -208,6 +255,7 @@ function Install-UserLevel {
 
     $vbsPath = New-HiddenRunner -ScriptPath $heartbeatScript -Dir $installDir
     Register-HiddenTask -VbsPath $vbsPath -InstallDir $installDir
+    Register-HourlyUpdateTask -InstallDir $installDir
 
     # Send first heartbeat immediately so admin/settings show "bound" within seconds
     try {
@@ -260,6 +308,7 @@ function Install-AdminLevel {
     $heartbeatScript = Join-Path $installDir "office-heartbeat.ps1"
     $vbsPath = New-HiddenRunner -ScriptPath $heartbeatScript -Dir $localConfigDir
     Register-HiddenTask -VbsPath $vbsPath -InstallDir $localConfigDir
+    Register-HourlyUpdateTask -InstallDir $localConfigDir
 
     Write-Host ""
     Write-Host "PwC Office Pulse installed (admin / Program Files)" -ForegroundColor Green

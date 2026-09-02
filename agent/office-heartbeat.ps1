@@ -10,6 +10,7 @@ param(
 $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ConfigFetchIntervalRuns = 5
+$UpdateCheckIntervalMinutes = 60
 
 function Write-Log([string]$Message) {
     $logDir = Join-Path $env:LOCALAPPDATA "OfficeTracker\logs"
@@ -99,14 +100,56 @@ function Invoke-AgentSelfUpdate([string]$ApiUrl, [string]$Token) {
     }
     try {
         Write-Log "Auto-update: server has newer agent version"
-        $txtPath = [System.IO.Path]::ChangeExtension($updateScript, ".txt")
-        Copy-Item $updateScript $txtPath -Force
-        $escapedApi = $ApiUrl -replace "'", "''"
-        $escapedToken = $Token -replace "'", "''"
-        powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden `
-            -Command "& { `$ApiUrl='$escapedApi'; `$Token='$escapedToken'; `$Silent=`$true; `$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s }" | Out-Null
+        Invoke-AgentUpdateScript -UpdateScript $updateScript -ApiUrl $ApiUrl -Token $Token
     } catch {
         Write-Log "WARN auto-update failed: $($_.Exception.Message)"
+    }
+}
+
+function Get-LastUpdateCheckPath {
+    Join-Path $env:LOCALAPPDATA "OfficeTracker\last-update-check.txt"
+}
+
+function Test-ShouldRunHourlyUpdateCheck {
+    $path = Get-LastUpdateCheckPath
+    if (-not (Test-Path $path)) { return $true }
+    try {
+        $last = [DateTime]::Parse((Get-Content $path -Raw).Trim())
+        return ((Get-Date) - $last).TotalMinutes -ge $UpdateCheckIntervalMinutes
+    } catch {
+        return $true
+    }
+}
+
+function Set-LastUpdateCheckTime {
+    Set-Content -Path (Get-LastUpdateCheckPath) -Value (Get-Date -Format "o") -Encoding UTF8
+}
+
+function Invoke-AgentUpdateScript {
+    param(
+        [string]$UpdateScript,
+        [string]$ApiUrl,
+        [string]$Token
+    )
+    $txtPath = [System.IO.Path]::ChangeExtension($UpdateScript, ".txt")
+    Copy-Item $UpdateScript $txtPath -Force
+    $escapedApi = $ApiUrl -replace "'", "''"
+    $escapedToken = $Token -replace "'", "''"
+    powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden `
+        -Command "& { `$ApiUrl='$escapedApi'; `$Token='$escapedToken'; `$Silent=`$true; `$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s }" | Out-Null
+}
+
+function Invoke-HourlyUpdateCheck([string]$ApiUrl, [string]$Token) {
+    $updateScript = Join-Path $env:LOCALAPPDATA "OfficeTracker\update.ps1"
+    if (-not (Test-Path $updateScript)) {
+        Write-Log "WARN update.ps1 missing; cannot run hourly update check"
+        return
+    }
+    try {
+        Write-Log "Hourly update check"
+        Invoke-AgentUpdateScript -UpdateScript $updateScript -ApiUrl $ApiUrl -Token $Token
+    } catch {
+        Write-Log "WARN hourly update check failed: $($_.Exception.Message)"
     }
 }
 
@@ -330,8 +373,10 @@ $token = $localConfig.token
 $networkWaitSec = if ($isResumeRun) { 90 } else { 60 }
 Wait-NetworkReady -ApiUrl $apiUrl -MaxWaitSec $networkWaitSec | Out-Null
 
+$hourlyUpdateCheck = Test-ShouldRunHourlyUpdateCheck
+
 try {
-    $serverConfig = Get-ServerConfig -ApiUrl $apiUrl -Token $token
+    $serverConfig = Get-ServerConfig -ApiUrl $apiUrl -Token $token -Force:$hourlyUpdateCheck
 } catch {
     Write-Log "ERROR: Cannot fetch server config"
     if ($DryRun) { Write-Host "ERROR: Cannot fetch server config: $($_.Exception.Message)"; exit 1 }
@@ -340,6 +385,10 @@ try {
 
 if (Test-NeedsAgentUpdate $serverConfig) {
     Invoke-AgentSelfUpdate -ApiUrl $apiUrl -Token $token
+    Set-LastUpdateCheckTime
+} elseif ($hourlyUpdateCheck) {
+    Invoke-HourlyUpdateCheck -ApiUrl $apiUrl -Token $token
+    Set-LastUpdateCheckTime
 }
 
 Set-RunCounter ((Get-RunCounter) + 1)

@@ -15,7 +15,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 $TaskName = "PwCOfficePulse"
+$UpdateTaskName = "PwCOfficePulseUpdate"
 $TaskDescription = "PwC Office Pulse - office hours tracker"
+$UpdateTaskDescription = "PwC Office Pulse - hourly agent update check"
 $LegacyTaskNames = @("OfficeTrackerHeartbeat", "PwCOfficePulse")
 $ExtractFolder = "PwCOfficePulse"
 $AgentFiles = @("office-heartbeat.ps1", "update.ps1", "uninstall.ps1", "install.ps1", "version.txt")
@@ -84,6 +86,47 @@ CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -Ex
 "@
     Set-Content -Path $vbsPath -Value $vbsContent -Encoding ASCII
     return $vbsPath
+}
+
+function New-UpdateHiddenRunner {
+    param([string]$ScriptPath, [string]$Dir)
+    $txtPath = Publish-AgentScriptTxt -Ps1Path $ScriptPath
+    $vbsPath = Join-Path $Dir "run-update.vbs"
+    $vbsContent = @"
+CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""& { `$Silent=`$true; `$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s }""", 0, False
+"@
+    Set-Content -Path $vbsPath -Value $vbsContent -Encoding ASCII
+    return $vbsPath
+}
+
+function Register-HourlyUpdateTask {
+    param([string]$InstallDir)
+
+    $updateScript = Join-Path $InstallDir "update.ps1"
+    if (-not (Test-Path $updateScript)) { return }
+
+    $vbsPath = New-UpdateHiddenRunner -ScriptPath $updateScript -Dir $InstallDir
+    $wscript = (Get-Command wscript.exe).Source
+    $actionArgs = "//B //Nologo `"$vbsPath`""
+    $action = New-ScheduledTaskAction -Execute $wscript -Argument $actionArgs
+    $hourlyTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
+        -RepetitionInterval (New-TimeSpan -Hours 1) `
+        -RepetitionDuration (New-TimeSpan -Days 3650)
+    $logonTrigger = New-ScheduledTaskTrigger -AtLogOn
+    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
+        -LogonType Interactive -RunLevel Limited
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+        -StartWhenAvailable -MultipleInstances IgnoreNew
+
+    try {
+        Register-ScheduledTask -TaskName $UpdateTaskName -Action $action `
+            -Trigger @($hourlyTrigger, $logonTrigger) -Principal $principal -Settings $settings `
+            -Description $UpdateTaskDescription -Force | Out-Null
+    } catch {
+        Register-ScheduledTask -TaskName $UpdateTaskName -Action $action `
+            -Trigger $hourlyTrigger -Principal $principal -Settings $settings `
+            -Description $UpdateTaskDescription -Force | Out-Null
+    }
 }
 
 function New-HeartbeatTaskTriggers {
@@ -214,33 +257,36 @@ try {
     $localVersion = Get-LocalAgentVersion
     if ((Compare-AgentVersion $newVersion $localVersion) -le 0) {
         Write-UpdateLog "SKIP already at v$localVersion (server v$newVersion)"
+        Register-HourlyUpdateTask -InstallDir $installDir
         if (-not $Silent) { Write-Host "Agent already up to date (v$localVersion)." -ForegroundColor Green }
-        exit 0
-    }
+    } else {
+        Write-UpdateLog "Updating v$localVersion -> v$newVersion"
 
-    Write-UpdateLog "Updating v$localVersion -> v$newVersion"
-
-    foreach ($file in $AgentFiles) {
-        $src = Join-Path $sourceDir $file
-        if (Test-Path $src) {
-            Copy-Item $src (Join-Path $installDir $file) -Force
+        foreach ($file in $AgentFiles) {
+            $src = Join-Path $sourceDir $file
+            if (Test-Path $src) {
+                Copy-Item $src (Join-Path $installDir $file) -Force
+            }
         }
-    }
 
-    $heartbeatScript = Join-Path $installDir "office-heartbeat.ps1"
-    Publish-AgentScriptTxt -Ps1Path $heartbeatScript | Out-Null
-    Publish-AgentScriptTxt -Ps1Path (Join-Path $installDir "update.ps1") | Out-Null
-    $vbsPath = New-HiddenRunner -ScriptPath $heartbeatScript -Dir $installDir
+        $heartbeatScript = Join-Path $installDir "office-heartbeat.ps1"
+        Publish-AgentScriptTxt -Ps1Path $heartbeatScript | Out-Null
+        Publish-AgentScriptTxt -Ps1Path (Join-Path $installDir "update.ps1") | Out-Null
+        $vbsPath = New-HiddenRunner -ScriptPath $heartbeatScript -Dir $installDir
 
-    $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
-    if ($task) {
-        Refresh-ScheduledTask -VbsPath $vbsPath -InstallDir $installDir
-        Write-UpdateLog "Refreshed scheduled task (did not stop running heartbeat)"
-    }
+        $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+        if ($task) {
+            Refresh-ScheduledTask -VbsPath $vbsPath -InstallDir $installDir
+            Write-UpdateLog "Refreshed scheduled task (did not stop running heartbeat)"
+        }
 
-    Write-UpdateLog "OK updated to v$newVersion"
-    if (-not $Silent) {
-        Write-Host "PwC Office Pulse updated to v$newVersion." -ForegroundColor Green
+        Register-HourlyUpdateTask -InstallDir $installDir
+        Write-UpdateLog "Refreshed hourly update task"
+
+        Write-UpdateLog "OK updated to v$newVersion"
+        if (-not $Silent) {
+            Write-Host "PwC Office Pulse updated to v$newVersion." -ForegroundColor Green
+        }
     }
 } catch {
     Write-UpdateLog "ERROR $($_.Exception.Message)"

@@ -1,7 +1,7 @@
 # PwC Office Pulse uninstaller. No admin for default user-level install.
 
 $ErrorActionPreference = "Stop"
-$LegacyTaskNames = @("OfficeTrackerHeartbeat", "PwCOfficePulse")
+$LegacyTaskNames = @("OfficeTrackerHeartbeat", "PwCOfficePulse", "PwCOfficePulseUpdate")
 $LegacyStartupShortcuts = @("OfficeTrackerHeartbeat.lnk", "PwC Office Pulse.lnk")
 
 function Write-UninstallLog([string]$Message) {
