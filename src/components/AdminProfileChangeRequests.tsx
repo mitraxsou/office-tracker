@@ -80,7 +80,8 @@ export function AdminProfileChangeRequests() {
         <div>
           <h2 className="text-lg font-medium">Profile change requests</h2>
           <p className="text-sm text-muted">
-            Users request updates to display name or PwC email. Approve to update their account.
+            Users and admins can request display name or PwC email updates. Any admin can approve
+            to update the account.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

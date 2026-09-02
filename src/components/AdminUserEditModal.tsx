@@ -11,10 +11,12 @@ type Props = {
 };
 
 export function AdminUserEditModal({ userId, email, name, onClose, onSaved }: Props) {
-  const [editName, setEditName] = useState(name ?? "");
-  const [editEmail, setEditEmail] = useState(email);
+  const [requestedName, setRequestedName] = useState("");
+  const [requestedEmail, setRequestedEmail] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -28,25 +30,30 @@ export function AdminUserEditModal({ userId, email, name, onClose, onSaved }: Pr
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(false);
 
-    const res = await fetch(`/api/admin/users/${userId}`, {
-      method: "PATCH",
+    const body: { requestedName?: string; requestedEmail?: string; message?: string } = {};
+    const nameTrimmed = requestedName.trim();
+    const emailTrimmed = requestedEmail.trim();
+    if (nameTrimmed) body.requestedName = nameTrimmed;
+    if (emailTrimmed) body.requestedEmail = emailTrimmed;
+    if (message.trim()) body.message = message.trim();
+
+    const res = await fetch(`/api/admin/users/${userId}/profile-change-request`, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: editName,
-        email: editEmail,
-      }),
+      body: JSON.stringify(body),
     });
 
     setLoading(false);
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      setError(body.error ?? "Failed to update profile");
+      setError(body.error ?? "Failed to submit profile change request");
       return;
     }
 
+    setSuccess(true);
     onSaved();
-    onClose();
   }
 
   return (
@@ -62,42 +69,64 @@ export function AdminUserEditModal({ userId, email, name, onClose, onSaved }: Pr
         aria-labelledby="edit-user-title"
       >
         <h3 id="edit-user-title" className="mb-1 text-lg font-medium">
-          Edit profile
+          Request profile change
         </h3>
         <p className="mb-4 text-sm text-muted">
-          Admins can correct name and email directly. Changes apply immediately.
+          Submit a name or PwC email change for {email}. An admin must approve it under User
+          requests before it applies.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <label className="block text-sm">
-            <span className="text-muted">Display name</span>
+            <span className="text-muted">New display name (optional)</span>
             <input
               type="text"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
+              value={requestedName}
+              onChange={(e) => setRequestedName(e.target.value)}
+              placeholder={name ?? "(not set)"}
               className="mt-1 w-full rounded-lg border px-3 py-2"
             />
           </label>
           <label className="block text-sm">
-            <span className="text-muted">PwC email</span>
+            <span className="text-muted">New PwC email (optional)</span>
             <input
               type="email"
-              required
-              value={editEmail}
-              onChange={(e) => setEditEmail(e.target.value)}
+              value={requestedEmail}
+              onChange={(e) => setRequestedEmail(e.target.value)}
+              placeholder={email}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="text-muted">Note (optional)</span>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={2}
               className="mt-1 w-full rounded-lg border px-3 py-2"
             />
           </label>
 
           {error && <p className="text-sm text-red-400">{error}</p>}
+          {success && (
+            <p className="text-sm text-green-400">
+              Profile change request submitted for admin review.
+            </p>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose} className="btn-secondary px-4 py-2 text-sm">
-              Cancel
+              {success ? "Close" : "Cancel"}
             </button>
-            <button type="submit" disabled={loading} className="btn-primary px-4 py-2 text-sm disabled:opacity-50">
-              {loading ? "Saving..." : "Save changes"}
-            </button>
+            {!success && (
+              <button
+                type="submit"
+                disabled={loading || (!requestedName.trim() && !requestedEmail.trim())}
+                className="btn-primary px-4 py-2 text-sm disabled:opacity-50"
+              >
+                {loading ? "Submitting..." : "Submit request"}
+              </button>
+            )}
           </div>
         </form>
       </div>

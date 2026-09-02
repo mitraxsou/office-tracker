@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { enforcePasswordChangeIfRequired } from "@/lib/session-guards";
 import { prisma } from "@/lib/db";
-import { getProfileChangeBlockReason } from "@/lib/profile-change-requests";
+import { getProfileChangeBlockReason, getUserProfileChangeRequestState } from "@/lib/profile-change-requests";
 import { AppNav } from "@/components/AppNav";
 import { AdminSubNav } from "@/components/AdminSubNav";
 import { AdminUserReport } from "@/components/AdminUserReport";
@@ -25,6 +25,7 @@ export default async function AdminUserReportPage({
   const profileChangeBlockedMessage = target
     ? getProfileChangeBlockReason(target.email)
     : null;
+  const profileChangeState = target ? await getUserProfileChangeRequestState(id) : null;
 
   return (
     <>
@@ -35,6 +36,7 @@ export default async function AdminUserReportPage({
           userId={id}
           profileChangeBlocked={!!profileChangeBlockedMessage}
           profileChangeBlockedMessage={profileChangeBlockedMessage}
+          profileChangeOpenRequest={profileChangeState?.openRequest ?? null}
         />
       </main>
     </>

@@ -441,7 +441,7 @@ export function AdminUsersDashboard() {
                   onClick={() => setEditingUser(u)}
                   className="text-accent hover:underline"
                 >
-                  Edit profile
+                  Request profile change
                 </button>
               </div>
               <p className="mt-1 text-xs text-muted">

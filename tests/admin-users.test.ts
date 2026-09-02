@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  ADMIN_PROFILE_CHANGE_REQUIRES_APPROVAL,
   buildUserSearchWhere,
+  getAdminDirectProfileUpdateError,
   parseAdminUsersListParams,
-  validateAdminDirectProfileUpdate,
 } from "../src/lib/admin-users";
 
 describe("parseAdminUsersListParams", () => {
@@ -55,41 +56,20 @@ describe("buildUserSearchWhere", () => {
   });
 });
 
-describe("validateAdminDirectProfileUpdate", () => {
-  it("accepts valid name and email changes", () => {
-    const result = validateAdminDirectProfileUpdate({
-      currentName: "Alice",
-      currentEmail: "alice@pwc.com",
-      name: "Alice Smith",
-      email: "alice.smith@uk.pwc.com",
-    });
-    expect(result).toEqual({
-      updates: {
-        name: "Alice Smith",
-        email: "alice.smith@uk.pwc.com",
-      },
-    });
+describe("getAdminDirectProfileUpdateError", () => {
+  it("rejects direct name updates", () => {
+    expect(getAdminDirectProfileUpdateError({ name: "Alice Smith" })).toBe(
+      ADMIN_PROFILE_CHANGE_REQUIRES_APPROVAL,
+    );
   });
 
-  it("rejects non-PwC email", () => {
-    const result = validateAdminDirectProfileUpdate({
-      currentName: "Alice",
-      currentEmail: "alice@pwc.com",
-      email: "alice@gmail.com",
-    });
-    expect(result).toEqual({
-      error:
-        "Email must be a PwC address (for example user@pwc.com or user@uk.pwc.com)",
-    });
+  it("rejects direct email updates", () => {
+    expect(getAdminDirectProfileUpdateError({ email: "alice@uk.pwc.com" })).toBe(
+      ADMIN_PROFILE_CHANGE_REQUIRES_APPROVAL,
+    );
   });
 
-  it("rejects when nothing changed", () => {
-    const result = validateAdminDirectProfileUpdate({
-      currentName: "Alice",
-      currentEmail: "alice@pwc.com",
-      name: "Alice",
-      email: "alice@pwc.com",
-    });
-    expect(result).toEqual({ error: "No profile changes to apply" });
+  it("allows role-only updates", () => {
+    expect(getAdminDirectProfileUpdateError({})).toBeNull();
   });
 });

@@ -14,6 +14,7 @@ import { formatHours, formatTime } from "@/lib/visits";
 import { AdminResetPasswordButton } from "./AdminResetPasswordButton";
 import { AdminUserProfileChangeForm } from "./AdminUserProfileChangeForm";
 import { AdminGrantComplianceExemption } from "./AdminGrantComplianceExemption";
+import type { ProfileChangeRequestSummary } from "@/lib/profile-change-requests";
 
 type UserReport = {
   user: {
@@ -96,10 +97,12 @@ export function AdminUserReport({
   userId,
   profileChangeBlocked,
   profileChangeBlockedMessage,
+  profileChangeOpenRequest,
 }: {
   userId: string;
   profileChangeBlocked?: boolean;
   profileChangeBlockedMessage?: string | null;
+  profileChangeOpenRequest?: ProfileChangeRequestSummary | null;
 }) {
   const router = useRouter();
   const [monthKey, setMonthKey] = useState(() => currentMonthKey("Asia/Kolkata"));
@@ -440,6 +443,7 @@ export function AdminUserReport({
           userId={userId}
           currentName={data.user.name}
           currentEmail={data.user.email}
+          openRequest={profileChangeOpenRequest}
           blocked={profileChangeBlocked}
           blockedMessage={profileChangeBlockedMessage}
         />

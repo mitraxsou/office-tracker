@@ -1,9 +1,3 @@
-import {
-  getProfileChangeBlockReason,
-  isPwcEmail,
-  normalizeProfileEmail,
-} from "./profile-change-requests";
-
 export const DEFAULT_ADMIN_USERS_PAGE_SIZE = 20;
 export const MAX_ADMIN_USERS_PAGE_SIZE = 100;
 
@@ -38,51 +32,15 @@ export function buildUserSearchWhere(search: string) {
   };
 }
 
-const MAX_NAME_LENGTH = 120;
+export const ADMIN_PROFILE_CHANGE_REQUIRES_APPROVAL =
+  "Name and email changes require admin approval. Submit a profile change request instead.";
 
-function normalizeName(name: string | null | undefined): string | null {
-  const trimmed = name?.trim() ?? "";
-  if (!trimmed) return null;
-  return trimmed.slice(0, MAX_NAME_LENGTH);
-}
-
-export function validateAdminDirectProfileUpdate(params: {
-  currentName: string | null;
-  currentEmail: string;
+export function getAdminDirectProfileUpdateError(body: {
   name?: string;
   email?: string;
-}): { error: string } | { updates: { name?: string | null; email?: string } } {
-  const blockReason = getProfileChangeBlockReason(params.currentEmail);
-  if (blockReason) {
-    return { error: blockReason };
+}): string | null {
+  if (body.name !== undefined || body.email !== undefined) {
+    return ADMIN_PROFILE_CHANGE_REQUIRES_APPROVAL;
   }
-
-  const updates: { name?: string | null; email?: string } = {};
-
-  if (params.name !== undefined) {
-    const normalized = normalizeName(params.name);
-    const currentName = normalizeName(params.currentName);
-    if (normalized !== currentName) {
-      updates.name = normalized;
-    }
-  }
-
-  if (params.email !== undefined) {
-    const normalized = normalizeProfileEmail(params.email);
-    const currentEmail = normalizeProfileEmail(params.currentEmail);
-    if (!isPwcEmail(normalized)) {
-      return {
-        error: "Email must be a PwC address (for example user@pwc.com or user@uk.pwc.com)",
-      };
-    }
-    if (normalized !== currentEmail) {
-      updates.email = normalized;
-    }
-  }
-
-  if (Object.keys(updates).length === 0) {
-    return { error: "No profile changes to apply" };
-  }
-
-  return { updates };
+  return null;
 }

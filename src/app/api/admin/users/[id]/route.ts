@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit-log";
-import { validateAdminDirectProfileUpdate } from "@/lib/admin-users";
+import { getAdminDirectProfileUpdateError } from "@/lib/admin-users";
 
 const VALID_ROLES = new Set(["admin", "user"]);
 
@@ -25,10 +25,14 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const hasRole = body.role !== undefined;
-  const hasProfile = body.name !== undefined || body.email !== undefined;
+  const profileUpdateError = getAdminDirectProfileUpdateError(body);
+  if (profileUpdateError) {
+    return NextResponse.json({ error: profileUpdateError }, { status: 400 });
+  }
 
-  if (!hasRole && !hasProfile) {
+  const hasRole = body.role !== undefined;
+
+  if (!hasRole) {
     return NextResponse.json({ error: "No updates provided" }, { status: 400 });
   }
 
@@ -58,37 +62,9 @@ export async function PATCH(
     }
   }
 
-  let profileUpdates: { name?: string | null; email?: string } | null = null;
-  if (hasProfile) {
-    const validation = validateAdminDirectProfileUpdate({
-      currentName: target.name,
-      currentEmail: target.email,
-      ...(body.name !== undefined ? { name: body.name } : {}),
-      ...(body.email !== undefined ? { email: body.email } : {}),
-    });
-    if ("error" in validation) {
-      return NextResponse.json({ error: validation.error }, { status: 400 });
-    }
-    profileUpdates = validation.updates;
-
-    if (profileUpdates.email) {
-      const existing = await prisma.user.findUnique({
-        where: { email: profileUpdates.email },
-        select: { id: true },
-      });
-      if (existing && existing.id !== id) {
-        return NextResponse.json({ error: "That email is already registered" }, { status: 409 });
-      }
-    }
-  }
-
   const data: Prisma.UserUpdateInput = {};
   if (hasRole && body.role && target.role !== body.role) {
     data.role = body.role;
-  }
-  if (profileUpdates) {
-    if (profileUpdates.name !== undefined) data.name = profileUpdates.name;
-    if (profileUpdates.email) data.email = profileUpdates.email;
   }
 
   if (Object.keys(data).length === 0) {
@@ -117,21 +93,6 @@ export async function PATCH(
       action: "user_role_change",
       targetUserId: id,
       details: { from: target.role, to: body.role },
-    });
-  }
-
-  if (profileUpdates) {
-    await logAuditEvent({
-      actorId: admin.id,
-      action: "admin_profile_edit",
-      targetUserId: id,
-      details: {
-        from: { name: target.name, email: target.email },
-        to: {
-          ...(profileUpdates.name !== undefined ? { name: profileUpdates.name } : {}),
-          ...(profileUpdates.email ? { email: profileUpdates.email } : {}),
-        },
-      },
     });
   }
 
