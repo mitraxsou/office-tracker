@@ -57,9 +57,8 @@ function isManualSource(source: string): boolean {
 
 /**
  * Daily total: first check-in to last check-out on the day (gaps between visits count).
- * Open visits on the current day extend to now (or effectiveVisitEnd).
- * Manual check-out caps the day only when there is no open visit (user left office).
- * Last in-office heartbeat extends wifi days when no open visit and no manual cap.
+ * lastOut is the max of all visit effective ends, last in-office heartbeat, and now for
+ * an open visit on the current day. Manual check-out does not cap later office activity.
  * Capped at 24 hours.
  */
 export function daySpanMsForDay(
@@ -94,23 +93,34 @@ export function daySpanMsForDay(
 
   if (firstIn === null) return 0;
 
-  const manualEndsOnDay = visits
-    .filter(
-      (v) =>
-        isManualSource(v.source) &&
-        v.endAt !== null &&
-        v.endAt.getTime() >= dayStartMs &&
-        v.endAt.getTime() <= dayEndMs
-    )
-    .map((v) => v.endAt!.getTime());
-
-  const latestManualEnd =
-    manualEndsOnDay.length > 0 ? Math.max(...manualEndsOnDay) : null;
-
   const openVisit = visits.find((v) => v.endAt === null);
   const isCurrentDay = params.now.getTime() <= dayEndMs;
 
   let lastOut: number | null = null;
+
+  for (const v of visits) {
+    if (v.endAt === null && isManualSource(v.source) && isCurrentDay) {
+      continue;
+    }
+    const end = effectiveVisitEnd({
+      endAt: v.endAt,
+      updatedAt: v.updatedAt ?? v.startAt,
+      startAt: v.startAt,
+      now: params.now,
+      staleMs: params.staleMs,
+      lastHeartbeatAt: params.lastHeartbeatAt,
+      dayEnd: params.dayEnd,
+    });
+    const clippedEnd = Math.min(end.getTime(), dayEndMs);
+    const start = clipToDay(v.startAt.getTime(), params.dayStart, params.dayEnd);
+    if (start === null || clippedEnd < start) continue;
+    if (lastOut === null || clippedEnd > lastOut) lastOut = clippedEnd;
+  }
+
+  if (lastHb) {
+    const hbEnd = Math.min(lastHb.getTime(), dayEndMs);
+    if (lastOut === null || hbEnd > lastOut) lastOut = hbEnd;
+  }
 
   if (openVisit && isCurrentDay) {
     const end = isManualSource(openVisit.source)
@@ -124,30 +134,8 @@ export function daySpanMsForDay(
           lastHeartbeatAt: params.lastHeartbeatAt,
           dayEnd: params.dayEnd,
         });
-    lastOut = Math.min(end.getTime(), dayEndMs);
-  } else if (latestManualEnd !== null) {
-    lastOut = Math.min(latestManualEnd, dayEndMs);
-  } else {
-    for (const v of visits) {
-      const end = effectiveVisitEnd({
-        endAt: v.endAt,
-        updatedAt: v.updatedAt ?? v.startAt,
-        startAt: v.startAt,
-        now: params.now,
-        staleMs: params.staleMs,
-        lastHeartbeatAt: params.lastHeartbeatAt,
-        dayEnd: params.dayEnd,
-      });
-      const clippedEnd = Math.min(end.getTime(), dayEndMs);
-      const start = clipToDay(v.startAt.getTime(), params.dayStart, params.dayEnd);
-      if (start === null || clippedEnd < start) continue;
-      if (lastOut === null || clippedEnd > lastOut) lastOut = clippedEnd;
-    }
-
-    if (lastHb) {
-      const hbEnd = Math.min(lastHb.getTime(), dayEndMs);
-      if (lastOut === null || hbEnd > lastOut) lastOut = hbEnd;
-    }
+    const endMs = Math.min(end.getTime(), dayEndMs);
+    if (lastOut === null || endMs > lastOut) lastOut = endMs;
   }
 
   if (lastOut === null) return 0;

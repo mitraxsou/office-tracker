@@ -277,7 +277,7 @@ describe("hours calculations", () => {
     expect(spanMs).toBeCloseTo(5 * ms(60), 0);
   });
 
-  it("manual checkout caps day before later heartbeat", () => {
+  it("later in-office heartbeat extends past closed manual checkout", () => {
     const dayStart = new Date("2026-08-27T00:00:00+05:30");
     const dayEnd = new Date("2026-08-27T23:59:59.999+05:30");
     const visits = [
@@ -297,7 +297,47 @@ describe("hours calculations", () => {
       lastHeartbeatAt: new Date("2026-08-27T17:30:00+05:30"),
       lastInOfficeHeartbeatAt: new Date("2026-08-27T17:30:00+05:30"),
     });
-    expect(spanMs).toBeCloseTo(7 * ms(60), 0);
+    expect(spanMs).toBeCloseTo(8.5 * ms(60), 0);
+  });
+
+  it("closed manual then closed wifi spans first-in to last-out (Arnab)", () => {
+    const dayStart = new Date("2026-09-02T00:00:00+05:30");
+    const dayEnd = new Date("2026-09-02T23:59:59.999+05:30");
+    const visits = [
+      {
+        id: "1",
+        startAt: new Date("2026-09-02T15:02:00+05:30"),
+        endAt: new Date("2026-09-02T15:34:00+05:30"),
+        source: "manual",
+        updatedAt: new Date("2026-09-02T15:34:00+05:30"),
+      },
+      {
+        id: "2",
+        startAt: new Date("2026-09-02T17:35:00+05:30"),
+        endAt: new Date("2026-09-02T20:08:00+05:30"),
+        source: "wifi",
+        updatedAt: new Date("2026-09-02T20:08:00+05:30"),
+      },
+    ];
+    const spanMs = daySpanMsForDay(visits, {
+      dayStart,
+      dayEnd,
+      now: new Date("2026-09-02T21:00:00+05:30"),
+      staleMs: VISIT_GAP_MS,
+      lastHeartbeatAt: new Date("2026-09-02T20:08:00+05:30"),
+      firstInOfficeHeartbeatAt: new Date("2026-09-02T17:35:00+05:30"),
+      lastInOfficeHeartbeatAt: new Date("2026-09-02T20:08:00+05:30"),
+    });
+    expect(spanMs).toBeCloseTo(5.1 * ms(60), 0);
+    expect(daySpanHoursForDay(visits, {
+      dayStart,
+      dayEnd,
+      now: new Date("2026-09-02T21:00:00+05:30"),
+      staleMs: VISIT_GAP_MS,
+      lastHeartbeatAt: new Date("2026-09-02T20:08:00+05:30"),
+      firstInOfficeHeartbeatAt: new Date("2026-09-02T17:35:00+05:30"),
+      lastInOfficeHeartbeatAt: new Date("2026-09-02T20:08:00+05:30"),
+    })).toBeGreaterThanOrEqual(5);
   });
 
   it("open visit on current day extends to now when agent is healthy", () => {
