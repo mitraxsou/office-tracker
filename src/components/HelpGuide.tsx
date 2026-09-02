@@ -388,6 +388,16 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             </p>
           </div>
           <div>
+            <p className="font-medium">Wi-Fi name differs from Windows tray</p>
+            <p className="mt-1 text-muted">
+              The agent reports your laptop&apos;s Wi-Fi network name (SSID). During captive portal sign-in,
+              Windows may briefly show a domain name such as <code>pwcglb.com</code> instead of{" "}
+              <code>ExternalConnect</code>. The agent prefers the actual WLAN name from netsh. If pulses show
+              the wrong network or &quot;Identifying...&quot;, wait a minute for Wi-Fi to settle, or use{" "}
+              <strong>Check in</strong> on the Today page.
+            </p>
+          </div>
+          <div>
             <p className="font-medium">Hours not updating in the office</p>
             <p className="mt-1 text-muted">
               Use manual check-in on the Today page. If the problem persists, contact your pilot admin.
