@@ -7,6 +7,8 @@ import { revokeExpiredPendingTokens } from "./token-expiry";
 import { daySpanMsForDay, roundHoursToMinute } from "./visits";
 import { laptopActiveHoursForDay } from "./laptop-active";
 import { heartbeatInOffice } from "./heartbeat-office";
+import { getAgentVersion } from "./agent-version";
+import { isDeviceAgentVersionStale } from "./agent-update";
 
 function dayKeyForTimezone(date: Date, timezone: string) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -55,6 +57,7 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
   const graceHours = await getEffectiveAgentStaleGraceHours(user);
   const today = await getTodaySummary(user.id, user.timezone, hoursTarget, graceHours);
   const pulse = await getPulseStats(user.id, graceHours);
+  const serverAgentVersion = getAgentVersion();
 
   const dailyTrend: Array<{
     date: string;
@@ -132,12 +135,19 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
       ssid: h.ssid,
     })),
     pulse,
+    serverAgentVersion,
     devices: user.agentDevices.map((d) => ({
       id: d.id,
       serialNumber: d.serialNumber,
       lastSeenAt: d.lastSeenAt?.toISOString() ?? null,
       installedAt: d.installedAt?.toISOString() ?? null,
       uninstalledAt: d.uninstalledAt?.toISOString() ?? null,
+      agentScriptVersion: d.agentScriptVersion,
+      agentVersionReportedAt: d.agentVersionReportedAt?.toISOString() ?? null,
+      agentVersionStale: isDeviceAgentVersionStale(
+        d.agentScriptVersion,
+        serverAgentVersion,
+      ),
     })),
     lifecycleEvents: await getLifecycleEventsForUser(user.id),
     tokens: summarizeAgentTokens(user.agentTokens),

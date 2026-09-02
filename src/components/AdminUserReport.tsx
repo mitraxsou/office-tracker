@@ -21,6 +21,7 @@ import { AdminResetPasswordButton } from "./AdminResetPasswordButton";
 import { AdminUserProfileChangeForm } from "./AdminUserProfileChangeForm";
 import { AdminGrantComplianceExemption } from "./AdminGrantComplianceExemption";
 import type { ProfileChangeRequestSummary } from "@/lib/profile-change-requests";
+import { AdminUserReportSearch } from "./AdminUserReportSearch";
 
 type UserReport = {
   user: {
@@ -66,12 +67,16 @@ type UserReport = {
     lastHeartbeat: string | null;
     recentPulses: Array<{ recordedAt: string; inOffice: boolean; ssid: string | null }>;
   };
+  serverAgentVersion: string;
   devices: Array<{
     id: string;
     serialNumber: string;
     lastSeenAt: string | null;
     installedAt?: string | null;
     uninstalledAt?: string | null;
+    agentScriptVersion: string | null;
+    agentVersionReportedAt: string | null;
+    agentVersionStale: boolean;
   }>;
   lifecycleEvents?: Array<{
     id: string;
@@ -246,16 +251,29 @@ export function AdminUserReport({
   if (error && !data) return <p className="text-red-400">{error}</p>;
   if (!data) return null;
 
+  const agentHealthLabel = data.pulse.agentHealthy
+    ? "Healthy"
+    : data.pulse.lastHeartbeat
+      ? "Stale"
+      : "No pulses";
+  const installedVersionSummary =
+    data.devices.length === 0
+      ? "No devices"
+      : data.devices.length === 1
+        ? data.devices[0].agentScriptVersion ?? "Version not reported"
+        : `${data.devices.filter((device) => !device.agentVersionStale).length}/${data.devices.length} current`;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+        <div className="min-w-56">
           <Link href="/admin" className="text-sm text-accent hover:underline">
             ← Back to reports
           </Link>
           <h2 className="mt-1 text-xl font-medium">{data.user.email}</h2>
           {data.user.name && <p className="text-sm text-muted">{data.user.name}</p>}
         </div>
+        <AdminUserReportSearch currentUserId={data.user.id} />
         <button
           type="button"
           onClick={() => void handleViewAsUser()}
@@ -298,8 +316,8 @@ export function AdminUserReport({
           value={`${data.monthlyProgress.qualifyingDays} / ${data.monthlyDaysTarget}`}
         />
         <SummaryCard
-          label="Agent"
-          value={data.pulse.agentHealthy ? "Healthy" : data.pulse.lastHeartbeat ? "Stale" : "No pulses"}
+          label={`Agent (expected ${data.serverAgentVersion})`}
+          value={`${agentHealthLabel} · ${installedVersionSummary}`}
         />
         <SummaryCard label="Pulses (24h)" value={`${data.pulse.pulsesLast24h} / ~${data.pulse.expectedPulsesPerDay}`} />
       </div>
@@ -379,7 +397,12 @@ export function AdminUserReport({
       </section>
 
       <section className="card p-6">
-        <h3 className="mb-3 text-sm font-medium">Agent pulse</h3>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-medium">Agent pulse</h3>
+          <span className="text-xs text-muted">
+            Expected agent version: {data.serverAgentVersion}
+          </span>
+        </div>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-muted">Last heartbeat</dt>
@@ -404,6 +427,35 @@ export function AdminUserReport({
           <div>
             <dt className="text-muted">Registered laptops</dt>
             <dd>{data.devices.length}</dd>
+          </div>
+          <div className="sm:col-span-2">
+            <dt className="text-muted">Installed agent versions</dt>
+            <dd>
+              {data.devices.length === 0 ? (
+                "No registered laptops"
+              ) : (
+                <ul className="mt-1 space-y-1">
+                  {data.devices.map((device) => (
+                    <li key={device.id}>
+                      <code>{device.serialNumber}</code>:{" "}
+                      {device.agentScriptVersion ?? "not reported"}
+                      {device.agentVersionStale ? (
+                        <span className="text-accent"> (update needed)</span>
+                      ) : (
+                        <span className="text-green-400"> (current)</span>
+                      )}
+                      {" · "}
+                      last seen{" "}
+                      {device.lastSeenAt
+                        ? new Date(device.lastSeenAt).toLocaleString("en-IN", {
+                            timeZone: data.user.timezone,
+                          })
+                        : "never"}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </dd>
           </div>
         </dl>
         {data.pulse.recentPulses.length > 0 && (
