@@ -60,6 +60,7 @@ function HoursTooltip({
       <p className="mt-1 text-xs text-muted">
         First check-in to last check-out. Last heartbeat counts unless manual checkout.
       </p>
+      <p className="mt-1 text-xs text-muted">Click bar to filter table</p>
     </div>
   );
 }

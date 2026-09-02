@@ -184,21 +184,120 @@ describe("hours calculations", () => {
         updatedAt: new Date("2026-08-27T18:00:00+05:30"),
       },
     ];
+    const params = {
+      dayStart,
+      dayEnd,
+      now: new Date("2026-08-27T20:00:00+05:30"),
+      staleMs: VISIT_GAP_MS,
+      lastHeartbeatAt: new Date("2026-08-27T18:00:00+05:30"),
+      lastInOfficeHeartbeatAt: new Date("2026-08-27T18:00:00+05:30"),
+    };
+    const spanMs = daySpanMsForDay(visits, params);
+    expect(spanMs).toBeCloseTo(9 * ms(60), 0);
+    expect(daySpanHoursForDay(visits, params)).toBeCloseTo(9, 1);
+  });
+
+  it("extends wifi day to last in-office heartbeat after visit ended earlier", () => {
+    const dayStart = new Date("2026-08-27T00:00:00+05:30");
+    const dayEnd = new Date("2026-08-27T23:59:59.999+05:30");
+    const visits = [
+      {
+        id: "1",
+        startAt: new Date("2026-08-27T09:00:00+05:30"),
+        endAt: new Date("2026-08-27T12:00:00+05:30"),
+        source: "wifi",
+        updatedAt: new Date("2026-08-27T12:00:00+05:30"),
+      },
+    ];
+    const lastHb = new Date("2026-08-27T17:30:00+05:30");
     const spanMs = daySpanMsForDay(visits, {
       dayStart,
       dayEnd,
       now: new Date("2026-08-27T20:00:00+05:30"),
       staleMs: VISIT_GAP_MS,
-      lastHeartbeatAt: new Date("2026-08-27T18:00:00+05:30"),
+      lastHeartbeatAt: lastHb,
+      firstInOfficeHeartbeatAt: new Date("2026-08-27T09:00:00+05:30"),
+      lastInOfficeHeartbeatAt: lastHb,
     });
-    expect(spanMs).toBeCloseTo(9 * ms(60), 0);
-    expect(daySpanHoursForDay(visits, {
+    expect(spanMs).toBeCloseTo(8.5 * ms(60), 0);
+  });
+
+  it("manual checkout caps day before later heartbeat", () => {
+    const dayStart = new Date("2026-08-27T00:00:00+05:30");
+    const dayEnd = new Date("2026-08-27T23:59:59.999+05:30");
+    const visits = [
+      {
+        id: "1",
+        startAt: new Date("2026-08-27T09:00:00+05:30"),
+        endAt: new Date("2026-08-27T16:00:00+05:30"),
+        source: "manual",
+        updatedAt: new Date("2026-08-27T16:00:00+05:30"),
+      },
+    ];
+    const spanMs = daySpanMsForDay(visits, {
       dayStart,
       dayEnd,
       now: new Date("2026-08-27T20:00:00+05:30"),
       staleMs: VISIT_GAP_MS,
-      lastHeartbeatAt: new Date("2026-08-27T18:00:00+05:30"),
-    })).toBeCloseTo(9, 1);
+      lastHeartbeatAt: new Date("2026-08-27T17:30:00+05:30"),
+      lastInOfficeHeartbeatAt: new Date("2026-08-27T17:30:00+05:30"),
+    });
+    expect(spanMs).toBeCloseTo(7 * ms(60), 0);
+  });
+
+  it("open visit on current day extends to now when agent is healthy", () => {
+    const dayStart = new Date("2026-08-27T00:00:00+05:30");
+    const dayEnd = new Date("2026-08-27T23:59:59.999+05:30");
+    const now = new Date("2026-08-27T15:00:00+05:30");
+    const visits = [
+      {
+        id: "1",
+        startAt: new Date("2026-08-27T09:00:00+05:30"),
+        endAt: null,
+        source: "wifi",
+        updatedAt: new Date("2026-08-27T14:58:00+05:30"),
+      },
+    ];
+    const spanMs = daySpanMsForDay(visits, {
+      dayStart,
+      dayEnd,
+      now,
+      staleMs: VISIT_GAP_MS,
+      lastHeartbeatAt: new Date("2026-08-27T14:58:00+05:30"),
+      lastInOfficeHeartbeatAt: new Date("2026-08-27T14:58:00+05:30"),
+    });
+    expect(spanMs).toBeCloseTo(6 * ms(60), 0);
+  });
+
+  it("first-in last-out across lunch gap with heartbeat tail", () => {
+    const dayStart = new Date("2026-08-27T00:00:00+05:30");
+    const dayEnd = new Date("2026-08-27T23:59:59.999+05:30");
+    const visits = [
+      {
+        id: "1",
+        startAt: new Date("2026-08-27T09:00:00+05:30"),
+        endAt: new Date("2026-08-27T12:00:00+05:30"),
+        source: "wifi",
+        updatedAt: new Date("2026-08-27T12:00:00+05:30"),
+      },
+      {
+        id: "2",
+        startAt: new Date("2026-08-27T13:00:00+05:30"),
+        endAt: new Date("2026-08-27T17:00:00+05:30"),
+        source: "wifi",
+        updatedAt: new Date("2026-08-27T17:00:00+05:30"),
+      },
+    ];
+    const lastHb = new Date("2026-08-27T18:00:00+05:30");
+    const spanMs = daySpanMsForDay(visits, {
+      dayStart,
+      dayEnd,
+      now: new Date("2026-08-27T20:00:00+05:30"),
+      staleMs: VISIT_GAP_MS,
+      lastHeartbeatAt: lastHb,
+      lastInOfficeHeartbeatAt: lastHb,
+    });
+    expect(spanMs).toBeCloseTo(9 * ms(60), 0);
   });
 
   it("detects 5h target met", () => {

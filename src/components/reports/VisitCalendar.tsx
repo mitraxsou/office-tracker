@@ -200,7 +200,7 @@ function VisitDayDetail({
         <div>
           <h3 className="font-medium text-accent">{dayLabel}</h3>
           <p className="mt-1 text-sm text-muted">
-            Total: {formatHours(totalHours)} / {hoursTarget}h target (first in to last out)
+            Total: {formatHours(totalHours)} / {hoursTarget}h target (first check-in to last check-out)
             {" · "}
             <span className={metTarget ? "text-green-400" : "text-accent"}>
               {metTarget ? "Target met" : "Below target"}
