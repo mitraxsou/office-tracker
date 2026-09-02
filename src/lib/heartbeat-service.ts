@@ -302,7 +302,6 @@ export async function getTodaySummary(
     params.lastHeartbeatAt !== null &&
     now.getTime() - params.lastHeartbeatAt.getTime() <= graceMs;
 
-  const openVisit = visits.find((v) => v.endAt === null);
   const totalMs = daySpanMsForDay(visits, params);
   const totalHours = totalMs / (1000 * 60 * 60);
   const lastPulseInOffice = lastHeartbeat
