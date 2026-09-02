@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminUserManagement } from "./AdminUserManagement";
 import { AdminNotificationPrefsForm } from "./AdminNotificationPrefsForm";
 import { AdminResetPasswordButton } from "./AdminResetPasswordButton";
+import { AdminUserEditModal } from "./AdminUserEditModal";
 import { copyToClipboard } from "@/lib/clipboard";
+import { DEFAULT_ADMIN_USERS_PAGE_SIZE } from "@/lib/admin-users";
 
 type TokenRow = {
   id: string;
@@ -49,63 +51,136 @@ type AuditEntry = {
   targetEmail: string | null;
 };
 
+const SEARCH_DEBOUNCE_MS = 300;
+
 export function AdminUsersDashboard() {
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(DEFAULT_ADMIN_USERS_PAGE_SIZE);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [busyTokenId, setBusyTokenId] = useState<string | null>(null);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [sharedCommand, setSharedCommand] = useState<string | null>(null);
 
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    else setRefreshing(true);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
 
-    const [usersRes, auditRes] = await Promise.all([
-      fetch("/api/admin/users"),
-      fetch("/api/admin/reports"),
-    ]);
+  const load = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      else setRefreshing(true);
 
-    if (!silent) setLoading(false);
-    else setRefreshing(false);
+      const qs = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+      });
+      if (searchQuery) qs.set("search", searchQuery);
 
-    if (!usersRes.ok) {
-      if (!silent) setError("Failed to load users");
-      return;
-    }
+      const [usersRes, auditRes] = await Promise.all([
+        fetch(`/api/admin/users?${qs}`),
+        fetch("/api/admin/reports"),
+      ]);
 
-    const usersData = await usersRes.json();
-    setUsers(usersData.users);
-    setError(null);
+      if (!silent) setLoading(false);
+      else setRefreshing(false);
 
-    if (auditRes.ok) {
-      const auditData = await auditRes.json();
-      setAuditLog(
-        (auditData.auditLog as AuditEntry[]).filter((l) =>
-          [
-            "user_create",
-            "agent_token_issue",
-            "agent_token_share",
-            "agent_token_reissue",
-            "agent_token_revoke",
-            "agent_device_registered",
-            "device_remove",
-            "device_remove_self",
-            "password_reset",
-            "admin_notification_prefs_update",
-            "admin_ooo_update",
-          ].includes(l.action),
-        ),
-      );
-    }
-  }, []);
+      if (!usersRes.ok) {
+        if (!silent) setError("Failed to load users");
+        return;
+      }
+
+      const usersData = await usersRes.json();
+      setUsers(usersData.users);
+      setTotal(usersData.total ?? usersData.users.length);
+      setError(null);
+      setSelectedIds((prev) => {
+        const next = new Set<string>();
+        for (const id of prev) {
+          if (usersData.users.some((u: UserRow) => u.id === id)) next.add(id);
+        }
+        return next;
+      });
+
+      if (auditRes.ok) {
+        const auditData = await auditRes.json();
+        setAuditLog(
+          (auditData.auditLog as AuditEntry[]).filter((l) =>
+            [
+              "user_create",
+              "agent_token_issue",
+              "agent_token_share",
+              "agent_token_reissue",
+              "agent_token_revoke",
+              "agent_device_registered",
+              "device_remove",
+              "device_remove_self",
+              "password_reset",
+              "admin_notification_prefs_update",
+              "admin_ooo_update",
+              "admin_profile_edit",
+              "agent_update_push",
+            ].includes(l.action),
+          ),
+        );
+      }
+    },
+    [page, pageSize, searchQuery],
+  );
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, total);
+  const allOnPageSelected = users.length > 0 && users.every((u) => selectedIds.has(u.id));
+
+  const selectedOnPageCount = useMemo(
+    () => users.filter((u) => selectedIds.has(u.id)).length,
+    [users, selectedIds],
+  );
+
+  function toggleSelect(userId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  }
+
+  function toggleSelectAllOnPage() {
+    if (allOnPageSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (const u of users) next.delete(u.id);
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (const u of users) next.add(u.id);
+        return next;
+      });
+    }
+  }
 
   async function changeRole(userId: string, role: "admin" | "user") {
     setBusyUserId(userId);
@@ -192,20 +267,121 @@ export function AdminUsersDashboard() {
     load(true);
   }
 
+  async function bulkPushAgentUpdate() {
+    const userIds = Array.from(selectedIds);
+    if (userIds.length === 0) return;
+    if (
+      !confirm(
+        `Push agent update to ${userIds.length} selected user${userIds.length === 1 ? "" : "s"}?`,
+      )
+    ) {
+      return;
+    }
+
+    setBulkBusy(true);
+    setActionError(null);
+    setActionMessage(null);
+    const res = await fetch("/api/admin/agent-update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userIds }),
+    });
+    setBulkBusy(false);
+    if (!res.ok) {
+      setActionError("Failed to push agent update");
+      return;
+    }
+    const body = await res.json();
+    setActionMessage(
+      `Agent update queued for ${body.deviceCount ?? 0} laptop${body.deviceCount === 1 ? "" : "s"} across ${userIds.length} user${userIds.length === 1 ? "" : "s"}.`,
+    );
+    setSelectedIds(new Set());
+    load(true);
+  }
+
   return (
     <div className="space-y-6">
       <AdminUserManagement onUserCreated={() => load(true)} />
 
-      <div className="flex items-center justify-end gap-3">
-        {refreshing && <span className="text-xs text-muted">Refreshing...</span>}
-        <button
-          type="button"
-          onClick={() => load(true)}
-          className="btn-secondary px-3 py-1 text-xs"
-        >
-          Refresh
-        </button>
-      </div>
+      <section className="card p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="min-w-[200px] flex-1 text-sm">
+            <span className="text-muted">Search users</span>
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Email or name"
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+          <div className="flex items-center gap-3">
+            {refreshing && <span className="text-xs text-muted">Refreshing...</span>}
+            <button
+              type="button"
+              onClick={() => load(true)}
+              className="btn-secondary px-3 py-2 text-sm"
+            >
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
+          <p className="text-muted">
+            {total === 0
+              ? "No users found"
+              : `Showing ${rangeStart}-${rangeEnd} of ${total}`}
+            {searchQuery ? ` matching "${searchQuery}"` : ""}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={page <= 1 || loading}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="btn-secondary px-3 py-1 text-xs disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <span className="text-xs text-muted">
+              Page {page} of {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page >= totalPages || loading}
+              onClick={() => setPage((p) => p + 1)}
+              className="btn-secondary px-3 py-1 text-xs disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+
+        {selectedIds.size > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-3 rounded-lg border border-[var(--pwc-orange)]/30 bg-[var(--pwc-orange-muted)]/10 px-3 py-2">
+            <span className="text-sm">
+              {selectedIds.size} selected
+              {selectedOnPageCount < selectedIds.size &&
+                ` (${selectedOnPageCount} on this page)`}
+            </span>
+            <button
+              type="button"
+              disabled={bulkBusy}
+              onClick={bulkPushAgentUpdate}
+              className="btn-secondary px-3 py-1 text-xs disabled:opacity-50"
+            >
+              {bulkBusy ? "Pushing..." : "Push agent update"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="text-xs text-muted hover:text-[var(--foreground)]"
+            >
+              Clear selection
+            </button>
+          </div>
+        )}
+      </section>
 
       {sharedCommand && (
         <div className="rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm">
@@ -217,19 +393,57 @@ export function AdminUsersDashboard() {
       {loading && users.length === 0 && <p className="text-muted">Loading users...</p>}
       {error && users.length === 0 && <p className="text-red-400">{error}</p>}
       {actionError && <p className="text-sm text-red-400">{actionError}</p>}
+      {actionMessage && <p className="text-sm text-green-400">{actionMessage}</p>}
+
+      {users.length > 0 && (
+        <div className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={allOnPageSelected}
+            onChange={toggleSelectAllOnPage}
+            id="select-all-users"
+            className="rounded"
+          />
+          <label htmlFor="select-all-users" className="text-muted">
+            Select all on this page
+          </label>
+        </div>
+      )}
 
       {users.map((u) => (
         <section key={u.id} className="card p-6">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div>
+          <div className="mb-4 flex flex-wrap items-start gap-3">
+            <input
+              type="checkbox"
+              checked={selectedIds.has(u.id)}
+              onChange={() => toggleSelect(u.id)}
+              aria-label={`Select ${u.email}`}
+              className="mt-1 rounded"
+            />
+            <div className="min-w-0 flex-1">
               <h2 className="text-lg font-medium">{u.email}</h2>
               {u.name && <p className="text-sm text-muted">{u.name}</p>}
-              <Link
-                href={`/admin/reports/users/${u.id}`}
-                className="text-xs text-accent hover:underline"
-              >
-                View report →
-              </Link>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                <Link
+                  href={`/admin/reports/users/${u.id}`}
+                  className="text-accent hover:underline"
+                >
+                  Manage data
+                </Link>
+                <Link
+                  href="/admin/visit-reports"
+                  className="text-accent hover:underline"
+                >
+                  User requests
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(u)}
+                  className="text-accent hover:underline"
+                >
+                  Edit profile
+                </button>
+              </div>
               <p className="mt-1 text-xs text-muted">
                 Today: {u.today.totalHours.toFixed(1)}h / {u.hoursTarget}h · Agent:{" "}
                 {u.today.agentHealthy ? "Healthy" : "Stale"}
@@ -302,23 +516,23 @@ export function AdminUsersDashboard() {
                 <tbody>
                   {u.tokens.map((t) => (
                     <tr key={t.id} className="border-b border-[var(--border)]">
-                      <td className="py-2 pr-3">{t.label ?? "—"}</td>
+                      <td className="py-2 pr-3">{t.label ?? "-"}</td>
                       <td className="py-2 pr-3 font-mono text-xs">{t.prefix}</td>
                       <td className="py-2 pr-3">
-                            <span
-                              className={
-                                t.status === "bound"
-                                  ? "text-green-400"
-                                  : t.status === "expired"
-                                    ? "text-red-400"
-                                    : "text-amber-300"
-                              }
-                            >
-                              {t.status}
-                            </span>
+                        <span
+                          className={
+                            t.status === "bound"
+                              ? "text-green-400"
+                              : t.status === "expired"
+                                ? "text-red-400"
+                                : "text-amber-300"
+                          }
+                        >
+                          {t.status}
+                        </span>
                       </td>
                       <td className="py-2 pr-3 font-mono text-xs">
-                        {t.boundSerialNumber ?? "—"}
+                        {t.boundSerialNumber ?? "-"}
                       </td>
                       <td className="py-2 pr-3 text-xs text-muted">
                         {new Date(t.createdAt).toLocaleString("en-IN")}
@@ -356,10 +570,12 @@ export function AdminUsersDashboard() {
                             </>
                           )}
                           {t.status === "expired" && (
-                            <span className="text-muted">Expired — issue a new token</span>
+                            <span className="text-muted">Expired - issue a new token</span>
                           )}
                           {t.status === "bound" && (
-                            <span className="text-muted">Bound — issue new token for another laptop</span>
+                            <span className="text-muted">
+                              Bound - issue new token for another laptop
+                            </span>
                           )}
                         </div>
                       </td>
@@ -399,6 +615,30 @@ export function AdminUsersDashboard() {
         </section>
       ))}
 
+      {total > pageSize && (
+        <div className="flex items-center justify-center gap-2 text-sm">
+          <button
+            type="button"
+            disabled={page <= 1 || loading}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className="btn-secondary px-3 py-1 text-xs disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span className="text-xs text-muted">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            type="button"
+            disabled={page >= totalPages || loading}
+            onClick={() => setPage((p) => p + 1)}
+            className="btn-secondary px-3 py-1 text-xs disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      )}
+
       <section className="card p-6">
         <h2 className="mb-4 text-lg font-medium">User & agent activity</h2>
         {auditLog.length === 0 ? (
@@ -420,6 +660,16 @@ export function AdminUsersDashboard() {
           </ul>
         )}
       </section>
+
+      {editingUser && (
+        <AdminUserEditModal
+          userId={editingUser.id}
+          email={editingUser.email}
+          name={editingUser.name}
+          onClose={() => setEditingUser(null)}
+          onSaved={() => load(true)}
+        />
+      )}
     </div>
   );
 }

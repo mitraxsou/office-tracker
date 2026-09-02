@@ -63,3 +63,12 @@ export async function requestAgentUpdateForAllDevices() {
   });
   return result.count;
 }
+
+export async function requestAgentUpdateForUsers(userIds: string[]) {
+  if (userIds.length === 0) return 0;
+  const result = await prisma.agentDevice.updateMany({
+    where: { userId: { in: userIds }, uninstalledAt: null },
+    data: { forceAgentUpdate: true },
+  });
+  return result.count;
+}

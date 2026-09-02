@@ -5,7 +5,6 @@ import { getTodaySummary } from "@/lib/heartbeat-service";
 import { getUserHoursTarget } from "@/lib/app-config";
 import {
   createUserByAdmin,
-  issueAgentToken,
   summarizeAgentTokens,
 } from "@/lib/auth";
 import { revokeExpiredPendingTokens } from "@/lib/token-expiry";
@@ -13,12 +12,64 @@ import { logAuditEvent } from "@/lib/audit-log";
 import { buildInstallCommand } from "@/lib/agent-branding";
 import { getAgentVersion } from "@/lib/agent-version";
 import { isDeviceAgentVersionStale } from "@/lib/agent-update";
+import {
+  buildUserSearchWhere,
+  parseAdminUsersListParams,
+} from "@/lib/admin-users";
 
 function appUrl() {
   return process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "http://localhost:3000";
 }
 
-export async function GET() {
+async function summarizeUser(user: {
+  id: string;
+  email: string;
+  name: string | null;
+  role: string;
+  timezone: string;
+  hoursTarget: number | null;
+  agentDevices: Array<{
+    id: string;
+    serialNumber: string;
+    lastSeenAt: Date | null;
+    agentScriptVersion: string | null;
+    agentVersionReportedAt: Date | null;
+    forceAgentUpdate: boolean;
+  }>;
+  agentTokens: Parameters<typeof summarizeAgentTokens>[0];
+}) {
+  const serverAgentVersion = getAgentVersion();
+  const hoursTarget = await getUserHoursTarget(user);
+  const summary = await getTodaySummary(user.id, user.timezone, hoursTarget);
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    timezone: user.timezone,
+    hoursTarget,
+    devices: user.agentDevices.map((d) => ({
+      id: d.id,
+      serialNumber: d.serialNumber,
+      lastSeenAt: d.lastSeenAt,
+      agentScriptVersion: d.agentScriptVersion,
+      agentVersionReportedAt: d.agentVersionReportedAt,
+      forceAgentUpdate: d.forceAgentUpdate,
+      agentVersionStale: isDeviceAgentVersionStale(d.agentScriptVersion, serverAgentVersion),
+    })),
+    serverAgentVersion,
+    tokens: summarizeAgentTokens(user.agentTokens),
+    today: {
+      totalHours: summary.totalHours,
+      metTarget: summary.metTarget,
+      agentHealthy: summary.agentHealthy,
+      inOfficeNow: summary.inOfficeNow,
+      lastHeartbeat: summary.lastHeartbeat?.recordedAt ?? null,
+    },
+  };
+}
+
+export async function GET(request: Request) {
   const admin = await requireAdmin();
   if (!admin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -26,50 +77,47 @@ export async function GET() {
 
   await revokeExpiredPendingTokens();
 
-  const serverAgentVersion = getAgentVersion();
+  const { searchParams } = new URL(request.url);
+  const { all, search, page, pageSize } = parseAdminUsersListParams(searchParams);
+  const where = buildUserSearchWhere(search);
 
-  const users = await prisma.user.findMany({
+  const userQuery = {
+    where,
     include: {
-      agentDevices: { orderBy: { lastSeenAt: "desc" } },
-      agentTokens: { where: { revokedAt: null }, orderBy: { createdAt: "desc" } },
+      agentDevices: { orderBy: { lastSeenAt: "desc" as const } },
+      agentTokens: { where: { revokedAt: null }, orderBy: { createdAt: "desc" as const } },
     },
-    orderBy: { email: "asc" },
-  });
+    orderBy: { email: "asc" as const },
+  };
 
-  const summaries = await Promise.all(
-    users.map(async (user) => {
-      const hoursTarget = await getUserHoursTarget(user);
-      const summary = await getTodaySummary(user.id, user.timezone, hoursTarget);
-      return {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        timezone: user.timezone,
-        hoursTarget,
-        devices: user.agentDevices.map((d) => ({
-          id: d.id,
-          serialNumber: d.serialNumber,
-          lastSeenAt: d.lastSeenAt,
-          agentScriptVersion: d.agentScriptVersion,
-          agentVersionReportedAt: d.agentVersionReportedAt,
-          forceAgentUpdate: d.forceAgentUpdate,
-          agentVersionStale: isDeviceAgentVersionStale(d.agentScriptVersion, serverAgentVersion),
-        })),
-        serverAgentVersion,
-        tokens: summarizeAgentTokens(user.agentTokens),
-        today: {
-          totalHours: summary.totalHours,
-          metTarget: summary.metTarget,
-          agentHealthy: summary.agentHealthy,
-          inOfficeNow: summary.inOfficeNow,
-          lastHeartbeat: summary.lastHeartbeat?.recordedAt ?? null,
-        },
-      };
+  if (all) {
+    const users = await prisma.user.findMany(userQuery);
+    const summaries = await Promise.all(users.map((user) => summarizeUser(user)));
+    return NextResponse.json({
+      users: summaries,
+      total: summaries.length,
+      page: 1,
+      pageSize: summaries.length,
+    });
+  }
+
+  const [total, users] = await Promise.all([
+    prisma.user.count({ where }),
+    prisma.user.findMany({
+      ...userQuery,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     }),
-  );
+  ]);
 
-  return NextResponse.json({ users: summaries });
+  const summaries = await Promise.all(users.map((user) => summarizeUser(user)));
+
+  return NextResponse.json({
+    users: summaries,
+    total,
+    page,
+    pageSize,
+  });
 }
 
 export async function POST(request: Request) {

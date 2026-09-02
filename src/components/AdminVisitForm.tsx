@@ -20,7 +20,7 @@ export function AdminVisitForm() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    Promise.all([fetch("/api/admin/users"), fetch("/api/admin/config")])
+    Promise.all([fetch("/api/admin/users?all=true"), fetch("/api/admin/config")])
       .then(async ([usersRes, configRes]) => {
         const usersData = await usersRes.json();
         const configData = await configRes.json();

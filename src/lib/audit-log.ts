@@ -42,7 +42,8 @@ export type AuditAction =
   | "profile_change_reject"
   | "password_reset"
   | "agent_update_push"
-  | "admin_agent_grace_update";
+  | "admin_agent_grace_update"
+  | "admin_profile_edit";
 
 export async function logAuditEvent(params: {
   actorId: string;
