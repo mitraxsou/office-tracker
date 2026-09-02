@@ -1,6 +1,5 @@
 import { prisma } from "./db";
 import { hashPassword, ensureAgentToken } from "./auth";
-import { isBreakglassEmail } from "./breakglass-shared";
 
 export { isBreakglassEmail, BREAKGLASS_PASSWORD_ENV_MESSAGE } from "./breakglass-shared";
 
