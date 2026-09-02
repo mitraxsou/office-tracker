@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
-import { getCurrentUser } from "@/lib/auth";
+import { requireAuthenticatedUser, enforcePasswordChangeIfRequired } from "@/lib/session-guards";
 import { getTodaySummary, getPulseStats } from "@/lib/heartbeat-service";
 import { getUserHoursTarget, getAppConfig } from "@/lib/app-config";
 import { getMonthlyProgress } from "@/lib/monthly-progress";
@@ -16,8 +15,8 @@ import { RecentHeartbeats } from "@/components/RecentHeartbeats";
 import { formatTime } from "@/lib/visits";
 
 export default async function DashboardPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  const user = await requireAuthenticatedUser();
+  enforcePasswordChangeIfRequired(user);
 
   const summary = await getTodaySummary(
     user.id,

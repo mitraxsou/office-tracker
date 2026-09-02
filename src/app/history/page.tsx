@@ -1,5 +1,4 @@
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { requireAuthenticatedUser, enforcePasswordChangeIfRequired } from "@/lib/session-guards";
 import { prisma } from "@/lib/db";
 import { AppNav } from "@/components/AppNav";
 import { VisitList } from "@/components/VisitList";
@@ -7,8 +6,8 @@ import { UserCorrectionRequests } from "@/components/UserCorrectionRequests";
 import { formatDate } from "@/lib/visits";
 
 export default async function HistoryPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  const user = await requireAuthenticatedUser();
+  enforcePasswordChangeIfRequired(user);
 
   const visits = await prisma.visit.findMany({
     where: { userId: user.id },

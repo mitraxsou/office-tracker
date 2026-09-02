@@ -1,10 +1,14 @@
 import { AppNav } from "@/components/AppNav";
 import { HelpGuide } from "@/components/HelpGuide";
 import { getCurrentUser } from "@/lib/auth";
+import { enforcePasswordChangeIfRequired } from "@/lib/session-guards";
 import { isAdmin } from "@/lib/admin";
 
 export default async function HelpPage() {
   const user = await getCurrentUser();
+  if (user) {
+    enforcePasswordChangeIfRequired(user);
+  }
 
   return (
     <>

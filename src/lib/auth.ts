@@ -46,6 +46,50 @@ export function generateTempPassword(length = 12) {
   return result;
 }
 
+export async function changeUserPassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+) {
+  const { getSelfPasswordChangeBlockReason, validatePasswordStrength } = await import(
+    "./password-policy"
+  );
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  const blockReason = getSelfPasswordChangeBlockReason(user.email);
+  if (blockReason) {
+    throw new Error(blockReason);
+  }
+
+  const valid = await verifyPassword(currentPassword, user.passwordHash);
+  if (!valid) {
+    throw new Error("Current password is incorrect");
+  }
+
+  const strengthError = validatePasswordStrength(newPassword);
+  if (strengthError) {
+    throw new Error(strengthError);
+  }
+
+  if (currentPassword === newPassword) {
+    throw new Error("New password must be different from your current password");
+  }
+
+  const passwordHash = await hashPassword(newPassword);
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordHash,
+      mustChangePassword: false,
+      passwordResetAt: null,
+    },
+  });
+}
+
 export async function resetUserPasswordByAdmin(userId: string) {
   const tempPassword = generateTempPassword();
   const passwordHash = await hashPassword(tempPassword);

@@ -30,6 +30,7 @@ type SettingsPageClientProps = {
   legacyBoundCount: number;
   localDevAgentPath?: string | null;
   timezoneRequestState: TimezoneRequestState;
+  lockSettings?: boolean;
 };
 
 export function SettingsPageClient({
@@ -43,6 +44,7 @@ export function SettingsPageClient({
   legacyBoundCount,
   localDevAgentPath,
   timezoneRequestState,
+  lockSettings,
 }: SettingsPageClientProps) {
   const [devices, setDevices] = useState(initialDevices);
 
@@ -60,6 +62,12 @@ export function SettingsPageClient({
 
   return (
     <>
+      {lockSettings ? (
+        <p className="mb-6 text-sm text-muted">
+          Other settings are available after you set a new password above.
+        </p>
+      ) : (
+        <>
       <AgentStatusPanel
         installTokens={installTokens}
         legacyBoundCount={legacyBoundCount}
@@ -88,6 +96,8 @@ export function SettingsPageClient({
       <NotificationPrefsForm />
 
       <OutOfOfficeSection />
+        </>
+      )}
     </>
   );
 }

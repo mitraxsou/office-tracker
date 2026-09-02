@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { copyToClipboard } from "@/lib/clipboard";
+import { buildPasswordResetMailto } from "@/lib/password-policy";
 
 type Props = {
   userId: string;
@@ -63,6 +64,20 @@ export function AdminResetPasswordButton({
     setTimeout(() => setCopied(false), 2000);
   }
 
+  function closeModal() {
+    setTempPassword(null);
+    setCopied(false);
+    setError(null);
+  }
+
+  const mailtoHref =
+    tempPassword &&
+    buildPasswordResetMailto({
+      userEmail,
+      tempPassword,
+      loginUrl: `${window.location.origin}/login`,
+    });
+
   return (
     <div className={className}>
       <button
@@ -75,25 +90,50 @@ export function AdminResetPasswordButton({
       </button>
 
       {tempPassword && (
-        <div className="mt-3 rounded-lg border border-[var(--pwc-orange)]/40 bg-[var(--pwc-orange-muted)]/20 p-3 text-sm">
-          <p className="mb-2">
-            Temporary password for <strong>{userEmail}</strong>. Copy it now. It will not be shown
-            again.
-          </p>
-          <code className="block rounded border bg-[var(--background)] px-3 py-2 font-mono text-sm">
-            {tempPassword}
-          </code>
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="btn-secondary mt-2 px-3 py-1 text-xs"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div
+            className="w-full max-w-md rounded-lg border border-[var(--border)] bg-[var(--background-elevated)] p-6 shadow-xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-password-title"
           >
-            {copied ? "Copied!" : "Copy password"}
-          </button>
+            <h3 id="reset-password-title" className="text-lg font-semibold">
+              Temporary password
+            </h3>
+            <p className="mt-2 text-sm text-muted">
+              Password for <strong>{userEmail}</strong>. Copy or email it now. It will not be shown
+              again.
+            </p>
+            <code className="mt-4 block rounded border bg-[var(--background)] px-3 py-2 font-mono text-sm">
+              {tempPassword}
+            </code>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="btn-primary px-3 py-1.5 text-sm"
+              >
+                {copied ? "Copied!" : "Copy password"}
+              </button>
+              {mailtoHref && (
+                <a href={mailtoHref} className="btn-secondary px-3 py-1.5 text-sm">
+                  Open in Outlook
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={closeModal}
+                className="btn-secondary px-3 py-1.5 text-sm"
+              >
+                Close
+              </button>
+            </div>
+            {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
+          </div>
         </div>
       )}
 
-      {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+      {error && !tempPassword && <p className="mt-2 text-xs text-red-400">{error}</p>}
     </div>
   );
 }

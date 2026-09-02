@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/admin";
 import { resetUserPasswordByAdmin } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit-log";
 import { prisma } from "@/lib/db";
+import { getAdminPasswordResetBlockReason } from "@/lib/password-policy";
 
 export async function POST(
   _request: Request,
@@ -17,6 +18,15 @@ export async function POST(
   const target = await prisma.user.findUnique({ where: { id } });
   if (!target) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  const blockReason = getAdminPasswordResetBlockReason({
+    adminId: admin.id,
+    targetId: target.id,
+    targetEmail: target.email,
+  });
+  if (blockReason) {
+    return NextResponse.json({ error: blockReason }, { status: 403 });
   }
 
   const tempPassword = await resetUserPasswordByAdmin(id);

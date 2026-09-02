@@ -1,11 +1,10 @@
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/auth";
+import { requireAuthenticatedUser, enforcePasswordChangeIfRequired } from "@/lib/session-guards";
 import { AppNav } from "@/components/AppNav";
 import { UserReportsDashboard } from "@/components/UserReportsDashboard";
 
 export default async function ReportsPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  const user = await requireAuthenticatedUser();
+  enforcePasswordChangeIfRequired(user);
 
   return (
     <>

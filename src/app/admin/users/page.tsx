@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
+import { enforcePasswordChangeIfRequired } from "@/lib/session-guards";
 import { AppNav } from "@/components/AppNav";
 import { AdminSubNav } from "@/components/AdminSubNav";
 import { AdminUsersDashboard } from "@/components/AdminUsersDashboard";
@@ -7,6 +8,7 @@ import { AdminUsersDashboard } from "@/components/AdminUsersDashboard";
 export default async function AdminUsersPage() {
   const admin = await requireAdmin();
   if (!admin) redirect("/dashboard");
+  enforcePasswordChangeIfRequired(admin);
 
   return (
     <>

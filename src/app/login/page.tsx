@@ -44,6 +44,9 @@ async function LoginForm({
     }
     await clearLoginAttempts();
     await createSession(user.id);
+    if (user.mustChangePassword) {
+      redirect("/settings?mustChange=1");
+    }
     redirect("/dashboard");
   }
 

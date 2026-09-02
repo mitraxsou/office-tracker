@@ -1,8 +1,9 @@
-import { redirect } from "next/navigation";
+import { isBreakglassEmail } from "@/lib/breakglass";
+import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 import {
-  getCurrentUser,
   getUserInstallTokenState,
 } from "@/lib/auth";
+import { requireAuthenticatedUser } from "@/lib/session-guards";
 import { getUserHoursTarget, getAppConfig } from "@/lib/app-config";
 import { getEnrichedDevicesForUser } from "@/lib/device-enrichment";
 import { getUserTimezoneRequestState } from "@/lib/timezone-requests";
@@ -13,10 +14,9 @@ import { AGENT_PRODUCT_NAME } from "@/lib/agent-branding";
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ welcome?: string }>;
+  searchParams: Promise<{ welcome?: string; mustChange?: string }>;
 }) {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  const user = await requireAuthenticatedUser();
 
   const params = await searchParams;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -27,6 +27,8 @@ export default async function SettingsPage({
   const { installTokens, legacyBoundCount } = await getUserInstallTokenState(user.id, appUrl);
   const enrichedDevices = await getEnrichedDevicesForUser(user.id);
   const timezoneRequestState = await getUserTimezoneRequestState(user.id);
+  const mustChangePassword = user.mustChangePassword || params.mustChange === "1";
+  const isBreakglass = isBreakglassEmail(user.email);
 
   return (
     <>
@@ -39,6 +41,8 @@ export default async function SettingsPage({
           </p>
         </div>
 
+        <ChangePasswordForm required={mustChangePassword} isBreakglass={isBreakglass} />
+
         <SettingsPageClient
           timezone={user.timezone}
           hoursTarget={hoursTarget}
@@ -50,6 +54,7 @@ export default async function SettingsPage({
           legacyBoundCount={legacyBoundCount}
           localDevAgentPath={localDevAgentPath}
           timezoneRequestState={timezoneRequestState}
+          lockSettings={mustChangePassword}
         />
       </main>
     </>

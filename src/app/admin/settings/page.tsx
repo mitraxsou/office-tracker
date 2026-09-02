@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
+import { enforcePasswordChangeIfRequired } from "@/lib/session-guards";
 import { getAppConfig } from "@/lib/app-config";
 import { isRegistrationEnvLocked } from "@/lib/auth";
 import { AppNav } from "@/components/AppNav";
@@ -13,6 +14,7 @@ import { listIntegrationApiKeys } from "@/lib/integration-api-keys";
 export default async function AdminSettingsPage() {
   const admin = await requireAdmin();
   if (!admin) redirect("/dashboard");
+  enforcePasswordChangeIfRequired(admin);
 
   const config = await getAppConfig();
   const integrationKeys = await listIntegrationApiKeys();
