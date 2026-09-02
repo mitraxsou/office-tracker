@@ -1,14 +1,8 @@
 import { prisma } from "./db";
 import { hashPassword, ensureAgentToken } from "./auth";
+import { isBreakglassEmail } from "./breakglass-shared";
 
-export const BREAKGLASS_PASSWORD_ENV_MESSAGE =
-  "Breakglass password is managed via server environment";
-
-export function isBreakglassEmail(email: string): boolean {
-  const breakglassEmail = process.env.BREAKGLASS_EMAIL?.toLowerCase().trim();
-  if (!breakglassEmail) return false;
-  return email.toLowerCase().trim() === breakglassEmail;
-}
+export { isBreakglassEmail, BREAKGLASS_PASSWORD_ENV_MESSAGE } from "./breakglass-shared";
 
 function getBreakglassCredentials(): { email: string; password: string } | null {
   const email = process.env.BREAKGLASS_EMAIL?.toLowerCase().trim();

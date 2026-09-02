@@ -368,8 +368,16 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             <p className="mt-1 text-muted">
               Re-copy and re-run the install command from Settings (#install section). Check Task Scheduler for task{" "}
               <code>{AGENT_TASK_NAME}</code>. Review{" "}
-              <code>%LOCALAPPDATA%\OfficeTracker\logs\heartbeat.log</code> on the laptop. If the laptop was
-              asleep for hours, heartbeats pause until it wakes.
+              <code>%LOCALAPPDATA%\OfficeTracker\logs\heartbeat.log</code> on the laptop.
+            </p>
+          </div>
+          <div>
+            <p className="font-medium">After sleep or laptop wake</p>
+            <p className="mt-1 text-muted">
+              Heartbeats pause while the laptop sleeps. After wake or unlock, the agent should recover within about
+              2 minutes (unlock and power-resume triggers run the heartbeat sooner). Wi-Fi may take a few seconds to
+              reconnect; the agent retries SSID detection automatically. Refresh the Today dashboard if agent status
+              still looks stale after a minute.
             </p>
           </div>
           <div>

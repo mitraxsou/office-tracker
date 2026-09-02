@@ -26,7 +26,8 @@ import {
   verifyPassword,
   changeUserPassword,
 } from "../src/lib/auth";
-import { ensureBreakglassAdmin, isBreakglassEmail, BREAKGLASS_PASSWORD_ENV_MESSAGE } from "../src/lib/breakglass";
+import { ensureBreakglassAdmin } from "../src/lib/breakglass";
+import { isBreakglassEmail, BREAKGLASS_PASSWORD_ENV_MESSAGE } from "../src/lib/breakglass-shared";
 import {
   ADMIN_SELF_RESET_MESSAGE,
   buildPasswordResetMailto,

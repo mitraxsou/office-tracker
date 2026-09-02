@@ -33,6 +33,30 @@ function Get-RunCounterPath {
     Join-Path $env:LOCALAPPDATA "OfficeTracker\run-counter.txt"
 }
 
+function Get-LastRunPath {
+    Join-Path $env:LOCALAPPDATA "OfficeTracker\last-run.txt"
+}
+
+function Get-LastRunTime {
+    $path = Get-LastRunPath
+    if (-not (Test-Path $path)) { return $null }
+    try {
+        return [DateTime]::Parse((Get-Content $path -Raw).Trim())
+    } catch {
+        return $null
+    }
+}
+
+function Set-LastRunTime {
+    Set-Content -Path (Get-LastRunPath) -Value (Get-Date -Format "o") -Encoding UTF8
+}
+
+function Test-ResumeFromSleep {
+    $last = Get-LastRunTime
+    if (-not $last) { return $false }
+    return ((Get-Date) - $last).TotalMinutes -gt 5
+}
+
 function Get-VersionPath {
     Join-Path $env:LOCALAPPDATA "OfficeTracker\version.txt"
 }
@@ -149,6 +173,23 @@ function Get-CurrentWifiSsid {
     return @{ Ssid = $null; Method = "none" }
 }
 
+function Get-CurrentWifiSsidWithRetry {
+    param(
+        [int]$MaxAttempts = 3,
+        [int]$DelaySec = 5
+    )
+    $result = @{ Ssid = $null; Method = "none" }
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        $result = Get-CurrentWifiSsid
+        if ($result.Ssid) { return $result }
+        if ($attempt -lt $MaxAttempts) {
+            Write-Log "WARN SSID empty on attempt $attempt; retrying in ${DelaySec}s"
+            Start-Sleep -Seconds $DelaySec
+        }
+    }
+    return $result
+}
+
 function Get-VpnGatewayDiagnostic {
     try {
         $gp = Get-Process -Name "PanGPA","GlobalProtect" -ErrorAction SilentlyContinue
@@ -228,11 +269,20 @@ if (-not (Test-Path $configPath)) {
     exit 1
 }
 
+$isResumeRun = Test-ResumeFromSleep
+if ($isResumeRun) {
+    $last = Get-LastRunTime
+    $gapMin = [Math]::Round(((Get-Date) - $last).TotalMinutes, 1)
+    Write-Log "RESUME detected (gap ${gapMin}m since last run)"
+}
+Set-LastRunTime
+
 $localConfig = Get-Content $configPath -Raw | ConvertFrom-Json
 $apiUrl = $localConfig.apiUrl.TrimEnd("/")
 $token = $localConfig.token
 
-Wait-NetworkReady -ApiUrl $apiUrl | Out-Null
+$networkWaitSec = if ($isResumeRun) { 90 } else { 60 }
+Wait-NetworkReady -ApiUrl $apiUrl -MaxWaitSec $networkWaitSec | Out-Null
 
 try {
     $serverConfig = Get-ServerConfig -ApiUrl $apiUrl -Token $token
@@ -248,7 +298,7 @@ if (Test-NeedsAgentUpdate $serverConfig) {
 
 Set-RunCounter ((Get-RunCounter) + 1)
 
-$ssidResult = Get-CurrentWifiSsid
+$ssidResult = Get-CurrentWifiSsidWithRetry
 $ssid = $ssidResult.Ssid
 $ssidMethod = $ssidResult.Method
 $serialNumber = Get-LaptopSerial

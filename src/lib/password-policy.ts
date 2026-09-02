@@ -1,4 +1,4 @@
-import { isBreakglassEmail, BREAKGLASS_PASSWORD_ENV_MESSAGE } from "./breakglass";
+import { isBreakglassEmail, BREAKGLASS_PASSWORD_ENV_MESSAGE } from "./breakglass-shared";
 
 export const MIN_PASSWORD_LENGTH = 8;
 

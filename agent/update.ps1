@@ -86,22 +86,57 @@ CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -Ex
     return $vbsPath
 }
 
+function New-HeartbeatTaskTriggers {
+    $repeatTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
+        -RepetitionInterval (New-TimeSpan -Minutes 2) `
+        -RepetitionDuration (New-TimeSpan -Days 3650)
+    $logonTrigger = New-ScheduledTaskTrigger -AtLogOn
+
+    $unlockTrigger = $null
+    $resumeTrigger = $null
+    try {
+        $unlockTrigger = New-CimInstance -Namespace "Root\Microsoft\Windows\TaskScheduler" `
+            -ClassName "MSFT_TaskSessionStateChangeTrigger" -ClientOnly
+        $unlockTrigger.Enabled = $true
+        $unlockTrigger.StateChange = 7
+        $unlockTrigger.Delay = "PT30S"
+    } catch {}
+
+    try {
+        $resumeTrigger = New-CimInstance -Namespace "Root\Microsoft\Windows\TaskScheduler" `
+            -ClassName "MSFT_TaskEventTrigger" -ClientOnly
+        $resumeTrigger.Enabled = $true
+        $resumeTrigger.Subscription = @"
+<QueryList>
+  <Query Id="0" Path="System">
+    <Select Path="System">*[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=107]]</Select>
+  </Query>
+</QueryList>
+"@
+        $resumeTrigger.ValueQueries = ""
+        $resumeTrigger.Delay = "PT45S"
+    } catch {}
+
+    $triggers = @($repeatTrigger, $logonTrigger)
+    if ($unlockTrigger) { $triggers += $unlockTrigger }
+    if ($resumeTrigger) { $triggers += $resumeTrigger }
+    return $triggers
+}
+
 function Refresh-ScheduledTask {
     param([string]$VbsPath, [string]$InstallDir)
     $wscript = (Get-Command wscript.exe).Source
     $actionArgs = "//B //Nologo `"$VbsPath`""
     $action = New-ScheduledTaskAction -Execute $wscript -Argument $actionArgs
-    $repeatTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
-        -RepetitionInterval (New-TimeSpan -Minutes 2) `
-        -RepetitionDuration (New-TimeSpan -Days 3650)
-    $logonTrigger = New-ScheduledTaskTrigger -AtLogOn
+    $triggers = New-HeartbeatTaskTriggers
+    $repeatTrigger = $triggers[0]
     $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
         -LogonType Interactive -RunLevel Limited
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
         -StartWhenAvailable -MultipleInstances Queue
 
     try {
-        Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger @($repeatTrigger, $logonTrigger) `
+        Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $triggers `
             -Principal $principal -Settings $settings -Description $TaskDescription -Force | Out-Null
     } catch {
         Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $repeatTrigger `
