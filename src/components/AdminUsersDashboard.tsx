@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AdminUserManagement } from "./AdminUserManagement";
+import { AdminNotificationPrefsForm } from "./AdminNotificationPrefsForm";
 import { AdminResetPasswordButton } from "./AdminResetPasswordButton";
 import { copyToClipboard } from "@/lib/clipboard";
 
@@ -94,6 +95,8 @@ export function AdminUsersDashboard() {
             "device_remove",
             "device_remove_self",
             "password_reset",
+            "admin_notification_prefs_update",
+            "admin_ooo_update",
           ].includes(l.action),
         ),
       );
@@ -391,6 +394,8 @@ export function AdminUsersDashboard() {
               ))}
             </ul>
           )}
+
+          <AdminNotificationPrefsForm userId={u.id} userEmail={u.email} />
         </section>
       ))}
 

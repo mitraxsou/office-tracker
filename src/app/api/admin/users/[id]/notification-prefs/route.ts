@@ -31,6 +31,20 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  return patchNotificationPrefs(request, params);
+}
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  return patchNotificationPrefs(request, params);
+}
+
+async function patchNotificationPrefs(
+  request: Request,
+  params: Promise<{ id: string }>,
+) {
   const admin = await requireAdmin();
   if (!admin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

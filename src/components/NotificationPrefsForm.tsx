@@ -79,8 +79,9 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
       </h2>
       <p className="mb-4 text-sm text-muted">
         Used by Power Automate to send Teams and email reminders. Alerts are nudges only, not HR
-        records. Reminders are sent only on your selected <strong>usual office days</strong> (e.g.
-        Mon–Fri by default; Sat/Sun are skipped unless you enable them).
+        records. Reminders are sent only on {adminUserId ? "the user's" : "your"} selected{" "}
+        <strong>usual office days</strong> (e.g. Mon-Fri by default; Sat/Sun are skipped unless
+        enabled).
       </p>
 
       <label className="mb-5 flex items-center gap-3 rounded-lg border border-[var(--border)] px-4 py-3 text-sm">
