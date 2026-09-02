@@ -8,6 +8,8 @@ import {
   dayKeysInMonthUpToToday,
   dayQualifiesForTarget,
   getMonthlyProgressState,
+  isCompliantYearMonthStatus,
+  isPrePilotMonth,
   monthKeyInTimezone,
   monthDayKeysFromTrend,
   monthKeysInYear,
@@ -145,20 +147,35 @@ describe("year compliance helpers", () => {
     ]);
   });
 
-  it("classifies year month status for past, current, and future months", () => {
-    expect(yearMonthStatus("2026-08", "2026-09", true)).toBe("met");
-    expect(yearMonthStatus("2026-08", "2026-09", false)).toBe("not_met");
-    expect(yearMonthStatus("2026-09", "2026-09", false)).toBe("not_met");
-    expect(yearMonthStatus("2026-10", "2026-09", false)).toBe("pending");
-  });
-
   it("counts exempt qualifying days without double counting", () => {
     const keys = new Set(["2026-09-01", "2026-09-02"]);
     expect(countExemptQualifyingDays(keys, ["2026-09-03"])).toBe(3);
     expect(countExemptQualifyingDays(keys, ["2026-09-01"])).toBe(2);
   });
 
-  it("resolves month compliance with exemption metVia", () => {
+  it("classifies year month status for past, current, and future months", () => {
+    expect(yearMonthStatus("2026-08", "2026-09", true)).toBe("earned");
+    expect(yearMonthStatus("2026-08", "2026-09", false)).toBe("not_met");
+    expect(yearMonthStatus("2026-09", "2026-09", false)).toBe("not_met");
+    expect(yearMonthStatus("2026-10", "2026-09", false)).toBe("pending");
+  });
+
+  it("identifies months before the pilot start as pre-pilot", () => {
+    expect(isPrePilotMonth("2026-01", "2026-09")).toBe(true);
+    expect(isPrePilotMonth("2026-08", "2026-09")).toBe(true);
+    expect(isPrePilotMonth("2026-09", "2026-09")).toBe(false);
+    expect(isPrePilotMonth("2026-10", "2026-09")).toBe(false);
+  });
+
+  it("counts pre-pilot and earned months as compliant", () => {
+    expect(isCompliantYearMonthStatus("earned")).toBe(true);
+    expect(isCompliantYearMonthStatus("exemption")).toBe(true);
+    expect(isCompliantYearMonthStatus("pre_pilot")).toBe(true);
+    expect(isCompliantYearMonthStatus("not_met")).toBe(false);
+    expect(isCompliantYearMonthStatus("pending")).toBe(false);
+  });
+
+  it("resolves month compliance with exemption status", () => {
     const resolved = resolveMonthCompliance({
       monthKey: "2026-08",
       currentMonthKey: "2026-09",
@@ -169,6 +186,16 @@ describe("year compliance helpers", () => {
       qualifyingDayKeys: new Set(),
     });
     expect(resolved.metTarget).toBe(true);
-    expect(resolved.metVia).toBe("exemption");
+    expect(resolved.status).toBe("exemption");
+  });
+
+  it("marks Jan-Aug 2026 as pre-pilot when pilot starts Sep 2026", () => {
+    const pilotStart = "2026-09";
+    const prePilotMonths = monthKeysInYear(2026).slice(0, 8);
+    for (const monthKey of prePilotMonths) {
+      expect(isPrePilotMonth(monthKey, pilotStart)).toBe(true);
+      expect(isCompliantYearMonthStatus("pre_pilot")).toBe(true);
+    }
+    expect(isPrePilotMonth("2026-09", pilotStart)).toBe(false);
   });
 });

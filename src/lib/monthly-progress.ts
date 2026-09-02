@@ -1,6 +1,7 @@
 import { allDayKeysInMonth, daysInMonth, parseMonthKey } from "./month-range";
 import { aggregateHoursForDay } from "./user-reports";
 import type { ApprovedExemptions } from "./compliance-exemptions";
+import { DEFAULT_PILOT_START_MONTH_KEY } from "./app-config";
 
 export function validateMonthlyDaysTarget(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 31) {
@@ -80,17 +81,19 @@ export type MonthlyProgress = {
   progressState: MonthlyProgressState;
 };
 
-export type YearMonthStatus = "met" | "not_met" | "pending";
-
-export type YearMonthMetVia = "earned" | "exemption";
+export type YearMonthComplianceStatus =
+  | "earned"
+  | "exemption"
+  | "pre_pilot"
+  | "pending"
+  | "not_met";
 
 export type YearMonthCompliance = {
   monthKey: string;
   metTarget: boolean;
   qualifyingDays: number;
   monthlyDaysTarget: number;
-  status: YearMonthStatus;
-  metVia?: YearMonthMetVia;
+  status: YearMonthComplianceStatus;
   hasPendingExemption?: boolean;
 };
 
@@ -124,13 +127,21 @@ export function monthKeysInYearUpToMonth(
   return monthKeysInYear(year).slice(0, monthCount);
 }
 
+export function isPrePilotMonth(monthKey: string, pilotStartMonthKey: string): boolean {
+  return monthKey < pilotStartMonthKey;
+}
+
+export function isCompliantYearMonthStatus(status: YearMonthComplianceStatus): boolean {
+  return status === "earned" || status === "exemption" || status === "pre_pilot";
+}
+
 export function yearMonthStatus(
   monthKey: string,
   currentMonthKey: string,
   metTarget: boolean,
-): YearMonthStatus {
+): YearMonthComplianceStatus {
   if (monthKey > currentMonthKey) return "pending";
-  if (metTarget) return "met";
+  if (metTarget) return "earned";
   return "not_met";
 }
 
@@ -156,7 +167,7 @@ export function resolveMonthCompliance(params: {
   exemptDayKeysInMonth: string[];
   qualifyingDayKeys: Set<string>;
   hasPendingExemption?: boolean;
-}): Pick<YearMonthCompliance, "metTarget" | "qualifyingDays" | "status" | "metVia" | "hasPendingExemption"> {
+}): Pick<YearMonthCompliance, "metTarget" | "qualifyingDays" | "status" | "hasPendingExemption"> {
   if (params.monthKey > params.currentMonthKey) {
     return {
       metTarget: false,
@@ -170,8 +181,7 @@ export function resolveMonthCompliance(params: {
     return {
       metTarget: true,
       qualifyingDays: params.qualifyingDays,
-      status: "met",
-      metVia: "exemption",
+      status: "exemption",
       hasPendingExemption: params.hasPendingExemption,
     };
   }
@@ -182,18 +192,15 @@ export function resolveMonthCompliance(params: {
   );
   const naturalMet = params.qualifyingDays >= params.monthlyDaysTarget;
   const metTarget = naturalMet || effectiveQualifyingDays >= params.monthlyDaysTarget;
-  const metVia: YearMonthMetVia | undefined = params.hasMonthExemption
-    ? "exemption"
-    : metTarget && !naturalMet
-      ? "exemption"
-      : metTarget
-        ? "earned"
-        : undefined;
+  const status: YearMonthComplianceStatus = metTarget
+    ? naturalMet
+      ? "earned"
+      : "exemption"
+    : "not_met";
   return {
     metTarget,
     qualifyingDays: effectiveQualifyingDays,
-    status: metTarget ? "met" : "not_met",
-    metVia,
+    status,
     hasPendingExemption: params.hasPendingExemption,
   };
 }
@@ -284,6 +291,7 @@ export async function getYearCompliance(
   referenceDate: Date = new Date(),
   approvedExemptions?: ApprovedExemptions,
   pendingExemptionMonthKeys: string[] = [],
+  pilotStartMonthKey: string = DEFAULT_PILOT_START_MONTH_KEY,
 ): Promise<YearCompliance> {
   const year = yearFromDate(referenceDate, timezone);
   const currentMonthKey = monthKeyInTimezone(referenceDate, timezone);
@@ -294,7 +302,6 @@ export async function getYearCompliance(
 
   const monthDetails = await Promise.all(
     monthKeys.map(async (monthKey) => {
-      const dayKeys = dayKeysForMonth(monthKey, timezone, referenceDate);
       if (monthKey > currentMonthKey) {
         return {
           monthKey,
@@ -306,6 +313,18 @@ export async function getYearCompliance(
         };
       }
 
+      if (isPrePilotMonth(monthKey, pilotStartMonthKey)) {
+        return {
+          monthKey,
+          metTarget: true,
+          qualifyingDays: 0,
+          monthlyDaysTarget,
+          status: "pre_pilot" as const,
+          hasPendingExemption: pendingMonths.has(monthKey),
+        };
+      }
+
+      const dayKeys = dayKeysForMonth(monthKey, timezone, referenceDate);
       const dailyHours = await Promise.all(
         dayKeys.map((dayKey) => aggregateHoursForDay(userId, timezone, dayKey)),
       );
@@ -337,7 +356,7 @@ export async function getYearCompliance(
 
   return {
     year,
-    compliantMonths: monthDetails.filter((month) => month.status === "met").length,
+    compliantMonths: monthDetails.filter((month) => isCompliantYearMonthStatus(month.status)).length,
     monthsInYear: 12,
     monthsElapsed,
     monthDetails,

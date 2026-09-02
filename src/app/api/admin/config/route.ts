@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin";
 import { getAppConfig, updateAppConfig } from "@/lib/app-config";
 import { validateMonthlyDaysTarget } from "@/lib/monthly-progress";
+import { isValidMonthKey } from "@/lib/compliance-exemptions";
 import { validateSsids } from "@/lib/security";
 import { normalizeSsid } from "@/lib/constants";
 import { logAuditEvent } from "@/lib/audit-log";
@@ -38,6 +39,7 @@ export async function PATCH(request: Request) {
     agentStaleMinutes?: number;
     agentStaleGraceHours?: number;
     complianceExemptionRequiresApproval?: boolean;
+    pilotStartMonthKey?: string;
   };
 
   try {
@@ -126,6 +128,13 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Invalid complianceExemptionRequiresApproval" }, { status: 400 });
     }
     update.complianceExemptionRequiresApproval = body.complianceExemptionRequiresApproval;
+  }
+
+  if (body.pilotStartMonthKey !== undefined) {
+    if (!isValidMonthKey(body.pilotStartMonthKey)) {
+      return NextResponse.json({ error: "Invalid pilotStartMonthKey (expected YYYY-MM)" }, { status: 400 });
+    }
+    update.pilotStartMonthKey = body.pilotStartMonthKey;
   }
 
   const config = await updateAppConfig(update);

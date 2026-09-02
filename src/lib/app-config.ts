@@ -12,6 +12,20 @@ export const DEFAULT_PENDING_TOKEN_TTL_DAYS = 7;
 export const DEFAULT_HEARTBEAT_RETENTION_DAYS = 7;
 export const DEFAULT_AGENT_STALE_MINUTES = 8;
 export const DEFAULT_AGENT_STALE_GRACE_HOURS = 24;
+export const DEFAULT_PILOT_START_MONTH_KEY = "2026-09";
+
+export function resolvePilotStartMonthKey(stored?: string | null): string {
+  const fromEnv = process.env.PILOT_START_MONTH?.trim();
+  if (fromEnv && /^\d{4}-\d{2}$/.test(fromEnv)) {
+    const month = Number(fromEnv.slice(5, 7));
+    if (month >= 1 && month <= 12) return fromEnv;
+  }
+  if (stored && /^\d{4}-\d{2}$/.test(stored)) {
+    const month = Number(stored.slice(5, 7));
+    if (month >= 1 && month <= 12) return stored;
+  }
+  return DEFAULT_PILOT_START_MONTH_KEY;
+}
 
 export function logAppConfigSchemaDriftIfNeeded(err: unknown): boolean {
   const isMissingColumn =
@@ -41,6 +55,7 @@ export type AppConfigData = {
   agentStaleMinutes: number;
   agentStaleGraceHours: number;
   complianceExemptionRequiresApproval: boolean;
+  pilotStartMonthKey: string;
 };
 
 const CONFIG_ID = "global";
@@ -83,6 +98,7 @@ export async function ensureAppConfig(): Promise<AppConfigData> {
           agentStaleMinutes: DEFAULT_AGENT_STALE_MINUTES,
           agentStaleGraceHours: DEFAULT_AGENT_STALE_GRACE_HOURS,
           complianceExemptionRequiresApproval: true,
+          pilotStartMonthKey: resolvePilotStartMonthKey(),
         },
       });
     } else {
@@ -124,6 +140,7 @@ export async function updateAppConfig(data: Partial<AppConfigData>) {
   if (data.complianceExemptionRequiresApproval !== undefined) {
     update.complianceExemptionRequiresApproval = data.complianceExemptionRequiresApproval;
   }
+  if (data.pilotStartMonthKey !== undefined) update.pilotStartMonthKey = data.pilotStartMonthKey;
 
   const config = await prisma.appConfig.update({
     where: { id: CONFIG_ID },
@@ -164,6 +181,7 @@ function parseConfig(config: {
   agentStaleMinutes?: number;
   agentStaleGraceHours?: number;
   complianceExemptionRequiresApproval?: boolean;
+  pilotStartMonthKey?: string;
 }): AppConfigData {
   let ssids: string[] = parseDefaultSsidsFromEnv();
   try {
@@ -183,5 +201,6 @@ function parseConfig(config: {
     agentStaleMinutes: config.agentStaleMinutes ?? DEFAULT_AGENT_STALE_MINUTES,
     agentStaleGraceHours: config.agentStaleGraceHours ?? DEFAULT_AGENT_STALE_GRACE_HOURS,
     complianceExemptionRequiresApproval: config.complianceExemptionRequiresApproval ?? true,
+    pilotStartMonthKey: resolvePilotStartMonthKey(config.pilotStartMonthKey),
   };
 }

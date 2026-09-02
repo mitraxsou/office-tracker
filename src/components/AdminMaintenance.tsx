@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   MAINTENANCE_TABLE_LABELS,
+  NEVER_PURGED_TABLES,
   RETENTION_PERIOD_LABELS,
   type MaintenanceTable,
   type RetentionPeriod,
@@ -68,8 +69,9 @@ export function AdminMaintenance() {
     <section className="card border border-red-500/30 p-6">
       <h2 className="mb-1 text-lg font-medium">Data maintenance</h2>
       <p className="mb-4 text-sm text-muted">
-        Remove old operational data. Users, tokens, devices, and AppConfig are never deleted here.
-        Use preview before purging.
+        Remove old operational data. Never purged here:{" "}
+        {NEVER_PURGED_TABLES.join(", ")}. Integration API keys are revoked in Admin, not deleted
+        here. Open requests and active visits are skipped. Use preview before purging.
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2">

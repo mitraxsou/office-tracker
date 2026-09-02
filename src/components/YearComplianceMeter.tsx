@@ -25,20 +25,26 @@ function monthChipTitle(
   if (month.status === "pending") {
     return `${label}: Not started yet`;
   }
-  if (month.metVia === "exemption") {
-    return `${label}: Met via HR exemption (${month.qualifyingDays}/${month.monthlyDaysTarget} days logged)`;
+  if (month.status === "pre_pilot") {
+    return `${label}: Data not available - app not active`;
   }
-  if (month.status === "met") {
+  if (month.status === "exemption") {
+    return `${label}: Exempted by admin (${month.qualifyingDays}/${month.monthlyDaysTarget} days logged)`;
+  }
+  if (month.status === "earned") {
     return `${label}: ${month.qualifyingDays}/${month.monthlyDaysTarget} days`;
   }
   return `${label}: ${month.qualifyingDays}/${month.monthlyDaysTarget} days`;
 }
 
 function monthChipClassName(month: YearCompliance["monthDetails"][number]): string {
-  if (month.status === "met" && month.metVia === "exemption") {
+  if (month.status === "pre_pilot") {
+    return "bg-green-500/10 text-green-300/80 border border-dashed border-green-500/30";
+  }
+  if (month.status === "exemption") {
     return "bg-green-500/10 text-green-300 border border-dashed border-green-500/40";
   }
-  if (month.status === "met") {
+  if (month.status === "earned") {
     return "bg-green-500/15 text-green-400 border border-green-500/30";
   }
   if (month.hasPendingExemption) {
@@ -151,7 +157,7 @@ export function YearComplianceMeter({ compliance, timezone }: YearComplianceMete
       </div>
       <p className="mt-2 text-xs text-muted">
         Months where you hit the office-days target ({compliance.monthDetails[0]?.monthlyDaysTarget ?? 8}{" "}
-        qualifying days per month), including approved HR exemptions.
+        qualifying days per month), including pre-pilot months and admin exemptions.
       </p>
       <div className="progress-track mt-4 h-3 overflow-hidden rounded-full">
         <div
@@ -164,10 +170,8 @@ export function YearComplianceMeter({ compliance, timezone }: YearComplianceMete
           {compliance.monthDetails.map((month) => {
             const pending = pendingForMonth(month.monthKey);
             const canRequest =
-              month.status !== "pending" &&
-              month.status !== "met" &&
-              !pending &&
-              month.metVia !== "exemption";
+              month.status === "not_met" &&
+              !pending;
             return (
               <span key={month.monthKey} className="inline-flex items-center gap-1">
                 <button

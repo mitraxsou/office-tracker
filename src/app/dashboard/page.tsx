@@ -53,6 +53,7 @@ export default async function DashboardPage() {
     new Date(),
     approvedExemptions,
     pendingExemptionMonthKeys,
+    config.pilotStartMonthKey,
   );
   const pulse = await getPulseStats(user.id, graceHours);
   const isOutToday = await isUserOutOfOffice(user.id, summary.dayKey);

@@ -291,6 +291,9 @@ export async function register() {
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "complianceExemptionRequiresApproval" BOOLEAN NOT NULL DEFAULT true;'
     );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "pilotStartMonthKey" TEXT NOT NULL DEFAULT \'2026-09\';'
+    );
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "ComplianceExemptionRequest" (
         "id" TEXT NOT NULL,

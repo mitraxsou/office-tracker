@@ -75,8 +75,7 @@ describe("year compliance exemption counting", () => {
       exemptDayKeysInMonth: [],
       qualifyingDayKeys: new Set(["2026-08-01", "2026-08-02"]),
     });
-    expect(result.status).toBe("met");
-    expect(result.metVia).toBe("exemption");
+    expect(result.status).toBe("exemption");
     expect(result.metTarget).toBe(true);
   });
 
@@ -99,8 +98,7 @@ describe("year compliance exemption counting", () => {
       exemptDayKeysInMonth: ["2026-08-08"],
       qualifyingDayKeys,
     });
-    expect(result.status).toBe("met");
-    expect(result.metVia).toBe("exemption");
+    expect(result.status).toBe("exemption");
     expect(result.qualifyingDays).toBe(8);
   });
 
@@ -116,7 +114,6 @@ describe("year compliance exemption counting", () => {
         Array.from({ length: 8 }, (_, i) => `2026-08-${String(i + 1).padStart(2, "0")}`),
       ),
     });
-    expect(result.status).toBe("met");
-    expect(result.metVia).toBe("earned");
+    expect(result.status).toBe("earned");
   });
 });
