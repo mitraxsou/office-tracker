@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { dayKeyForTimezone } from "@/lib/user-reports";
+import { dayKeyInTimezone } from "@/lib/visits";
 import { formatHours, formatTime } from "@/lib/visits";
 
 type VisitRow = {
@@ -56,7 +56,7 @@ function buildDayGroups(
   const byDay = new Map<string, VisitRow[]>();
 
   for (const visit of visits) {
-    const dayKey = dayKeyForTimezone(new Date(visit.startAt), timezone);
+    const dayKey = dayKeyInTimezone(new Date(visit.startAt), timezone);
     const rows = byDay.get(dayKey) ?? [];
     rows.push(visit);
     byDay.set(dayKey, rows);
