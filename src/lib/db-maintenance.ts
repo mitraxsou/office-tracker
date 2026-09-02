@@ -76,7 +76,7 @@ export function dayKeyFromDate(date: Date): string {
 }
 
 const RESOLVED_REQUEST_WHERE = (cutoff: Date) => ({
-  status: { in: ["approved", "rejected"] as const },
+  status: { in: ["approved", "rejected"] },
   reviewedAt: { lt: cutoff },
 });
 
