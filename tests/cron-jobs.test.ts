@@ -73,3 +73,34 @@ describe("cron health", () => {
     ).toBe("overdue");
   });
 });
+
+describe("Vercel Hobby cron schedules", () => {
+  function isSingleNumber(field: string) {
+    return /^\d+$/.test(field);
+  }
+
+  function isHobbySafe(schedule: string) {
+    const parts = schedule.trim().split(/\s+/);
+    if (parts.length !== 5) return false;
+    const [minute, hour, dayOfMonth, , dayOfWeek] = parts;
+    if (dayOfMonth !== "*" || dayOfWeek !== "*") return true;
+    return isSingleNumber(minute) && isSingleNumber(hour);
+  }
+
+  it("rejects more-than-daily expressions the way Hobby does", () => {
+    expect(isHobbySafe("*/15 * * * *")).toBe(false);
+    expect(isHobbySafe("0 * * * *")).toBe(false);
+  });
+
+  it("keeps vercel.json crons at most once per day", async () => {
+    const { readFile } = await import("node:fs/promises");
+    const { resolve } = await import("node:path");
+    const vercel = JSON.parse(await readFile(resolve("vercel.json"), "utf8")) as {
+      crons?: { schedule: string }[];
+    };
+    expect(vercel.crons?.length).toBeGreaterThan(0);
+    for (const cron of vercel.crons ?? []) {
+      expect(isHobbySafe(cron.schedule), cron.schedule).toBe(true);
+    }
+  });
+});

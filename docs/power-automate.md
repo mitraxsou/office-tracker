@@ -133,7 +133,7 @@ When true, add **Send an email (V2)**:
 5. Confirm that Teams and email arrive at the signed-in admin email.
 6. Send or inspect a request without the token and confirm the flow terminates before delivery.
 
-Office Pulse acknowledges an alert only after Power Automate returns HTTP 2xx. Failed requests remain pending and the 15-minute cron retries them.
+Office Pulse acknowledges an alert only after Power Automate returns HTTP 2xx. Failed requests remain pending. The daily agent-alerts cron retries them, and in-office hours_started and hours_met alerts also send from agent heartbeats.
 
 ## Rotation and operations
 

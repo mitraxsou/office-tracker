@@ -39,7 +39,7 @@
 | `DELETE /api/admin/devices/[id]` | Admin | Unbind laptop |
 | `GET/POST/DELETE /api/admin/integration-keys` | Admin | List, generate, and revoke the Power Automate webhook secret |
 | `POST /api/admin/integration-keys/test` | Admin | Send a Power Automate test notification to the admin |
-| `GET /api/cron/agent-alerts` | Cron bearer | Dispatch pending alerts to Power Automate |
+| `GET /api/cron/agent-alerts` | Cron bearer | Dispatch pending alerts to Power Automate (daily on Vercel Hobby) |
 
 ## Prisma models (high level)
 

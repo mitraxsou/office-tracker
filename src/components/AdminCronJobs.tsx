@@ -71,8 +71,9 @@ export function AdminCronJobs({ initialJobs }: { initialJobs: CronJob[] }) {
         never sends the secret to the browser.
       </p>
       <p className="mt-1 text-xs text-muted">
-        Scheduled runs occur only in the deployed Vercel environment. Local development shows manual
-        runs and any records in the connected database.
+        Scheduled runs occur only in the deployed Vercel environment. Hobby plans reject cron
+        expressions that would run more than once per day, so agent alerts are daily. Local
+        development shows manual runs and any records in the connected database.
       </p>
 
       <div className="mt-5 space-y-4">

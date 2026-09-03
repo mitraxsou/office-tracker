@@ -146,6 +146,7 @@ git -c user.name="mitraxsou" -c user.email="16998608+mitraxsou@users.noreply.git
 - **SSID none:** Location blocked; ensure NetConnectionProfile path in agent
 - **CSS broken:** verify `globals.css` has `@import "tailwindcss"`, clear `.next`, restart dev server
 - **401 heartbeat:** token regenerated without re-install; serial mismatch on wrong laptop
+- **Vercel deploy fails immediately (Hobby):** cron expressions more frequent than once per day are rejected (`*/15 * * * *`, `0 * * * *`). Keep `vercel.json` crons daily or weekly.
 - **Git review tools fail:** need at least one commit; use full codebase read for initial audit
 
 ## Additional resources

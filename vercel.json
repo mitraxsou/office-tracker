@@ -6,7 +6,7 @@
   "crons": [
     {
       "path": "/api/cron/agent-alerts",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 10 * * *"
     },
     {
       "path": "/api/cron/purge-heartbeats",
