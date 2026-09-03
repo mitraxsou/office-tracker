@@ -251,6 +251,22 @@ model AppConfig {
   updatedAt             DateTime @updatedAt
 }
 
+model CronJobRun {
+  id            String   @id @default(cuid())
+  jobName       String
+  source        String
+  status        String
+  startedAt     DateTime
+  finishedAt    DateTime
+  durationMs    Int
+  resultSummary String?
+  error         String?
+  createdAt     DateTime @default(now())
+
+  @@index([jobName, startedAt])
+  @@index([status, startedAt])
+}
+
 model Heartbeat {
   id         String   @id @default(cuid())
   userId     String

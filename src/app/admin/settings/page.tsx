@@ -11,14 +11,22 @@ import { AdminComplianceExemptionControls } from "@/components/AdminComplianceEx
 import { AdminIntegrationKeys } from "@/components/AdminIntegrationKeys";
 import { AdminMaintenance } from "@/components/AdminMaintenance";
 import { listIntegrationApiKeys } from "@/lib/integration-api-keys";
+import { AdminCronJobs } from "@/components/AdminCronJobs";
+import { listCronJobs } from "@/lib/cron-jobs";
+import { AdminDatabaseStats } from "@/components/AdminDatabaseStats";
+import { getDatabaseStats } from "@/lib/db-stats";
 
 export default async function AdminSettingsPage() {
   const admin = await requireAdmin();
   if (!admin) redirect("/dashboard");
   enforcePasswordChangeIfRequired(admin);
 
-  const config = await getAppConfig();
-  const integrationKeys = await listIntegrationApiKeys();
+  const [config, integrationKeys, cronJobs, databaseStats] = await Promise.all([
+    getAppConfig(),
+    listIntegrationApiKeys(),
+    listCronJobs(),
+    getDatabaseStats(),
+  ]);
 
   return (
     <>
@@ -42,7 +50,9 @@ export default async function AdminSettingsPage() {
         <AdminComplianceExemptionControls
           complianceExemptionRequiresApproval={config.complianceExemptionRequiresApproval}
         />
+        <AdminCronJobs initialJobs={cronJobs} />
         <AdminIntegrationKeys initialKeys={integrationKeys} />
+        <AdminDatabaseStats stats={databaseStats} />
         <AdminMaintenance />
         <AdminPilotControls
           allowRegistration={config.allowRegistration}
