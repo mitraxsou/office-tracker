@@ -14,7 +14,12 @@ import { buildOutOfOfficeLinkUrl, isUserOutOfOffice } from "./out-of-office";
 import { userHasActiveInstalledDevice } from "./agent-lifecycle";
 import { heartbeatInOffice } from "./heartbeat-office";
 
-export type IntegrationAlertType = "absent" | "stale" | "behind";
+export type IntegrationAlertType =
+  | "absent"
+  | "stale"
+  | "behind"
+  | "hours_started"
+  | "hours_met";
 
 export type IntegrationAlert = {
   type: IntegrationAlertType;
@@ -31,6 +36,7 @@ export type IntegrationAlert = {
   dayKey: string;
   dashboardUrl: string;
   settingsUrl: string;
+  helpUrl: string;
   outOfOfficeUrl: string;
 };
 
@@ -52,8 +58,8 @@ async function wasAlertSentToday(
       targetUserId: userId,
       action: INTEGRATION_ALERT_ACTION,
       details: { contains: `"type":"${type}"` },
-      createdAt: { gte: dayBoundsFromKey(dayKey, "Asia/Kolkata").start },
     },
+    orderBy: { createdAt: "desc" },
   });
   if (!existing?.details) return false;
   try {
@@ -88,28 +94,56 @@ export async function acknowledgeIntegrationAlerts(
 async function hadInOfficeHeartbeatToday(
   userId: string,
   dayStart: Date,
+  dayEnd: Date,
   allowlist: string[],
 ): Promise<boolean> {
   const beats = await prisma.heartbeat.findMany({
-    where: { userId, recordedAt: { gte: dayStart } },
+    where: { userId, recordedAt: { gte: dayStart, lte: dayEnd } },
     select: { ssid: true, inOffice: true },
   });
   return beats.some((b) => heartbeatInOffice(b, allowlist));
 }
 
-function buildAbsentMessage(prefs: NotificationPrefsData): string {
-  return `No office Wi-Fi detected yet today. You usually start around ${prefs.officeStartTime}. Open the dashboard to check in manually if you are in the office.`;
+function buildAbsentMessage(
+  prefs: NotificationPrefsData,
+  baseUrl: string = appBaseUrl(),
+): string {
+  return `Office Pulse is not receiving a Wi-Fi name from your laptop. Your usual start time is ${prefs.officeStartTime}. To restore tracking: 1) open ${baseUrl}/settings#install, 2) download and extract the agent zip, 3) copy the install command, and 4) run it in PowerShell. Full steps: ${baseUrl}/help#install-agent`;
 }
 
-function buildStaleMessage(minutes: number | null): string {
+function buildStaleMessage(minutes: number | null, baseUrl: string = appBaseUrl()): string {
   if (minutes != null) {
-    return `Your Office Pulse agent has not sent a heartbeat in about ${minutes} minutes. Re-run the install command from Settings (#install section).`;
+    return `Your Office Pulse agent has not sent a heartbeat in about ${minutes} minutes. To restore tracking: 1) open ${baseUrl}/settings#install, 2) download and extract the agent zip, 3) copy the install command, and 4) run it in PowerShell. Full steps: ${baseUrl}/help#install-agent`;
   }
-  return "Your Office Pulse agent is not sending heartbeats. Re-run the install command from Settings (#install section).";
+  return `Your Office Pulse agent is not sending heartbeats. Reinstall it from ${baseUrl}/settings#install using the steps at ${baseUrl}/help#install-agent.`;
 }
 
 function buildBehindMessage(hoursToday: number, minExpected: number, target: number): string {
   return `You have logged ${hoursToday.toFixed(1)}h in the office so far. On a typical day you aim for at least ${minExpected}h by now (${target}h total).`;
+}
+
+function buildHoursStartedMessage(hoursTarget: number): string {
+  return `Office Wi-Fi detected. Your office hours count has started for today. Your daily target is ${hoursTarget}h.`;
+}
+
+function buildHoursMetMessage(hoursToday: number, hoursTarget: number): string {
+  return `You have completed your ${hoursTarget}h office target for today. Office Pulse has counted ${hoursToday.toFixed(1)}h.`;
+}
+
+export function classifyPresenceReminder(input: {
+  inOfficeToday: boolean;
+  inOfficeNow: boolean;
+  agentHealthy: boolean;
+  lastSsid: string | null;
+}): "absent" | "stale" | null {
+  if (input.inOfficeToday || input.inOfficeNow) return null;
+  if (!input.agentHealthy) return "stale";
+  if (!input.lastSsid?.trim()) return "absent";
+  return null;
+}
+
+export function shouldQueueDailyAlert(eligible: boolean, alreadySent: boolean): boolean {
+  return eligible && !alreadySent;
 }
 
 async function evaluateUserAlerts(
@@ -137,13 +171,18 @@ async function evaluateUserAlerts(
   const dayKey = dayKeyInTimezone(now, user.timezone);
   if (await isUserOutOfOffice(user.id, dayKey)) return [];
 
-  const dayStart = dayBoundsFromKey(dayKey, user.timezone).start;
+  const { start: dayStart, end: dayEnd } = dayBoundsFromKey(dayKey, user.timezone);
   const nowMinutes = getMinutesInTimezone(now, user.timezone);
   const workDay = isWorkDayNow(prefs, now, user.timezone);
-  if (!workDay) return [];
 
   const baseUrl = appBaseUrl();
   const outOfOfficeUrl = await buildOutOfOfficeLinkUrl(user.id, dayKey);
+  const inOfficeToday = await hadInOfficeHeartbeatToday(
+    user.id,
+    dayStart,
+    dayEnd,
+    config.officeSsids,
+  );
 
   const alerts: IntegrationAlert[] = [];
 
@@ -160,33 +199,43 @@ async function evaluateUserAlerts(
     dayKey,
     dashboardUrl: `${baseUrl}/dashboard`,
     settingsUrl: `${baseUrl}/settings`,
+    helpUrl: `${baseUrl}/help`,
     outOfOfficeUrl,
   };
 
-  if (types.has("stale") && prefs.alertIfAgentStale && workDay && !pulse.agentHealthy) {
+  const presenceReminder = classifyPresenceReminder({
+    inOfficeToday,
+    inOfficeNow: summary.inOfficeNow,
+    agentHealthy: pulse.agentHealthy,
+    lastSsid: summary.lastHeartbeat?.ssid ?? null,
+  });
+
+  if (
+    types.has("stale") &&
+    prefs.alertIfAgentStale &&
+    workDay &&
+    presenceReminder === "stale"
+  ) {
     const hasDevice = await userHasActiveInstalledDevice(user.id);
     if (hasDevice && !(await wasAlertSentToday(user.id, "stale", dayKey))) {
       alerts.push({
         ...base,
         type: "stale",
-        message: buildStaleMessage(pulse.minutesSinceLastPulse),
+        message: buildStaleMessage(pulse.minutesSinceLastPulse, baseUrl),
       });
     }
   }
 
   if (types.has("absent") && prefs.alertIfNotInOffice && workDay) {
     const startMinutes = parseTimeToMinutes(prefs.officeStartTime) + prefs.graceMinutes;
-    if (nowMinutes >= startMinutes) {
-      const inOfficeToday = await hadInOfficeHeartbeatToday(user.id, dayStart, config.officeSsids);
+    if (nowMinutes >= startMinutes && presenceReminder === "absent") {
       if (
-        !inOfficeToday &&
-        !summary.inOfficeNow &&
         !(await wasAlertSentToday(user.id, "absent", dayKey))
       ) {
         alerts.push({
           ...base,
           type: "absent",
-          message: buildAbsentMessage(prefs),
+          message: buildAbsentMessage(prefs, baseUrl),
         });
       }
     }
@@ -211,6 +260,36 @@ async function evaluateUserAlerts(
     }
   }
 
+  if (
+    types.has("hours_started") &&
+    prefs.alertIfHoursStarted &&
+    shouldQueueDailyAlert(
+      inOfficeToday,
+      await wasAlertSentToday(user.id, "hours_started", dayKey),
+    )
+  ) {
+    alerts.push({
+      ...base,
+      type: "hours_started",
+      message: buildHoursStartedMessage(hoursTarget),
+    });
+  }
+
+  if (
+    types.has("hours_met") &&
+    prefs.alertIfHoursMet &&
+    shouldQueueDailyAlert(
+      inOfficeToday && summary.totalHours >= hoursTarget,
+      await wasAlertSentToday(user.id, "hours_met", dayKey),
+    )
+  ) {
+    alerts.push({
+      ...base,
+      type: "hours_met",
+      message: buildHoursMetMessage(summary.totalHours, hoursTarget),
+    });
+  }
+
   return alerts;
 }
 
@@ -218,7 +297,13 @@ export async function getIntegrationAlerts(typesParam?: string | null): Promise<
   generatedAt: string;
   alerts: IntegrationAlert[];
 }> {
-  const allTypes: IntegrationAlertType[] = ["absent", "stale", "behind"];
+  const allTypes: IntegrationAlertType[] = [
+    "absent",
+    "stale",
+    "behind",
+    "hours_started",
+    "hours_met",
+  ];
   const types = new Set<IntegrationAlertType>(
     typesParam
       ? typesParam
@@ -253,4 +338,11 @@ export async function getIntegrationAlerts(typesParam?: string | null): Promise<
 }
 
 /** Exported for unit tests */
-export { evaluateUserAlerts, buildAbsentMessage, buildStaleMessage, buildBehindMessage };
+export {
+  evaluateUserAlerts,
+  buildAbsentMessage,
+  buildStaleMessage,
+  buildBehindMessage,
+  buildHoursStartedMessage,
+  buildHoursMetMessage,
+};

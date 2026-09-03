@@ -62,7 +62,7 @@ export async function register() {
       CREATE TABLE IF NOT EXISTS "UserNotificationPrefs" (
         "id" TEXT NOT NULL,
         "userId" TEXT NOT NULL,
-        "workDays" TEXT NOT NULL DEFAULT '[1,2,3,4,5]',
+        "workDays" TEXT NOT NULL DEFAULT '[3,5]',
         "officeStartTime" TEXT NOT NULL DEFAULT '09:30',
         "officeEndTime" TEXT NOT NULL DEFAULT '18:00',
         "graceMinutes" INTEGER NOT NULL DEFAULT 45,
@@ -72,6 +72,8 @@ export async function register() {
         "alertIfNotInOffice" BOOLEAN NOT NULL DEFAULT true,
         "alertIfAgentStale" BOOLEAN NOT NULL DEFAULT true,
         "alertIfBehindHours" BOOLEAN NOT NULL DEFAULT false,
+        "alertIfHoursStarted" BOOLEAN NOT NULL DEFAULT true,
+        "alertIfHoursMet" BOOLEAN NOT NULL DEFAULT true,
         "behindHoursCheckTime" TEXT NOT NULL DEFAULT '15:00',
         "behindHoursMinExpected" DOUBLE PRECISION NOT NULL DEFAULT 2.5,
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -90,6 +92,19 @@ export async function register() {
     );
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "UserNotificationPrefs" ADD COLUMN IF NOT EXISTS "scheduleUserSet" BOOLEAN NOT NULL DEFAULT false;'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "UserNotificationPrefs" ADD COLUMN IF NOT EXISTS "alertIfHoursStarted" BOOLEAN NOT NULL DEFAULT true;'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "UserNotificationPrefs" ADD COLUMN IF NOT EXISTS "alertIfHoursMet" BOOLEAN NOT NULL DEFAULT true;'
+    );
+    await prisma.$executeRawUnsafe(
+      `UPDATE "UserNotificationPrefs"
+       SET "workDays" = '[3,5]'
+       WHERE "workDays" = '[1,2,3,4,5]'
+         AND "scheduleUserSet" = false
+         AND "scheduleAutoFilled" = false;`
     );
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "VisitCorrectionRequest" (

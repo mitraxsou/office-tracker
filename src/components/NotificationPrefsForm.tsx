@@ -120,9 +120,10 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
       <p className="mb-4 text-sm text-muted">
         Used by Power Automate to send Teams and email reminders. Alerts are nudges only, not HR
         records. Reminders are sent only on {adminUserId ? "the user's" : "your"} selected{" "}
-        <strong>usual office days</strong> (e.g. Mon-Fri by default; Sat/Sun are skipped unless
-        enabled). Fill usual days and times from office visit history when there is enough data.
-        Edit anytime to keep your own.
+        <strong>usual office days</strong> (Wednesday and Friday by default for this pilot).
+        Positive hours alerts can fire on any day when office Wi-Fi is detected. Fill usual days
+        and times from office visit history when there is enough data. Edit anytime to keep your
+        own.
       </p>
 
       {showSuggestion && suggestion && (
@@ -221,17 +222,16 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
             className="mt-1 block w-full max-w-xs rounded-lg border px-3 py-2"
           />
           <span className="mt-1 block text-xs text-muted">
-            Wait this long after your start time before a &quot;not in office&quot; alert.
+            Wait this long after your start time before a no Wi-Fi or stale-agent reminder.
           </span>
         </label>
 
         <p className="text-sm text-muted">
-          These times drive &quot;not in office&quot; alerts only when notifications are on and that
-          alert type is enabled (Teams and/or email as configured). The alert can fire on a usual
-          office day after usual start plus grace, if there is no in-office pulse yet and the person
-          is not out of office. Usual days choose which weekdays those work-day alerts can fire.
-          Usual end time is stored with the schedule; current alerts use start time and grace, not
-          end time.
+          Reminder alerts can fire on a usual office day after start plus grace when the agent has
+          no Wi-Fi name or is not responding, unless the person is out of office. A recent pulse
+          from a home or other non-office Wi-Fi is treated as working from home and does not trigger
+          a reminder. Usual end time is stored with the schedule; current reminders use start time
+          and grace, not end time.
         </p>
 
         <div>
@@ -265,7 +265,7 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
                 checked={prefs.alertIfNotInOffice}
                 onChange={(e) => setPrefs({ ...prefs, alertIfNotInOffice: e.target.checked })}
               />
-              Remind me if no office Wi-Fi on a work day (after grace period)
+              Remind me if the agent has no Wi-Fi name (after grace period)
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -282,6 +282,22 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
                 onChange={(e) => setPrefs({ ...prefs, alertIfBehindHours: e.target.checked })}
               />
               Remind me if I am behind on hours by a set time
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={prefs.alertIfHoursStarted}
+                onChange={(e) => setPrefs({ ...prefs, alertIfHoursStarted: e.target.checked })}
+              />
+              Tell me when office hours start counting
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={prefs.alertIfHoursMet}
+                onChange={(e) => setPrefs({ ...prefs, alertIfHoursMet: e.target.checked })}
+              />
+              Tell me when I meet my daily hours target
             </label>
           </div>
         </div>

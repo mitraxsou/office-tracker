@@ -1,7 +1,7 @@
 import { prisma } from "./db";
 
-/** ISO weekday: 1 = Monday … 7 = Sunday */
-export const DEFAULT_WORK_DAYS = [1, 2, 3, 4, 5];
+/** ISO weekday: 1 = Monday through 7 = Sunday */
+export const DEFAULT_WORK_DAYS = [3, 5];
 
 export type NotificationPrefsData = {
   workDays: number[];
@@ -14,6 +14,8 @@ export type NotificationPrefsData = {
   alertIfNotInOffice: boolean;
   alertIfAgentStale: boolean;
   alertIfBehindHours: boolean;
+  alertIfHoursStarted: boolean;
+  alertIfHoursMet: boolean;
   behindHoursCheckTime: string;
   behindHoursMinExpected: number;
 };
@@ -29,6 +31,8 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefsData = {
   alertIfNotInOffice: true,
   alertIfAgentStale: true,
   alertIfBehindHours: false,
+  alertIfHoursStarted: true,
+  alertIfHoursMet: true,
   behindHoursCheckTime: "15:00",
   behindHoursMinExpected: 2.5,
 };
@@ -58,6 +62,8 @@ export function toNotificationPrefsData(row: {
   alertIfNotInOffice: boolean;
   alertIfAgentStale: boolean;
   alertIfBehindHours: boolean;
+  alertIfHoursStarted?: boolean;
+  alertIfHoursMet?: boolean;
   behindHoursCheckTime: string;
   behindHoursMinExpected: number;
 }): NotificationPrefsData {
@@ -72,6 +78,8 @@ export function toNotificationPrefsData(row: {
     alertIfNotInOffice: row.alertIfNotInOffice,
     alertIfAgentStale: row.alertIfAgentStale,
     alertIfBehindHours: row.alertIfBehindHours,
+    alertIfHoursStarted: row.alertIfHoursStarted ?? true,
+    alertIfHoursMet: row.alertIfHoursMet ?? true,
     behindHoursCheckTime: isValidTime(row.behindHoursCheckTime)
       ? row.behindHoursCheckTime
       : "15:00",
@@ -131,6 +139,8 @@ export async function updateNotificationPrefs(
   if (data.alertIfNotInOffice !== undefined) update.alertIfNotInOffice = data.alertIfNotInOffice;
   if (data.alertIfAgentStale !== undefined) update.alertIfAgentStale = data.alertIfAgentStale;
   if (data.alertIfBehindHours !== undefined) update.alertIfBehindHours = data.alertIfBehindHours;
+  if (data.alertIfHoursStarted !== undefined) update.alertIfHoursStarted = data.alertIfHoursStarted;
+  if (data.alertIfHoursMet !== undefined) update.alertIfHoursMet = data.alertIfHoursMet;
   if (data.behindHoursCheckTime !== undefined) {
     if (!isValidTime(data.behindHoursCheckTime)) throw new Error("Invalid behind-hours check time");
     update.behindHoursCheckTime = data.behindHoursCheckTime;

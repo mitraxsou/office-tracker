@@ -40,6 +40,7 @@ To check legacy setup: Vercel dashboard → your project → **Settings** → **
 ```
 GET https://office-tracker-theta.vercel.app/api/integrations/alerts
 GET https://office-tracker-theta.vercel.app/api/integrations/alerts?types=stale,absent
+GET https://office-tracker-theta.vercel.app/api/integrations/alerts?types=hours_started,hours_met
 ```
 
 **Auth** (either):
@@ -68,6 +69,7 @@ GET https://office-tracker-theta.vercel.app/api/integrations/alerts?types=stale,
       "dayKey": "2026-09-01",
       "dashboardUrl": "https://office-tracker-theta.vercel.app/dashboard",
       "settingsUrl": "https://office-tracker-theta.vercel.app/settings",
+      "helpUrl": "https://office-tracker-theta.vercel.app/help",
       "outOfOfficeUrl": "https://office-tracker-theta.vercel.app/ooo?token=..."
     }
   ]
@@ -78,11 +80,15 @@ GET https://office-tracker-theta.vercel.app/api/integrations/alerts?types=stale,
 
 | Type | When |
 |------|------|
-| `absent` | Work day, past start + grace, no in-office Wi-Fi today |
-| `stale` | Work day, agent not pulsing, user has a registered laptop |
+| `absent` | Usual office day, past start + grace, no office presence, and the latest healthy pulse has no SSID |
+| `stale` | Usual office day, no office presence, agent not responding, and user has a registered laptop |
 | `behind` | Work day, past check time, hours below user threshold |
+| `hours_started` | First office Wi-Fi heartbeat for that user and local calendar day |
+| `hours_met` | Office hours span reaches the user&apos;s daily hours target |
 
-Each type is sent **at most once per user per day** (after ack). **No alerts** are sent on days outside the user&apos;s configured office days (default Mon–Fri) or on **out-of-office** days.
+Each type is sent **at most once per user per local calendar day** after acknowledgement. Reminder types (`absent`, `stale`, and `behind`) only run on the user&apos;s configured usual office days, which default to Wednesday and Friday. `hours_started` and `hours_met` can run on any day because verified office Wi-Fi presence triggers them. No alerts are sent on out-of-office days.
+
+A recent heartbeat with an SSID that is not on the office allowlist is treated as working from home. It does not produce `absent` or `stale`. A reminder is only produced when the latest heartbeat has no SSID or the agent is not responding.
 
 ### Acknowledge alerts (after sending)
 
@@ -116,7 +122,7 @@ This usually means the HTTP action was added but **not saved or completed**:
 ### Trigger
 
 - **Recurrence**: every 15–30 minutes (15 min is fine for pilot)
-- **Days**: Monday–Friday
+- **Days**: every day that pilot users may attend the office
 - **Hours**: 8:00–18:00 (India Standard Time)
 
 ### Step 1 — HTTP GET alerts
@@ -148,6 +154,7 @@ Office Pulse: @{email}
 
 Dashboard: @{dashboardUrl}
 Settings: @{settingsUrl}
+Install help: @{helpUrl}
 Out of office today: @{outOfOfficeUrl}
 ```
 
@@ -174,6 +181,22 @@ After the loop, collect sent items and POST ack:
 
 Use **Append to array variable** inside the loop, then POST once at the end.
 
+## Duplicate the flow for positive hours alerts
+
+Create a second Power Automate flow so Teams and email templates for positive updates are separate from reminders:
+
+1. Open the existing reminder flow and choose **Save As**.
+2. Name the copy `Office Pulse - hours updates`.
+3. In its HTTP GET action, set the URI to `https://office-tracker-theta.vercel.app/api/integrations/alerts?types=hours_started,hours_met`.
+4. Keep the same Parse JSON fields. The `type` value is either `hours_started` or `hours_met`.
+5. Add a Condition or Switch on `type`:
+   - `hours_started`: use a template such as `Office hours have started counting. Daily target: @{hoursTarget}h.`
+   - `hours_met`: use a template such as `Daily office target met. Counted today: @{hoursToday}h.`
+6. Keep the POST acknowledgement step and send `userId`, `type`, and `dayKey` exactly as returned.
+7. Turn on both flows.
+
+The second flow can reuse the same Integration API key. For separate ownership or easier revocation, generate another key under Admin settings and use it only in the positive-alert flow. Both flows use the same `/api/integrations/alerts` path; the `types` query parameter separates their queues. Do not configure both flows to request all types, or they can race to deliver the same alert.
+
 ## User settings
 
 Users control alerts at **Settings → Office schedule and alerts**:
@@ -183,6 +206,7 @@ Users control alerts at **Settings → Office schedule and alerts**:
 - Grace period before “not in office” alert
 - Teams / email toggles
 - Alert types: not in office, agent stale, behind on hours
+- Positive alert types: hours started and daily hours target met
 
 **Out of office** (Settings → Out of office):
 
@@ -193,7 +217,7 @@ Users control alerts at **Settings → Office schedule and alerts**:
 
 - Heartbeats cannot be recreated if the laptop was off; alerts nudge users to fix the agent or check in manually.
 - “Not in office” means no office Wi-Fi SSID detected, not badge/HR presence.
-- WFH days: user can disable `alertIfNotInOffice`, remove that day from work days, or mark **Out of office** for that day.
+- A recent pulse on home or another non-office Wi-Fi is treated as WFH and does not trigger a not-in-office reminder.
 
 ## Testing the API
 

@@ -317,8 +317,11 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           <div>
             <dt className="font-medium">Office schedule and alerts</dt>
             <dd className="mt-1 text-muted">
-              Choose which days you work in the office and when reminder emails or Teams messages are sent
-              if you have not met the daily target. You can turn alerts off entirely.
+              Choose your usual office days (Wednesday and Friday by default), delivery channels,
+              and alert types. Office Pulse can tell you when office hours start, when you meet your
+              daily target, or when the agent needs attention. A recent pulse on home or other
+              non-office Wi-Fi is treated as working from home and does not trigger a not-in-office
+              reminder.
             </dd>
           </div>
           <div>
@@ -366,9 +369,10 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           <div>
             <p className="font-medium">Agent stale or offline</p>
             <p className="mt-1 text-muted">
-              Re-copy and re-run the install command from Settings (#install section). Check Task Scheduler for task{" "}
-              <code>{AGENT_TASK_NAME}</code>. Review{" "}
-              <code>%LOCALAPPDATA%\OfficeTracker\logs\heartbeat.log</code> on the laptop.
+              Open Settings and go to Install or reinstall. Download and extract the latest agent
+              zip, copy the install command, and run it in PowerShell. Check Task Scheduler for task{" "}
+              <code>{AGENT_TASK_NAME}</code>. If it still does not pulse, review{" "}
+              <code>%LOCALAPPDATA%\OfficeTracker\logs\heartbeat.log</code> or contact your pilot admin.
             </p>
           </div>
           <div>

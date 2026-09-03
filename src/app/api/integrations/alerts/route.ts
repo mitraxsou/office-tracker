@@ -3,8 +3,17 @@ import { prisma } from "@/lib/db";
 import {
   acknowledgeIntegrationAlerts,
   getIntegrationAlerts,
+  type IntegrationAlertType,
   verifyIntegrationApiKey,
 } from "@/lib/integration-alerts";
+
+const ALERT_TYPES: IntegrationAlertType[] = [
+  "absent",
+  "stale",
+  "behind",
+  "hours_started",
+  "hours_met",
+];
 
 async function getIntegrationActorId() {
   const admin = await prisma.user.findFirst({ where: { role: "admin" } });
@@ -42,8 +51,8 @@ export async function POST(request: Request) {
     (a) =>
       a.userId &&
       a.dayKey &&
-      (a.type === "absent" || a.type === "stale" || a.type === "behind"),
-  ) as Array<{ userId: string; type: "absent" | "stale" | "behind"; dayKey: string }>;
+      ALERT_TYPES.includes(a.type as IntegrationAlertType),
+  ) as Array<{ userId: string; type: IntegrationAlertType; dayKey: string }>;
 
   await acknowledgeIntegrationAlerts(actorId, items);
   return NextResponse.json({ ok: true, acknowledged: items.length });

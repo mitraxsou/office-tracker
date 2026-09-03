@@ -101,7 +101,7 @@ describe("office schedule inference", () => {
 
 describe("auto-fill protection", () => {
   const defaults = {
-    workDays: [1, 2, 3, 4, 5],
+    workDays: [3, 5],
     officeStartTime: "09:30",
     officeEndTime: "18:00",
   };
@@ -139,7 +139,7 @@ describe("auto-fill protection", () => {
   it("treats a matching inference as not a suggestion", () => {
     expect(
       inferredScheduleEqualsPrefs(
-        { workDays: [1, 2, 3, 4, 5], officeStartTime: "09:30", officeEndTime: "18:00" },
+        { workDays: [3, 5], officeStartTime: "09:30", officeEndTime: "18:00" },
         defaults,
       ),
     ).toBe(true);
