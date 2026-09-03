@@ -25,11 +25,11 @@ export default async function AdminVisitReportsPage() {
           </p>
         </div>
         <AdminSubNav active="corrections" />
-        <AdminTimezoneChangeRequests />
-        <AdminProfileChangeRequests />
-        <AdminComplianceExemptionRequests />
-        <AdminDeviceRemovalRequests />
-        <AdminVisitReports />
+        <div id="timezone_change" className="scroll-mt-6"><AdminTimezoneChangeRequests /></div>
+        <div id="profile_change" className="scroll-mt-6"><AdminProfileChangeRequests /></div>
+        <div id="compliance_exemption" className="scroll-mt-6"><AdminComplianceExemptionRequests /></div>
+        <div id="device_removal" className="scroll-mt-6"><AdminDeviceRemovalRequests /></div>
+        <div id="visit_correction" className="scroll-mt-6"><AdminVisitReports /></div>
       </main>
     </>
   );

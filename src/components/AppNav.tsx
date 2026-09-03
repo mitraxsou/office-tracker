@@ -4,6 +4,9 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { destroySession, getCurrentUser, getImpersonationContext, getRealCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
+import { APP_VERSION } from "@/lib/app-version";
+import { getAdminInbox } from "@/lib/admin-inbox";
+import { AdminNotificationCorner } from "@/components/AdminNotificationCorner";
 
 export async function AppNav() {
   const user = await getCurrentUser();
@@ -38,6 +41,9 @@ export async function AppNav() {
     redirect("/login");
   }
 
+  const adminAccess = isAdmin(realUser ?? user);
+  const inbox = adminAccess ? await getAdminInbox() : null;
+
   return (
     <>
       {impersonation && (
@@ -62,7 +68,7 @@ export async function AppNav() {
           <Link href="/settings" className="link-nav text-sm">
             Settings
           </Link>
-          {isAdmin(realUser ?? user) && (
+          {adminAccess && (
             <Link href="/admin" className="link-nav text-sm">
               Admin
             </Link>
@@ -72,7 +78,11 @@ export async function AppNav() {
           </Link>
         </div>
         <div className="flex items-center gap-3">
+          {inbox && <AdminNotificationCorner total={inbox.total} items={inbox.items} />}
           <ThemeToggle />
+          <Link href="/help#whats-new" className="text-xs text-muted hover:text-accent">
+            v{APP_VERSION}
+          </Link>
           <span className="text-sm text-muted" title={user.email}>
             {user.name ?? user.email}
           </span>

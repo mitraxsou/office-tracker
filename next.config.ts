@@ -15,6 +15,8 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   // Fix wrong workspace root when a parent package-lock.json exists (breaks CSS/static assets)
   outputFileTracingRoot: path.join(__dirname),
+  // A separate directory can avoid stale OneDrive placeholders during local verification.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   async headers() {
     return [
       {

@@ -6,6 +6,7 @@ import {
   AGENT_TASK_NAME,
   AGENT_ZIP_STEM,
 } from "@/lib/agent-branding";
+import { APP_VERSION, getCurrentRelease } from "@/lib/app-version";
 
 type HelpGuideProps = {
   isLoggedIn: boolean;
@@ -44,6 +45,11 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
       <nav className="card p-4 text-sm">
         <p className="mb-2 font-medium">On this page</p>
         <ul className="columns-1 gap-x-8 space-y-1 text-muted sm:columns-2">
+          <li>
+            <a href="#whats-new" className="text-accent hover:underline">
+              What&apos;s new
+            </a>
+          </li>
           <li>
             <a href="#overview" className="text-accent hover:underline">
               What it does
@@ -98,6 +104,16 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           )}
         </ul>
       </nav>
+
+      <section id="whats-new" className="card scroll-mt-6 space-y-3 p-6">
+        <h2 className="text-lg font-medium text-accent">What&apos;s new in v{APP_VERSION}</h2>
+        <p className="text-xs text-muted">Released {getCurrentRelease().date}</p>
+        <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
+          {getCurrentRelease().bullets.map((bullet) => (
+            <li key={bullet}>{bullet}</li>
+          ))}
+        </ul>
+      </section>
 
       <section className="card space-y-3 p-6">
         <SectionAnchor id="overview">What it does</SectionAnchor>
