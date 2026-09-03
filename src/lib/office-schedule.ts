@@ -28,6 +28,17 @@ export type InferredOfficeSchedule = {
   officeEndTime: string | null;
 };
 
+export type OfficeScheduleInferenceAnalysis = {
+  inferred: InferredOfficeSchedule | null;
+  officeDaysFound: number;
+  qualifyingOfficeDays: number;
+  weekdayCounts: Array<{
+    weekday: number;
+    officeDays: number;
+    occurrences: number;
+  }>;
+};
+
 export type AutoFillDecision = {
   scheduleUserSet: boolean;
   scheduleAutoFilled: boolean;
@@ -138,6 +149,14 @@ export function inferOfficeSchedule(input: {
   windowStartDayKey: string;
   windowEndDayKey: string;
 }): InferredOfficeSchedule | null {
+  return analyzeOfficeSchedule(input).inferred;
+}
+
+export function analyzeOfficeSchedule(input: {
+  samples: OfficeDaySample[];
+  windowStartDayKey: string;
+  windowEndDayKey: string;
+}): OfficeScheduleInferenceAnalysis {
   const occurrences = weekdayOccurrenceCounts(input.windowStartDayKey, input.windowEndDayKey);
   const byWeekday: OfficeDaySample[][] = [[], [], [], [], [], [], [], []];
 
@@ -159,11 +178,31 @@ export function inferOfficeSchedule(input: {
     }
   }
 
-  if (workDays.length === 0) return null;
+  const weekdayCounts = Array.from({ length: 7 }, (_, index) => ({
+    weekday: index + 1,
+    officeDays: byWeekday[index + 1].length,
+    occurrences: occurrences[index + 1],
+  }));
+
+  if (workDays.length === 0) {
+    return {
+      inferred: null,
+      officeDaysFound: input.samples.length,
+      qualifyingOfficeDays: 0,
+      weekdayCounts,
+    };
+  }
 
   const qualifying = workDays.flatMap((d) => byWeekday[d]);
   const startMedian = median(qualifying.map((s) => s.firstInMinutes));
-  if (startMedian == null) return null;
+  if (startMedian == null) {
+    return {
+      inferred: null,
+      officeDaysFound: input.samples.length,
+      qualifyingOfficeDays: 0,
+      weekdayCounts,
+    };
+  }
 
   const ends = qualifying
     .map((s) => s.lastOutMinutes)
@@ -173,8 +212,13 @@ export function inferOfficeSchedule(input: {
   const endMedian = manyOpen ? null : median(ends);
 
   return {
-    workDays,
-    officeStartTime: minutesToHhMm(startMedian),
-    officeEndTime: endMedian == null ? null : minutesToHhMm(endMedian),
+    inferred: {
+      workDays,
+      officeStartTime: minutesToHhMm(startMedian),
+      officeEndTime: endMedian == null ? null : minutesToHhMm(endMedian),
+    },
+    officeDaysFound: input.samples.length,
+    qualifyingOfficeDays: qualifying.length,
+    weekdayCounts,
   };
 }

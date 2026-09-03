@@ -7,11 +7,13 @@ import {
 } from "./notification-prefs";
 import { isDayKeyInRange } from "./out-of-office";
 import {
+  analyzeOfficeSchedule,
   canApplyInferredSchedule,
   inferOfficeSchedule,
   inferredScheduleEqualsPrefs,
   scheduleWindowForNow,
   type InferredOfficeSchedule,
+  type OfficeScheduleInferenceAnalysis,
   type OfficeDaySample,
 } from "./office-schedule";
 
@@ -30,7 +32,7 @@ function visitsOverlapDay(visits: VisitRow[], dayStart: Date, dayEnd: Date): Vis
   const endMs = dayEnd.getTime();
   return visits.filter((v) => {
     if (v.startAt.getTime() > endMs) return false;
-    const visitEnd = v.endAt?.getTime() ?? Number.POSITIVE_INFINITY;
+    const visitEnd = (v.endAt ?? v.updatedAt).getTime();
     return visitEnd >= startMs;
   });
 }
@@ -162,16 +164,56 @@ export async function inferScheduleForUser(
   return inferOfficeSchedule({ samples, windowStartDayKey: startDayKey, windowEndDayKey: endDayKey });
 }
 
+export type OfficeScheduleSuggestionResult = OfficeScheduleInferenceAnalysis & {
+  status: "suggestion" | "insufficient_history" | "matches_current";
+  suggestion: InferredOfficeSchedule | null;
+  windowStartDayKey: string;
+  windowEndDayKey: string;
+};
+
+export async function analyzeScheduleForUser(
+  userId: string,
+  timezone: string,
+  prefs: { workDays: number[]; officeStartTime: string; officeEndTime: string },
+  now = new Date(),
+): Promise<OfficeScheduleSuggestionResult> {
+  const todayKey = dayKeyInTimezone(now, timezone);
+  const { startDayKey, endDayKey } = scheduleWindowForNow(todayKey);
+  const samples = await loadOfficeDaySamples(userId, timezone, startDayKey, endDayKey);
+  const analysis = analyzeOfficeSchedule({
+    samples,
+    windowStartDayKey: startDayKey,
+    windowEndDayKey: endDayKey,
+  });
+
+  if (!analysis.inferred) {
+    return {
+      ...analysis,
+      status: "insufficient_history",
+      suggestion: null,
+      windowStartDayKey: startDayKey,
+      windowEndDayKey: endDayKey,
+    };
+  }
+
+  const matchesCurrent = inferredScheduleEqualsPrefs(analysis.inferred, prefs);
+  return {
+    ...analysis,
+    status: matchesCurrent ? "matches_current" : "suggestion",
+    suggestion: matchesCurrent ? null : analysis.inferred,
+    windowStartDayKey: startDayKey,
+    windowEndDayKey: endDayKey,
+  };
+}
+
 export async function getOfficeScheduleSuggestion(
   userId: string,
   timezone: string,
   prefs: { workDays: number[]; officeStartTime: string; officeEndTime: string },
   now = new Date(),
 ): Promise<InferredOfficeSchedule | null> {
-  const inferred = await inferScheduleForUser(userId, timezone, now);
-  if (!inferred) return null;
-  if (inferredScheduleEqualsPrefs(inferred, prefs)) return null;
-  return inferred;
+  const analysis = await analyzeScheduleForUser(userId, timezone, prefs, now);
+  return analysis.suggestion;
 }
 
 export async function applyInferredOfficeSchedule(

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { NotificationPrefsData } from "@/lib/notification-prefs";
+import { OfficeScheduleSuggestionCard } from "@/components/OfficeScheduleSuggestionCard";
 
 const WEEKDAYS: Array<{ value: number; label: string }> = [
   { value: 1, label: "Mon" },
@@ -13,28 +14,11 @@ const WEEKDAYS: Array<{ value: number; label: string }> = [
   { value: 7, label: "Sun" },
 ];
 
-type ScheduleSuggestion = {
-  workDays: number[];
-  officeStartTime: string;
-  officeEndTime: string | null;
-};
-
-function formatWorkDays(days: number[]): string {
-  const labels = days
-    .slice()
-    .sort((a, b) => a - b)
-    .map((d) => WEEKDAYS.find((w) => w.value === d)?.label)
-    .filter((label): label is string => Boolean(label));
-  return labels.join(", ");
-}
-
 export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } = {}) {
   const apiUrl = adminUserId
     ? `/api/admin/users/${adminUserId}/notification-prefs`
     : "/api/settings/notification-prefs";
   const [prefs, setPrefs] = useState<NotificationPrefsData | null>(null);
-  const [suggestion, setSuggestion] = useState<ScheduleSuggestion | null>(null);
-  const [dismissedSuggestion, setDismissedSuggestion] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -45,10 +29,29 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
       .then((r) => r.json())
       .then((data) => {
         setPrefs(data.prefs);
-        setSuggestion(data.suggestion ?? null);
-        setDismissedSuggestion(false);
         setLoading(false);
       });
+
+    function handleScheduleUpdated(event: Event) {
+      const schedule = (event as CustomEvent<{
+        workDays: number[];
+        officeStartTime: string;
+        officeEndTime: string | null;
+      }>).detail;
+      setPrefs((current) =>
+        current
+          ? {
+              ...current,
+              workDays: schedule.workDays,
+              officeStartTime: schedule.officeStartTime,
+              officeEndTime: schedule.officeEndTime ?? current.officeEndTime,
+            }
+          : current,
+      );
+    }
+
+    window.addEventListener("office-schedule-updated", handleScheduleUpdated);
+    return () => window.removeEventListener("office-schedule-updated", handleScheduleUpdated);
   }, [apiUrl]);
 
   function toggleWorkDay(day: number) {
@@ -86,21 +89,6 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
     await savePrefs(prefs, "Notification preferences saved.");
   }
 
-  async function handleUseSuggestion() {
-    if (!prefs || !suggestion) return;
-    const next: NotificationPrefsData = {
-      ...prefs,
-      workDays: suggestion.workDays,
-      officeStartTime: suggestion.officeStartTime,
-      officeEndTime: suggestion.officeEndTime ?? prefs.officeEndTime,
-    };
-    const ok = await savePrefs(next, "Saved suggested usual days and times.");
-    if (ok) {
-      setSuggestion(null);
-      setDismissedSuggestion(true);
-    }
-  }
-
   if (loading || !prefs) {
     return (
       <section className="card p-6">
@@ -110,10 +98,11 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
   }
 
   const alertsDisabled = !prefs.notificationsEnabled;
-  const showSuggestion = Boolean(suggestion) && !dismissedSuggestion;
 
   return (
-    <section className="card p-6">
+    <>
+      {adminUserId && <OfficeScheduleSuggestionCard adminUserId={adminUserId} />}
+      <section className="card p-6">
       <h2 className="mb-1 text-lg font-medium">
         {adminUserId ? "Office schedule and alerts (admin)" : "Office schedule and alerts"}
       </h2>
@@ -125,33 +114,6 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
         and times from office visit history when there is enough data. Edit anytime to keep your
         own.
       </p>
-
-      {showSuggestion && suggestion && (
-        <div className="mb-5 rounded-lg border border-[var(--border)] px-4 py-3">
-          <p className="text-sm font-medium">Suggested from office visits (last 8 weeks)</p>
-          <p className="mt-1 text-sm text-muted">
-            Days: {formatWorkDays(suggestion.workDays)}. Start: {suggestion.officeStartTime}
-            {suggestion.officeEndTime ? `. End: ${suggestion.officeEndTime}` : ". End: not enough check-outs to suggest."}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => void handleUseSuggestion()}
-              disabled={saving}
-              className="btn-primary px-3 py-1.5 text-xs disabled:opacity-50"
-            >
-              Use suggested times
-            </button>
-            <button
-              type="button"
-              onClick={() => setDismissedSuggestion(true)}
-              className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs"
-            >
-              Keep current
-            </button>
-          </div>
-        </div>
-      )}
 
       <label className="mb-5 flex items-center gap-3 rounded-lg border border-[var(--border)] px-4 py-3 text-sm">
         <input
@@ -348,6 +310,7 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
         {message && <span className="text-sm text-green-400">{message}</span>}
         {error && <span className="text-sm text-red-400">{error}</span>}
       </div>
-    </section>
+      </section>
+    </>
   );
 }

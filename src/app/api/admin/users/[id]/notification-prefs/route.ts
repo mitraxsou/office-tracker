@@ -7,7 +7,6 @@ import {
   updateNotificationPrefs,
   type NotificationPrefsData,
 } from "@/lib/notification-prefs";
-import { getOfficeScheduleSuggestion } from "@/lib/office-schedule-sync";
 
 export async function GET(
   _request: Request,
@@ -28,8 +27,7 @@ export async function GET(
   }
 
   const prefs = await getNotificationPrefs(user.id);
-  const suggestion = await getOfficeScheduleSuggestion(user.id, user.timezone, prefs);
-  return NextResponse.json({ prefs, suggestion });
+  return NextResponse.json({ prefs });
 }
 
 export async function PUT(

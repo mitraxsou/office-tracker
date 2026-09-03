@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import {
   AUTO_FILL_GRACE_MINUTES,
+  analyzeOfficeSchedule,
   canApplyInferredSchedule,
   inferOfficeSchedule,
   inferredScheduleEqualsPrefs,
@@ -33,19 +34,25 @@ describe("office schedule inference", () => {
   });
 
   it("skips the user when no weekday has enough office days", () => {
-    const inferred = inferOfficeSchedule({
+    const input = {
       samples: [
         sample("2026-01-05", 9 * 60 + 30, 18 * 60),
         sample("2026-01-12", 9 * 60 + 30, 18 * 60),
       ],
       windowStartDayKey: WINDOW_START,
       windowEndDayKey: WINDOW_END,
-    });
+    };
+    const inferred = inferOfficeSchedule(input);
     expect(inferred).toBeNull();
+
+    const analysis = analyzeOfficeSchedule(input);
+    expect(analysis.officeDaysFound).toBe(2);
+    expect(analysis.qualifyingOfficeDays).toBe(0);
+    expect(analysis.weekdayCounts.find((item) => item.weekday === 1)?.officeDays).toBe(2);
   });
 
   it("includes a weekday with at least 3 qualifying days", () => {
-    const inferred = inferOfficeSchedule({
+    const input = {
       samples: [
         sample("2026-01-05", 9 * 60, 18 * 60),
         sample("2026-01-12", 9 * 60 + 30, 18 * 60),
@@ -53,10 +60,12 @@ describe("office schedule inference", () => {
       ],
       windowStartDayKey: WINDOW_START,
       windowEndDayKey: WINDOW_END,
-    });
+    };
+    const inferred = inferOfficeSchedule(input);
     expect(inferred?.workDays).toEqual([1]);
     expect(inferred?.officeStartTime).toBe("09:30");
     expect(inferred?.officeEndTime).toBe("18:00");
+    expect(analyzeOfficeSchedule(input).qualifyingOfficeDays).toBe(3);
   });
 
   it("includes a weekday at 40% of calendar occurrences even if under 3 days", () => {
