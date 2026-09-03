@@ -7,6 +7,7 @@ import {
   updateNotificationPrefs,
   type NotificationPrefsData,
 } from "@/lib/notification-prefs";
+import { getOfficeScheduleSuggestion } from "@/lib/office-schedule-sync";
 
 export async function GET(
   _request: Request,
@@ -18,13 +19,17 @@ export async function GET(
   }
 
   const { id } = await params;
-  const user = await prisma.user.findUnique({ where: { id }, select: { id: true } });
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, timezone: true },
+  });
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
   const prefs = await getNotificationPrefs(user.id);
-  return NextResponse.json({ prefs });
+  const suggestion = await getOfficeScheduleSuggestion(user.id, user.timezone, prefs);
+  return NextResponse.json({ prefs, suggestion });
 }
 
 export async function PUT(

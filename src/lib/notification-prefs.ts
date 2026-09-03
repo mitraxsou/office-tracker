@@ -111,6 +111,14 @@ export async function updateNotificationPrefs(
     if (!isValidTime(data.officeEndTime)) throw new Error("Invalid office end time");
     update.officeEndTime = data.officeEndTime;
   }
+  if (
+    data.workDays !== undefined ||
+    data.officeStartTime !== undefined ||
+    data.officeEndTime !== undefined
+  ) {
+    update.scheduleUserSet = true;
+    update.scheduleAutoFilled = false;
+  }
   if (data.graceMinutes !== undefined) {
     if (data.graceMinutes < 0 || data.graceMinutes > 180) {
       throw new Error("graceMinutes must be 0–180");

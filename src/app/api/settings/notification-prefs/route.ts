@@ -5,6 +5,7 @@ import {
   updateNotificationPrefs,
   type NotificationPrefsData,
 } from "@/lib/notification-prefs";
+import { getOfficeScheduleSuggestion } from "@/lib/office-schedule-sync";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -12,7 +13,8 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const prefs = await getNotificationPrefs(user.id);
-  return NextResponse.json({ prefs });
+  const suggestion = await getOfficeScheduleSuggestion(user.id, user.timezone, prefs);
+  return NextResponse.json({ prefs, suggestion });
 }
 
 export async function PUT(request: Request) {

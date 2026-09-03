@@ -85,6 +85,12 @@ export async function register() {
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "UserNotificationPrefs" ADD COLUMN IF NOT EXISTS "notificationsEnabled" BOOLEAN NOT NULL DEFAULT true;'
     );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "UserNotificationPrefs" ADD COLUMN IF NOT EXISTS "scheduleAutoFilled" BOOLEAN NOT NULL DEFAULT false;'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "UserNotificationPrefs" ADD COLUMN IF NOT EXISTS "scheduleUserSet" BOOLEAN NOT NULL DEFAULT false;'
+    );
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "VisitCorrectionRequest" (
         "id" TEXT NOT NULL,

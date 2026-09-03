@@ -87,6 +87,8 @@ model UserNotificationPrefs {
   alertIfBehindHours    Boolean  @default(false)
   behindHoursCheckTime  String   @default("15:00")
   behindHoursMinExpected Float   @default(2.5)
+  scheduleAutoFilled    Boolean  @default(false)
+  scheduleUserSet       Boolean  @default(false)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
