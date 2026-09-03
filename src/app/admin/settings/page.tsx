@@ -51,7 +51,10 @@ export default async function AdminSettingsPage() {
           complianceExemptionRequiresApproval={config.complianceExemptionRequiresApproval}
         />
         <AdminCronJobs initialJobs={cronJobs} />
-        <AdminIntegrationKeys initialKeys={integrationKeys} />
+        <AdminIntegrationKeys
+          initialKeys={integrationKeys}
+          webhookConfigured={Boolean(process.env.POWER_AUTOMATE_WEBHOOK_URL?.trim())}
+        />
         <AdminDatabaseStats stats={databaseStats} />
         <AdminMaintenance />
         <AdminPilotControls

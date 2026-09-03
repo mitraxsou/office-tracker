@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import crypto from "node:crypto";
 
 function getKey() {
   const secret = process.env.AUTH_SECRET;

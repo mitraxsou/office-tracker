@@ -1,48 +1,40 @@
-import crypto from "crypto";
+import crypto from "node:crypto";
 import { prisma } from "./db";
-import { hashPassword, verifyPassword } from "./auth";
+import { hashPassword } from "./auth";
 
 export function generateIntegrationApiKey() {
   return crypto.randomBytes(32).toString("hex");
 }
 
-export function extractIntegrationApiKey(request: Request): string | null {
-  const auth = request.headers.get("authorization");
-  if (auth?.startsWith("Bearer ")) {
-    const token = auth.slice(7).trim();
-    if (token) return token;
+function encryptionKey() {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error("AUTH_SECRET must be set and at least 32 characters");
   }
-  const header = request.headers.get("x-api-key")?.trim();
-  return header || null;
+  return crypto.createHash("sha256").update(secret).digest();
 }
 
-function matchesEnvIntegrationKey(key: string): boolean {
-  const expected = process.env.INTEGRATION_API_KEY?.trim();
-  return Boolean(expected && key === expected);
+export function encryptIntegrationSecret(plain: string): string {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", encryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([iv, tag, encrypted]).toString("base64url");
 }
 
-export async function verifyIntegrationApiKey(request: Request): Promise<boolean> {
-  const key = extractIntegrationApiKey(request);
-  if (!key || key.length < 16) return false;
-
-  if (matchesEnvIntegrationKey(key)) return true;
-
-  const keyPrefix = key.slice(0, 8);
-  const record = await prisma.integrationApiKey.findUnique({
-    where: { keyPrefix },
-  });
-
-  if (!record || record.revokedAt) return false;
-
-  const valid = await verifyPassword(key, record.keyHash);
-  if (!valid) return false;
-
-  await prisma.integrationApiKey.update({
-    where: { id: record.id },
-    data: { lastUsedAt: new Date() },
-  });
-
-  return true;
+export function decryptIntegrationSecret(encrypted: string): string | null {
+  try {
+    const buffer = Buffer.from(encrypted, "base64url");
+    if (buffer.length < 29) return null;
+    const iv = buffer.subarray(0, 12);
+    const tag = buffer.subarray(12, 28);
+    const data = buffer.subarray(28);
+    const decipher = crypto.createDecipheriv("aes-256-gcm", encryptionKey(), iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(data), decipher.final()]).toString("utf8");
+  } catch {
+    return null;
+  }
 }
 
 export async function listIntegrationApiKeys() {
@@ -74,17 +66,52 @@ export async function createIntegrationApiKey(label: string, createdById: string
   const plainKey = generateIntegrationApiKey();
   const keyHash = await hashPassword(plainKey);
   const keyPrefix = plainKey.slice(0, 8);
+  const encryptedSecret = encryptIntegrationSecret(plainKey);
 
-  const record = await prisma.integrationApiKey.create({
-    data: {
-      label: trimmedLabel,
-      keyHash,
-      keyPrefix,
-      createdById,
-    },
+  const record = await prisma.$transaction(async (tx) => {
+    await tx.integrationApiKey.updateMany({
+      where: { revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return tx.integrationApiKey.create({
+      data: {
+        label: trimmedLabel,
+        keyHash,
+        keyPrefix,
+        encryptedSecret,
+        createdById,
+      },
+    });
   });
 
   return { record, plainKey };
+}
+
+export async function getActiveIntegrationSecret(): Promise<{
+  id: string;
+  actorId: string;
+  secret: string;
+} | null> {
+  const record = await prisma.integrationApiKey.findFirst({
+    where: {
+      revokedAt: null,
+      encryptedSecret: { not: null },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, createdById: true, encryptedSecret: true },
+  });
+  if (!record?.encryptedSecret) return null;
+
+  const secret = decryptIntegrationSecret(record.encryptedSecret);
+  if (!secret) return null;
+  return { id: record.id, actorId: record.createdById, secret };
+}
+
+export async function markIntegrationSecretUsed(id: string) {
+  await prisma.integrationApiKey.update({
+    where: { id },
+    data: { lastUsedAt: new Date() },
+  });
 }
 
 export async function revokeIntegrationApiKey(id: string) {
@@ -95,22 +122,4 @@ export async function revokeIntegrationApiKey(id: string) {
     where: { id },
     data: { revokedAt: new Date() },
   });
-}
-
-/** Exported for unit tests */
-export async function verifyIntegrationApiKeyValue(
-  key: string,
-  lookup: (prefix: string) => Promise<{
-    id: string;
-    keyHash: string;
-    revokedAt: Date | null;
-  } | null>,
-): Promise<boolean> {
-  if (!key || key.length < 16) return false;
-  if (matchesEnvIntegrationKey(key)) return true;
-
-  const record = await lookup(key.slice(0, 8));
-  if (!record || record.revokedAt) return false;
-
-  return verifyPassword(key, record.keyHash);
 }

@@ -1,21 +1,21 @@
 import { getAppConfig } from "./app-config";
-import { notifyStaleAgents } from "./agent-notify";
 import { logAuditEvent } from "./audit-log";
 import { prisma } from "./db";
 import { purgeOldHeartbeats } from "./heartbeat-retention";
 import { syncOfficeSchedulesFromHistory } from "./office-schedule-sync";
+import { dispatchPendingAlerts } from "./power-automate-notify";
 
 export const CRON_JOBS = [
   {
     name: "agent-alerts",
     label: "Agent alerts",
     path: "/api/cron/agent-alerts",
-    schedule: "0 * * * *",
-    scheduleUtc: "Every hour at minute 00 UTC",
-    scheduleIst: "Every hour at minute 30 IST",
-    purpose: "Checks active laptops for stale agents and sends eligible email alerts.",
-    expectedIntervalMs: 60 * 60 * 1000,
-    healthyWithinMs: 2 * 60 * 60 * 1000,
+    schedule: "*/15 * * * *",
+    scheduleUtc: "Every 15 minutes UTC",
+    scheduleIst: "Every 15 minutes IST",
+    purpose: "Sends eligible Office Pulse alerts through Power Automate.",
+    expectedIntervalMs: 15 * 60 * 1000,
+    healthyWithinMs: 45 * 60 * 1000,
   },
   {
     name: "purge-heartbeats",
@@ -52,7 +52,7 @@ export function isCronJobName(value: string): value is CronJobName {
 
 async function runJobLogic(jobName: CronJobName): Promise<CronResult> {
   if (jobName === "agent-alerts") {
-    return notifyStaleAgents();
+    return dispatchPendingAlerts();
   }
 
   if (jobName === "purge-heartbeats") {

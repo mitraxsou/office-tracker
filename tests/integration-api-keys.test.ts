@@ -1,89 +1,99 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import bcrypt from "bcryptjs";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  extractIntegrationApiKey,
-  verifyIntegrationApiKeyValue,
+  decryptIntegrationSecret,
+  encryptIntegrationSecret,
+  generateIntegrationApiKey,
 } from "../src/lib/integration-api-keys";
+import { dispatchAlert } from "../src/lib/power-automate-notify";
+import type { IntegrationAlert } from "../src/lib/integration-alerts";
 
-describe("extractIntegrationApiKey", () => {
-  it("reads Bearer token from Authorization header", () => {
-    const request = new Request("https://example.com", {
-      headers: { Authorization: "Bearer abcdef1234567890" },
-    });
-    expect(extractIntegrationApiKey(request)).toBe("abcdef1234567890");
-  });
+const alert: IntegrationAlert = {
+  type: "hours_started",
+  userId: "user-1",
+  email: "admin@example.com",
+  name: "Admin",
+  message: "Test message",
+  hoursToday: 1,
+  hoursTarget: 5,
+  agentHealthy: true,
+  inOfficeNow: true,
+  notifyTeams: true,
+  notifyEmail: true,
+  dayKey: "2026-09-04",
+  dashboardUrl: "https://pulse.example/dashboard",
+  settingsUrl: "https://pulse.example/settings",
+  helpUrl: "https://pulse.example/help",
+  outOfOfficeUrl: "https://pulse.example/out-of-office",
+};
 
-  it("reads X-Api-Key header", () => {
-    const request = new Request("https://example.com", {
-      headers: { "X-Api-Key": "secret-key-value-here" },
-    });
-    expect(extractIntegrationApiKey(request)).toBe("secret-key-value-here");
-  });
-
-  it("returns null when no auth headers", () => {
-    const request = new Request("https://example.com");
-    expect(extractIntegrationApiKey(request)).toBeNull();
-  });
-});
-
-describe("verifyIntegrationApiKeyValue", () => {
-  const originalEnv = process.env.INTEGRATION_API_KEY;
+describe("Power Automate webhook secrets", () => {
+  const originalAuthSecret = process.env.AUTH_SECRET;
+  const originalWebhookUrl = process.env.POWER_AUTOMATE_WEBHOOK_URL;
 
   beforeEach(() => {
-    delete process.env.INTEGRATION_API_KEY;
+    process.env.AUTH_SECRET = "test-auth-secret-that-is-at-least-32-characters";
+    delete process.env.POWER_AUTOMATE_WEBHOOK_URL;
   });
 
   afterEach(() => {
-    if (originalEnv === undefined) {
-      delete process.env.INTEGRATION_API_KEY;
-    } else {
-      process.env.INTEGRATION_API_KEY = originalEnv;
-    }
+    vi.restoreAllMocks();
+    if (originalAuthSecret === undefined) delete process.env.AUTH_SECRET;
+    else process.env.AUTH_SECRET = originalAuthSecret;
+    if (originalWebhookUrl === undefined) delete process.env.POWER_AUTOMATE_WEBHOOK_URL;
+    else process.env.POWER_AUTOMATE_WEBHOOK_URL = originalWebhookUrl;
   });
 
-  it("accepts legacy env var key", async () => {
-    process.env.INTEGRATION_API_KEY = "legacy-env-key-123456";
-    const lookup = vi.fn();
-    const ok = await verifyIntegrationApiKeyValue("legacy-env-key-123456", lookup);
-    expect(ok).toBe(true);
-    expect(lookup).not.toHaveBeenCalled();
+  it("generates a 32-byte hex secret", () => {
+    expect(generateIntegrationApiKey()).toMatch(/^[a-f0-9]{64}$/);
   });
 
-  it("rejects short keys", async () => {
-    const ok = await verifyIntegrationApiKeyValue("short", async () => null);
-    expect(ok).toBe(false);
+  it("encrypts and decrypts a secret with AUTH_SECRET", () => {
+    const plain = generateIntegrationApiKey();
+    const encrypted = encryptIntegrationSecret(plain);
+    expect(encrypted).not.toContain(plain);
+    expect(decryptIntegrationSecret(encrypted)).toBe(plain);
   });
 
-  it("rejects revoked DB keys", async () => {
-    const plain = "a".repeat(32);
-    const hash = await bcrypt.hash(plain, 12);
-    const ok = await verifyIntegrationApiKeyValue(plain, async () => ({
-      id: "k1",
-      keyHash: hash,
-      revokedAt: new Date(),
-    }));
-    expect(ok).toBe(false);
+  it("rejects encrypted data after AUTH_SECRET changes", () => {
+    const encrypted = encryptIntegrationSecret("shared-secret");
+    process.env.AUTH_SECRET = "a-different-auth-secret-that-is-long-enough";
+    expect(decryptIntegrationSecret(encrypted)).toBeNull();
   });
 
-  it("accepts valid non-revoked DB key", async () => {
-    const plain = "b".repeat(32);
-    const hash = await bcrypt.hash(plain, 12);
-    const ok = await verifyIntegrationApiKeyValue(plain, async () => ({
-      id: "k1",
-      keyHash: hash,
-      revokedAt: null,
-    }));
-    expect(ok).toBe(true);
+  it("skips dispatch when the webhook URL is missing", async () => {
+    const getSecret = vi.fn();
+    const fetcher = vi.fn();
+    const result = await dispatchAlert(alert, { getSecret, fetcher });
+    expect(result).toMatchObject({ sent: false, skipped: true, reason: "not_configured" });
+    expect(getSecret).not.toHaveBeenCalled();
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it("rejects hash mismatch", async () => {
-    const plain = "c".repeat(32);
-    const hash = await bcrypt.hash("different-key-value-1234567890", 12);
-    const ok = await verifyIntegrationApiKeyValue(plain, async () => ({
-      id: "k1",
-      keyHash: hash,
-      revokedAt: null,
-    }));
-    expect(ok).toBe(false);
+  it("skips dispatch when no active secret exists", async () => {
+    const fetcher = vi.fn();
+    const result = await dispatchAlert(alert, {
+      webhookUrl: "https://example.invalid/webhook",
+      getSecret: async () => null,
+      fetcher,
+    });
+    expect(result).toMatchObject({ sent: false, skipped: true, reason: "not_configured" });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("posts the token as a header without userId in the body", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 202 }));
+    const markUsed = vi.fn().mockResolvedValue(undefined);
+    const result = await dispatchAlert(alert, {
+      webhookUrl: "https://example.invalid/webhook",
+      getSecret: async () => ({ id: "key-1", actorId: "admin-1", secret: "header-secret" }),
+      fetcher,
+      markUsed,
+    });
+
+    expect(result).toMatchObject({ sent: true, skipped: false });
+    const [, init] = fetcher.mock.calls[0];
+    expect(init.headers["X-Office-Pulse-Token"]).toBe("header-secret");
+    expect(JSON.parse(init.body)).not.toHaveProperty("userId");
+    expect(markUsed).toHaveBeenCalledWith("key-1");
   });
 });

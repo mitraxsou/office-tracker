@@ -108,16 +108,30 @@ curl.exe -sS `
   Sort-Object -Unique
 ```
 
-## 6. If curl also fails SSL
+## 6. Fix Vercel CLI SSL on PwC laptops (Node)
 
-Try adding your corporate root CA (e.g. Zscaler) — **do not** disable TLS verification in scripts.
+`npx vercel login` and `npx vercel --token ...` fail with `self-signed certificate in certificate chain` because Node does not use the Windows cert store.
+
+**One-time export** (captures the PwC proxy chain from `api.vercel.com`):
 
 ```powershell
-# Example — path varies by org; ask IT for the corp root .pem
-$env:NODE_EXTRA_CA_CERTS = "C:\path\to\corp-root.pem"
+.\scripts\export-pwc-proxy-ca.ps1
 ```
 
-This helps Node-based tools (`npx vercel`). For `curl.exe`, import the cert into the **Windows Trusted Root Certification Authorities** store (IT often does this via group policy).
+**Each PowerShell session** (before `npx vercel`):
+
+```powershell
+$env:NODE_EXTRA_CA_CERTS = "C:\Users\smandal089\OneDrive - PwC\Documents\Cursor\OfficeTracker\.certs\pwc-proxy.pem"
+$env:VERCEL_TOKEN = "your_token_here"   # session only — do not commit
+npx vercel whoami
+npx vercel env pull .env.vercel.local
+```
+
+**Persistent (optional):** Windows → Environment Variables → User → `NODE_EXTRA_CA_CERTS` = path to `.certs\pwc-proxy.pem`. Keep `VERCEL_TOKEN` as a session variable or Windows user env var — **not** in `.env` (that file is for the Next.js app).
+
+Do **not** set `NODE_TLS_REJECT_UNAUTHORIZED=0` unless you accept disabling all TLS checks.
+
+For `curl.exe` without `--ssl-no-revoke`, import the corp root into **Windows Trusted Root Certification Authorities** (IT often does this via group policy).
 
 ## 7. Revoke the token
 

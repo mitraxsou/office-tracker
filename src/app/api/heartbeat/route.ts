@@ -19,6 +19,7 @@ import {
   sanitizeVpnGateway,
 } from "@/lib/security";
 import { recordDeviceScriptVersion } from "@/lib/agent-update";
+import { dispatchUserAlerts } from "@/lib/power-automate-notify";
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -104,6 +105,14 @@ export async function POST(request: Request) {
     recordedAt,
     allowlist,
   });
+
+  if (result.inOffice) {
+    try {
+      await dispatchUserAlerts(user.id, ["hours_started", "hours_met"]);
+    } catch {
+      console.error("[heartbeat] Failed to evaluate Power Automate notifications");
+    }
+  }
 
   return NextResponse.json({
     ok: true,

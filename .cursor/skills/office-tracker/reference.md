@@ -6,8 +6,8 @@
 |---|---|
 | `POSTGRES_PRISMA_URL` | Prisma Client (pooled). Auto from Vercel Storage; or set locally |
 | `POSTGRES_URL_NON_POOLING` | Migrations / `db push`. Auto from Vercel Storage; or set locally |
-| `DATABASE_URL` | Legacy local alias — resolved to `POSTGRES_*` at runtime |
-| `DATABASE_URL_*` | Misconfigured Storage prefix vars — auto-mapped; reconnect Storage with no prefix |
+| `DATABASE_URL` | Legacy local alias, resolved to `POSTGRES_*` at runtime |
+| `DATABASE_URL_*` | Misconfigured Storage prefix vars, auto-mapped; reconnect Storage with no prefix |
 | `AUTH_SECRET` | Session JWT (32+ chars) |
 | `NEXT_PUBLIC_APP_URL` | Public URL for install commands and agent |
 | `DEFAULT_OFFICE_SSIDS` | Seed value (`OfficeConnect`, `ExternalConnect`, `pwcglb.com`); admin manages via AppConfig in prod; startup merges missing defaults |
@@ -16,6 +16,8 @@
 | `BREAKGLASS_PASSWORD` | Recovery admin password |
 | `ALLOW_REGISTRATION` | `"false"` disables `/register` in production |
 | `AGENT_INSTALL_PATH` | Optional full path to `agent/` for local dev install copy |
+| `CRON_SECRET` | Bearer secret used by scheduled cron requests |
+| `POWER_AUTOMATE_WEBHOOK_URL` | Secret Power Automate HTTP trigger URL for outbound notifications |
 
 ## API routes
 
@@ -35,16 +37,20 @@
 | `PATCH /api/admin/config` | Admin | Global SSIDs / hours |
 | `POST/PATCH/DELETE /api/admin/visits` | Admin | Correct visits |
 | `DELETE /api/admin/devices/[id]` | Admin | Unbind laptop |
+| `GET/POST/DELETE /api/admin/integration-keys` | Admin | List, generate, and revoke the Power Automate webhook secret |
+| `POST /api/admin/integration-keys/test` | Admin | Send a Power Automate test notification to the admin |
+| `GET /api/cron/agent-alerts` | Cron bearer | Dispatch pending alerts to Power Automate |
 
 ## Prisma models (high level)
 
-- `User` — email, role, timezone, optional hoursTarget override
-- `AgentToken` — bcrypt token hash, tokenPrefix lookup
-- `AgentDevice` — serialNumber, lastSeenAt per user
-- `AppConfig` — global hoursTarget, monthlyDaysTarget, officeSsids JSON
-- `Heartbeat` — ssid, inOffice, vpnGateway, recordedAt
-- `Visit` — startAt, endAt, source (wifi|manual)
-- `AuditLog` — admin actions
+- `User` - email, role, timezone, optional hoursTarget override
+- `AgentToken` - bcrypt token hash, tokenPrefix lookup
+- `AgentDevice` - serialNumber, lastSeenAt per user
+- `IntegrationApiKey` - bcrypt hash plus AES-256-GCM encrypted Power Automate secret
+- `AppConfig` - global hoursTarget, monthlyDaysTarget, officeSsids JSON
+- `Heartbeat` - ssid, inOffice, vpnGateway, recordedAt
+- `Visit` - startAt, endAt, source (wifi|manual)
+- `AuditLog` - admin actions
 
 ## Agent local paths (show users in Settings)
 

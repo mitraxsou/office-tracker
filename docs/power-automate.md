@@ -1,228 +1,151 @@
-# Power Automate integration (Teams + email)
+# Power Automate notifications
 
-Office Tracker exposes a secured API for **Power Automate** to poll for alerts. Delivery (Teams, Outlook email) happens in Power Automate using approved PwC Microsoft connectors.
+Office Pulse sends each eligible alert to a Power Automate HTTP trigger. Power Automate validates a shared header secret, then delivers the alert through Teams and Outlook.
 
-## Integration API keys (recommended)
+## 1. Create the trigger
 
-Admins generate keys in the app. No Vercel env var is required for new setups.
+Create an instant cloud flow named `Office Pulse - notify user`.
 
-1. Sign in as **admin** and open **Admin → Global settings**.
-2. Scroll to **Integration API keys**.
-3. Enter a label (e.g. `Power Automate - AC IAM`) and click **Generate new key**.
-4. **Copy the key immediately**; it is shown once and cannot be retrieved later.
-5. In Power Automate HTTP actions, set header **`Authorization`** to **`Bearer <key>`** (or use **`X-Api-Key: <key>`**).
+Choose **When an HTTP request is received**:
 
-You can create **multiple keys** (separate flows, environments, or teams). Revoke a key from the same admin page if it is compromised or no longer needed.
-
-**Security:**
-
-- Keys are stored as bcrypt hashes; only the 8-character prefix is shown in the admin table.
-- Revoked keys stop working immediately.
-- Create and revoke actions are written to the audit log.
-
-## Legacy env var (`INTEGRATION_API_KEY`)
-
-Older deployments may still use a single key in **Vercel → Project → Settings → Environment Variables** as `INTEGRATION_API_KEY`. That value continues to work alongside admin-generated keys. New pilots should use admin-generated keys instead.
-
-To check legacy setup: Vercel dashboard → your project → **Settings** → **Environment Variables** → look for `INTEGRATION_API_KEY`.
-
-## Prerequisites
-
-1. Deploy Office Tracker (Postgres connected).
-2. Admin generates at least one integration key (or legacy env var is set).
-3. Users configure **Office schedule and alerts** in Settings (`/settings`).
-4. Power Automate access to HTTP, Teams, and Outlook connectors.
-
-## API
-
-### Get pending alerts
-
-```
-GET https://office-tracker-theta.vercel.app/api/integrations/alerts
-GET https://office-tracker-theta.vercel.app/api/integrations/alerts?types=stale,absent
-GET https://office-tracker-theta.vercel.app/api/integrations/alerts?types=hours_started,hours_met
-```
-
-**Auth** (either):
-
-- `Authorization: Bearer <integration-api-key>`
-- `X-Api-Key: <integration-api-key>`
-
-**Response:**
+- Who can trigger the flow: **Anyone**
+- Method: `POST`
+- Request Body JSON Schema:
 
 ```json
 {
-  "generatedAt": "2026-09-01T10:15:00.000Z",
-  "alerts": [
-    {
-      "type": "absent",
-      "userId": "clx...",
-      "email": "user@pwc.com",
-      "name": "User Name",
-      "message": "No office Wi-Fi detected yet today...",
-      "hoursToday": 0,
-      "hoursTarget": 5,
-      "agentHealthy": true,
-      "inOfficeNow": false,
-      "notifyTeams": true,
-      "notifyEmail": true,
-      "dayKey": "2026-09-01",
-      "dashboardUrl": "https://office-tracker-theta.vercel.app/dashboard",
-      "settingsUrl": "https://office-tracker-theta.vercel.app/settings",
-      "helpUrl": "https://office-tracker-theta.vercel.app/help",
-      "outOfOfficeUrl": "https://office-tracker-theta.vercel.app/ooo?token=..."
-    }
+  "type": "object",
+  "properties": {
+    "type": { "type": "string" },
+    "email": { "type": "string" },
+    "name": { "type": "string" },
+    "message": { "type": "string" },
+    "hoursToday": { "type": "number" },
+    "hoursTarget": { "type": "number" },
+    "notifyTeams": { "type": "boolean" },
+    "notifyEmail": { "type": "boolean" },
+    "dashboardUrl": { "type": "string" },
+    "settingsUrl": { "type": "string" },
+    "helpUrl": { "type": "string" },
+    "outOfOfficeUrl": { "type": "string" }
+  },
+  "required": [
+    "type",
+    "email",
+    "name",
+    "message",
+    "hoursToday",
+    "hoursTarget",
+    "notifyTeams",
+    "notifyEmail",
+    "dashboardUrl",
+    "settingsUrl",
+    "helpUrl",
+    "outOfOfficeUrl"
   ]
 }
 ```
 
-**Alert types:**
+The secret is not part of the JSON body or schema.
 
-| Type | When |
-|------|------|
-| `absent` | Usual office day, past start + grace, no office presence, and the latest healthy pulse has no SSID |
-| `stale` | Usual office day, no office presence, agent not responding, and user has a registered laptop |
-| `behind` | Work day, past check time, hours below user threshold |
-| `hours_started` | First office Wi-Fi heartbeat for that user and local calendar day |
-| `hours_met` | Office hours span reaches the user&apos;s daily hours target |
+Save the flow once. Copy the generated HTTP POST URL into the Vercel environment variable `POWER_AUTOMATE_WEBHOOK_URL`. Treat this URL as a secret and never commit it.
 
-Each type is sent **at most once per user per local calendar day** after acknowledgement. Reminder types (`absent`, `stale`, and `behind`) only run on the user&apos;s configured usual office days, which default to Wednesday and Friday. `hours_started` and `hours_met` can run on any day because verified office Wi-Fi presence triggers them. No alerts are sent on out-of-office days.
+## 2. Generate the header secret
 
-A recent heartbeat with an SSID that is not on the office allowlist is treated as working from home. It does not produce `absent` or `stale`. A reminder is only produced when the latest heartbeat has no SSID or the agent is not responding.
+1. Sign in to Office Pulse as an admin.
+2. Open **Admin > Global settings**.
+3. Find **Power Automate webhook secret**.
+4. Enter a label and select **Generate new secret**.
+5. Copy the value immediately. It is shown once.
 
-### Acknowledge alerts (after sending)
+Generating a new secret revokes the previous active secret. Office Pulse stores a bcrypt hash and an AES-256-GCM encrypted copy protected by `AUTH_SECRET`.
 
-```
-POST https://office-tracker-theta.vercel.app/api/integrations/alerts
-Authorization: Bearer <integration-api-key>
-Content-Type: application/json
+## 3. Reject requests with the wrong secret
 
-{
-  "alerts": [
-    { "userId": "clx...", "type": "absent", "dayKey": "2026-09-01" }
-  ]
-}
-```
+The first flow action after the trigger must be a **Condition**. Compare the incoming `X-Office-Pulse-Token` header with the admin-generated secret.
 
-Call this after Teams/email succeed so users are not spammed.
-
-## Power Automate flow (step-by-step)
-
-Build this after generating an integration key in the admin panel.
-
-### Troubleshooting: “Your flow should contain at least one trigger and one action”
-
-This usually means the HTTP action was added but **not saved or completed**:
-
-- Open the **HTTP** action and fill in Method, URI, and Headers, then click **Save** on the action card.
-- Ensure the HTTP step is **inside** the flow (not a disconnected draft block).
-- Add at least one more action after HTTP (e.g. **Parse JSON**) so the flow has trigger + action(s).
-- Save the whole flow (**Save** top-right), then try **Test** or turn the flow **On**.
-
-### Trigger
-
-- **Recurrence**: every 15–30 minutes (15 min is fine for pilot)
-- **Days**: every day that pilot users may attend the office
-- **Hours**: 8:00–18:00 (India Standard Time)
-
-### Step 1 — HTTP GET alerts
-
-- **Method**: GET
-- **URI**: `https://office-tracker-theta.vercel.app/api/integrations/alerts`
-- **Headers**:
-  - `Authorization`: `Bearer <your integration API key>`
-
-### Step 2 — Parse JSON
-
-- **Content**: body from step 1
-- **Schema**: use `generatedAt` (string), `alerts` (array)
-
-### Step 3 — Apply to each alert
-
-For each item in `alerts`:
-
-#### 3a — Teams (if `notifyTeams` is true)
-
-- **Post message in a chat or channel** (Teams connector)
-- **Recipient**: user email from `email` field (or post to pilot channel with @mention)
-- **Message** example:
+Use this expression and replace the placeholder with the copied secret:
 
 ```
-Office Pulse: @{email}
-
-@{message}
-
-Dashboard: @{dashboardUrl}
-Settings: @{settingsUrl}
-Install help: @{helpUrl}
-Out of office today: @{outOfOfficeUrl}
+equals(
+  coalesce(
+    triggerOutputs()?['headers']?['X-Office-Pulse-Token'],
+    triggerOutputs()?['headers']?['x-office-pulse-token']
+  ),
+  '<paste admin-generated secret>'
+)
 ```
 
-The **outOfOfficeUrl** link is unique per user per day. When clicked, it marks them out of office and stops further alerts for that day (no login required).
+Header names may be normalized to lowercase, so the expression checks both forms.
 
-#### 3b — Email (if `notifyEmail` is true)
+- If **No**, add **Terminate** with status **Cancelled**.
+- If **Yes**, continue to the Teams and email conditions.
 
-- **Send an email (V2)** (Office 365 Outlook)
-- **To**: `email`
-- **Subject**: `PwC Office Pulse reminder`
-- **Body**: HTML with `message`, `dashboardUrl`, `settingsUrl`, and a link using `outOfOfficeUrl` (“I’m out of office today”)
+Do not place delivery actions outside the **Yes** branch.
 
-### Step 4 — HTTP POST ack
+## 4. Send a Teams message
 
-After the loop, collect sent items and POST ack:
+Inside the valid-token branch, add a Condition for:
 
-```json
-{
-  "alerts": [
-    { "userId": "...", "type": "absent", "dayKey": "2026-09-01" }
-  ]
-}
+```
+triggerBody()?['notifyTeams']
 ```
 
-Use **Append to array variable** inside the loop, then POST once at the end.
+When true, add **Post message in a chat or channel**:
 
-## Duplicate the flow for positive hours alerts
+- Post as: User
+- Post in: Chat with
+- Recipient: `email`
 
-Create a second Power Automate flow so Teams and email templates for positive updates are separate from reminders:
+Suggested message:
 
-1. Open the existing reminder flow and choose **Save As**.
-2. Name the copy `Office Pulse - hours updates`.
-3. In its HTTP GET action, set the URI to `https://office-tracker-theta.vercel.app/api/integrations/alerts?types=hours_started,hours_met`.
-4. Keep the same Parse JSON fields. The `type` value is either `hours_started` or `hours_met`.
-5. Add a Condition or Switch on `type`:
-   - `hours_started`: use a template such as `Office hours have started counting. Daily target: @{hoursTarget}h.`
-   - `hours_met`: use a template such as `Daily office target met. Counted today: @{hoursToday}h.`
-6. Keep the POST acknowledgement step and send `userId`, `type`, and `dayKey` exactly as returned.
-7. Turn on both flows.
-
-The second flow can reuse the same Integration API key. For separate ownership or easier revocation, generate another key under Admin settings and use it only in the positive-alert flow. Both flows use the same `/api/integrations/alerts` path; the `types` query parameter separates their queues. Do not configure both flows to request all types, or they can race to deliver the same alert.
-
-## User settings
-
-Users control alerts at **Settings → Office schedule and alerts**:
-
-- Usual office days (Mon–Sun toggles)
-- Start / end time
-- Grace period before “not in office” alert
-- Teams / email toggles
-- Alert types: not in office, agent stale, behind on hours
-- Positive alert types: hours started and daily hours target met
-
-**Out of office** (Settings → Out of office):
-
-- Mark today or future days when away — no alerts for those days
-- Or use the one-click link in a Teams/email alert (`outOfOfficeUrl`)
-
-## Limitations
-
-- Heartbeats cannot be recreated if the laptop was off; alerts nudge users to fix the agent or check in manually.
-- “Not in office” means no office Wi-Fi SSID detected, not badge/HR presence.
-- A recent pulse on home or another non-office Wi-Fi is treated as WFH and does not trigger a not-in-office reminder.
-
-## Testing the API
-
-```powershell
-$key = "your-integration-api-key-from-admin-panel"
-Invoke-RestMethod -Uri "https://office-tracker-theta.vercel.app/api/integrations/alerts" `
-  -Headers @{ Authorization = "Bearer $key" }
 ```
+PwC Office Pulse (@{triggerBody()?['type']})
+
+@{triggerBody()?['message']}
+
+Dashboard: @{triggerBody()?['dashboardUrl']}
+Settings: @{triggerBody()?['settingsUrl']}
+Help: @{triggerBody()?['helpUrl']}
+Out of office today: @{triggerBody()?['outOfOfficeUrl']}
+```
+
+## 5. Send an email
+
+Inside the valid-token branch, add a Condition for:
+
+```
+triggerBody()?['notifyEmail']
+```
+
+When true, add **Send an email (V2)**:
+
+- To: `email`
+- Subject: `PwC Office Pulse reminder`
+- Body: use the message and links from the Teams example
+
+## 6. Test and enable
+
+1. Turn the flow on.
+2. In Office Pulse, open **Admin > Global settings**.
+3. Confirm **Webhook URL: Configured**.
+4. Select **Send test notification**.
+5. Confirm that Teams and email arrive at the signed-in admin email.
+6. Send or inspect a request without the token and confirm the flow terminates before delivery.
+
+Office Pulse acknowledges an alert only after Power Automate returns HTTP 2xx. Failed requests remain pending and the 15-minute cron retries them.
+
+## Rotation and operations
+
+To rotate the shared secret:
+
+1. Generate a new secret in Admin.
+2. Copy it into the first Power Automate Condition.
+3. Save the flow.
+4. Send a test notification.
+
+Only one database secret remains active. Revoking it stops outbound delivery until another secret is generated.
+
+The webhook URL and header token must never be logged or exposed in browser responses. Limit flow run history access to flow owners because HTTP trigger headers may appear there.
+
+Disable old Recurrence flows that call `GET /api/integrations/alerts` and post acknowledgements. That inbound API no longer exists.

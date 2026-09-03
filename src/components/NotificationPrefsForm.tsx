@@ -107,7 +107,7 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
         {adminUserId ? "Office schedule and alerts (admin)" : "Office schedule and alerts"}
       </h2>
       <p className="mb-4 text-sm text-muted">
-        Used by Power Automate to send Teams and email reminders. Alerts are nudges only, not HR
+        Teams and email reminders are sent through Power Automate. Alerts are nudges only, not HR
         records. Reminders are sent only on {adminUserId ? "the user's" : "your"} selected{" "}
         <strong>usual office days</strong> (Wednesday and Friday by default for this pilot).
         Positive hours alerts can fire on any day when office Wi-Fi is detected. Fill usual days
@@ -213,7 +213,7 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
                 checked={prefs.notifyEmail}
                 onChange={(e) => setPrefs({ ...prefs, notifyEmail: e.target.checked })}
               />
-              Email (via Power Automate / Outlook)
+              Email (via Power Automate and Outlook)
             </label>
           </div>
         </div>

@@ -46,8 +46,6 @@ function appBaseUrl() {
   return process.env.NEXT_PUBLIC_APP_URL ?? "https://office-tracker-theta.vercel.app";
 }
 
-export { verifyIntegrationApiKey } from "./integration-api-keys";
-
 async function wasAlertSentToday(
   userId: string,
   type: IntegrationAlertType,
@@ -335,6 +333,25 @@ export async function getIntegrationAlerts(typesParam?: string | null): Promise<
     generatedAt: now.toISOString(),
     alerts,
   };
+}
+
+export async function getIntegrationAlertsForUser(
+  userId: string,
+  types: IntegrationAlertType[],
+): Promise<IntegrationAlert[]> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      timezone: true,
+      hoursTarget: true,
+      agentStaleGraceHours: true,
+    },
+  });
+  if (!user) return [];
+  return evaluateUserAlerts(user, new Set(types), new Date());
 }
 
 /** Exported for unit tests */

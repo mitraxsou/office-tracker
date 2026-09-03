@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { prisma } from "./db";
 import { ensureAppConfig, getAppConfig } from "./app-config";
-import crypto from "crypto";
+import crypto from "node:crypto";
 import { encryptPendingToken, decryptPendingToken } from "./token-crypto";
 import { buildInstallCommand, buildUpdateCommand } from "./agent-branding";
 import { isTokenExpired, revokeExpiredPendingTokens } from "./token-expiry";
