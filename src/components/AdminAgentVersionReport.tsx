@@ -116,11 +116,15 @@ export function AdminAgentVersionReport() {
                         </span>
                         <button
                           type="button"
-                          disabled={pushing === device.deviceId}
+                          disabled={pushing === device.deviceId || device.updateQueued}
                           onClick={() => void queueUpdate(device.deviceId)}
                           className="ml-2 text-xs text-blue-400 hover:underline disabled:opacity-50"
                         >
-                          {pushing === device.deviceId ? "Queuing..." : "Queue update"}
+                          {pushing === device.deviceId
+                            ? "Pushing..."
+                            : device.updateQueued
+                              ? "Update pending"
+                              : "Push update"}
                         </button>
                       </td>
                     </tr>

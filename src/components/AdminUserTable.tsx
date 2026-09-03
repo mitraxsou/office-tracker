@@ -67,7 +67,7 @@ export function AdminUserTable() {
   if (loading) return <p className="text-muted">Loading...</p>;
   if (error) return <p className="text-red-400">{error}</p>;
 
-  const serverVersion = users[0]?.serverAgentVersion ?? "—";
+  const serverVersion = users[0]?.serverAgentVersion ?? "-";
 
   return (
     <div className="overflow-x-auto">
@@ -117,22 +117,26 @@ export function AdminUserTable() {
                         >
                           v{d.agentScriptVersion ?? "?"}
                           {d.agentVersionStale ? " (update needed)" : ""}
-                          {d.forceAgentUpdate ? " · queued" : ""}
+                          {d.forceAgentUpdate ? " (pending)" : ""}
                         </span>
                         <button
                           type="button"
                           onClick={() => pushAgentUpdate("device", d.id)}
-                          disabled={pushing === `device:${d.id}`}
+                          disabled={pushing === `device:${d.id}` || d.forceAgentUpdate}
                           className="text-xs text-blue-400 hover:underline disabled:opacity-50"
                         >
-                          {pushing === `device:${d.id}` ? "…" : "push update"}
+                          {pushing === `device:${d.id}`
+                            ? "Pushing..."
+                            : d.forceAgentUpdate
+                              ? "Update pending"
+                              : "Push update"}
                         </button>
                         <button
                           type="button"
                           onClick={() => removeDevice(d.id)}
                           className="text-xs text-red-400 hover:underline"
                         >
-                          remove
+                          Remove
                         </button>
                       </li>
                     ))}
@@ -144,7 +148,7 @@ export function AdminUserTable() {
                           disabled={pushing === `user:${u.id}`}
                           className="text-xs text-blue-400 hover:underline disabled:opacity-50"
                         >
-                          {pushing === `user:${u.id}` ? "…" : "push update (all devices)"}
+                          {pushing === `user:${u.id}` ? "Pushing..." : "Push update to all devices"}
                         </button>
                       </li>
                     )}

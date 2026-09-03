@@ -39,6 +39,24 @@ function Get-LockPath {
     Join-Path (Get-InstallDir) ".update.lock"
 }
 
+function Get-ForceUpdateMarkerPath {
+    Join-Path (Get-InstallDir) "force-update.txt"
+}
+
+function Remove-MarkOfWeb {
+    param([string]$Path)
+    if (Test-Path -LiteralPath $Path) {
+        Unblock-File -LiteralPath $Path -ErrorAction SilentlyContinue
+    }
+}
+
+function Remove-MarkOfWebFromTree {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    Get-ChildItem -LiteralPath $Path -File -Recurse -ErrorAction SilentlyContinue |
+        ForEach-Object { Remove-MarkOfWeb -Path $_.FullName }
+}
+
 function Write-UpdateLog([string]$Message) {
     $logDir = Join-Path (Get-InstallDir) "logs"
     if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
@@ -73,8 +91,10 @@ function Get-LocalAgentVersion {
 
 function Publish-AgentScriptTxt {
     param([string]$Ps1Path)
+    Remove-MarkOfWeb -Path $Ps1Path
     $txtPath = [System.IO.Path]::ChangeExtension($Ps1Path, ".txt")
     Copy-Item $Ps1Path $txtPath -Force
+    Remove-MarkOfWeb -Path $txtPath
     return $txtPath
 }
 
@@ -91,12 +111,13 @@ CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -Ex
 
 function New-UpdateHiddenRunner {
     param([string]$ScriptPath, [string]$Dir)
-    $txtPath = Publish-AgentScriptTxt -Ps1Path $ScriptPath
+    Remove-MarkOfWeb -Path $ScriptPath
     $vbsPath = Join-Path $Dir "run-update.vbs"
     $vbsContent = @"
-CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""& { `$Silent=`$true; `$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s }""", 0, False
+CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$ScriptPath"" -Silent", 0, True
 "@
     Set-Content -Path $vbsPath -Value $vbsContent -Encoding ASCII
+    Remove-MarkOfWeb -Path $vbsPath
     return $vbsPath
 }
 
@@ -212,6 +233,12 @@ if (-not (Test-Path $installDir)) {
     New-Item -ItemType Directory -Path $installDir -Force | Out-Null
 }
 
+$forceMarkerPath = Get-ForceUpdateMarkerPath
+if (Test-Path -LiteralPath $forceMarkerPath) {
+    $Force = $true
+    Remove-Item -LiteralPath $forceMarkerPath -Force -ErrorAction SilentlyContinue
+}
+
 $configPath = Get-ConfigPath
 if (-not $ApiUrl -or -not $Token) {
     if (-not (Test-Path $configPath)) {
@@ -244,9 +271,11 @@ try {
     Write-UpdateLog "Downloading agent from $ApiUrl/api/agent/download"
     Invoke-WebRequest -Uri "$ApiUrl/api/agent/download" -Headers $headers `
         -OutFile $tempZip -UseBasicParsing -TimeoutSec 120
+    Remove-MarkOfWeb -Path $tempZip
 
     New-Item -ItemType Directory -Path $tempExtract -Force | Out-Null
     Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force
+    Remove-MarkOfWebFromTree -Path $tempExtract
 
     $sourceDir = Resolve-AgentSourceDir -ExtractRoot $tempExtract
     $newVersion = "0.0.0"
@@ -267,7 +296,10 @@ try {
         foreach ($file in $AgentFiles) {
             $src = Join-Path $sourceDir $file
             if (Test-Path $src) {
-                Copy-Item $src (Join-Path $installDir $file) -Force
+                Remove-MarkOfWeb -Path $src
+                $destination = Join-Path $installDir $file
+                Copy-Item $src $destination -Force
+                Remove-MarkOfWeb -Path $destination
             }
         }
 

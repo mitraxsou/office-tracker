@@ -28,6 +28,7 @@ describe("agent version", () => {
     );
     expect(heartbeat).toContain(`$AgentScriptVersion = "${getAgentVersion()}"`);
     expect(heartbeat).toContain("scriptVersion  = $scriptVersion");
+    expect(heartbeat).toContain('$uri = "${uri}?serialNumber=$encoded"');
   });
 
   it("treats missing or different versions as needing update", () => {
@@ -52,7 +53,30 @@ describe("agent version", () => {
 
   it("builds a full-path PowerShell reinstall command", () => {
     expect(buildInstallCommand("https://office.example", "token-123")).toBe(
-      'powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\\Downloads\\PwCOfficePulse\\install.ps1" -ApiUrl "https://office.example" -Token "token-123"',
+      'Unblock-File -LiteralPath "$env:USERPROFILE\\Downloads\\PwCOfficePulse\\install.ps1"; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$env:USERPROFILE\\Downloads\\PwCOfficePulse\\install.ps1" -ApiUrl "https://office.example" -Token "token-123"',
     );
+  });
+
+  it("removes MOTW before hidden installed updater launches", () => {
+    const heartbeat = readFileSync(
+      path.join(process.cwd(), "agent", "office-heartbeat.ps1"),
+      "utf8",
+    );
+    const updater = readFileSync(path.join(process.cwd(), "agent", "update.ps1"), "utf8");
+    const installer = readFileSync(path.join(process.cwd(), "agent", "install.ps1"), "utf8");
+
+    expect(heartbeat).toContain("Unblock-File -LiteralPath $UpdateScript");
+    expect(heartbeat).toContain('Join-Path (Split-Path $UpdateScript) "run-update.vbs"');
+    expect(heartbeat).toContain("-NoProfile -NonInteractive -ExecutionPolicy Bypass");
+    expect(heartbeat).toContain('-File ""$UpdateScript"" -Silent');
+
+    expect(updater).toContain("Remove-MarkOfWeb -Path $tempZip");
+    expect(updater).toContain("Remove-MarkOfWebFromTree -Path $tempExtract");
+    expect(updater).toContain("Remove-MarkOfWeb -Path $destination");
+    expect(updater).toContain('-File ""$ScriptPath"" -Silent');
+
+    expect(installer).toContain("Remove-MarkOfWeb -Path $src");
+    expect(installer).toContain("Remove-MarkOfWeb -Path $destination");
+    expect(installer).toContain('-File ""$ScriptPath"" -Silent');
   });
 });

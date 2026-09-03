@@ -14,7 +14,7 @@ $UpdateCheckIntervalMinutes = 60
 
 # Version of this script. Keep in sync with agent/version.txt. Used when version.txt is
 # missing so the server always receives a real version instead of nothing.
-$AgentScriptVersion = "1.2.7"
+$AgentScriptVersion = "1.2.8"
 
 function Write-Log([string]$Message) {
     $logDir = Join-Path $env:LOCALAPPDATA "OfficeTracker\logs"
@@ -144,13 +144,24 @@ function Invoke-AgentUpdateScript {
         [string]$Token,
         [switch]$Force
     )
-    $txtPath = [System.IO.Path]::ChangeExtension($UpdateScript, ".txt")
-    Copy-Item $UpdateScript $txtPath -Force
-    $escapedApi = $ApiUrl -replace "'", "''"
-    $escapedToken = $Token -replace "'", "''"
-    $forceAssignment = if ($Force) { "`$Force=`$true; " } else { "" }
-    powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden `
-        -Command "& { `$ApiUrl='$escapedApi'; `$Token='$escapedToken'; `$Silent=`$true; $forceAssignment`$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s }" | Out-Null
+    # ExecutionPolicy Bypass does not suppress Attachment Manager prompts. Remove MOTW
+    # from the installed updater, then launch that exact copy through a hidden VBS host.
+    Unblock-File -LiteralPath $UpdateScript -ErrorAction SilentlyContinue
+    if ($Force) {
+        Set-Content -Path (Join-Path (Split-Path $UpdateScript) "force-update.txt") `
+            -Value (Get-Date -Format "o") -Encoding UTF8
+    }
+
+    $runnerPath = Join-Path (Split-Path $UpdateScript) "run-update.vbs"
+    $vbsContent = @"
+CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$UpdateScript"" -Silent", 0, True
+"@
+    Set-Content -Path $runnerPath -Value $vbsContent -Encoding ASCII
+    Unblock-File -LiteralPath $runnerPath -ErrorAction SilentlyContinue
+
+    $wscript = (Get-Command wscript.exe).Source
+    Start-Process -FilePath $wscript -ArgumentList @("//B", "//Nologo", "`"$runnerPath`"") `
+        -WindowStyle Hidden -Wait
 }
 
 function Invoke-HourlyUpdateCheck([string]$ApiUrl, [string]$Token) {
@@ -337,7 +348,7 @@ function Fetch-ServerConfig([string]$ApiUrl, [string]$Token, [string]$SerialNumb
     $uri = "$ApiUrl/api/agent/config"
     if ($SerialNumber) {
         $encoded = [Uri]::EscapeDataString($SerialNumber)
-        $uri = "$uri?serialNumber=$encoded"
+        $uri = "${uri}?serialNumber=$encoded"
     }
     $response = Invoke-RestMethod -Uri $uri -Method GET `
         -Headers $headers -TimeoutSec 30

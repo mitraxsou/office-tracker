@@ -82,6 +82,7 @@ type UserReport = {
     agentScriptVersion: string | null;
     agentVersionReportedAt: string | null;
     agentVersionStale: boolean;
+    forceAgentUpdate: boolean;
   }>;
   lifecycleEvents?: Array<{
     id: string;
@@ -140,6 +141,7 @@ export function AdminUserReport({
   const [resetMessage, setResetMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [impersonating, setImpersonating] = useState(false);
+  const [pushingDeviceId, setPushingDeviceId] = useState<string | null>(null);
 
   const load = useCallback(async (month: string) => {
     setLoading(true);
@@ -159,6 +161,29 @@ export function AdminUserReport({
     setSelectedDate(null);
     setError(null);
   }, [userId]);
+
+  async function pushDeviceAgentUpdate(deviceId: string) {
+    setPushingDeviceId(deviceId);
+    setActionError(null);
+    const response = await fetch(`/api/admin/devices/${deviceId}/agent-update`, {
+      method: "POST",
+    });
+    setPushingDeviceId(null);
+    if (!response.ok) {
+      setActionError("Failed to push agent update");
+      return;
+    }
+    setData((current) =>
+      current
+        ? {
+            ...current,
+            devices: current.devices.map((device) =>
+              device.id === deviceId ? { ...device, forceAgentUpdate: true } : device,
+            ),
+          }
+        : current,
+    );
+  }
 
   useEffect(() => {
     fetch("/api/admin/config")
@@ -464,6 +489,25 @@ export function AdminUserReport({
                               timeZone: data.user.timezone,
                             })
                           : "never"}
+                        {device.agentVersionStale && (
+                          <>
+                            {" "}
+                            <button
+                              type="button"
+                              onClick={() => void pushDeviceAgentUpdate(device.id)}
+                              disabled={
+                                pushingDeviceId === device.id || device.forceAgentUpdate
+                              }
+                              className="text-xs text-blue-400 hover:underline disabled:opacity-50"
+                            >
+                              {pushingDeviceId === device.id
+                                ? "Pushing..."
+                                : device.forceAgentUpdate
+                                  ? "Update pending"
+                                  : "Push update"}
+                            </button>
+                          </>
+                        )}
                       </li>
                     );
                   })}

@@ -75,6 +75,7 @@ export function AdminUsersDashboard() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [busyTokenId, setBusyTokenId] = useState<string | null>(null);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const [busyDeviceId, setBusyDeviceId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [sharedCommand, setSharedCommand] = useState<string | null>(null);
 
@@ -270,6 +271,27 @@ export function AdminUsersDashboard() {
       return;
     }
     load(true);
+  }
+
+  async function pushDeviceAgentUpdate(deviceId: string) {
+    setBusyDeviceId(deviceId);
+    setActionError(null);
+    const res = await fetch(`/api/admin/devices/${deviceId}/agent-update`, {
+      method: "POST",
+    });
+    setBusyDeviceId(null);
+    if (!res.ok) {
+      setActionError("Failed to push agent update");
+      return;
+    }
+    setUsers((current) =>
+      current.map((user) => ({
+        ...user,
+        devices: user.devices.map((device) =>
+          device.id === deviceId ? { ...device, forceAgentUpdate: true } : device,
+        ),
+      })),
+    );
   }
 
   async function bulkPushAgentUpdate() {
@@ -608,6 +630,20 @@ export function AdminUsersDashboard() {
                     <span className="text-xs text-muted">
                       last seen {new Date(d.lastSeenAt).toLocaleString("en-IN")}
                     </span>
+                  )}
+                  {d.agentVersionStale && (
+                    <button
+                      type="button"
+                      onClick={() => pushDeviceAgentUpdate(d.id)}
+                      disabled={busyDeviceId === d.id || d.forceAgentUpdate}
+                      className="text-xs text-blue-400 hover:underline disabled:opacity-50"
+                    >
+                      {busyDeviceId === d.id
+                        ? "Pushing..."
+                        : d.forceAgentUpdate
+                          ? "Update pending"
+                          : "Push update"}
+                    </button>
                   )}
                   <button
                     type="button"

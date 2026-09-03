@@ -51,10 +51,19 @@ function Get-LaptopSerial {
     return $null
 }
 
+function Remove-MarkOfWeb {
+    param([string]$Path)
+    if (Test-Path -LiteralPath $Path) {
+        Unblock-File -LiteralPath $Path -ErrorAction SilentlyContinue
+    }
+}
+
 function Publish-AgentScriptTxt {
     param([string]$Ps1Path)
+    Remove-MarkOfWeb -Path $Ps1Path
     $txtPath = [System.IO.Path]::ChangeExtension($Ps1Path, ".txt")
     Copy-Item $Ps1Path $txtPath -Force
+    Remove-MarkOfWeb -Path $txtPath
     return $txtPath
 }
 
@@ -177,12 +186,13 @@ function New-UpdateHiddenRunner {
         [string]$ScriptPath,
         [string]$Dir
     )
-    $txtPath = Publish-AgentScriptTxt -Ps1Path $ScriptPath
+    Remove-MarkOfWeb -Path $ScriptPath
     $vbsPath = Join-Path $Dir "run-update.vbs"
     $vbsContent = @"
-CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""& { `$Silent=`$true; `$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s }""", 0, False
+CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$ScriptPath"" -Silent", 0, True
 "@
     Set-Content -Path $vbsPath -Value $vbsContent -Encoding ASCII
+    Remove-MarkOfWeb -Path $vbsPath
     return $vbsPath
 }
 
@@ -224,7 +234,10 @@ function Copy-AgentScripts {
     foreach ($file in @("office-heartbeat.ps1", "update.ps1", "uninstall.ps1", "version.txt")) {
         $src = Join-Path $SourceDir $file
         if (Test-Path $src) {
-            Copy-Item $src (Join-Path $TargetDir $file) -Force
+            Remove-MarkOfWeb -Path $src
+            $destination = Join-Path $TargetDir $file
+            Copy-Item $src $destination -Force
+            Remove-MarkOfWeb -Path $destination
         }
     }
 }

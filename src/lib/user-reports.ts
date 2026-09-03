@@ -148,6 +148,7 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
         d.agentScriptVersion,
         serverAgentVersion,
       ),
+      forceAgentUpdate: d.forceAgentUpdate,
     })),
     lifecycleEvents: await getLifecycleEventsForUser(user.id),
     tokens: summarizeAgentTokens(user.agentTokens),

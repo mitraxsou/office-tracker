@@ -29,13 +29,14 @@ export const AGENT_EXTRACT_PATH_PS = `$env:USERPROFILE\\Downloads\\${AGENT_EXTRA
 
 /** Full-path install command for the extracted agent folder in Downloads. */
 export function buildInstallCommand(appUrl: string, token: string) {
-  return `powershell -ExecutionPolicy Bypass -File "${AGENT_EXTRACT_PATH_PS}\\install.ps1" -ApiUrl "${appUrl}" -Token "${token}"`;
+  const scriptPath = `${AGENT_EXTRACT_PATH_PS}\\install.ps1`;
+  return `Unblock-File -LiteralPath "${scriptPath}"; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${scriptPath}" -ApiUrl "${appUrl}" -Token "${token}"`;
 }
 
 /** Full-path install command (legacy / local dev with explicit script dir) */
 export function buildInstallCommandWithPath(appUrl: string, token: string, installScriptDir: string) {
   const scriptPath = `${installScriptDir}\\install.ps1`.replace(/\\\\/g, "\\");
-  return `powershell -ExecutionPolicy Bypass -File "${scriptPath}" -ApiUrl "${appUrl}" -Token "${token}"`;
+  return `Unblock-File -LiteralPath "${scriptPath}"; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${scriptPath}" -ApiUrl "${appUrl}" -Token "${token}"`;
 }
 
 export function defaultInstallScriptDir(localDevPath?: string | null) {
