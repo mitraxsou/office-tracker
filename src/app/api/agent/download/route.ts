@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 
   zip.file(
     `${AGENT_EXTRACT_FOLDER}/README.txt`,
-    `${AGENT_PRODUCT_NAME} agent (v${getAgentVersion()})\n\n1. Extract this zip to your Downloads folder (creates ${AGENT_EXTRACT_FOLDER}\\)\n2. Open Settings in the web app\n3. Click "Copy install command" and run in PowerShell\n\nRe-running the install command is safe: it refreshes an existing install.\n`
+    `${AGENT_PRODUCT_NAME} agent (v${getAgentVersion()})\n\n1. Extract this zip (Extract All on PwCOfficePulse-agent.zip may create a nested folder).\n2. Open PowerShell in the folder that contains install.ps1 and update.ps1 (dir must list them). On PwC laptops Downloads is often OneDrive - PwC\\Downloads.\n3. In Settings, copy the install command (first setup) or update command (existing agent) and paste here.\n\nCommands use .\\install.ps1 and .\\update.ps1. They only work from this folder.\n`
   );
 
   const buffer = await zip.generateAsync({ type: "nodebuffer" });

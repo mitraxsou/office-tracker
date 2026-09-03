@@ -9,7 +9,7 @@ import {
 } from "@/lib/auth";
 import { revokeExpiredPendingTokens } from "@/lib/token-expiry";
 import { logAuditEvent } from "@/lib/audit-log";
-import { buildInstallCommand } from "@/lib/agent-branding";
+import { buildInstallCommand, buildUpdateCommand } from "@/lib/agent-branding";
 import { getAgentVersion } from "@/lib/agent-version";
 import { isDeviceAgentVersionStale } from "@/lib/agent-update";
 import {
@@ -171,11 +171,15 @@ export async function POST(request: Request) {
     const installCommand = plainAgentToken
       ? buildInstallCommand(appUrl(), plainAgentToken)
       : null;
+    const updateCommand = plainAgentToken
+      ? buildUpdateCommand(appUrl(), plainAgentToken)
+      : null;
 
     return NextResponse.json({
       user: { id: user.id, email: user.email, name: user.name, role: user.role },
       token: plainAgentToken,
       installCommand,
+      updateCommand,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create user";

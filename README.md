@@ -160,8 +160,9 @@ Agent install commands in Settings will then use the Vercel URL automatically.
 ## Quick start (colleagues)
 
 1. Sign in at the **Vercel URL** → **Settings**
-2. **Download agent (.zip)** → extract to `%USERPROFILE%\Downloads\PwCOfficePulse`
-3. **Copy install command** → run in PowerShell
+2. **Download agent (.zip)** (`PwCOfficePulse-agent.zip`) → extract (may nest under `OneDrive - PwC\Downloads`)
+3. Open PowerShell in the folder that contains `install.ps1` (`dir` should list it)
+4. **Copy install command** or **Copy update command** → paste in that window
 4. Verify: `powershell -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\OfficeTracker\office-heartbeat.ps1" -DryRun`
 
 ---

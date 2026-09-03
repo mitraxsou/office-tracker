@@ -16,9 +16,10 @@ export function AdminUserManagement({ onUserCreated }: Props) {
   const [result, setResult] = useState<{
     email: string;
     installCommand: string;
+    updateCommand: string;
     token: string;
   } | null>(null);
-  const [copied, setCopied] = useState<"cmd" | "token" | null>(null);
+  const [copied, setCopied] = useState<"cmd" | "update" | "token" | null>(null);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -43,6 +44,7 @@ export function AdminUserManagement({ onUserCreated }: Props) {
       setResult({
         email: data.user.email,
         installCommand: data.installCommand,
+        updateCommand: data.updateCommand ?? "",
         token: data.token,
       });
     }
@@ -53,7 +55,7 @@ export function AdminUserManagement({ onUserCreated }: Props) {
     onUserCreated();
   }
 
-  async function handleCopy(text: string, which: "cmd" | "token") {
+  async function handleCopy(text: string, which: "cmd" | "update" | "token") {
     const ok = await copyToClipboard(text);
     if (!ok) {
       setError("Could not copy. Select the text and press Ctrl+C.");
@@ -116,7 +118,9 @@ export function AdminUserManagement({ onUserCreated }: Props) {
             install steps below.
           </p>
           <div>
-            <p className="mb-1 text-xs font-medium text-muted">Install command (run inside extracted folder)</p>
+            <p className="mb-1 text-xs font-medium text-muted">
+              Install command (run from the folder that contains install.ps1)
+            </p>
             <pre className="overflow-x-auto rounded border bg-[var(--background)] p-3 text-xs whitespace-pre-wrap">
               {result.installCommand}
             </pre>
@@ -128,6 +132,23 @@ export function AdminUserManagement({ onUserCreated }: Props) {
               {copied === "cmd" ? "Copied!" : "Copy install command"}
             </button>
           </div>
+          {result.updateCommand ? (
+            <div>
+              <p className="mb-1 text-xs font-medium text-muted">
+                Update command (same folder; contains update.ps1)
+              </p>
+              <pre className="overflow-x-auto rounded border bg-[var(--background)] p-3 text-xs whitespace-pre-wrap">
+                {result.updateCommand}
+              </pre>
+              <button
+                type="button"
+                onClick={() => handleCopy(result.updateCommand, "update")}
+                className="btn-secondary mt-2 px-3 py-1 text-xs"
+              >
+                {copied === "update" ? "Copied!" : "Copy update command"}
+              </button>
+            </div>
+          ) : null}
         </div>
       )}
 

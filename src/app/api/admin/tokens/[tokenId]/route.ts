@@ -6,7 +6,7 @@ import {
   revokeAgentToken,
 } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit-log";
-import { buildInstallCommand } from "@/lib/agent-branding";
+import { buildInstallCommand, buildUpdateCommand } from "@/lib/agent-branding";
 import { prisma } from "@/lib/db";
 
 function appUrl() {
@@ -90,5 +90,6 @@ export async function POST(
   }
 
   const installCommand = buildInstallCommand(appUrl(), plainToken);
-  return NextResponse.json({ token: plainToken, installCommand, reissued });
+  const updateCommand = buildUpdateCommand(appUrl(), plainToken);
+  return NextResponse.json({ token: plainToken, installCommand, updateCommand, reissued });
 }

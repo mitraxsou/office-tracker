@@ -24,7 +24,7 @@
 | `POST /api/heartbeat` | Agent token + serial | Record presence |
 | `GET /api/agent/config` | Bearer token | SSIDs, hours target, timezone |
 | `GET /api/agent/download` | Session | Agent zip download |
-| `POST /api/settings/install-command` | Session | One-step install command |
+| `POST /api/settings/install-command` | Session | Relative install and update commands (run from extract folder) |
 | `POST /api/settings/regenerate-token` | Session | New agent token |
 | `GET /api/today` | Session | Today's summary |
 | `POST /api/visits` | Session | Manual visit |

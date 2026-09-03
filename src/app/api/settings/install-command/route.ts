@@ -29,6 +29,7 @@ export async function POST() {
 
   return NextResponse.json({
     command: first.installCommand,
+    updateCommand: first.updateCommand,
     token: first.plainToken,
     appUrl,
     agentFolder: AGENT_EXTRACT_FOLDER,

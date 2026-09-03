@@ -4,6 +4,7 @@ import {
   AGENT_INSTALL_DIR,
   AGENT_PRODUCT_NAME,
   AGENT_TASK_NAME,
+  AGENT_ZIP_STEM,
 } from "@/lib/agent-branding";
 
 type HelpGuideProps = {
@@ -190,44 +191,50 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           <li>
             <span className="font-medium">Download the agent zip</span>
             <p className="mt-1 text-muted">
-              Click <strong>Download agent (.zip)</strong> and save <code>PwCOfficePulse-agent.zip</code> to
-              your Downloads folder.
+              Click <strong>Download agent (.zip)</strong> and save <code>{AGENT_ZIP_STEM}.zip</code>{" "}
+              to Downloads. On PwC laptops that is often <code>OneDrive - PwC\Downloads</code>.
             </p>
           </li>
           <li>
             <span className="font-medium">Extract the zip</span>
             <p className="mt-1 text-muted">
-              Right-click the zip, choose <strong>Extract All</strong>, and extract to{" "}
-              <strong>Downloads</strong>. Windows creates <code>{AGENT_EXTRACT_FOLDER}</code> with{" "}
-              <code>install.ps1</code> inside.
+              Right-click the zip, choose <strong>Extract All</strong>, and extract to Downloads.
+              Because the zip is named <code>{AGENT_ZIP_STEM}.zip</code>, Extract All may create a
+              nested folder such as <code>{`${AGENT_ZIP_STEM}\\${AGENT_EXTRACT_FOLDER}`}</code>. Keep
+              opening folders until you see <code>install.ps1</code> and <code>update.ps1</code>.
             </p>
           </li>
           <li>
             <span className="font-medium">Open PowerShell in that folder</span>
             <p className="mt-1 text-muted">
-              In Downloads, open the <code>{AGENT_EXTRACT_FOLDER}</code> folder. Shift + right-click empty
-              space and choose <strong>Open PowerShell window here</strong> (or Terminal). You should see{" "}
-              <code>install.ps1</code> in that window.
+              In that extracted folder, Shift + right-click empty space and choose{" "}
+              <strong>Open PowerShell window here</strong> (or Terminal). Run <code>dir</code>; it
+              must list <code>install.ps1</code>. Copied commands use <code>.\install.ps1</code>{" "}
+              and <code>.\update.ps1</code> and only work from this folder.
             </p>
             <p className="mt-1 text-xs text-muted">
-              Or run:{" "}
-              <code>{`cd $env:USERPROFILE\\Downloads\\${AGENT_EXTRACT_FOLDER}`}</code>
+              If you are not already in that folder, <code>cd</code> into it first. Example nested
+              path:{" "}
+              <code>{`cd "$env:USERPROFILE\\OneDrive - PwC\\Downloads\\${AGENT_ZIP_STEM}\\${AGENT_EXTRACT_FOLDER}"`}</code>
             </p>
           </li>
           <li>
-            <span className="font-medium">Copy the install command</span>
+            <span className="font-medium">Copy the install or update command</span>
             <p className="mt-1 text-muted">
               In Settings, under <strong>Install or reinstall {AGENT_PRODUCT_NAME}</strong>, click{" "}
-              <strong>Copy install command</strong> for the token that matches this laptop. If you have no
-              tokens, ask your admin to issue one from Admin → Users &amp; tokens.
+              <strong>Copy install command</strong> for a first install, or{" "}
+              <strong>Copy update command</strong> to refresh an existing agent. Use the token that
+              matches this laptop. If you have no tokens, ask your admin to issue one from Admin →
+              Users &amp; tokens.
             </p>
           </li>
           <li>
             <span className="font-medium">Paste and run in PowerShell</span>
             <p className="mt-1 text-muted">
-              Right-click in the PowerShell window (or press Ctrl+V), then press Enter. The agent installs
-              to <code>{AGENT_INSTALL_DIR}</code> and registers scheduled task{" "}
-              <code>{AGENT_TASK_NAME}</code>.
+              Paste into the PowerShell window from this folder (right-click or Ctrl+V), then press
+              Enter. The command must run from the folder that contains <code>install.ps1</code> /{" "}
+              <code>update.ps1</code>. The agent installs to <code>{AGENT_INSTALL_DIR}</code> and
+              registers scheduled task <code>{AGENT_TASK_NAME}</code>.
             </p>
           </li>
           <li>
@@ -335,8 +342,10 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           <div>
             <dt className="font-medium">Install or reinstall agent</dt>
             <dd className="mt-1 text-muted">
-              At the top of Settings, copy install commands to set up or reinstall the agent without
-              asking admin again. Each token binds to one laptop serial on first heartbeat.
+              At the top of Settings, copy the install command for a new laptop or the update
+              command to refresh an existing agent. Each token binds to one laptop serial on first
+              heartbeat. Both commands must be run from the extracted folder that contains the
+              scripts.
             </dd>
           </div>
           <div>
@@ -370,9 +379,10 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             <p className="font-medium">Agent stale or offline</p>
             <p className="mt-1 text-muted">
               Open Settings and go to Install or reinstall. Download and extract the latest agent
-              zip, copy the install command, and run it in PowerShell. Check Task Scheduler for task{" "}
-              <code>{AGENT_TASK_NAME}</code>. If it still does not pulse, review{" "}
-              <code>%LOCALAPPDATA%\OfficeTracker\logs\heartbeat.log</code> or contact your pilot admin.
+              zip, open PowerShell in that folder, copy the <strong>update command</strong>, and
+              paste it. Check Task Scheduler for task <code>{AGENT_TASK_NAME}</code>. If it still
+              does not pulse, review <code>%LOCALAPPDATA%\OfficeTracker\logs\heartbeat.log</code> or
+              contact your pilot admin.
             </p>
           </div>
           <div>
@@ -387,7 +397,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           <div>
             <p className="font-medium">Low pulses but agent shows connected</p>
             <p className="mt-1 text-muted">
-              The scheduled task may not be running reliably. Re-run install, then confirm the{" "}
+              The scheduled task may not be running reliably. Download the latest zip, open
+              PowerShell in the extract folder, paste the update command, then confirm the{" "}
               <code>{AGENT_TASK_NAME}</code> task exists and last run time is recent.
             </p>
           </div>

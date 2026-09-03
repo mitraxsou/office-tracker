@@ -43,12 +43,15 @@ describe("integration alert messages", () => {
     expect(msg).toContain("09:30");
     expect(msg).toContain("https://pulse.example/settings#install");
     expect(msg).toContain("https://pulse.example/help#install-agent");
+    expect(msg).toContain("update command");
+    expect(msg).toContain("open PowerShell in that folder");
   });
 
   it("builds stale message with minutes", () => {
     const msg = buildStaleMessage(30, "https://pulse.example");
     expect(msg).toContain("30 minutes");
     expect(msg).toContain("https://pulse.example/settings#install");
+    expect(msg).toContain("update command");
   });
 
   it("builds behind-hours message", () => {

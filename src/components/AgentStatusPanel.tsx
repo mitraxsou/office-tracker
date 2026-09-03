@@ -45,7 +45,7 @@ const STATUS_LABELS = {
 const PULSE_LABELS = {
   healthy: { text: "Sending pulses regularly", color: "text-green-400" },
   stale: {
-    text: "Not responding - reinstall below or contact admin",
+    text: "Not responding - update below or contact admin",
     color: "text-red-300",
   },
   none: { text: "No pulses received yet", color: "text-muted" },
@@ -104,11 +104,11 @@ export function AgentStatusPanel({
       {showReinstall && (
         <div className="mt-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-3 text-sm text-muted">
           <p className="font-medium text-red-200">
-            {status.pulseStatus === "stale" ? "Reinstall the agent" : "Install the agent"}
+            {status.pulseStatus === "stale" ? "Update the agent" : "Install the agent"}
           </p>
           <p className="mt-1">
             {status.pulseStatus === "stale"
-              ? "Re-run the install command below or jump to the full install steps."
+              ? "Download the latest zip, open PowerShell in the extract folder, then copy the update command below."
               : "Follow the install steps below to register this laptop."}
           </p>
           <div className="mt-3">

@@ -108,14 +108,14 @@ function buildAbsentMessage(
   prefs: NotificationPrefsData,
   baseUrl: string = appBaseUrl(),
 ): string {
-  return `Office Pulse is not receiving a Wi-Fi name from your laptop. Your usual start time is ${prefs.officeStartTime}. To restore tracking: 1) open ${baseUrl}/settings#install, 2) download and extract the agent zip, 3) copy the install command, and 4) run it in PowerShell. Full steps: ${baseUrl}/help#install-agent`;
+  return `Office Pulse is not receiving a Wi-Fi name from your laptop. Your usual start time is ${prefs.officeStartTime}. To restore tracking: 1) open ${baseUrl}/settings#install, 2) download and extract the agent zip, 3) open PowerShell in that folder, 4) copy the update command, and 5) paste it. Full steps: ${baseUrl}/help#install-agent`;
 }
 
 function buildStaleMessage(minutes: number | null, baseUrl: string = appBaseUrl()): string {
   if (minutes != null) {
-    return `Your Office Pulse agent has not sent a heartbeat in about ${minutes} minutes. To restore tracking: 1) open ${baseUrl}/settings#install, 2) download and extract the agent zip, 3) copy the install command, and 4) run it in PowerShell. Full steps: ${baseUrl}/help#install-agent`;
+    return `Your Office Pulse agent has not sent a heartbeat in about ${minutes} minutes. To restore tracking: 1) open ${baseUrl}/settings#install, 2) download and extract the agent zip, 3) open PowerShell in that folder, 4) copy the update command, and 5) paste it. Full steps: ${baseUrl}/help#install-agent`;
   }
-  return `Your Office Pulse agent is not sending heartbeats. Reinstall it from ${baseUrl}/settings#install using the steps at ${baseUrl}/help#install-agent.`;
+  return `Your Office Pulse agent is not sending heartbeats. Download the zip from ${baseUrl}/settings#install, extract it, open PowerShell in that folder, and paste the update command. Steps: ${baseUrl}/help#install-agent.`;
 }
 
 function buildBehindMessage(hoursToday: number, minExpected: number, target: number): string {

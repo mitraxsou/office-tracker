@@ -82,8 +82,15 @@ export function InstallTokenCommands({
                 Issued {new Date(t.createdAt).toLocaleString("en-IN")}
               </p>
             )}
+            <p className="mt-2 text-xs text-muted">
+              Run from the folder that contains <code>install.ps1</code> and{" "}
+              <code>update.ps1</code>. If PowerShell is already open there, paste as-is.
+            </p>
             <pre className="mt-2 overflow-x-auto rounded border bg-[var(--background-elevated)] p-2 text-xs whitespace-pre-wrap">
               {t.installCommand}
+            </pre>
+            <pre className="mt-2 overflow-x-auto rounded border bg-[var(--background-elevated)] p-2 text-xs whitespace-pre-wrap">
+              {t.updateCommand}
             </pre>
             <div className="mt-2 flex flex-wrap gap-2">
               <button
@@ -92,6 +99,13 @@ export function InstallTokenCommands({
                 className="btn-primary px-3 py-1 text-xs"
               >
                 {copiedId === t.id ? "Copied!" : "Copy install command"}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCopy(t.updateCommand, `${t.id}-update`)}
+                className="btn-secondary px-3 py-1 text-xs"
+              >
+                {copiedId === `${t.id}-update` ? "Copied!" : "Copy update command"}
               </button>
               {!compact && (
                 <button

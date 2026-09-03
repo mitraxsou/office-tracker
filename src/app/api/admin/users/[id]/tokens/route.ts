@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin";
 import { issueAgentToken } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit-log";
-import { buildInstallCommand } from "@/lib/agent-branding";
+import { buildInstallCommand, buildUpdateCommand } from "@/lib/agent-branding";
 import { prisma } from "@/lib/db";
 
 function appUrl() {
@@ -45,10 +45,12 @@ export async function POST(
   });
 
   const installCommand = buildInstallCommand(appUrl(), plainToken);
+  const updateCommand = buildUpdateCommand(appUrl(), plainToken);
 
   return NextResponse.json({
     token: plainToken,
     installCommand,
+    updateCommand,
     label,
   });
 }

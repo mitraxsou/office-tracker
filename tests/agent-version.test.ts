@@ -7,7 +7,7 @@ import {
   describeDeviceAgentVersion,
   summarizeDeviceAgentVersions,
 } from "@/lib/agent-version-display";
-import { buildInstallCommand } from "@/lib/agent-branding";
+import { buildInstallCommand, buildUpdateCommand } from "@/lib/agent-branding";
 
 describe("agent version", () => {
   it("reads version from agent/version.txt", () => {
@@ -51,9 +51,15 @@ describe("agent version", () => {
     ).toBe("not reported");
   });
 
-  it("builds a full-path PowerShell reinstall command", () => {
+  it("builds a relative PowerShell install command", () => {
     expect(buildInstallCommand("https://office.example", "token-123")).toBe(
-      'Unblock-File -LiteralPath "$env:USERPROFILE\\Downloads\\PwCOfficePulse\\install.ps1"; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$env:USERPROFILE\\Downloads\\PwCOfficePulse\\install.ps1" -ApiUrl "https://office.example" -Token "token-123"',
+      'Unblock-File -LiteralPath ".\\install.ps1"; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ".\\install.ps1" -ApiUrl "https://office.example" -Token "token-123"',
+    );
+  });
+
+  it("builds a relative PowerShell update command", () => {
+    expect(buildUpdateCommand("https://office.example", "token-123")).toBe(
+      'Unblock-File -LiteralPath ".\\update.ps1"; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ".\\update.ps1" -ApiUrl "https://office.example" -Token "token-123"',
     );
   });
 

@@ -58,7 +58,7 @@ Normalize before send: strip ` (Unauthenticated)`, band suffixes (` 2`, ` 5`), a
 
 **Identity on agent:** `token` + `serialNumber` (BIOS via `Get-CimInstance Win32_Bios`). Multiple laptops per user via `AgentDevice` table (auto-register, admin can remove).
 
-**Install UX:** Users download agent zip from Settings (`GET /api/agent/download`, session required). **One-click copy install command** embeds token + `NEXT_PUBLIC_APP_URL`. Use **full absolute paths** in copy commands; note **PowerShell not cmd.exe**.
+**Install UX:** Users download agent zip from Settings (`GET /api/agent/download`, session required). **Copy install command** and **Copy update command** embed token + `NEXT_PUBLIC_APP_URL` with relative `.\install.ps1` / `.\update.ps1`. Commands must run from the extract folder (PowerShell, not cmd.exe). Downloads on PwC laptops is often `OneDrive - PwC\Downloads`; zip `PwCOfficePulse-agent` may nest `PwCOfficePulse`.
 
 ## Roles
 

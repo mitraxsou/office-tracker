@@ -5,7 +5,7 @@ import { prisma } from "./db";
 import { ensureAppConfig, getAppConfig } from "./app-config";
 import crypto from "crypto";
 import { encryptPendingToken, decryptPendingToken } from "./token-crypto";
-import { buildInstallCommand } from "./agent-branding";
+import { buildInstallCommand, buildUpdateCommand } from "./agent-branding";
 import { isTokenExpired, revokeExpiredPendingTokens } from "./token-expiry";
 import type { InstallTokenForUser } from "./install-token-types";
 
@@ -391,6 +391,7 @@ export async function getUserInstallTokenState(
         prefix: t.tokenPrefix,
         plainToken: plain,
         installCommand: buildInstallCommand(appUrl, plain),
+        updateCommand: buildUpdateCommand(appUrl, plain),
         createdAt: t.createdAt.toISOString(),
         status,
         boundSerialNumber: t.boundSerialNumber,

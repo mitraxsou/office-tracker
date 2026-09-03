@@ -7,6 +7,7 @@ import {
   AGENT_PRODUCT_NAME,
   AGENT_TASK_NAME,
   AGENT_STARTUP_SHORTCUT,
+  AGENT_ZIP_STEM,
   buildUninstallCommand,
   defaultInstallScriptDir,
 } from "@/lib/agent-branding";
@@ -55,7 +56,8 @@ export function AgentSetupPanel({
           <li>
             <span className="font-medium">Download the agent zip</span>
             <p className="mt-1 text-muted">
-              Save <code>PwCOfficePulse-agent.zip</code> to your Downloads folder.
+              Save <code>{AGENT_ZIP_STEM}.zip</code> to Downloads. On PwC laptops that is often{" "}
+              <code>OneDrive - PwC\Downloads</code>, not <code>%USERPROFILE%\Downloads</code>.
             </p>
             <a href="/api/agent/download" className="btn-secondary mt-2 inline-block px-4 py-2 text-sm">
               Download agent (.zip)
@@ -64,25 +66,29 @@ export function AgentSetupPanel({
           <li>
             <span className="font-medium">Extract the zip</span>
             <p className="mt-1 text-muted">
-              Right-click the zip, choose <strong>Extract All</strong>, and extract to{" "}
-              <strong>Downloads</strong>. Windows creates <code>{AGENT_EXTRACT_FOLDER}</code> with{" "}
-              <code>install.ps1</code> inside. No rename needed.
+              Right-click the zip, choose <strong>Extract All</strong>, and extract to Downloads.
+              The zip is named <code>{AGENT_ZIP_STEM}.zip</code>, so Extract All may create a nested
+              folder such as <code>{`${AGENT_ZIP_STEM}\\${AGENT_EXTRACT_FOLDER}`}</code>. Open the inner
+              folder until you see <code>install.ps1</code> and <code>update.ps1</code>.
             </p>
           </li>
           <li>
             <span className="font-medium">Open PowerShell in that folder</span>
             <p className="mt-1 text-muted">
-              In Downloads, open the <code>{AGENT_EXTRACT_FOLDER}</code> folder. Shift + right-click
-              empty space, choose <strong>Open PowerShell window here</strong> (or Terminal). You
-              should see <code>install.ps1</code> in that window&apos;s folder.
+              In the extracted folder, Shift + right-click empty space and choose{" "}
+              <strong>Open PowerShell window here</strong> (or Terminal). Run <code>dir</code>; it
+              must list <code>install.ps1</code>. The copy-paste commands use{" "}
+              <code>.\install.ps1</code> and <code>.\update.ps1</code>, so they only work from this
+              folder.
             </p>
             <p className="mt-1 text-xs text-muted">
-              Or run:{" "}
-              <code>{`cd $env:USERPROFILE\\Downloads\\${AGENT_EXTRACT_FOLDER}`}</code>
+              If this window is not already in that folder, <code>cd</code> into it first. Example
+              nested path:{" "}
+              <code>{`cd "$env:USERPROFILE\\OneDrive - PwC\\Downloads\\${AGENT_ZIP_STEM}\\${AGENT_EXTRACT_FOLDER}"`}</code>
             </p>
           </li>
           <li>
-            <span className="font-medium">Copy the install command for your laptop</span>
+            <span className="font-medium">Copy the install or update command for your laptop</span>
             <div className="mt-3">
               <InstallTokenCommands
                 installTokens={installTokens}
@@ -93,8 +99,11 @@ export function AgentSetupPanel({
           <li>
             <span className="font-medium">Paste and run in PowerShell</span>
             <p className="mt-1 text-muted">
-              Paste the command (right-click or Ctrl+V) and press Enter. Installs to{" "}
-              <code>{AGENT_INSTALL_DIR}</code> and registers task <code>{AGENT_TASK_NAME}</code>.
+              Paste into the PowerShell window you opened in this folder (right-click or Ctrl+V)
+              and press Enter. First-time setup uses the install command; an existing agent uses the
+              update command. Both must run from the folder that contains the scripts. Install
+              writes to <code>{AGENT_INSTALL_DIR}</code> and registers task{" "}
+              <code>{AGENT_TASK_NAME}</code>.
             </p>
           </li>
           <li>

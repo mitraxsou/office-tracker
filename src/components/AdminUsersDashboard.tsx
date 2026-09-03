@@ -77,7 +77,10 @@ export function AdminUsersDashboard() {
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [busyDeviceId, setBusyDeviceId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
-  const [sharedCommand, setSharedCommand] = useState<string | null>(null);
+  const [sharedCommands, setSharedCommands] = useState<{
+    installCommand: string;
+    updateCommand: string;
+  } | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -208,7 +211,7 @@ export function AdminUsersDashboard() {
   async function issueToken(userId: string) {
     setBusyUserId(userId);
     setActionError(null);
-    setSharedCommand(null);
+    setSharedCommands(null);
     const res = await fetch(`/api/admin/users/${userId}/tokens`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -222,7 +225,10 @@ export function AdminUsersDashboard() {
     const body = await res.json();
     if (body.installCommand) {
       await copyToClipboard(body.installCommand);
-      setSharedCommand(body.installCommand);
+      setSharedCommands({
+        installCommand: body.installCommand,
+        updateCommand: body.updateCommand ?? "",
+      });
     }
     load(true);
   }
@@ -230,7 +236,7 @@ export function AdminUsersDashboard() {
   async function shareToken(tokenId: string, reissue = false) {
     setBusyTokenId(tokenId);
     setActionError(null);
-    setSharedCommand(null);
+    setSharedCommands(null);
     const res = await fetch(`/api/admin/tokens/${tokenId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -245,7 +251,10 @@ export function AdminUsersDashboard() {
     const body = await res.json();
     if (body.installCommand) {
       await copyToClipboard(body.installCommand);
-      setSharedCommand(body.installCommand);
+      setSharedCommands({
+        installCommand: body.installCommand,
+        updateCommand: body.updateCommand ?? "",
+      });
     }
     if (body.reissued) load(true);
   }
@@ -411,10 +420,28 @@ export function AdminUsersDashboard() {
         )}
       </section>
 
-      {sharedCommand && (
+      {sharedCommands && (
         <div className="rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm">
-          Install command copied to clipboard.
-          <pre className="mt-2 overflow-x-auto text-xs whitespace-pre-wrap">{sharedCommand}</pre>
+          <p>Commands copied for sharing. Run them from the folder that contains the .ps1 files.</p>
+          <p className="mt-2 text-xs font-medium">Install</p>
+          <pre className="mt-1 overflow-x-auto text-xs whitespace-pre-wrap">
+            {sharedCommands.installCommand}
+          </pre>
+          {sharedCommands.updateCommand ? (
+            <>
+              <p className="mt-2 text-xs font-medium">Update</p>
+              <pre className="mt-1 overflow-x-auto text-xs whitespace-pre-wrap">
+                {sharedCommands.updateCommand}
+              </pre>
+              <button
+                type="button"
+                className="mt-2 text-xs text-accent hover:underline"
+                onClick={() => copyToClipboard(sharedCommands.updateCommand)}
+              >
+                Copy update command
+              </button>
+            </>
+          ) : null}
         </div>
       )}
 
