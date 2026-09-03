@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { InstallTokenCommands } from "@/components/InstallTokenCommands";
 import type { InstallTokenForUser } from "@/lib/install-token-types";
+import { formatPulseAge } from "@/lib/pulse-age";
 
 type AgentStatus = {
   installStatus: "not_installed" | "waiting" | "connected";
   agentHealthy: boolean;
   pulseStatus: "healthy" | "stale" | "none";
   lastHeartbeat: string | null;
+  timezone: string;
   inOfficeNow: boolean;
   deviceCount: number;
   pendingTokens: number;
@@ -161,8 +163,14 @@ export function AgentStatusPanel({
           </dd>
         </div>
         <div>
-          <dt className="text-muted">Minutes since last pulse</dt>
-          <dd>{status.minutesSinceLastPulse ?? "-"}</dd>
+          <dt className="text-muted">Time since last pulse</dt>
+          <dd>
+            {formatPulseAge({
+              minutes: status.minutesSinceLastPulse,
+              lastPulseAt: status.lastHeartbeat,
+              timezone: status.timezone,
+            })}
+          </dd>
         </div>
         <div>
           <dt className="text-muted">In office now</dt>

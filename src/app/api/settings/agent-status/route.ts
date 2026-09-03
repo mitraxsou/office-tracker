@@ -44,6 +44,7 @@ export async function GET() {
     agentHealthy: isOutToday || pulse.agentHealthy,
     pulseStatus,
     lastHeartbeat: pulse.lastHeartbeat,
+    timezone: user.timezone,
     inOfficeNow: summary.inOfficeNow,
     deviceCount: user.agentDevices.length,
     pendingTokens,

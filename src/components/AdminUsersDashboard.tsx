@@ -8,6 +8,7 @@ import { AdminResetPasswordButton } from "./AdminResetPasswordButton";
 import { AdminUserEditModal } from "./AdminUserEditModal";
 import { copyToClipboard } from "@/lib/clipboard";
 import { DEFAULT_ADMIN_USERS_PAGE_SIZE } from "@/lib/admin-users";
+import { AdminAgentVersionReport } from "./AdminAgentVersionReport";
 
 type TokenRow = {
   id: string;
@@ -25,6 +26,9 @@ type DeviceRow = {
   id: string;
   serialNumber: string;
   lastSeenAt: string | null;
+  agentScriptVersion: string | null;
+  agentVersionStale: boolean;
+  forceAgentUpdate: boolean;
 };
 
 type UserRow = {
@@ -33,6 +37,7 @@ type UserRow = {
   name: string | null;
   role: string;
   hoursTarget: number;
+  serverAgentVersion: string;
   tokens: TokenRow[];
   devices: DeviceRow[];
   today: {
@@ -302,6 +307,7 @@ export function AdminUsersDashboard() {
   return (
     <div className="space-y-6">
       <AdminUserManagement onUserCreated={() => load(true)} />
+      <AdminAgentVersionReport />
 
       <section className="card p-4">
         <div className="flex flex-wrap items-end gap-3">
@@ -594,6 +600,10 @@ export function AdminUsersDashboard() {
               {u.devices.map((d) => (
                 <li key={d.id} className="flex flex-wrap items-center gap-3 py-2">
                   <code className="text-accent">{d.serialNumber}</code>
+                  <span className={d.agentVersionStale ? "text-xs text-accent" : "text-xs text-green-400"}>
+                    {d.agentScriptVersion ?? "version not reported"}
+                    {d.agentVersionStale ? " (needs update)" : " (current)"}
+                  </span>
                   {d.lastSeenAt && (
                     <span className="text-xs text-muted">
                       last seen {new Date(d.lastSeenAt).toLocaleString("en-IN")}

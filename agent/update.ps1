@@ -10,7 +10,8 @@ param(
     [string]$ApiUrl,
     [string]$Token,
     [switch]$Silent,
-    [switch]$Verbose
+    [switch]$Verbose,
+    [switch]$Force
 )
 
 $ErrorActionPreference = "Stop"
@@ -255,12 +256,13 @@ try {
     }
 
     $localVersion = Get-LocalAgentVersion
-    if ((Compare-AgentVersion $newVersion $localVersion) -le 0) {
+    if (-not $Force -and (Compare-AgentVersion $newVersion $localVersion) -eq 0) {
         Write-UpdateLog "SKIP already at v$localVersion (server v$newVersion)"
         Register-HourlyUpdateTask -InstallDir $installDir
         if (-not $Silent) { Write-Host "Agent already up to date (v$localVersion)." -ForegroundColor Green }
     } else {
-        Write-UpdateLog "Updating v$localVersion -> v$newVersion"
+        $reason = if ($Force) { "server repair requested" } else { "version mismatch" }
+        Write-UpdateLog "Updating v$localVersion -> v$newVersion ($reason)"
 
         foreach ($file in $AgentFiles) {
             $src = Join-Path $sourceDir $file

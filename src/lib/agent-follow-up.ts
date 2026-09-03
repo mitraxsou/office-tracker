@@ -32,6 +32,7 @@ export type AgentFollowUpRow = {
   userId: string;
   email: string;
   name: string | null;
+  timezone: string;
   devices: AgentFollowUpDevice[];
   worstAgentStatus: "stale" | "offline";
   stalestMinutesSinceLastPulse: number;
@@ -190,6 +191,7 @@ export async function getAgentFollowUpReport(options?: {
         userId: device.user.id,
         email: device.user.email,
         name: device.user.name,
+        timezone: device.user.timezone,
         devices: [followUpDevice],
         worstAgentStatus: followUpStatus,
         stalestMinutesSinceLastPulse: minutes,

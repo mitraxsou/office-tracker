@@ -12,6 +12,10 @@ $ErrorActionPreference = "Stop"
 $ConfigFetchIntervalRuns = 5
 $UpdateCheckIntervalMinutes = 60
 
+# Version of this script. Keep in sync with agent/version.txt. Used when version.txt is
+# missing so the server always receives a real version instead of nothing.
+$AgentScriptVersion = "1.2.7"
+
 function Write-Log([string]$Message) {
     $logDir = Join-Path $env:LOCALAPPDATA "OfficeTracker\logs"
     if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
@@ -20,7 +24,24 @@ function Write-Log([string]$Message) {
     Add-Content -Path $logFile -Value $line -ErrorAction SilentlyContinue
 }
 
-Write-Log "START v$(if (Test-Path (Join-Path $env:LOCALAPPDATA 'OfficeTracker\version.txt')) { (Get-Content (Join-Path $env:LOCALAPPDATA 'OfficeTracker\version.txt') -Raw).Trim() } else { 'unknown' })"
+function Get-VersionPath {
+    Join-Path $env:LOCALAPPDATA "OfficeTracker\version.txt"
+}
+
+function Get-LocalAgentVersion {
+    $path = Get-VersionPath
+    if (Test-Path $path) {
+        $fromFile = Get-Content $path -Raw -ErrorAction SilentlyContinue
+        if ($fromFile) {
+            $trimmed = $fromFile.Trim()
+            # Server rejects anything that is not numeric dotted form, so check before sending.
+            if ($trimmed -match '^\d+(\.\d+){0,3}$') { return $trimmed }
+        }
+    }
+    return $AgentScriptVersion
+}
+
+Write-Log "START v$(Get-LocalAgentVersion)"
 
 function Get-ConfigPath {
     Join-Path $env:LOCALAPPDATA "OfficeTracker\config.json"
@@ -58,16 +79,6 @@ function Test-ResumeFromSleep {
     return ((Get-Date) - $last).TotalMinutes -gt 5
 }
 
-function Get-VersionPath {
-    Join-Path $env:LOCALAPPDATA "OfficeTracker\version.txt"
-}
-
-function Get-LocalAgentVersion {
-    $path = Get-VersionPath
-    if (-not (Test-Path $path)) { return "0.0.0" }
-    return (Get-Content $path -Raw -ErrorAction SilentlyContinue).Trim()
-}
-
 function Compare-AgentVersion {
     param([string]$Left, [string]$Right)
     $parse = {
@@ -90,18 +101,18 @@ function Test-NeedsAgentUpdate($ServerConfig) {
     if ($ServerConfig.forceAgentUpdate) { return $true }
     if (-not $ServerConfig.agentScriptVersion) { return $false }
     $local = Get-LocalAgentVersion
-    return (Compare-AgentVersion $ServerConfig.agentScriptVersion $local) -gt 0
+    return (Compare-AgentVersion $ServerConfig.agentScriptVersion $local) -ne 0
 }
 
-function Invoke-AgentSelfUpdate([string]$ApiUrl, [string]$Token) {
+function Invoke-AgentSelfUpdate([string]$ApiUrl, [string]$Token, [bool]$Force) {
     $updateScript = Join-Path $env:LOCALAPPDATA "OfficeTracker\update.ps1"
     if (-not (Test-Path $updateScript)) {
         Write-Log "WARN update.ps1 missing; cannot auto-update"
         return
     }
     try {
-        Write-Log "Auto-update: server has newer agent version"
-        Invoke-AgentUpdateScript -UpdateScript $updateScript -ApiUrl $ApiUrl -Token $Token
+        Write-Log "Auto-update: installed agent differs from server version"
+        Invoke-AgentUpdateScript -UpdateScript $updateScript -ApiUrl $ApiUrl -Token $Token -Force:$Force
     } catch {
         Write-Log "WARN auto-update failed: $($_.Exception.Message)"
     }
@@ -130,14 +141,16 @@ function Invoke-AgentUpdateScript {
     param(
         [string]$UpdateScript,
         [string]$ApiUrl,
-        [string]$Token
+        [string]$Token,
+        [switch]$Force
     )
     $txtPath = [System.IO.Path]::ChangeExtension($UpdateScript, ".txt")
     Copy-Item $UpdateScript $txtPath -Force
     $escapedApi = $ApiUrl -replace "'", "''"
     $escapedToken = $Token -replace "'", "''"
+    $forceAssignment = if ($Force) { "`$Force=`$true; " } else { "" }
     powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden `
-        -Command "& { `$ApiUrl='$escapedApi'; `$Token='$escapedToken'; `$Silent=`$true; `$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s }" | Out-Null
+        -Command "& { `$ApiUrl='$escapedApi'; `$Token='$escapedToken'; `$Silent=`$true; $forceAssignment`$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s }" | Out-Null
 }
 
 function Invoke-HourlyUpdateCheck([string]$ApiUrl, [string]$Token) {
@@ -395,7 +408,7 @@ try {
 }
 
 if (Test-NeedsAgentUpdate $serverConfig) {
-    Invoke-AgentSelfUpdate -ApiUrl $apiUrl -Token $token
+    Invoke-AgentSelfUpdate -ApiUrl $apiUrl -Token $token -Force ([bool]$serverConfig.forceAgentUpdate)
     Set-LastUpdateCheckTime
 } elseif ($hourlyUpdateCheck) {
     Invoke-HourlyUpdateCheck -ApiUrl $apiUrl -Token $token

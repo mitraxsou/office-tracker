@@ -22,6 +22,11 @@ import { AdminUserProfileChangeForm } from "./AdminUserProfileChangeForm";
 import { AdminGrantComplianceExemption } from "./AdminGrantComplianceExemption";
 import type { ProfileChangeRequestSummary } from "@/lib/profile-change-requests";
 import { AdminUserReportSearch } from "./AdminUserReportSearch";
+import {
+  describeDeviceAgentVersion,
+  summarizeDeviceAgentVersions,
+} from "@/lib/agent-version-display";
+import { formatPulseAge } from "@/lib/pulse-age";
 
 type UserReport = {
   user: {
@@ -256,12 +261,7 @@ export function AdminUserReport({
     : data.pulse.lastHeartbeat
       ? "Stale"
       : "No pulses";
-  const installedVersionSummary =
-    data.devices.length === 0
-      ? "No devices"
-      : data.devices.length === 1
-        ? data.devices[0].agentScriptVersion ?? "Version not reported"
-        : `${data.devices.filter((device) => !device.agentVersionStale).length}/${data.devices.length} current`;
+  const installedVersionSummary = summarizeDeviceAgentVersions(data.devices);
 
   return (
     <div className="space-y-6">
@@ -413,8 +413,14 @@ export function AdminUserReport({
             </dd>
           </div>
           <div>
-            <dt className="text-muted">Minutes since last pulse</dt>
-            <dd>{data.pulse.minutesSinceLastPulse ?? "-"}</dd>
+            <dt className="text-muted">Time since last pulse</dt>
+            <dd>
+              {formatPulseAge({
+                minutes: data.pulse.minutesSinceLastPulse,
+                lastPulseAt: data.pulse.lastHeartbeat,
+                timezone: data.user.timezone,
+              })}
+            </dd>
           </div>
           <div>
             <dt className="text-muted">Laptop active today</dt>
@@ -435,24 +441,32 @@ export function AdminUserReport({
                 "No registered laptops"
               ) : (
                 <ul className="mt-1 space-y-1">
-                  {data.devices.map((device) => (
-                    <li key={device.id}>
-                      <code>{device.serialNumber}</code>:{" "}
-                      {device.agentScriptVersion ?? "not reported"}
-                      {device.agentVersionStale ? (
-                        <span className="text-accent"> (update needed)</span>
-                      ) : (
-                        <span className="text-green-400"> (current)</span>
-                      )}
-                      {" · "}
-                      last seen{" "}
-                      {device.lastSeenAt
-                        ? new Date(device.lastSeenAt).toLocaleString("en-IN", {
-                            timeZone: data.user.timezone,
-                          })
-                        : "never"}
-                    </li>
-                  ))}
+                  {data.devices.map((device) => {
+                    const version = describeDeviceAgentVersion(
+                      device.agentScriptVersion,
+                      device.agentVersionStale,
+                    );
+                    return (
+                      <li key={device.id}>
+                        <code>{device.serialNumber}</code>: {version.version}
+                        <span
+                          className={
+                            version.state === "current" ? "text-green-400" : "text-accent"
+                          }
+                        >
+                          {" "}
+                          ({version.note})
+                        </span>
+                        {" · "}
+                        last seen{" "}
+                        {device.lastSeenAt
+                          ? new Date(device.lastSeenAt).toLocaleString("en-IN", {
+                              timeZone: data.user.timezone,
+                            })
+                          : "never"}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </dd>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { formatPulseAge } from "@/lib/pulse-age";
 
 type FollowUpDevice = {
   deviceId: string;
@@ -19,6 +20,7 @@ type FollowUpUser = {
   userId: string;
   email: string;
   name: string | null;
+  timezone: string;
   devices: FollowUpDevice[];
   worstAgentStatus: "stale" | "offline";
   stalestMinutesSinceLastPulse: number;
@@ -43,19 +45,6 @@ function formatWhen(iso: string | null): string {
     day: "numeric",
     month: "short",
   });
-}
-
-function formatMinutes(minutes: number | null): string {
-  if (minutes === null) return "Unknown";
-  if (minutes < 60) return `${minutes}m ago`;
-  if (minutes < 24 * 60) {
-    const h = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    return m > 0 ? `${h}h ${m}m ago` : `${h}h ago`;
-  }
-  const days = Math.floor(minutes / (24 * 60));
-  const h = Math.floor((minutes % (24 * 60)) / 60);
-  return h > 0 ? `${days}d ${h}h ago` : `${days}d ago`;
 }
 
 function statusBadgeClass(status: "stale" | "offline"): string {
@@ -246,7 +235,11 @@ export function AgentFollowUpPanel({
                           <div>
                             <dt>Since pulse</dt>
                             <dd className="text-[var(--foreground)]">
-                              {formatMinutes(device.minutesSinceLastPulse)}
+                              {formatPulseAge({
+                                minutes: device.minutesSinceLastPulse,
+                                lastPulseAt: device.lastHeartbeatAt,
+                                timezone: user.timezone,
+                              })}
                             </dd>
                           </div>
                           {device.boundTokenLabel && (

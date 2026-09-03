@@ -16,6 +16,7 @@ import { VisitCalendar } from "@/components/reports/VisitCalendar";
 import { currentMonthKey } from "@/lib/month-range";
 import type { MonthlyProgressState } from "@/lib/monthly-progress";
 import { formatHours } from "@/lib/visits";
+import { formatPulseAge } from "@/lib/pulse-age";
 
 type UserReportData = {
   user: { timezone: string; hoursTarget: number };
@@ -46,6 +47,7 @@ type UserReportData = {
     agentHealthy: boolean;
     pulseTimeline24h?: number[];
     minutesSinceLastPulse?: number | null;
+    lastHeartbeat?: string | null;
   };
   range: { days: number; from: string; to: string; month: string };
 };
@@ -204,7 +206,11 @@ export function UserReportsDashboard() {
             <p className="mt-1 text-[10px] text-muted">
               {data.pulse.pulsesLast24h} pulses · last 24h
               {data.pulse.minutesSinceLastPulse != null &&
-                ` · ${data.pulse.minutesSinceLastPulse}m ago`}
+                ` · ${formatPulseAge({
+                  minutes: data.pulse.minutesSinceLastPulse,
+                  lastPulseAt: data.pulse.lastHeartbeat,
+                  timezone: data.user.timezone,
+                })}`}
             </p>
           </KpiCard>
         </div>

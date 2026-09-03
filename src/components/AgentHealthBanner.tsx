@@ -1,11 +1,19 @@
 import Link from "next/link";
+import { formatPulseAge } from "@/lib/pulse-age";
 
 type AgentHealthBannerProps = {
   variant: "never_connected" | "stale" | "low_pulses";
   minutesSinceLastPulse?: number | null;
+  lastPulseAt?: string | Date | null;
+  timezone?: string;
 };
 
-export function AgentHealthBanner({ variant, minutesSinceLastPulse }: AgentHealthBannerProps) {
+export function AgentHealthBanner({
+  variant,
+  minutesSinceLastPulse,
+  lastPulseAt,
+  timezone,
+}: AgentHealthBannerProps) {
   if (variant === "never_connected") {
     return (
       <div className="rounded-lg border border-[var(--pwc-orange)] bg-[var(--pwc-orange-muted)] px-4 py-4">
@@ -46,7 +54,11 @@ export function AgentHealthBanner({ variant, minutesSinceLastPulse }: AgentHealt
       <p className="font-medium text-red-300">Agent not responding</p>
       <p className="mt-1 text-sm text-muted">
         {minutesSinceLastPulse != null
-          ? `No heartbeat for about ${minutesSinceLastPulse} minutes. `
+          ? `No heartbeat for ${formatPulseAge({
+              minutes: minutesSinceLastPulse,
+              lastPulseAt,
+              timezone,
+            })}. `
           : "No recent heartbeat detected. "}
         Your office hours are not updating. Re-run the install command from Settings. If that does not
         fix it, contact your admin.

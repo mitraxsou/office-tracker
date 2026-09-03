@@ -111,6 +111,8 @@ export default async function DashboardPage() {
           <AgentHealthBanner
             variant="stale"
             minutesSinceLastPulse={pulse.minutesSinceLastPulse}
+            lastPulseAt={pulse.lastHeartbeat}
+            timezone={user.timezone}
           />
         )}
         {!agentStale && agentLowPulses && <AgentHealthBanner variant="low_pulses" />}

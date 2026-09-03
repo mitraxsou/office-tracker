@@ -1,7 +1,7 @@
 /** User-facing product name for PwC Office Pulse agent */
 export const AGENT_PRODUCT_NAME = "PwC Office Pulse";
 
-/** Windows Task Scheduler task name (no spaces — schtasks-safe) */
+/** Windows Task Scheduler task name (no spaces, schtasks-safe) */
 export const AGENT_TASK_NAME = "PwCOfficePulse";
 
 /** Legacy task names removed on install/uninstall */
@@ -27,12 +27,9 @@ export const AGENT_DOWNLOAD_FOLDER = `%USERPROFILE%\\Downloads\\${AGENT_EXTRACT_
 /** PowerShell path for local dev install scripts */
 export const AGENT_EXTRACT_PATH_PS = `$env:USERPROFILE\\Downloads\\${AGENT_EXTRACT_FOLDER}`;
 
-/**
- * Install command when user has already cd'd into the extracted agent folder.
- * Uses relative install.ps1 path (user is at that location).
- */
+/** Full-path install command for the extracted agent folder in Downloads. */
 export function buildInstallCommand(appUrl: string, token: string) {
-  return `powershell -ExecutionPolicy Bypass -File "install.ps1" -ApiUrl "${appUrl}" -Token "${token}"`;
+  return `powershell -ExecutionPolicy Bypass -File "${AGENT_EXTRACT_PATH_PS}\\install.ps1" -ApiUrl "${appUrl}" -Token "${token}"`;
 }
 
 /** Full-path install command (legacy / local dev with explicit script dir) */

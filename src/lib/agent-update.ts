@@ -6,7 +6,7 @@ export function isDeviceAgentVersionStale(
   serverVersion = getAgentVersion(),
 ): boolean {
   if (!reportedVersion) return true;
-  return compareAgentVersions(serverVersion, reportedVersion) > 0;
+  return compareAgentVersions(serverVersion, reportedVersion) !== 0;
 }
 
 export async function getDeviceForceAgentUpdate(
@@ -17,10 +17,18 @@ export async function getDeviceForceAgentUpdate(
 
   const device = await prisma.agentDevice.findUnique({
     where: { userId_serialNumber: { userId, serialNumber } },
-    select: { forceAgentUpdate: true },
+    select: { forceAgentUpdate: true, agentScriptVersion: true },
   });
 
-  return device?.forceAgentUpdate ?? false;
+  if (!device) return false;
+
+  // Config polling is also the recovery path for agents that predate heartbeat version
+  // reporting or have a stale script beside a current version.txt. Force a bundle refresh
+  // until a subsequent heartbeat reports the expected version.
+  return (
+    device.forceAgentUpdate ||
+    isDeviceAgentVersionStale(device.agentScriptVersion, getAgentVersion())
+  );
 }
 
 export async function recordDeviceScriptVersion(
@@ -29,7 +37,7 @@ export async function recordDeviceScriptVersion(
   scriptVersion: string,
 ) {
   const serverVersion = getAgentVersion();
-  const upToDate = compareAgentVersions(scriptVersion, serverVersion) >= 0;
+  const upToDate = compareAgentVersions(scriptVersion, serverVersion) === 0;
 
   await prisma.agentDevice.update({
     where: { userId_serialNumber: { userId, serialNumber } },
