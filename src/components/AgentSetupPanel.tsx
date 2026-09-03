@@ -48,8 +48,9 @@ export function AgentSetupPanel({
         </h2>
         <p className="mb-4 text-sm text-muted">
           Use this section to set up the agent or fix a stale install. No admin required. Use{" "}
-          <strong>PowerShell</strong> (not Command Prompt). Re-running install is safe; it refreshes
-          an existing install silently.
+          <strong>PowerShell</strong> (not Command Prompt). Steps 1 to 3 are the same for both
+          paths. After that, follow either <strong>Install (first time)</strong> or{" "}
+          <strong>Update (already installed)</strong>, not both.
         </p>
 
         <ol className="mb-6 list-decimal space-y-3 pl-5 text-sm">
@@ -59,7 +60,7 @@ export function AgentSetupPanel({
               Save <code>{AGENT_ZIP_STEM}.zip</code> to Downloads. On PwC laptops that is often{" "}
               <code>OneDrive - PwC\Downloads</code>, not <code>%USERPROFILE%\Downloads</code>.
             </p>
-            <a href="/api/agent/download" className="btn-secondary mt-2 inline-block px-4 py-2 text-sm">
+            <a href="/api/agent/download" className="btn-primary mt-2 inline-block px-4 py-2 text-sm">
               Download agent (.zip)
             </a>
           </li>
@@ -88,7 +89,13 @@ export function AgentSetupPanel({
             </p>
           </li>
           <li>
-            <span className="font-medium">Copy the install or update command for your laptop</span>
+            <span className="font-medium">Pick your laptop, then choose Install or Update</span>
+            <p className="mt-1 text-muted">
+              Each laptop card below has two separate sections. Use{" "}
+              <strong>Install (first time)</strong> if the agent has never run on this laptop. Use{" "}
+              <strong>Update (already installed)</strong> to refresh an agent that is already there.
+              You only need one of them.
+            </p>
             <div className="mt-3">
               <InstallTokenCommands
                 installTokens={installTokens}
@@ -99,10 +106,9 @@ export function AgentSetupPanel({
           <li>
             <span className="font-medium">Paste and run in PowerShell</span>
             <p className="mt-1 text-muted">
-              Paste into the PowerShell window you opened in this folder (right-click or Ctrl+V)
-              and press Enter. First-time setup uses the install command; an existing agent uses the
-              update command. Both must run from the folder that contains the scripts. Install
-              writes to <code>{AGENT_INSTALL_DIR}</code> and registers task{" "}
+              Paste the one command you copied into the PowerShell window you opened in this folder
+              (right-click or Ctrl+V) and press Enter. It must run from the folder that contains the
+              scripts. Install writes to <code>{AGENT_INSTALL_DIR}</code> and registers task{" "}
               <code>{AGENT_TASK_NAME}</code>.
             </p>
           </li>

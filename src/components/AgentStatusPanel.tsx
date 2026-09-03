@@ -108,8 +108,8 @@ export function AgentStatusPanel({
           </p>
           <p className="mt-1">
             {status.pulseStatus === "stale"
-              ? "Download the latest zip, open PowerShell in the extract folder, then copy the update command below."
-              : "Follow the install steps below to register this laptop."}
+              ? "Download the latest zip, open PowerShell in the extract folder, then use the Update (already installed) section below."
+              : "Use the Install (first time) section below to register this laptop."}
           </p>
           <div className="mt-3">
             <InstallTokenCommands

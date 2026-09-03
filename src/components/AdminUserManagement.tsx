@@ -117,9 +117,11 @@ export function AdminUserManagement({ onUserCreated }: Props) {
             User <strong>{result.email}</strong> created. Send them the temp password and
             install steps below.
           </p>
-          <div>
-            <p className="mb-1 text-xs font-medium text-muted">
-              Install command (run from the folder that contains install.ps1)
+          <div className="rounded border border-[var(--border)] p-3">
+            <p className="text-sm font-medium">Install (first time)</p>
+            <p className="mt-1 mb-2 text-xs text-muted">
+              Send this for a laptop that has never run the agent. Run it from the extract folder
+              that contains <code>install.ps1</code>.
             </p>
             <pre className="overflow-x-auto rounded border bg-[var(--background)] p-3 text-xs whitespace-pre-wrap">
               {result.installCommand}
@@ -133,9 +135,11 @@ export function AdminUserManagement({ onUserCreated }: Props) {
             </button>
           </div>
           {result.updateCommand ? (
-            <div>
-              <p className="mb-1 text-xs font-medium text-muted">
-                Update command (same folder; contains update.ps1)
+            <div className="rounded border border-[var(--border)] p-3">
+              <p className="text-sm font-medium">Update (already installed)</p>
+              <p className="mt-1 mb-2 text-xs text-muted">
+                Send this only to refresh an existing agent. Same extract folder, which must contain{" "}
+                <code>update.ps1</code>.
               </p>
               <pre className="overflow-x-auto rounded border bg-[var(--background)] p-3 text-xs whitespace-pre-wrap">
                 {result.updateCommand}

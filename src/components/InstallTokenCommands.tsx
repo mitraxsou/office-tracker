@@ -78,36 +78,10 @@ export function InstallTokenCommands({
               )}
             </div>
             {!compact && (
-              <p className="mt-2 text-xs text-muted">
-                Issued {new Date(t.createdAt).toLocaleString("en-IN")}
-              </p>
-            )}
-            <p className="mt-2 text-xs text-muted">
-              Run from the folder that contains <code>install.ps1</code> and{" "}
-              <code>update.ps1</code>. If PowerShell is already open there, paste as-is.
-            </p>
-            <pre className="mt-2 overflow-x-auto rounded border bg-[var(--background-elevated)] p-2 text-xs whitespace-pre-wrap">
-              {t.installCommand}
-            </pre>
-            <pre className="mt-2 overflow-x-auto rounded border bg-[var(--background-elevated)] p-2 text-xs whitespace-pre-wrap">
-              {t.updateCommand}
-            </pre>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => handleCopy(t.installCommand, t.id)}
-                className="btn-primary px-3 py-1 text-xs"
-              >
-                {copiedId === t.id ? "Copied!" : "Copy install command"}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleCopy(t.updateCommand, `${t.id}-update`)}
-                className="btn-secondary px-3 py-1 text-xs"
-              >
-                {copiedId === `${t.id}-update` ? "Copied!" : "Copy update command"}
-              </button>
-              {!compact && (
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <p className="text-xs text-muted">
+                  Issued {new Date(t.createdAt).toLocaleString("en-IN")}
+                </p>
                 <button
                   type="button"
                   onClick={() => handleCopy(t.plainToken, `${t.id}-token`)}
@@ -115,7 +89,43 @@ export function InstallTokenCommands({
                 >
                   {copiedId === `${t.id}-token` ? "Copied!" : "Copy token"}
                 </button>
-              )}
+              </div>
+            )}
+
+            <div className="mt-3 rounded border border-[var(--border)] p-3">
+              <p className="text-sm font-medium">Install (first time)</p>
+              <p className="mt-1 text-xs text-muted">
+                Download and extract the agent zip, open PowerShell in that folder, then paste this
+                command. The folder must contain <code>install.ps1</code>.
+              </p>
+              <pre className="mt-2 overflow-x-auto rounded border bg-[var(--background-elevated)] p-2 text-xs whitespace-pre-wrap">
+                {t.installCommand}
+              </pre>
+              <button
+                type="button"
+                onClick={() => handleCopy(t.installCommand, t.id)}
+                className="btn-primary mt-2 px-3 py-1 text-xs"
+              >
+                {copiedId === t.id ? "Copied!" : "Copy install command"}
+              </button>
+            </div>
+
+            <div className="mt-3 rounded border border-[var(--border)] p-3">
+              <p className="text-sm font-medium">Update (already installed)</p>
+              <p className="mt-1 text-xs text-muted">
+                Use this to refresh an agent that is already on this laptop. Run it from the same
+                extract folder, which must contain <code>update.ps1</code>.
+              </p>
+              <pre className="mt-2 overflow-x-auto rounded border bg-[var(--background-elevated)] p-2 text-xs whitespace-pre-wrap">
+                {t.updateCommand}
+              </pre>
+              <button
+                type="button"
+                onClick={() => handleCopy(t.updateCommand, `${t.id}-update`)}
+                className="btn-primary mt-2 px-3 py-1 text-xs"
+              >
+                {copiedId === `${t.id}-update` ? "Copied!" : "Copy update command"}
+              </button>
             </div>
           </div>
         ))}

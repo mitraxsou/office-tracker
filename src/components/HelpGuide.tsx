@@ -71,6 +71,11 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             </a>
           </li>
           <li>
+            <a href="#update-agent" className="text-accent hover:underline">
+              Update the agent
+            </a>
+          </li>
+          <li>
             <a href="#install-folder" className="text-accent hover:underline">
               Open the install folder
             </a>
@@ -196,6 +201,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           Do this on each PwC laptop you use for the pilot. Use <strong>PowerShell</strong>, not Command
           Prompt. No IT admin password is required.
         </p>
+        <h3 className="text-sm font-medium">Steps 1 to 4: prepare (same for install and update)</h3>
         <ol className="list-decimal space-y-4 pl-5 text-sm">
           <li>
             <span className="font-medium">Sign in</span> and open{" "}
@@ -234,37 +240,72 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
               <code>{`cd "$env:USERPROFILE\\OneDrive - PwC\\Downloads\\${AGENT_ZIP_STEM}\\${AGENT_EXTRACT_FOLDER}"`}</code>
             </p>
           </li>
-          <li>
-            <span className="font-medium">Copy the install or update command</span>
-            <p className="mt-1 text-muted">
-              In Settings, under <strong>Install or reinstall {AGENT_PRODUCT_NAME}</strong>, click{" "}
-              <strong>Copy install command</strong> for a first install, or{" "}
-              <strong>Copy update command</strong> to refresh an existing agent. Use the token that
-              matches this laptop. If you have no tokens, ask your admin to issue one from Admin →
-              Users &amp; tokens.
-            </p>
-          </li>
-          <li>
-            <span className="font-medium">Paste and run in PowerShell</span>
-            <p className="mt-1 text-muted">
-              Paste into the PowerShell window from this folder (right-click or Ctrl+V), then press
-              Enter. The command must run from the folder that contains <code>install.ps1</code> /{" "}
-              <code>update.ps1</code>. The agent installs to <code>{AGENT_INSTALL_DIR}</code> and
-              registers scheduled task <code>{AGENT_TASK_NAME}</code>.
-            </p>
-          </li>
-          <li>
-            <span className="font-medium">Confirm on the dashboard</span>
-            <p className="mt-1 text-muted">
-              Within 2 to 4 minutes, open{" "}
-              <Link href="/dashboard" className="text-accent hover:underline">
-                Today
-              </Link>
-              . <strong>Agent status</strong> should show healthy, and your laptop serial should appear
-              under Registered laptops in Settings.
-            </p>
-          </li>
         </ol>
+
+        <div id="install-first-time" className="scroll-mt-6 rounded-lg border border-[var(--border)] p-4">
+          <h3 className="text-sm font-medium">Install (first time on this laptop)</h3>
+          <p className="mt-1 text-sm text-muted">
+            Follow this path when the agent has never run on this laptop.
+          </p>
+          <ol className="mt-3 list-decimal space-y-3 pl-5 text-sm">
+            <li>
+              <span className="font-medium">Copy the install command</span>
+              <p className="mt-1 text-muted">
+                In Settings, under <strong>Install or reinstall {AGENT_PRODUCT_NAME}</strong>, find the
+                card for this laptop and click <strong>Copy install command</strong> in the{" "}
+                <strong>Install (first time)</strong> section. If you have no tokens, ask your admin to
+                issue one from Admin → Users &amp; tokens.
+              </p>
+            </li>
+            <li>
+              <span className="font-medium">Paste and run in PowerShell</span>
+              <p className="mt-1 text-muted">
+                Paste into the PowerShell window from the extract folder (right-click or Ctrl+V), then
+                press Enter. The command must run from the folder that contains{" "}
+                <code>install.ps1</code>. The agent installs to <code>{AGENT_INSTALL_DIR}</code> and
+                registers scheduled task <code>{AGENT_TASK_NAME}</code>.
+              </p>
+            </li>
+          </ol>
+        </div>
+
+        <div id="update-agent" className="scroll-mt-6 rounded-lg border border-[var(--border)] p-4">
+          <h3 className="text-sm font-medium">Update (agent already installed)</h3>
+          <p className="mt-1 text-sm text-muted">
+            Follow this path when the laptop already has the agent and you need a newer version or a
+            fix for a stale install.
+          </p>
+          <ol className="mt-3 list-decimal space-y-3 pl-5 text-sm">
+            <li>
+              <span className="font-medium">Copy the update command</span>
+              <p className="mt-1 text-muted">
+                In the same Settings card for this laptop, click <strong>Copy update command</strong>{" "}
+                in the <strong>Update (already installed)</strong> section. Use the token that matches
+                this laptop.
+              </p>
+            </li>
+            <li>
+              <span className="font-medium">Paste and run in PowerShell</span>
+              <p className="mt-1 text-muted">
+                Run it from the same extract folder, which must contain <code>update.ps1</code>. The
+                update refreshes the scripts and the <code>{AGENT_TASK_NAME}</code> task without
+                changing your token.
+              </p>
+            </li>
+          </ol>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-medium">Last step for both paths: confirm on the dashboard</h3>
+          <p className="mt-1 text-sm text-muted">
+            Within 2 to 4 minutes, open{" "}
+            <Link href="/dashboard" className="text-accent hover:underline">
+              Today
+            </Link>
+            . <strong>Agent status</strong> should show healthy, and your laptop serial should appear
+            under Registered laptops in Settings.
+          </p>
+        </div>
       </section>
 
       <section className="card space-y-4 p-6">
@@ -358,10 +399,10 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           <div>
             <dt className="font-medium">Install or reinstall agent</dt>
             <dd className="mt-1 text-muted">
-              At the top of Settings, copy the install command for a new laptop or the update
-              command to refresh an existing agent. Each token binds to one laptop serial on first
-              heartbeat. Both commands must be run from the extracted folder that contains the
-              scripts.
+              At the top of Settings, each laptop card has an <strong>Install (first time)</strong>{" "}
+              section and a separate <strong>Update (already installed)</strong> section. Use one or
+              the other, not both. Each token binds to one laptop serial on first heartbeat, and both
+              commands must be run from the extracted folder that contains the scripts.
             </dd>
           </div>
           <div>

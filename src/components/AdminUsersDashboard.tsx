@@ -422,25 +422,43 @@ export function AdminUsersDashboard() {
 
       {sharedCommands && (
         <div className="rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm">
-          <p>Commands copied for sharing. Run them from the folder that contains the .ps1 files.</p>
-          <p className="mt-2 text-xs font-medium">Install</p>
-          <pre className="mt-1 overflow-x-auto text-xs whitespace-pre-wrap">
-            {sharedCommands.installCommand}
-          </pre>
+          <p>
+            Install command copied. Send the user one command only, run from the folder that
+            contains the .ps1 files.
+          </p>
+          <div className="mt-3 rounded border border-[var(--border)] bg-[var(--background-elevated)] p-3">
+            <p className="text-sm font-medium">Install (first time)</p>
+            <p className="mt-1 text-xs text-muted">
+              For a laptop that has never run the agent.
+            </p>
+            <pre className="mt-2 overflow-x-auto text-xs whitespace-pre-wrap">
+              {sharedCommands.installCommand}
+            </pre>
+            <button
+              type="button"
+              className="btn-secondary mt-2 px-3 py-1 text-xs"
+              onClick={() => copyToClipboard(sharedCommands.installCommand)}
+            >
+              Copy install command
+            </button>
+          </div>
           {sharedCommands.updateCommand ? (
-            <>
-              <p className="mt-2 text-xs font-medium">Update</p>
-              <pre className="mt-1 overflow-x-auto text-xs whitespace-pre-wrap">
+            <div className="mt-3 rounded border border-[var(--border)] bg-[var(--background-elevated)] p-3">
+              <p className="text-sm font-medium">Update (already installed)</p>
+              <p className="mt-1 text-xs text-muted">
+                Only to refresh an agent that is already on the laptop.
+              </p>
+              <pre className="mt-2 overflow-x-auto text-xs whitespace-pre-wrap">
                 {sharedCommands.updateCommand}
               </pre>
               <button
                 type="button"
-                className="mt-2 text-xs text-accent hover:underline"
+                className="btn-secondary mt-2 px-3 py-1 text-xs"
                 onClick={() => copyToClipboard(sharedCommands.updateCommand)}
               >
                 Copy update command
               </button>
-            </>
+            </div>
           ) : null}
         </div>
       )}
