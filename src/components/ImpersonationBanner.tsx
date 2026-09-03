@@ -33,7 +33,7 @@ export function ImpersonationBanner({
   }
 
   return (
-    <div className="border-b border-amber-500/40 bg-amber-500/15 px-4 py-2 text-sm text-amber-100">
+    <div className="banner-viewas px-4 py-2 text-sm">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2">
         <p>
           Viewing as <strong className="font-semibold">{displayName}</strong> ({email}). User

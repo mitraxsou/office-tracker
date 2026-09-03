@@ -79,6 +79,51 @@ textarea:focus {
   color: var(--pwc-orange);
 }
 
+/* View-as banner. The amber fill stays in both themes, so the copy and the exit
+   control follow --foreground to keep contrast on the pale background. */
+.banner-viewas {
+  background: rgba(253, 176, 8, 0.18);
+  border-bottom: 1px solid rgba(253, 176, 8, 0.5);
+  color: var(--foreground);
+}
+
+.banner-viewas .btn-secondary {
+  background: var(--background-elevated);
+  border-color: rgba(253, 81, 8, 0.6);
+  color: var(--foreground);
+}
+
+.banner-viewas .btn-secondary:hover {
+  border-color: var(--pwc-orange);
+  color: var(--pwc-orange);
+}
+
+/* Status colours are picked for the dark theme. On the light theme those tints sit on
+   white or pale fills, so darken them to keep the text readable. */
+html[data-theme="light"] .text-amber-100,
+html[data-theme="light"] .text-amber-200,
+html[data-theme="light"] .text-amber-300,
+html[data-theme="light"] .text-amber-400 {
+  color: #92400e;
+}
+
+html[data-theme="light"] .text-green-300,
+html[data-theme="light"] .text-green-400,
+html[data-theme="light"] .text-green-500 {
+  color: #15803d;
+}
+
+html[data-theme="light"] .text-red-200,
+html[data-theme="light"] .text-red-300,
+html[data-theme="light"] .text-red-400 {
+  color: #b91c1c;
+}
+
+html[data-theme="light"] .text-blue-300,
+html[data-theme="light"] .text-blue-400 {
+  color: #1d4ed8;
+}
+
 .text-muted {
   color: var(--muted);
 }
