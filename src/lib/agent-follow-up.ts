@@ -11,6 +11,7 @@ import {
   isDeviceExcludedFromFollowUp,
 } from "./agent-lifecycle";
 import { isUserOutOfOffice } from "./out-of-office";
+import { isWeekendDay } from "./admin-day-compliance";
 import { dayKeyInTimezone } from "./notification-prefs";
 
 export type AgentFollowUpStatusFilter = "all" | "stale" | "offline";
@@ -142,6 +143,8 @@ export async function getAgentFollowUpReport(options?: {
 
   for (const device of devices) {
     const userDayKey = dayKeyInTimezone(now, device.user.timezone);
+    if (isWeekendDay(userDayKey)) continue;
+
     let isOoo = oooCache.get(device.userId);
     if (isOoo === undefined) {
       isOoo = await isUserOutOfOffice(device.userId, userDayKey);

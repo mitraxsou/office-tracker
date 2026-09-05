@@ -6,6 +6,7 @@ import {
   shouldIncludeDeviceForFollowUp,
 } from "../src/lib/agent-follow-up";
 import { computeDeviceAgentStatus } from "../src/lib/device-status";
+import { isWeekendDay } from "../src/lib/admin-day-compliance";
 
 describe("agent follow-up criteria", () => {
   const now = new Date("2026-09-02T10:00:00+05:30");
@@ -111,6 +112,11 @@ describe("agent follow-up criteria", () => {
     expect(matchesFollowUpStatusFilter("stale", "stale")).toBe(true);
     expect(matchesFollowUpStatusFilter("offline", "stale")).toBe(false);
     expect(matchesFollowUpStatusFilter("offline", "offline")).toBe(true);
+  });
+
+  it("weekend days are excluded from stale follow-up eligibility", () => {
+    expect(isWeekendDay("2026-09-06")).toBe(true);
+    expect(isWeekendDay("2026-09-04")).toBe(false);
   });
 
   it("sorts offline before stale, then by stalest minutes", () => {

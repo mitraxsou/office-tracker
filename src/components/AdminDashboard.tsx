@@ -43,13 +43,32 @@ type DayDetailUser = {
   hours: number;
   hoursTarget: number;
   metTarget: boolean;
+  attended: boolean;
+  status: string;
+  agentHealthy: boolean;
+};
+
+type DayDetailData = {
+  date: string;
+  isWeekend: boolean;
+  totalUsers: number;
+  attendedCount: number;
+  metTargetCount: number;
+  compliancePct: number;
+  excludedStale: number;
+  excludedOoo: number;
+  excludedNoVisit: number;
+  users: DayDetailUser[];
 };
 
 type ReportsData = {
   summary: {
     totalUsers: number;
     inOfficeNow: number;
+    attendedToday: number;
     metTodayPct: number;
+    excludedStaleToday: number;
+    excludedOooToday: number;
     avgHours: number;
     hoursTarget: number;
   };
@@ -75,7 +94,8 @@ export function AdminDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [dayDetail, setDayDetail] = useState<DayDetailUser[] | null>(null);
+  const [dayDetail, setDayDetail] = useState<DayDetailData | null>(null);
+  const [dayPicker, setDayPicker] = useState("");
   const [search, setSearch] = useState("");
   const [compliance, setCompliance] = useState<"all" | "met" | "not_met">("all");
   const [agentStatus, setAgentStatus] = useState<"all" | "healthy" | "stale" | "in_office">("all");
@@ -116,18 +136,23 @@ export function AdminDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function loadDayDetail(date: string) {
+    const res = await fetch(`/api/admin/reports/day?date=${date}`);
+    if (res.ok) {
+      const json: DayDetailData = await res.json();
+      setDayDetail(json);
+      setSelectedDate(date);
+      setDayPicker(date);
+    }
+  }
+
   async function handleBarClick(date: string) {
-    const next = selectedDate === date ? null : date;
-    setSelectedDate(next);
-    if (!next) {
+    if (selectedDate === date) {
+      setSelectedDate(null);
       setDayDetail(null);
       return;
     }
-    const res = await fetch(`/api/admin/reports/day?date=${next}`);
-    if (res.ok) {
-      const json = await res.json();
-      setDayDetail(json.users);
-    }
+    await loadDayDetail(date);
   }
 
   const filteredUsers = useMemo(() => {
@@ -163,23 +188,31 @@ export function AdminDashboard() {
 
   const displayUsers = useMemo(() => {
     if (selectedDate && dayDetail) {
-      return dayDetail.map((d) => ({
-        id: d.userId,
-        email: d.email,
-        name: d.name,
-        role: "user",
-        hoursTarget: d.hoursTarget,
-        today: {
-          totalHours: d.hours,
-          metTarget: d.metTarget,
-          agentHealthy: true,
-          inOfficeNow: false,
-          lastHeartbeat: null,
-        },
-      }));
+      return dayDetail.users
+        .filter((u) => u.attended)
+        .map((d) => ({
+          id: d.userId,
+          email: d.email,
+          name: d.name,
+          role: "user",
+          hoursTarget: d.hoursTarget,
+          status: d.status,
+          today: {
+            totalHours: d.hours,
+            metTarget: d.metTarget,
+            agentHealthy: d.agentHealthy,
+            inOfficeNow: false,
+            lastHeartbeat: null,
+          },
+        }));
     }
     return sorted;
   }, [selectedDate, dayDetail, sorted]);
+
+  const excludedDayUsers = useMemo(() => {
+    if (!selectedDate || !dayDetail) return [];
+    return dayDetail.users.filter((u) => !u.attended);
+  }, [selectedDate, dayDetail]);
 
   return (
     <div className="space-y-6">
@@ -221,9 +254,65 @@ export function AdminDashboard() {
               onClick={() => setFollowUpPanelOpen(true)}
               clickable
             />
-            <SummaryCard label="Met target today" value={`${data.summary.metTodayPct}%`} />
-            <SummaryCard label="Avg hours today" value={`${data.summary.avgHours}h`} />
+            <SummaryCard
+              label="Attended today"
+              value={String(data.summary.attendedToday)}
+              sub={`${data.summary.metTodayPct}% met ${data.summary.hoursTarget}h target`}
+            />
+            <SummaryCard
+              label="Avg hours (attended)"
+              value={`${data.summary.avgHours}h`}
+            />
           </div>
+
+          <section className="card p-4">
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="text-sm">
+                <span className="mb-1 block text-xs text-muted">Day drill-down</span>
+                <input
+                  type="date"
+                  value={dayPicker}
+                  onChange={(e) => setDayPicker(e.target.value)}
+                  className="rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm"
+                />
+              </label>
+              <button
+                type="button"
+                className="btn-secondary px-3 py-1.5 text-xs"
+                disabled={!dayPicker}
+                onClick={() => void loadDayDetail(dayPicker)}
+              >
+                View day
+              </button>
+              {selectedDate && (
+                <button
+                  type="button"
+                  className="text-xs text-accent hover:underline"
+                  onClick={() => {
+                    setSelectedDate(null);
+                    setDayDetail(null);
+                    setDayPicker("");
+                  }}
+                >
+                  Clear day view
+                </button>
+              )}
+            </div>
+          </section>
+
+          {selectedDate && dayDetail && (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              <SummaryCard label="Attended" value={String(dayDetail.attendedCount)} />
+              <SummaryCard label="Met target" value={String(dayDetail.metTargetCount)} />
+              <SummaryCard
+                label="Compliance"
+                value={`${dayDetail.compliancePct}%`}
+                sub="Met target / attended (not all users)"
+              />
+              <SummaryCard label="Excluded (OOO)" value={String(dayDetail.excludedOoo)} />
+              <SummaryCard label="Excluded (stale agent)" value={String(dayDetail.excludedStale)} />
+            </div>
+          )}
 
           <InOfficeNowPanel
             open={inOfficePanelOpen}
@@ -246,26 +335,18 @@ export function AdminDashboard() {
                 selectedDate={selectedDate}
                 onBarClick={handleBarClick}
               />
-              {selectedDate && (
+              {selectedDate && dayDetail && (
                 <p className="mt-2 text-xs text-muted">
-                  Drill-down: <strong className="text-accent">{selectedDate}</strong> per user below.{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedDate(null);
-                      setDayDetail(null);
-                    }}
-                    className="text-accent hover:underline"
-                  >
-                    Clear
-                  </button>
+                  {dayDetail.isWeekend
+                    ? "Weekend day: stale agents are not penalized in compliance."
+                    : "Compliance counts only users who attended. OOO and stale-agent users are excluded."}
                 </p>
               )}
             </section>
             <section className="card p-6">
               <ComplianceTrendChart
                 data={chartData}
-                title="Compliance rate (% users met target)"
+                title="Compliance rate (% attended users met target)"
               />
             </section>
           </div>
@@ -277,7 +358,7 @@ export function AdminDashboard() {
           <section className="card p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-medium">
-                {selectedDate ? `Users on ${selectedDate}` : "Users today"}
+                {selectedDate ? `Attended on ${selectedDate}` : "Users today"}
               </h2>
               {!selectedDate && (
                 <ReportFilters
@@ -306,6 +387,7 @@ export function AdminDashboard() {
                         <th className="py-2">Report</th>
                       </>
                     )}
+                    {selectedDate && <th className="py-2">Agent</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -343,11 +425,35 @@ export function AdminDashboard() {
                           </td>
                         </>
                       )}
+                      {selectedDate && (
+                        <td className="py-3">
+                          {u.today.agentHealthy ? "Healthy" : "Stale"}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            {selectedDate && excludedDayUsers.length > 0 && (
+              <div className="mt-4 rounded border border-[var(--border)] bg-[var(--background)] p-4">
+                <h3 className="text-sm font-medium">Excluded from compliance</h3>
+                <ul className="mt-2 space-y-1 text-xs text-muted">
+                  {excludedDayUsers.map((u) => (
+                    <li key={u.userId}>
+                      {u.email}
+                      {" - "}
+                      {u.status === "excluded_ooo"
+                        ? "Out of office"
+                        : u.status === "excluded_stale"
+                          ? "Stale agent (untrusted data)"
+                          : "No office visit"}
+                      {u.hours > 0 ? ` (${u.hours.toFixed(1)}h logged)` : ""}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {!selectedDate && (
               <button
                 type="button"
@@ -402,11 +508,13 @@ export function AdminDashboard() {
 function SummaryCard({
   label,
   value,
+  sub,
   onClick,
   clickable,
 }: {
   label: string;
   value: string;
+  sub?: string;
   onClick?: () => void;
   clickable?: boolean;
 }) {
@@ -422,6 +530,7 @@ function SummaryCard({
       <button type="button" onClick={onClick} className={className}>
         <p className="text-xs text-muted">{label}</p>
         <p className="mt-1 text-2xl font-semibold text-accent">{value}</p>
+        {sub && <p className="mt-1 text-xs text-muted">{sub}</p>}
         <p className="mt-1 text-xs text-muted">Click to view list</p>
       </button>
     );
@@ -431,6 +540,7 @@ function SummaryCard({
     <div className={className}>
       <p className="text-xs text-muted">{label}</p>
       <p className="mt-1 text-2xl font-semibold">{value}</p>
+      {sub && <p className="mt-1 text-xs text-muted">{sub}</p>}
     </div>
   );
 }
