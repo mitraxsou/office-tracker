@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isAgentStaleForReporting,
   isWeekendDay,
+  resolveDayUserStatus,
   summarizeDayCompliance,
   userAttendedOnDay,
   wasAgentStaleAtDayEnd,
@@ -127,6 +128,49 @@ describe("userAttendedOnDay", () => {
         totalMs: 0,
       }),
     ).toBe(false);
+  });
+});
+
+describe("resolveDayUserStatus", () => {
+  it("counts OOO user with office hours as attended", () => {
+    expect(
+      resolveDayUserStatus({
+        ooo: true,
+        agentStaleOnDay: false,
+        attended: true,
+        metTarget: true,
+      }),
+    ).toBe("attended_met");
+    expect(
+      resolveDayUserStatus({
+        ooo: true,
+        agentStaleOnDay: false,
+        attended: true,
+        metTarget: false,
+      }),
+    ).toBe("attended_not_met");
+  });
+
+  it("excludes OOO user with no office activity", () => {
+    expect(
+      resolveDayUserStatus({
+        ooo: true,
+        agentStaleOnDay: false,
+        attended: false,
+        metTarget: false,
+      }),
+    ).toBe("excluded_ooo");
+  });
+
+  it("stale agent takes precedence over OOO when there is no attendance", () => {
+    expect(
+      resolveDayUserStatus({
+        ooo: true,
+        agentStaleOnDay: true,
+        attended: false,
+        metTarget: false,
+      }),
+    ).toBe("excluded_stale");
   });
 });
 

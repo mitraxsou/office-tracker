@@ -61,6 +61,32 @@ export function wasAgentStaleAtDayEnd(input: {
   return input.dayEnd.getTime() - input.lastHeartbeatBeforeDayEnd.getTime() > graceMs;
 }
 
+/**
+ * Resolve compliance status for one user on one day.
+ * Office presence overrides OOO: users with logged hours or in-office activity count as attended
+ * even when an OOO range covers the day (incorrect range, partial day, or came in anyway).
+ */
+export function resolveDayUserStatus(input: {
+  ooo: boolean;
+  agentStaleOnDay: boolean;
+  attended: boolean;
+  metTarget: boolean;
+}): AdminDayUserStatus {
+  if (input.agentStaleOnDay) {
+    return "excluded_stale";
+  }
+  if (input.ooo && !input.attended) {
+    return "excluded_ooo";
+  }
+  if (!input.attended) {
+    return "no_visit";
+  }
+  if (input.metTarget) {
+    return "attended_met";
+  }
+  return "attended_not_met";
+}
+
 /** True when the user had office presence on the day (visit segment or in-office pulse). */
 export function userAttendedOnDay(input: {
   visits: Array<{ startAt: Date; endAt: Date | null }>;
@@ -157,18 +183,12 @@ export async function evaluateUserDayCompliance(input: {
     totalMs,
   });
 
-  let status: AdminDayUserStatus;
-  if (ooo) {
-    status = "excluded_ooo";
-  } else if (agentStaleOnDay) {
-    status = "excluded_stale";
-  } else if (!attended) {
-    status = "no_visit";
-  } else if (metTarget) {
-    status = "attended_met";
-  } else {
-    status = "attended_not_met";
-  }
+  const status = resolveDayUserStatus({
+    ooo,
+    agentStaleOnDay,
+    attended,
+    metTarget,
+  });
 
   return {
     userId: user.id,
