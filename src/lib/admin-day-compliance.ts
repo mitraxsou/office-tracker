@@ -5,7 +5,7 @@ import { isoWeekdayFromDayKey } from "./office-schedule";
 import { isUserOutOfOffice } from "./out-of-office";
 import { prisma } from "./db";
 import { dayBoundsFromKey, dayKeyInTimezone } from "./timezone-dates";
-import { daySpanMsForDay, roundHoursToMinute } from "./visits";
+import { daySpanMsForDay, roundHoursToMinute, type VisitForDaySpan } from "./visits";
 
 export type AdminDayUserStatus =
   | "attended_met"
@@ -38,6 +38,19 @@ export type AdminDayComplianceSummary = {
   excludedOoo: number;
   excludedNoVisit: number;
   users: AdminDayUserRow[];
+};
+
+export type AdminOrgCalendarDay = {
+  dayKey: string;
+  attendedCount: number;
+  metTargetCount: number;
+  compliancePct: number;
+  totalRegistered: number;
+  excludedOoo: number;
+  excludedStale: number;
+  excludedNoVisit: number;
+  totalAttendedHours: number;
+  isWeekend: boolean;
 };
 
 /** Saturday or Sunday (ISO weekday 6 or 7). */
@@ -105,6 +118,25 @@ export function userAttendedOnDay(input: {
   return false;
 }
 
+export function toAdminOrgCalendarDay(
+  dayKey: string,
+  summary: Omit<AdminDayComplianceSummary, "date" | "isWeekend" | "users">,
+  totalAttendedHours: number,
+): AdminOrgCalendarDay {
+  return {
+    dayKey,
+    attendedCount: summary.attendedCount,
+    metTargetCount: summary.metTargetCount,
+    compliancePct: summary.compliancePct,
+    totalRegistered: summary.totalUsers,
+    excludedOoo: summary.excludedOoo,
+    excludedStale: summary.excludedStale,
+    excludedNoVisit: summary.excludedNoVisit,
+    totalAttendedHours: Math.round(totalAttendedHours * 10) / 10,
+    isWeekend: isWeekendDay(dayKey),
+  };
+}
+
 export function summarizeDayCompliance(users: AdminDayUserRow[]): Omit<
   AdminDayComplianceSummary,
   "date" | "isWeekend" | "users"
@@ -134,15 +166,100 @@ export function isAgentStaleForReporting(dayKey: string, agentStale: boolean): b
   return agentStale;
 }
 
-export async function evaluateUserDayCompliance(input: {
-  user: {
-    id: string;
-    email: string;
-    name: string | null;
-    timezone: string;
-    hoursTarget: number | null;
-    agentStaleGraceHours: number | null;
+type ComplianceUser = {
+  id: string;
+  email: string;
+  name: string | null;
+  timezone: string;
+  hoursTarget: number | null;
+  agentStaleGraceHours: number | null;
+};
+
+type DayHeartbeatRow = {
+  recordedAt: Date;
+  ssid: string | null;
+  inOffice: boolean;
+};
+
+type DayVisitRow = VisitForDaySpan;
+
+export function computeUserDayComplianceRow(input: {
+  user: ComplianceUser;
+  dayKey: string;
+  hadInstalledDevice: boolean;
+  lastHeartbeatBeforeDayEnd: Date | null;
+  ooo: boolean;
+  visits: DayVisitRow[];
+  dayHeartbeats: DayHeartbeatRow[];
+  officeSsids: string[];
+  hoursTarget: number;
+  graceHours: number;
+  now?: Date;
+}): AdminDayUserRow {
+  const { user, dayKey } = input;
+  const { start: dayStart, end: dayEnd } = dayBoundsFromKey(dayKey, user.timezone);
+  const now = input.now ?? new Date();
+
+  const agentStaleOnDay = wasAgentStaleAtDayEnd({
+    dayKey,
+    dayEnd,
+    lastHeartbeatBeforeDayEnd: input.lastHeartbeatBeforeDayEnd,
+    graceHours: input.graceHours,
+    hadInstalledDevice: input.hadInstalledDevice,
+  });
+
+  const inOfficeToday = input.dayHeartbeats.filter((h) =>
+    heartbeatInOffice(h, input.officeSsids),
+  );
+  const firstInOfficeHeartbeatAt = inOfficeToday[0]?.recordedAt ?? null;
+  const lastInOfficeHeartbeatAt = inOfficeToday[inOfficeToday.length - 1]?.recordedAt ?? null;
+  const lastHeartbeatOnDay = input.dayHeartbeats[input.dayHeartbeats.length - 1]?.recordedAt ?? null;
+
+  const params = {
+    dayStart,
+    dayEnd,
+    now,
+    staleMs: input.graceHours * 60 * 60 * 1000,
+    lastHeartbeatAt: input.lastHeartbeatBeforeDayEnd,
+    firstInOfficeHeartbeatAt,
+    lastInOfficeHeartbeatAt,
   };
+  const totalMs = daySpanMsForDay(input.visits, params);
+  const hours = roundHoursToMinute(totalMs / (1000 * 60 * 60));
+  const metTarget = hours >= input.hoursTarget;
+
+  const inOfficeHeartbeats = inOfficeToday.map((h) => h.recordedAt);
+  const attended = userAttendedOnDay({
+    visits: input.visits,
+    dayStart,
+    dayEnd,
+    inOfficeHeartbeats,
+    totalMs,
+  });
+
+  const status = resolveDayUserStatus({
+    ooo: input.ooo,
+    agentStaleOnDay,
+    attended,
+    metTarget,
+  });
+
+  return {
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    hours,
+    hoursTarget: input.hoursTarget,
+    metTarget,
+    attended: status === "attended_met" || status === "attended_not_met",
+    status,
+    agentHealthy: !agentStaleOnDay,
+    agentStaleOnDay,
+  };
+}
+
+export async function evaluateUserDayCompliance(input: {
+  user: ComplianceUser;
   dayKey: string;
   hadInstalledDevice: boolean;
   lastHeartbeatBeforeDayEnd: Date | null;
@@ -154,54 +271,26 @@ export async function evaluateUserDayCompliance(input: {
   const { start: dayStart, end: dayEnd } = dayBoundsFromKey(dayKey, user.timezone);
 
   const ooo = await isUserOutOfOffice(user.id, dayKey);
-  const agentStaleOnDay = wasAgentStaleAtDayEnd({
-    dayKey,
-    dayEnd,
-    lastHeartbeatBeforeDayEnd: input.lastHeartbeatBeforeDayEnd,
-    graceHours,
-    hadInstalledDevice: input.hadInstalledDevice,
-  });
-
   const { visits, params } = await loadDaySpanContext(user.id, dayKey, user.timezone);
-  const totalMs = daySpanMsForDay(visits, params);
-  const hours = roundHoursToMinute(totalMs / (1000 * 60 * 60));
-  const metTarget = hours >= hoursTarget;
 
   const dayHeartbeats = await prisma.heartbeat.findMany({
     where: { userId: user.id, recordedAt: { gte: dayStart, lte: dayEnd } },
     select: { recordedAt: true, ssid: true, inOffice: true },
   });
-  const inOfficeHeartbeats = dayHeartbeats
-    .filter((h) => heartbeatInOffice(h, config.officeSsids))
-    .map((h) => h.recordedAt);
 
-  const attended = userAttendedOnDay({
-    visits,
-    dayStart,
-    dayEnd,
-    inOfficeHeartbeats,
-    totalMs,
-  });
-
-  const status = resolveDayUserStatus({
+  return computeUserDayComplianceRow({
+    user,
+    dayKey,
+    hadInstalledDevice: input.hadInstalledDevice,
+    lastHeartbeatBeforeDayEnd: input.lastHeartbeatBeforeDayEnd,
     ooo,
-    agentStaleOnDay,
-    attended,
-    metTarget,
-  });
-
-  return {
-    userId: user.id,
-    email: user.email,
-    name: user.name,
-    hours,
+    visits,
+    dayHeartbeats,
+    officeSsids: config.officeSsids,
     hoursTarget,
-    metTarget,
-    attended: status === "attended_met" || status === "attended_not_met",
-    status,
-    agentHealthy: !agentStaleOnDay,
-    agentStaleOnDay,
-  };
+    graceHours,
+    now: params.now,
+  });
 }
 
 export async function getAdminDayCompliance(

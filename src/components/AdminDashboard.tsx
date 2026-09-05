@@ -18,6 +18,7 @@ import { currentMonthKey } from "@/lib/month-range";
 import { exportToCsv } from "@/lib/report-range";
 import { InOfficeNowPanel } from "@/components/InOfficeNowPanel";
 import { AgentFollowUpPanel, useAgentFollowUpCount } from "@/components/AgentFollowUpPanel";
+import { AdminOrgCalendar } from "@/components/AdminOrgCalendar";
 
 type DailyPoint = { date: string; totalHours: number; compliancePct: number };
 
@@ -102,6 +103,8 @@ export function AdminDashboard() {
   const [inOfficePanelOpen, setInOfficePanelOpen] = useState(false);
   const [followUpPanelOpen, setFollowUpPanelOpen] = useState(false);
   const [followUpCount, setFollowUpCount] = useAgentFollowUpCount(!loading && !!data);
+  const [viewTab, setViewTab] = useState<"charts" | "calendar">("charts");
+  const [calendarMonthKey, setCalendarMonthKey] = useState(() => currentMonthKey("Asia/Kolkata"));
 
   const load = useCallback(
     async (month: string, silent = false) => {
@@ -125,6 +128,7 @@ export function AdminDashboard() {
       setMonthKey(json.range.month);
       setFromKey(json.range.from);
       setToKey(json.range.to);
+      setCalendarMonthKey(json.range.month);
       setSelectedDate(null);
       setDayDetail(null);
     },
@@ -266,6 +270,31 @@ export function AdminDashboard() {
           </div>
 
           <section className="card p-4">
+            <div className="mb-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setViewTab("charts")}
+                className={`rounded-md px-3 py-1.5 text-xs ${
+                  viewTab === "charts"
+                    ? "bg-[var(--pwc-orange)]/15 text-accent ring-1 ring-[var(--pwc-orange)]"
+                    : "border border-[var(--border)] text-muted hover:text-accent"
+                }`}
+              >
+                Charts
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewTab("calendar")}
+                className={`rounded-md px-3 py-1.5 text-xs ${
+                  viewTab === "calendar"
+                    ? "bg-[var(--pwc-orange)]/15 text-accent ring-1 ring-[var(--pwc-orange)]"
+                    : "border border-[var(--border)] text-muted hover:text-accent"
+                }`}
+              >
+                Calendar
+              </button>
+            </div>
+
             <div className="flex flex-wrap items-end gap-3">
               <label className="text-sm">
                 <span className="mb-1 block text-xs text-muted">Day drill-down</span>
@@ -326,6 +355,18 @@ export function AdminDashboard() {
             onCountChange={setFollowUpCount}
           />
 
+          {viewTab === "calendar" ? (
+            <section className="card p-6">
+              <h2 className="mb-4 text-lg font-medium">Org office calendar ({calendarMonthKey})</h2>
+              <AdminOrgCalendar
+                monthKey={calendarMonthKey}
+                selectedDate={selectedDate}
+                onMonthChange={setCalendarMonthKey}
+                onSelectDate={(dayKey) => void loadDayDetail(dayKey)}
+              />
+            </section>
+          ) : (
+            <>
           <div className="grid gap-4 lg:grid-cols-2">
             <section className="card p-6">
               <HoursTrendChart
@@ -354,6 +395,8 @@ export function AdminDashboard() {
           <section className="card p-6">
             <StatusDonutChart breakdown={data.statusBreakdown} title="Users by status today" />
           </section>
+            </>
+          )}
 
           <section className="card p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
