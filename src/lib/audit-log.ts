@@ -26,6 +26,7 @@ export type AuditAction =
   | "integration_key_revoke"
   | "admin_ooo_update"
   | "admin_notification_prefs_update"
+  | "admin_custom_notification"
   | "device_removal_request"
   | "device_removal_approve"
   | "device_removal_reject"
@@ -49,7 +50,10 @@ export type AuditAction =
   | "compliance_exemption_approve"
   | "compliance_exemption_reject"
   | "impersonate_start"
-  | "impersonate_end";
+  | "impersonate_end"
+  | "otp_request"
+  | "otp_verify_failed"
+  | "user_create_otp";
 
 export async function logAuditEvent(params: {
   actorId: string;

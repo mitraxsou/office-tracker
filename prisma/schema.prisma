@@ -8,11 +8,23 @@ datasource db {
   directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
+model LoginOtp {
+  id        String   @id @default(cuid())
+  email     String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+}
+
 model User {
   id                 String        @id @default(cuid())
   email              String        @unique
   passwordHash       String
   name               String?
+  registrationSource String        @default("admin")
   role               String        @default("user")
   timezone           String        @default("Asia/Kolkata")
   hoursTarget        Float?
@@ -31,6 +43,7 @@ model User {
   auditActions AuditLog[]    @relation("AuditActor")
   auditTargets AuditLog[]    @relation("AuditTarget")
   notificationPrefs UserNotificationPrefs?
+  inAppNotifications InAppNotification[]
   integrationApiKeys IntegrationApiKey[]
   outOfOfficeDays    UserOutOfOffice[]
   deviceRemovalRequests DeviceRemovalRequest[]
@@ -81,19 +94,38 @@ model UserNotificationPrefs {
   officeEndTime         String   @default("18:00")
   graceMinutes          Int      @default(45)
   notifyTeams           Boolean  @default(true)
-  notifyEmail           Boolean  @default(true)
+  notifyEmail           Boolean  @default(false)
   notificationsEnabled  Boolean  @default(true)
-  alertIfNotInOffice    Boolean  @default(true)
-  alertIfAgentStale     Boolean  @default(true)
+  alertIfNotInOffice    Boolean  @default(false)
+  alertIfAgentStale     Boolean  @default(false)
   alertIfBehindHours    Boolean  @default(false)
   alertIfHoursStarted   Boolean  @default(true)
   alertIfHoursMet       Boolean  @default(true)
+  channelNotInOffice    String   @default("app")
+  channelAgentStale     String   @default("app")
+  channelBehindHours    String   @default("app")
+  channelHoursStarted   String   @default("teams")
+  channelHoursMet       String   @default("teams")
   behindHoursCheckTime  String   @default("15:00")
   behindHoursMinExpected Float   @default(2.5)
   scheduleAutoFilled    Boolean  @default(false)
   scheduleUserSet       Boolean  @default(false)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+}
+
+model InAppNotification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  dayKey    String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([userId, type, dayKey])
+  @@index([userId, readAt])
 }
 
 model AgentToken {
@@ -242,7 +274,8 @@ model AppConfig {
   monthlyDaysTarget Int      @default(8)
   officeSsids       String   @default("[\"OfficeConnect\",\"ExternalConnect\",\"pwcglb.com\"]")
   maxDevicesPerUser Int      @default(10)
-  allowRegistration     Boolean  @default(false)
+  allowRegistration         Boolean  @default(false)
+  allowOtpSelfRegistration  Boolean  @default(false)
   pendingTokenTtlDays   Int      @default(7)
   heartbeatRetentionDays Int     @default(1)
   agentStaleMinutes     Int      @default(8)

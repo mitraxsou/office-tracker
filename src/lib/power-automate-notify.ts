@@ -9,25 +9,32 @@ import {
   getActiveIntegrationSecret,
   markIntegrationSecretUsed,
 } from "./integration-api-keys";
+import { persistInAppAlerts } from "./in-app-notifications";
 
-type WebhookPayload = Omit<
-  Pick<
-  IntegrationAlert,
-  | "type"
-  | "email"
-  | "name"
-  | "message"
-  | "hoursToday"
-  | "hoursTarget"
-  | "notifyTeams"
-  | "notifyEmail"
-  | "dashboardUrl"
-  | "settingsUrl"
-  | "helpUrl"
-  | "outOfOfficeUrl"
-  >,
-  "name"
-> & { name: string };
+export type LoginOtpWebhookPayload = {
+  type: "login_otp";
+  email: string;
+  name: string;
+  message: string;
+  otp: string;
+  otpExpiresMinutes: number;
+};
+
+export type AlertWebhookPayload = {
+  type: IntegrationAlertType | "custom";
+  email: string;
+  name: string;
+  message: string;
+  hoursToday: number;
+  hoursTarget: number;
+  notifyTeams: boolean;
+  dashboardUrl: string;
+  settingsUrl: string;
+  helpUrl: string;
+  outOfOfficeUrl: string;
+};
+
+export type WebhookPayload = LoginOtpWebhookPayload | AlertWebhookPayload;
 
 type ActiveSecret = {
   id: string;
@@ -42,7 +49,7 @@ type DispatchDependencies = {
   markUsed?: (id: string) => Promise<void>;
 };
 
-function toWebhookPayload(alert: IntegrationAlert): WebhookPayload {
+function toWebhookPayload(alert: IntegrationAlert): AlertWebhookPayload {
   return {
     type: alert.type,
     email: alert.email,
@@ -51,7 +58,6 @@ function toWebhookPayload(alert: IntegrationAlert): WebhookPayload {
     hoursToday: alert.hoursToday,
     hoursTarget: alert.hoursTarget,
     notifyTeams: alert.notifyTeams,
-    notifyEmail: alert.notifyEmail,
     dashboardUrl: alert.dashboardUrl,
     settingsUrl: alert.settingsUrl,
     helpUrl: alert.helpUrl,
@@ -73,11 +79,15 @@ async function resolveWebhookConfig(
   return { url, activeSecret };
 }
 
-async function postPayload(
+export async function postWebhookPayload(
   payload: WebhookPayload,
-  config: { url: string; activeSecret: ActiveSecret },
   dependencies: DispatchDependencies = {},
 ): Promise<{ ok: boolean; status?: number; error?: string }> {
+  const config = await resolveWebhookConfig(dependencies);
+  if (!config) {
+    return { ok: false, error: "not_configured" };
+  }
+
   try {
     const response = await (dependencies.fetcher ?? fetch)(config.url, {
       method: "POST",
@@ -108,28 +118,40 @@ export async function dispatchAlert(
   alert: IntegrationAlert,
   dependencies: DispatchDependencies = {},
 ) {
-  const config = await resolveWebhookConfig(dependencies);
-  if (!config) return { sent: false, skipped: true as const, reason: "not_configured" };
-
-  const result = await postPayload(toWebhookPayload(alert), config, dependencies);
+  const result = await postWebhookPayload(toWebhookPayload(alert), dependencies);
   return result.ok
     ? { sent: true, skipped: false as const }
-    : { sent: false, skipped: false as const, reason: result.error ?? `http_${result.status}` };
+    : {
+        sent: false,
+        skipped: result.error === "not_configured",
+        reason: result.error ?? `http_${result.status}`,
+      };
 }
 
 async function dispatchAlerts(
   alerts: IntegrationAlert[],
   dependencies: DispatchDependencies = {},
 ) {
+  const appAlerts = alerts.filter((alert) => alert.deliveryChannel === "app");
+  const teamsAlerts = alerts.filter((alert) => alert.deliveryChannel === "teams");
+  const inApp = await persistInAppAlerts(appAlerts);
+
   const config = await resolveWebhookConfig(dependencies);
   if (!config) {
-    return { ok: true, configured: false, checked: alerts.length, sent: 0, failed: 0 };
+    return {
+      ok: true,
+      configured: false,
+      checked: alerts.length,
+      sent: 0,
+      failed: 0,
+      inApp,
+    };
   }
 
   let sent = 0;
   let failed = 0;
-  for (const alert of alerts) {
-    const result = await postPayload(toWebhookPayload(alert), config, dependencies);
+  for (const alert of teamsAlerts) {
+    const result = await postWebhookPayload(toWebhookPayload(alert), dependencies);
     if (!result.ok) {
       failed += 1;
       continue;
@@ -140,7 +162,14 @@ async function dispatchAlerts(
     sent += 1;
   }
 
-  return { ok: true, configured: true, checked: alerts.length, sent, failed };
+  return {
+    ok: true,
+    configured: true,
+    checked: alerts.length,
+    sent,
+    failed,
+    inApp,
+  };
 }
 
 export async function dispatchPendingAlerts(dependencies: DispatchDependencies = {}) {
@@ -163,10 +192,7 @@ export async function sendTestNotification(
 ) {
   const baseUrl =
     process.env.NEXT_PUBLIC_APP_URL ?? "https://office-tracker-theta.vercel.app";
-  const config = await resolveWebhookConfig(dependencies);
-  if (!config) return { sent: false, reason: "not_configured" };
-
-  const result = await postPayload(
+  const result = await postWebhookPayload(
     {
       type: "hours_started",
       email: admin.email,
@@ -175,13 +201,11 @@ export async function sendTestNotification(
       hoursToday: 1,
       hoursTarget: 5,
       notifyTeams: true,
-      notifyEmail: true,
       dashboardUrl: `${baseUrl}/dashboard`,
       settingsUrl: `${baseUrl}/settings`,
       helpUrl: `${baseUrl}/help`,
       outOfOfficeUrl: `${baseUrl}/settings#out-of-office`,
     },
-    config,
     dependencies,
   );
   return result.ok

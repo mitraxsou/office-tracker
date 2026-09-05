@@ -3,6 +3,8 @@ import { prisma } from "./db";
 /** ISO weekday: 1 = Monday through 7 = Sunday */
 export const DEFAULT_WORK_DAYS = [3, 5];
 
+export type AlertDeliveryChannel = "app" | "teams";
+
 export type NotificationPrefsData = {
   workDays: number[];
   officeStartTime: string;
@@ -16,6 +18,11 @@ export type NotificationPrefsData = {
   alertIfBehindHours: boolean;
   alertIfHoursStarted: boolean;
   alertIfHoursMet: boolean;
+  channelNotInOffice: AlertDeliveryChannel;
+  channelAgentStale: AlertDeliveryChannel;
+  channelBehindHours: AlertDeliveryChannel;
+  channelHoursStarted: AlertDeliveryChannel;
+  channelHoursMet: AlertDeliveryChannel;
   behindHoursCheckTime: string;
   behindHoursMinExpected: number;
 };
@@ -27,15 +34,45 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefsData = {
   graceMinutes: 45,
   notificationsEnabled: true,
   notifyTeams: true,
-  notifyEmail: true,
-  alertIfNotInOffice: true,
-  alertIfAgentStale: true,
+  notifyEmail: false,
+  alertIfNotInOffice: false,
+  alertIfAgentStale: false,
   alertIfBehindHours: false,
   alertIfHoursStarted: true,
   alertIfHoursMet: true,
+  channelNotInOffice: "app",
+  channelAgentStale: "app",
+  channelBehindHours: "app",
+  channelHoursStarted: "teams",
+  channelHoursMet: "teams",
   behindHoursCheckTime: "15:00",
   behindHoursMinExpected: 2.5,
 };
+
+export function parseAlertDeliveryChannel(
+  value: unknown,
+  fallback: AlertDeliveryChannel,
+): AlertDeliveryChannel {
+  return value === "app" || value === "teams" ? value : fallback;
+}
+
+export function channelForAlert(
+  prefs: NotificationPrefsData,
+  type: "absent" | "stale" | "behind" | "hours_started" | "hours_met",
+): AlertDeliveryChannel {
+  switch (type) {
+    case "absent":
+      return prefs.channelNotInOffice;
+    case "stale":
+      return prefs.channelAgentStale;
+    case "behind":
+      return prefs.channelBehindHours;
+    case "hours_started":
+      return prefs.channelHoursStarted;
+    case "hours_met":
+      return prefs.channelHoursMet;
+  }
+}
 
 function parseWorkDays(raw: string): number[] {
   try {
@@ -64,6 +101,11 @@ export function toNotificationPrefsData(row: {
   alertIfBehindHours: boolean;
   alertIfHoursStarted?: boolean;
   alertIfHoursMet?: boolean;
+  channelNotInOffice?: string;
+  channelAgentStale?: string;
+  channelBehindHours?: string;
+  channelHoursStarted?: string;
+  channelHoursMet?: string;
   behindHoursCheckTime: string;
   behindHoursMinExpected: number;
 }): NotificationPrefsData {
@@ -80,6 +122,26 @@ export function toNotificationPrefsData(row: {
     alertIfBehindHours: row.alertIfBehindHours,
     alertIfHoursStarted: row.alertIfHoursStarted ?? true,
     alertIfHoursMet: row.alertIfHoursMet ?? true,
+    channelNotInOffice: parseAlertDeliveryChannel(
+      row.channelNotInOffice,
+      DEFAULT_NOTIFICATION_PREFS.channelNotInOffice,
+    ),
+    channelAgentStale: parseAlertDeliveryChannel(
+      row.channelAgentStale,
+      DEFAULT_NOTIFICATION_PREFS.channelAgentStale,
+    ),
+    channelBehindHours: parseAlertDeliveryChannel(
+      row.channelBehindHours,
+      DEFAULT_NOTIFICATION_PREFS.channelBehindHours,
+    ),
+    channelHoursStarted: parseAlertDeliveryChannel(
+      row.channelHoursStarted,
+      DEFAULT_NOTIFICATION_PREFS.channelHoursStarted,
+    ),
+    channelHoursMet: parseAlertDeliveryChannel(
+      row.channelHoursMet,
+      DEFAULT_NOTIFICATION_PREFS.channelHoursMet,
+    ),
     behindHoursCheckTime: isValidTime(row.behindHoursCheckTime)
       ? row.behindHoursCheckTime
       : "15:00",
@@ -135,12 +197,27 @@ export async function updateNotificationPrefs(
   }
   if (data.notificationsEnabled !== undefined) update.notificationsEnabled = data.notificationsEnabled;
   if (data.notifyTeams !== undefined) update.notifyTeams = data.notifyTeams;
-  if (data.notifyEmail !== undefined) update.notifyEmail = data.notifyEmail;
+  if (data.notifyEmail !== undefined) update.notifyEmail = false;
   if (data.alertIfNotInOffice !== undefined) update.alertIfNotInOffice = data.alertIfNotInOffice;
   if (data.alertIfAgentStale !== undefined) update.alertIfAgentStale = data.alertIfAgentStale;
   if (data.alertIfBehindHours !== undefined) update.alertIfBehindHours = data.alertIfBehindHours;
   if (data.alertIfHoursStarted !== undefined) update.alertIfHoursStarted = data.alertIfHoursStarted;
   if (data.alertIfHoursMet !== undefined) update.alertIfHoursMet = data.alertIfHoursMet;
+  if (data.channelNotInOffice !== undefined) {
+    update.channelNotInOffice = parseAlertDeliveryChannel(data.channelNotInOffice, "app");
+  }
+  if (data.channelAgentStale !== undefined) {
+    update.channelAgentStale = parseAlertDeliveryChannel(data.channelAgentStale, "app");
+  }
+  if (data.channelBehindHours !== undefined) {
+    update.channelBehindHours = parseAlertDeliveryChannel(data.channelBehindHours, "app");
+  }
+  if (data.channelHoursStarted !== undefined) {
+    update.channelHoursStarted = parseAlertDeliveryChannel(data.channelHoursStarted, "teams");
+  }
+  if (data.channelHoursMet !== undefined) {
+    update.channelHoursMet = parseAlertDeliveryChannel(data.channelHoursMet, "teams");
+  }
   if (data.behindHoursCheckTime !== undefined) {
     if (!isValidTime(data.behindHoursCheckTime)) throw new Error("Invalid behind-hours check time");
     update.behindHoursCheckTime = data.behindHoursCheckTime;

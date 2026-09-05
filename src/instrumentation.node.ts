@@ -4,7 +4,8 @@ export async function registerNode() {
 
   const { prisma } = await import("./lib/db");
   const { ensureBreakglassAdmin } = await import("./lib/breakglass");
-  const { ensureAppConfig, logAppConfigSchemaDriftIfNeeded } = await import("./lib/app-config");
+  const { ensureAppConfig, logAppConfigSchemaDriftIfNeeded, logDatabaseAccessDeniedIfNeeded } =
+    await import("./lib/app-config");
   try {
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "allowRegistration" BOOLEAN NOT NULL DEFAULT false;'
@@ -63,7 +64,7 @@ export async function registerNode() {
         "officeEndTime" TEXT NOT NULL DEFAULT '18:00',
         "graceMinutes" INTEGER NOT NULL DEFAULT 45,
         "notifyTeams" BOOLEAN NOT NULL DEFAULT true,
-        "notifyEmail" BOOLEAN NOT NULL DEFAULT true,
+        "notifyEmail" BOOLEAN NOT NULL DEFAULT false,
         "notificationsEnabled" BOOLEAN NOT NULL DEFAULT true,
         "alertIfNotInOffice" BOOLEAN NOT NULL DEFAULT true,
         "alertIfAgentStale" BOOLEAN NOT NULL DEFAULT true,
@@ -94,6 +95,45 @@ export async function registerNode() {
     );
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "UserNotificationPrefs" ADD COLUMN IF NOT EXISTS "alertIfHoursMet" BOOLEAN NOT NULL DEFAULT true;'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "UserNotificationPrefs" ADD COLUMN IF NOT EXISTS "channelNotInOffice" TEXT NOT NULL DEFAULT \'app\';'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "UserNotificationPrefs" ADD COLUMN IF NOT EXISTS "channelAgentStale" TEXT NOT NULL DEFAULT \'app\';'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "UserNotificationPrefs" ADD COLUMN IF NOT EXISTS "channelBehindHours" TEXT NOT NULL DEFAULT \'app\';'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "UserNotificationPrefs" ADD COLUMN IF NOT EXISTS "channelHoursStarted" TEXT NOT NULL DEFAULT \'teams\';'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "UserNotificationPrefs" ADD COLUMN IF NOT EXISTS "channelHoursMet" TEXT NOT NULL DEFAULT \'teams\';'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "UserNotificationPrefs" ALTER COLUMN "notifyEmail" SET DEFAULT false;'
+    );
+    await prisma.$executeRawUnsafe(
+      `UPDATE "UserNotificationPrefs" SET "notifyEmail" = false WHERE "notifyEmail" = true;`
+    );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "InAppNotification" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "type" TEXT NOT NULL,
+        "dayKey" TEXT NOT NULL,
+        "message" TEXT NOT NULL,
+        "readAt" TIMESTAMP(3),
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "InAppNotification_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "InAppNotification_userId_type_dayKey_key" ON "InAppNotification"("userId", "type", "dayKey");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "InAppNotification_userId_readAt_idx" ON "InAppNotification"("userId", "readAt");'
     );
     await prisma.$executeRawUnsafe(
       `UPDATE "UserNotificationPrefs"
@@ -343,10 +383,36 @@ export async function registerNode() {
     await prisma.$executeRawUnsafe(
       'CREATE INDEX IF NOT EXISTS "ComplianceExemptionRequest_userId_dayKey_idx" ON "ComplianceExemptionRequest"("userId", "dayKey");'
     );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "allowOtpSelfRegistration" BOOLEAN NOT NULL DEFAULT false;'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "registrationSource" TEXT NOT NULL DEFAULT \'admin\';'
+    );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "LoginOtp" (
+        "id" TEXT NOT NULL,
+        "email" TEXT NOT NULL,
+        "codeHash" TEXT NOT NULL,
+        "expiresAt" TIMESTAMP(3) NOT NULL,
+        "attempts" INTEGER NOT NULL DEFAULT 0,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "LoginOtp_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "LoginOtp_email_createdAt_idx" ON "LoginOtp"("email", "createdAt");'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "UserNotificationPrefs" ALTER COLUMN "alertIfNotInOffice" SET DEFAULT false;'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "UserNotificationPrefs" ALTER COLUMN "alertIfAgentStale" SET DEFAULT false;'
+    );
     await ensureAppConfig();
     await ensureBreakglassAdmin();
   } catch (err) {
-    if (!logAppConfigSchemaDriftIfNeeded(err)) {
+    if (!logAppConfigSchemaDriftIfNeeded(err) && !logDatabaseAccessDeniedIfNeeded(err)) {
       console.error("[startup] breakglass/config init failed:", err);
     }
   }

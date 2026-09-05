@@ -4,14 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export function AdminPilotControls({
-  allowRegistration,
+  allowOtpSelfRegistration,
   registrationEnvLocked,
 }: {
-  allowRegistration: boolean;
+  allowOtpSelfRegistration: boolean;
   registrationEnvLocked: boolean;
 }) {
   const router = useRouter();
-  const [registrationEnabled, setRegistrationEnabled] = useState(allowRegistration);
+  const [otpRegistrationEnabled, setOtpRegistrationEnabled] = useState(allowOtpSelfRegistration);
   const [regLoading, setRegLoading] = useState(false);
   const [regError, setRegError] = useState<string | null>(null);
   const [regSaved, setRegSaved] = useState(false);
@@ -37,8 +37,8 @@ export function AdminPilotControls({
     setAgentPushMessage(`Queued update for ${data.deviceCount ?? 0} device(s).`);
   }
 
-  async function handleRegistrationToggle() {
-    const next = !registrationEnabled;
+  async function handleOtpRegistrationToggle() {
+    const next = !otpRegistrationEnabled;
     setRegLoading(true);
     setRegError(null);
     setRegSaved(false);
@@ -46,17 +46,17 @@ export function AdminPilotControls({
     const res = await fetch("/api/admin/config", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ allowRegistration: next }),
+      body: JSON.stringify({ allowOtpSelfRegistration: next }),
     });
 
     setRegLoading(false);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      setRegError(data.error ?? "Failed to update registration setting");
+      setRegError(data.error ?? "Failed to update OTP registration setting");
       return;
     }
 
-    setRegistrationEnabled(next);
+    setOtpRegistrationEnabled(next);
     setRegSaved(true);
     router.refresh();
   }
@@ -90,42 +90,42 @@ export function AdminPilotControls({
     <div className="space-y-6">
       <section className="card p-6">
         <h2 className="mb-1 text-lg font-medium">Pilot controls</h2>
-        <p className="mb-4 text-sm text-muted">Registration and testing tools for the pilot</p>
+        <p className="mb-4 text-sm text-muted">OTP sign-in and testing tools for the pilot</p>
 
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="font-medium">Allow new user registration</p>
+            <p className="font-medium">Allow OTP self-registration</p>
             <p className="mt-1 text-sm text-muted">
-              When off, the /register page is blocked. Production env can hard-lock this with
-              ALLOW_REGISTRATION=false.
+              When on, a colleague can sign in with a PwC email OTP and get an account on first
+              verify. When off, OTP works only for emails already in the database.
             </p>
             {registrationEnvLocked && (
               <p className="mt-2 text-sm text-accent">
                 Locked off by ALLOW_REGISTRATION=false in environment. UI toggle cannot enable
-                registration.
+                new user creation.
               </p>
             )}
           </div>
           <button
             type="button"
             role="switch"
-            aria-checked={registrationEnabled}
+            aria-checked={otpRegistrationEnabled}
             disabled={regLoading || registrationEnvLocked}
-            onClick={handleRegistrationToggle}
+            onClick={handleOtpRegistrationToggle}
             className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-              registrationEnabled ? "bg-[var(--pwc-orange)]" : "bg-[var(--border)]"
+              otpRegistrationEnabled ? "bg-[var(--pwc-orange)]" : "bg-[var(--border)]"
             }`}
           >
             <span
               className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white transition-transform ${
-                registrationEnabled ? "translate-x-5" : "translate-x-0"
+                otpRegistrationEnabled ? "translate-x-5" : "translate-x-0"
               }`}
             />
           </button>
         </div>
 
         {regError && <p className="mt-3 text-sm text-red-400">{regError}</p>}
-        {regSaved && <p className="mt-3 text-sm text-green-400">Registration setting saved.</p>}
+        {regSaved && <p className="mt-3 text-sm text-green-400">OTP registration setting saved.</p>}
       </section>
 
       <section className="card p-6">
@@ -140,7 +140,7 @@ export function AdminPilotControls({
           disabled={agentPushLoading}
           className="btn-primary px-4 py-2 disabled:opacity-50"
         >
-          {agentPushLoading ? "Queuing…" : "Push agent update to all devices"}
+          {agentPushLoading ? "Queuing..." : "Push agent update to all devices"}
         </button>
         {agentPushMessage && <p className="mt-3 text-sm text-green-400">{agentPushMessage}</p>}
       </section>

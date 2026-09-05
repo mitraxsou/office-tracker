@@ -4,10 +4,12 @@ import { getTodaySummary, getPulseStats } from "./heartbeat-service";
 import { dayBoundsFromKey, dayKeyInTimezone } from "./timezone-dates";
 import { roundHours } from "./visits";
 import {
+  channelForAlert,
   getMinutesInTimezone,
   getNotificationPrefs,
   isWorkDayNow,
   parseTimeToMinutes,
+  type AlertDeliveryChannel,
   type NotificationPrefsData,
 } from "./notification-prefs";
 import { buildOutOfOfficeLinkUrl, isUserOutOfOffice } from "./out-of-office";
@@ -19,7 +21,8 @@ export type IntegrationAlertType =
   | "stale"
   | "behind"
   | "hours_started"
-  | "hours_met";
+  | "hours_met"
+  | "custom";
 
 export type IntegrationAlert = {
   type: IntegrationAlertType;
@@ -32,7 +35,7 @@ export type IntegrationAlert = {
   agentHealthy: boolean;
   inOfficeNow: boolean;
   notifyTeams: boolean;
-  notifyEmail: boolean;
+  deliveryChannel: AlertDeliveryChannel;
   dayKey: string;
   dashboardUrl: string;
   settingsUrl: string;
@@ -158,7 +161,6 @@ async function evaluateUserAlerts(
 ): Promise<IntegrationAlert[]> {
   const prefs = await getNotificationPrefs(user.id);
   if (!prefs.notificationsEnabled) return [];
-  if (!prefs.notifyTeams && !prefs.notifyEmail) return [];
 
   const hoursTarget = await getUserHoursTarget(user);
   const graceHours = await getEffectiveAgentStaleGraceHours(user);
@@ -192,8 +194,7 @@ async function evaluateUserAlerts(
     hoursTarget,
     agentHealthy: pulse.agentHealthy,
     inOfficeNow: summary.inOfficeNow,
-    notifyTeams: prefs.notifyTeams,
-    notifyEmail: prefs.notifyEmail,
+    notifyTeams: false,
     dayKey,
     dashboardUrl: `${baseUrl}/dashboard`,
     settingsUrl: `${baseUrl}/settings`,
@@ -216,10 +217,13 @@ async function evaluateUserAlerts(
   ) {
     const hasDevice = await userHasActiveInstalledDevice(user.id);
     if (hasDevice && !(await wasAlertSentToday(user.id, "stale", dayKey))) {
+      const deliveryChannel = channelForAlert(prefs, "stale");
       alerts.push({
         ...base,
         type: "stale",
         message: buildStaleMessage(pulse.minutesSinceLastPulse, baseUrl),
+        deliveryChannel,
+        notifyTeams: deliveryChannel === "teams",
       });
     }
   }
@@ -230,10 +234,13 @@ async function evaluateUserAlerts(
       if (
         !(await wasAlertSentToday(user.id, "absent", dayKey))
       ) {
+        const deliveryChannel = channelForAlert(prefs, "absent");
         alerts.push({
           ...base,
           type: "absent",
           message: buildAbsentMessage(prefs, baseUrl),
+          deliveryChannel,
+          notifyTeams: deliveryChannel === "teams",
         });
       }
     }
@@ -246,15 +253,18 @@ async function evaluateUserAlerts(
       summary.totalHours < prefs.behindHoursMinExpected &&
       !(await wasAlertSentToday(user.id, "behind", dayKey))
     ) {
-      alerts.push({
-        ...base,
-        type: "behind",
-        message: buildBehindMessage(
-          summary.totalHours,
-          prefs.behindHoursMinExpected,
-          hoursTarget,
-        ),
-      });
+        const deliveryChannel = channelForAlert(prefs, "behind");
+        alerts.push({
+          ...base,
+          type: "behind",
+          message: buildBehindMessage(
+            summary.totalHours,
+            prefs.behindHoursMinExpected,
+            hoursTarget,
+          ),
+          deliveryChannel,
+          notifyTeams: deliveryChannel === "teams",
+        });
     }
   }
 
@@ -266,10 +276,13 @@ async function evaluateUserAlerts(
       await wasAlertSentToday(user.id, "hours_started", dayKey),
     )
   ) {
+    const deliveryChannel = channelForAlert(prefs, "hours_started");
     alerts.push({
       ...base,
       type: "hours_started",
       message: buildHoursStartedMessage(hoursTarget),
+      deliveryChannel,
+      notifyTeams: deliveryChannel === "teams",
     });
   }
 
@@ -281,10 +294,13 @@ async function evaluateUserAlerts(
       await wasAlertSentToday(user.id, "hours_met", dayKey),
     )
   ) {
+    const deliveryChannel = channelForAlert(prefs, "hours_met");
     alerts.push({
       ...base,
       type: "hours_met",
       message: buildHoursMetMessage(summary.totalHours, hoursTarget),
+      deliveryChannel,
+      notifyTeams: deliveryChannel === "teams",
     });
   }
 

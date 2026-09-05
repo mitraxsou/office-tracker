@@ -6,6 +6,7 @@ export type AdminUsersListParams = {
   search: string;
   page: number;
   pageSize: number;
+  source?: "otp_self";
 };
 
 export function parseAdminUsersListParams(searchParams: URLSearchParams): AdminUsersListParams {
@@ -18,18 +19,27 @@ export function parseAdminUsersListParams(searchParams: URLSearchParams): AdminU
       10,
     ) || DEFAULT_ADMIN_USERS_PAGE_SIZE;
   const pageSize = Math.min(MAX_ADMIN_USERS_PAGE_SIZE, Math.max(1, rawPageSize));
-  return { all, search, page, pageSize };
+  const source = searchParams.get("source") === "otp_self" ? "otp_self" : undefined;
+  return { all, search, page, pageSize, source };
 }
 
-export function buildUserSearchWhere(search: string) {
+export function buildUserSearchWhere(search: string, source?: "otp_self") {
   const trimmed = search.trim();
-  if (!trimmed) return {};
-  return {
-    OR: [
-      { email: { contains: trimmed, mode: "insensitive" as const } },
-      { name: { contains: trimmed, mode: "insensitive" as const } },
-    ],
-  };
+  const filters: Record<string, unknown>[] = [];
+  if (trimmed) {
+    filters.push({
+      OR: [
+        { email: { contains: trimmed, mode: "insensitive" as const } },
+        { name: { contains: trimmed, mode: "insensitive" as const } },
+      ],
+    });
+  }
+  if (source === "otp_self") {
+    filters.push({ registrationSource: "otp_self" });
+  }
+  if (filters.length === 0) return {};
+  if (filters.length === 1) return filters[0];
+  return { AND: filters };
 }
 
 export const ADMIN_PROFILE_CHANGE_REQUIRES_APPROVAL =

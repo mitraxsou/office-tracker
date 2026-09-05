@@ -10,8 +10,10 @@ import {
 } from "../src/lib/integration-alerts";
 import {
   DEFAULT_NOTIFICATION_PREFS,
+  channelForAlert,
   getWeekdayInTimezone,
   isWorkDayNow,
+  parseAlertDeliveryChannel,
   parseTimeToMinutes,
 } from "../src/lib/notification-prefs";
 
@@ -104,5 +106,24 @@ describe("presence reminder rules", () => {
     expect(shouldQueueDailyAlert(true, false)).toBe(true);
     expect(shouldQueueDailyAlert(true, true)).toBe(false);
     expect(shouldQueueDailyAlert(false, false)).toBe(false);
+  });
+});
+
+describe("alert delivery channels", () => {
+  it("defaults reminder alerts to the app and hours alerts to Teams", () => {
+    expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "absent")).toBe("app");
+    expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "stale")).toBe("app");
+    expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "behind")).toBe("app");
+    expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "hours_started")).toBe("teams");
+    expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "hours_met")).toBe("teams");
+    expect(DEFAULT_NOTIFICATION_PREFS.alertIfHoursStarted).toBe(true);
+    expect(DEFAULT_NOTIFICATION_PREFS.alertIfHoursMet).toBe(true);
+    expect(DEFAULT_NOTIFICATION_PREFS.alertIfNotInOffice).toBe(false);
+    expect(DEFAULT_NOTIFICATION_PREFS.alertIfAgentStale).toBe(false);
+  });
+
+  it("rejects unknown channel values", () => {
+    expect(parseAlertDeliveryChannel("email", "app")).toBe("app");
+    expect(parseAlertDeliveryChannel("teams", "app")).toBe("teams");
   });
 });

@@ -485,6 +485,7 @@ export async function createUserByAdmin(params: {
       passwordHash,
       name: params.name?.trim() || null,
       role: "user",
+      registrationSource: "admin",
     },
   });
 

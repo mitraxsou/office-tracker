@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { NotificationPrefsData } from "@/lib/notification-prefs";
+import type {
+  AlertDeliveryChannel,
+  NotificationPrefsData,
+} from "@/lib/notification-prefs";
 import { OfficeScheduleSuggestionCard } from "@/components/OfficeScheduleSuggestionCard";
 
 const WEEKDAYS: Array<{ value: number; label: string }> = [
@@ -14,6 +17,72 @@ const WEEKDAYS: Array<{ value: number; label: string }> = [
   { value: 7, label: "Sun" },
 ];
 
+const HOURS_ALERT_ROWS: Array<{
+  enabledKey: "alertIfHoursStarted" | "alertIfHoursMet";
+  channelKey: "channelHoursStarted" | "channelHoursMet";
+  label: string;
+  help: string;
+}> = [
+  {
+    enabledKey: "alertIfHoursStarted",
+    channelKey: "channelHoursStarted",
+    label: "Tell me when office hours start counting",
+    help: "Sends once per day when office Wi-Fi is first detected, including days that are not usual office days. Default delivery is Microsoft Teams via Power Automate.",
+  },
+  {
+    enabledKey: "alertIfHoursMet",
+    channelKey: "channelHoursMet",
+    label: "Tell me when I meet my daily hours target",
+    help: "Sends once per day when counted office hours reach your daily target. Default delivery is Microsoft Teams via Power Automate.",
+  },
+];
+
+const ADVANCED_ALERT_ROWS: Array<{
+  enabledKey: "alertIfNotInOffice" | "alertIfAgentStale" | "alertIfBehindHours";
+  channelKey: "channelNotInOffice" | "channelAgentStale" | "channelBehindHours";
+  label: string;
+  help: string;
+}> = [
+  {
+    enabledKey: "alertIfNotInOffice",
+    channelKey: "channelNotInOffice",
+    label: "Remind me if the agent has no Wi-Fi name (after grace period)",
+    help: "On a usual office day, after start time plus grace, Office Pulse reminds you if the agent is healthy but cannot report a Wi-Fi name. Working from home on a known non-office network does not trigger this. Default delivery is in the app only.",
+  },
+  {
+    enabledKey: "alertIfAgentStale",
+    channelKey: "channelAgentStale",
+    label: "Remind me if the agent stops sending heartbeats",
+    help: "On a usual office day, after start time plus grace, Office Pulse reminds you if a registered laptop has gone quiet past the stale threshold. Default delivery is in the app only.",
+  },
+  {
+    enabledKey: "alertIfBehindHours",
+    channelKey: "channelBehindHours",
+    label: "Remind me if I am behind on hours by a set time",
+    help: "On a usual office day, after the check time you set below, Office Pulse reminds you if logged office hours are still below the minimum you chose. Off by default. Default delivery is in the app only.",
+  },
+];
+
+function InfoTip({ label, text }: { label: string; text: string }) {
+  return (
+    <span className="group relative inline-flex shrink-0">
+      <button
+        type="button"
+        className="flex h-4 w-4 items-center justify-center rounded-full border border-[var(--border)] text-[10px] font-medium leading-none text-muted transition-colors hover:border-[var(--pwc-orange)] hover:text-[var(--pwc-orange)]"
+        aria-label={`About ${label}`}
+      >
+        i
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-64 rounded-md border border-[var(--border)] bg-[var(--background-elevated)] px-2.5 py-2 text-left text-[11px] leading-snug font-normal text-muted shadow-lg group-hover:block group-focus-within:block sm:left-auto sm:right-0"
+      >
+        {text}
+      </span>
+    </span>
+  );
+}
+
 export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } = {}) {
   const apiUrl = adminUserId
     ? `/api/admin/users/${adminUserId}/notification-prefs`
@@ -23,6 +92,7 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
     fetch(apiUrl)
@@ -86,7 +156,8 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
 
   async function handleSave() {
     if (!prefs) return;
-    await savePrefs(prefs, "Notification preferences saved.");
+    const next = { ...prefs, notifyEmail: false };
+    await savePrefs(next, "Notification preferences saved.");
   }
 
   if (loading || !prefs) {
@@ -107,12 +178,8 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
         {adminUserId ? "Office schedule and alerts (admin)" : "Office schedule and alerts"}
       </h2>
       <p className="mb-4 text-sm text-muted">
-        Teams and email reminders are sent through Power Automate. Alerts are nudges only, not HR
-        records. Reminders are sent only on {adminUserId ? "the user's" : "your"} selected{" "}
-        <strong>usual office days</strong> (Wednesday and Friday by default for this pilot).
-        Positive hours alerts can fire on any day when office Wi-Fi is detected. Fill usual days
-        and times from office visit history when there is enough data. Edit anytime to keep your
-        own.
+        Office hours alerts go to Microsoft Teams by default. Optional reminder alerts stay in the
+        app unless you change delivery. Alerts are nudges only, not HR records.
       </p>
 
       <label className="mb-5 flex items-center gap-3 rounded-lg border border-[var(--border)] px-4 py-3 text-sm">
@@ -124,7 +191,7 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
         <span>
           <span className="font-medium">Enable notifications</span>
           <span className="mt-0.5 block text-xs text-muted">
-            Turn off to stop all Teams and email alerts from Office Pulse.
+            Turn off to stop all in-app and Teams alerts from Office Pulse.
           </span>
         </span>
       </label>
@@ -197,71 +264,107 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
         </p>
 
         <div>
-          <p className="mb-2 text-sm font-medium">Delivery channels</p>
-          <div className="space-y-2 text-sm">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={prefs.notifyTeams}
-                onChange={(e) => setPrefs({ ...prefs, notifyTeams: e.target.checked })}
-              />
-              Microsoft Teams (via Power Automate)
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={prefs.notifyEmail}
-                onChange={(e) => setPrefs({ ...prefs, notifyEmail: e.target.checked })}
-              />
-              Email (via Power Automate and Outlook)
-            </label>
+          <p className="mb-2 text-sm font-medium">Office hours alerts</p>
+          <p className="mb-3 text-xs text-muted">
+            Default on: Teams when office Wi-Fi is detected and when you meet your daily target.
+          </p>
+          <div className="space-y-3 text-sm">
+            {HOURS_ALERT_ROWS.map((row) => (
+              <div
+                key={row.enabledKey}
+                className="rounded-lg border border-[var(--border)] px-3 py-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <label className="flex min-w-0 items-start gap-2">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={prefs[row.enabledKey]}
+                      onChange={(e) =>
+                        setPrefs({ ...prefs, [row.enabledKey]: e.target.checked })
+                      }
+                    />
+                    <span className="font-medium">{row.label}</span>
+                  </label>
+                  <InfoTip label={row.label} text={row.help} />
+                </div>
+                <label className="mt-2 flex items-center gap-2 pl-6 text-xs text-muted">
+                  Delivery
+                  <select
+                    value={prefs[row.channelKey]}
+                    disabled={!prefs[row.enabledKey]}
+                    onChange={(e) =>
+                      setPrefs({
+                        ...prefs,
+                        [row.channelKey]: e.target.value as AlertDeliveryChannel,
+                      })
+                    }
+                    className="rounded-md border border-[var(--border)] bg-transparent px-2 py-1 text-xs text-[var(--foreground)] disabled:opacity-50"
+                  >
+                    <option value="app">In the app</option>
+                    <option value="teams">Microsoft Teams</option>
+                  </select>
+                </label>
+              </div>
+            ))}
           </div>
         </div>
 
         <div>
-          <p className="mb-2 text-sm font-medium">Alert types</p>
-          <div className="space-y-2 text-sm">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={prefs.alertIfNotInOffice}
-                onChange={(e) => setPrefs({ ...prefs, alertIfNotInOffice: e.target.checked })}
-              />
-              Remind me if the agent has no Wi-Fi name (after grace period)
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={prefs.alertIfAgentStale}
-                onChange={(e) => setPrefs({ ...prefs, alertIfAgentStale: e.target.checked })}
-              />
-              Remind me if the agent stops sending heartbeats
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={prefs.alertIfBehindHours}
-                onChange={(e) => setPrefs({ ...prefs, alertIfBehindHours: e.target.checked })}
-              />
-              Remind me if I am behind on hours by a set time
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={prefs.alertIfHoursStarted}
-                onChange={(e) => setPrefs({ ...prefs, alertIfHoursStarted: e.target.checked })}
-              />
-              Tell me when office hours start counting
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={prefs.alertIfHoursMet}
-                onChange={(e) => setPrefs({ ...prefs, alertIfHoursMet: e.target.checked })}
-              />
-              Tell me when I meet my daily hours target
-            </label>
-          </div>
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen((v) => !v)}
+            className="flex w-full items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2 text-sm font-medium"
+          >
+            Advanced reminders
+            <span className="text-xs text-muted">{advancedOpen ? "Hide" : "Show"}</span>
+          </button>
+          {advancedOpen && (
+            <div className="mt-3 space-y-3 text-sm">
+              <p className="text-xs text-muted">
+                Optional reminders on usual office days only (Wednesday and Friday by default). Off
+                by default for this pilot.
+              </p>
+              {ADVANCED_ALERT_ROWS.map((row) => (
+                <div
+                  key={row.enabledKey}
+                  className="rounded-lg border border-[var(--border)] px-3 py-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <label className="flex min-w-0 items-start gap-2">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={prefs[row.enabledKey]}
+                        onChange={(e) =>
+                          setPrefs({ ...prefs, [row.enabledKey]: e.target.checked })
+                        }
+                      />
+                      <span className="font-medium">{row.label}</span>
+                    </label>
+                    <InfoTip label={row.label} text={row.help} />
+                  </div>
+                  <label className="mt-2 flex items-center gap-2 pl-6 text-xs text-muted">
+                    Delivery
+                    <select
+                      value={prefs[row.channelKey]}
+                      disabled={!prefs[row.enabledKey]}
+                      onChange={(e) =>
+                        setPrefs({
+                          ...prefs,
+                          [row.channelKey]: e.target.value as AlertDeliveryChannel,
+                        })
+                      }
+                      className="rounded-md border border-[var(--border)] bg-transparent px-2 py-1 text-xs text-[var(--foreground)] disabled:opacity-50"
+                    >
+                      <option value="app">In the app</option>
+                      <option value="teams">Microsoft Teams</option>
+                    </select>
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {prefs.alertIfBehindHours && (

@@ -4,7 +4,7 @@ import {
   encryptIntegrationSecret,
   generateIntegrationApiKey,
 } from "../src/lib/integration-api-keys";
-import { dispatchAlert } from "../src/lib/power-automate-notify";
+import { dispatchAlert, postWebhookPayload } from "../src/lib/power-automate-notify";
 import type { IntegrationAlert } from "../src/lib/integration-alerts";
 
 const alert: IntegrationAlert = {
@@ -18,7 +18,7 @@ const alert: IntegrationAlert = {
   agentHealthy: true,
   inOfficeNow: true,
   notifyTeams: true,
-  notifyEmail: true,
+  deliveryChannel: "teams",
   dayKey: "2026-09-04",
   dashboardUrl: "https://pulse.example/dashboard",
   settingsUrl: "https://pulse.example/settings",
@@ -95,5 +95,32 @@ describe("Power Automate webhook secrets", () => {
     expect(init.headers["X-Office-Pulse-Token"]).toBe("header-secret");
     expect(JSON.parse(init.body)).not.toHaveProperty("userId");
     expect(markUsed).toHaveBeenCalledWith("key-1");
+  });
+
+  it("posts login_otp payload without url fields", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 202 }));
+    const markUsed = vi.fn().mockResolvedValue(undefined);
+    const result = await postWebhookPayload(
+      {
+        type: "login_otp",
+        email: "user@pwc.com",
+        name: "User",
+        message: "Your code is 123456",
+        otp: "123456",
+        otpExpiresMinutes: 10,
+      },
+      {
+        webhookUrl: "https://example.invalid/webhook",
+        getSecret: async () => ({ id: "key-1", actorId: "admin-1", secret: "header-secret" }),
+        fetcher,
+        markUsed,
+      },
+    );
+    expect(result.ok).toBe(true);
+    const body = JSON.parse(fetcher.mock.calls[0][1].body);
+    expect(body.type).toBe("login_otp");
+    expect(body.otp).toBe("123456");
+    expect(body).not.toHaveProperty("notifyEmail");
+    expect(body).not.toHaveProperty("dashboardUrl");
   });
 });

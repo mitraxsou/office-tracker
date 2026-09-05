@@ -14,6 +14,7 @@ describe("parseAdminUsersListParams", () => {
       search: "",
       page: 1,
       pageSize: 20,
+      source: undefined,
     });
   });
 
@@ -51,6 +52,23 @@ describe("buildUserSearchWhere", () => {
       OR: [
         { email: { contains: "bob", mode: "insensitive" } },
         { name: { contains: "bob", mode: "insensitive" } },
+      ],
+    });
+  });
+
+  it("filters self-registered otp users", () => {
+    expect(buildUserSearchWhere("", "otp_self")).toEqual({
+      registrationSource: "otp_self",
+    });
+    expect(buildUserSearchWhere("bob", "otp_self")).toEqual({
+      AND: [
+        {
+          OR: [
+            { email: { contains: "bob", mode: "insensitive" } },
+            { name: { contains: "bob", mode: "insensitive" } },
+          ],
+        },
+        { registrationSource: "otp_self" },
       ],
     });
   });

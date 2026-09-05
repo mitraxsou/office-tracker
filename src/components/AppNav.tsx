@@ -7,6 +7,7 @@ import { isAdmin } from "@/lib/admin";
 import { APP_VERSION } from "@/lib/app-version";
 import { getAdminInbox } from "@/lib/admin-inbox";
 import { AdminNotificationCorner } from "@/components/AdminNotificationCorner";
+import { AdminImpersonatePicker } from "@/components/AdminImpersonatePicker";
 
 export async function AppNav() {
   const user = await getCurrentUser();
@@ -79,6 +80,7 @@ export async function AppNav() {
         </div>
         <div className="flex items-center gap-3">
           {inbox && <AdminNotificationCorner total={inbox.total} items={inbox.items} />}
+          {adminAccess && !impersonation && <AdminImpersonatePicker />}
           <ThemeToggle />
           <Link href="/help#whats-new" className="text-xs text-muted hover:text-accent">
             v{APP_VERSION}

@@ -43,12 +43,31 @@ export function logAppConfigSchemaDriftIfNeeded(err: unknown): boolean {
   return true;
 }
 
+/** Neon rejects every connection (P1010) when the role, password, or project is no longer valid. */
+export function logDatabaseAccessDeniedIfNeeded(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  const isAccessDenied =
+    message.includes("User was denied access on the database") || message.includes("P1010");
+
+  if (!isAccessDenied) return false;
+
+  console.error(
+    "[startup] Postgres refused the connection (access denied for the configured role).\n" +
+      "  The app cannot read or write anything until this is fixed, so every page will fail.\n" +
+      "  Check Vercel -> Storage -> Postgres (or the Neon dashboard) for a suspended or\n" +
+      "  over-quota project, then copy fresh POSTGRES_PRISMA_URL and POSTGRES_URL_NON_POOLING\n" +
+      "  values into .env.vercel.local and restart the dev server."
+  );
+  return true;
+}
+
 export type AppConfigData = {
   hoursTarget: number;
   monthlyDaysTarget: number;
   officeSsids: string[];
   maxDevicesPerUser: number;
   allowRegistration: boolean;
+  allowOtpSelfRegistration: boolean;
   pendingTokenTtlDays: number;
   heartbeatRetentionDays: number;
   agentStaleMinutes: number;
@@ -85,6 +104,7 @@ export async function ensureAppConfig(): Promise<AppConfigData> {
           officeSsids: JSON.stringify(parseDefaultSsidsFromEnv()),
           maxDevicesPerUser: 10,
           allowRegistration: false,
+          allowOtpSelfRegistration: false,
           pendingTokenTtlDays: DEFAULT_PENDING_TOKEN_TTL_DAYS,
           heartbeatRetentionDays: DEFAULT_HEARTBEAT_RETENTION_DAYS,
           agentStaleMinutes: DEFAULT_AGENT_STALE_MINUTES,
@@ -117,6 +137,9 @@ export async function updateAppConfig(data: Partial<AppConfigData>) {
   if (data.officeSsids !== undefined) update.officeSsids = JSON.stringify(data.officeSsids);
   if (data.maxDevicesPerUser !== undefined) update.maxDevicesPerUser = data.maxDevicesPerUser;
   if (data.allowRegistration !== undefined) update.allowRegistration = data.allowRegistration;
+  if (data.allowOtpSelfRegistration !== undefined) {
+    update.allowOtpSelfRegistration = data.allowOtpSelfRegistration;
+  }
   if (data.pendingTokenTtlDays !== undefined) update.pendingTokenTtlDays = data.pendingTokenTtlDays;
   if (data.heartbeatRetentionDays !== undefined) update.heartbeatRetentionDays = data.heartbeatRetentionDays;
   if (data.agentStaleMinutes !== undefined) update.agentStaleMinutes = data.agentStaleMinutes;
@@ -160,6 +183,7 @@ function parseConfig(config: {
   officeSsids: string;
   maxDevicesPerUser: number;
   allowRegistration: boolean;
+  allowOtpSelfRegistration?: boolean;
   pendingTokenTtlDays?: number;
   heartbeatRetentionDays?: number;
   agentStaleMinutes?: number;
@@ -180,6 +204,7 @@ function parseConfig(config: {
     officeSsids: ssids,
     maxDevicesPerUser: config.maxDevicesPerUser,
     allowRegistration: config.allowRegistration,
+    allowOtpSelfRegistration: config.allowOtpSelfRegistration ?? false,
     pendingTokenTtlDays: config.pendingTokenTtlDays ?? DEFAULT_PENDING_TOKEN_TTL_DAYS,
     heartbeatRetentionDays: config.heartbeatRetentionDays ?? DEFAULT_HEARTBEAT_RETENTION_DAYS,
     agentStaleMinutes: config.agentStaleMinutes ?? DEFAULT_AGENT_STALE_MINUTES,

@@ -58,7 +58,7 @@ export default async function AdminSettingsPage() {
         <AdminDatabaseStats stats={databaseStats} />
         <AdminMaintenance />
         <AdminPilotControls
-          allowRegistration={config.allowRegistration}
+          allowOtpSelfRegistration={config.allowOtpSelfRegistration}
           registrationEnvLocked={isRegistrationEnvLocked()}
         />
       </main>

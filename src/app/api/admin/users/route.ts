@@ -28,6 +28,8 @@ async function summarizeUser(user: {
   role: string;
   timezone: string;
   hoursTarget: number | null;
+  registrationSource: string;
+  createdAt: Date;
   agentDevices: Array<{
     id: string;
     serialNumber: string;
@@ -47,6 +49,8 @@ async function summarizeUser(user: {
     name: user.name,
     role: user.role,
     timezone: user.timezone,
+    registrationSource: user.registrationSource,
+    createdAt: user.createdAt.toISOString(),
     hoursTarget,
     devices: user.agentDevices.map((d) => ({
       id: d.id,
@@ -79,8 +83,8 @@ export async function GET(request: Request) {
   await revokeExpiredPendingTokens();
 
   const { searchParams } = new URL(request.url);
-  const { all, search, page, pageSize } = parseAdminUsersListParams(searchParams);
-  const where = buildUserSearchWhere(search);
+  const { all, search, page, pageSize, source } = parseAdminUsersListParams(searchParams);
+  const where = buildUserSearchWhere(search, source);
 
   const userQuery = {
     where,

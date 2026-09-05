@@ -36,6 +36,8 @@ type UserRow = {
   email: string;
   name: string | null;
   role: string;
+  registrationSource: string;
+  createdAt: string;
   hoursTarget: number;
   serverAgentVersion: string;
   tokens: TokenRow[];
@@ -58,6 +60,17 @@ type AuditEntry = {
 
 const SEARCH_DEBOUNCE_MS = 300;
 
+function registrationSourceLabel(source: string): string {
+  switch (source) {
+    case "otp_self":
+      return "Self-registered (OTP)";
+    case "seed":
+      return "Seed";
+    default:
+      return "Admin-created";
+  }
+}
+
 export function AdminUsersDashboard() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -65,6 +78,7 @@ export function AdminUsersDashboard() {
   const [pageSize] = useState(DEFAULT_ADMIN_USERS_PAGE_SIZE);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [otpSelfOnly, setOtpSelfOnly] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
@@ -100,6 +114,7 @@ export function AdminUsersDashboard() {
         pageSize: String(pageSize),
       });
       if (searchQuery) qs.set("search", searchQuery);
+      if (otpSelfOnly) qs.set("source", "otp_self");
 
       const [usersRes, auditRes] = await Promise.all([
         fetch(`/api/admin/users?${qs}`),
@@ -141,6 +156,7 @@ export function AdminUsersDashboard() {
               "device_remove_self",
               "password_reset",
               "admin_notification_prefs_update",
+              "admin_custom_notification",
               "admin_ooo_update",
               "admin_profile_edit",
               "agent_update_push",
@@ -149,7 +165,7 @@ export function AdminUsersDashboard() {
         );
       }
     },
-    [page, pageSize, searchQuery],
+    [page, pageSize, searchQuery, otpSelfOnly],
   );
 
   useEffect(() => {
@@ -353,6 +369,20 @@ export function AdminUsersDashboard() {
             />
           </label>
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setOtpSelfOnly((v) => !v);
+                setPage(1);
+              }}
+              className={`rounded-full px-3 py-1 text-xs ${
+                otpSelfOnly
+                  ? "bg-[var(--pwc-orange)] text-white"
+                  : "border border-[var(--border)] text-muted"
+              }`}
+            >
+              Self-registered only
+            </button>
             {refreshing && <span className="text-xs text-muted">Refreshing...</span>}
             <button
               type="button"
@@ -496,6 +526,10 @@ export function AdminUsersDashboard() {
             <div className="min-w-0 flex-1">
               <h2 className="text-lg font-medium">{u.email}</h2>
               {u.name && <p className="text-sm text-muted">{u.name}</p>}
+              <p className="mt-1 text-xs text-muted">
+                Source: {registrationSourceLabel(u.registrationSource)} · Joined{" "}
+                {new Date(u.createdAt).toLocaleDateString("en-IN")}
+              </p>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                 <Link
                   href={`/admin/reports/users/${u.id}`}
@@ -525,6 +559,15 @@ export function AdminUsersDashboard() {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded px-2 py-0.5 text-xs ${
+                  u.registrationSource === "otp_self"
+                    ? "bg-blue-500/20 text-blue-300"
+                    : "bg-[var(--border)] text-muted"
+                }`}
+              >
+                {registrationSourceLabel(u.registrationSource)}
+              </span>
               <span
                 className={`rounded px-2 py-0.5 text-xs ${
                   u.role === "admin"

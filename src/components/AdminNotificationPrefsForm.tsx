@@ -4,6 +4,7 @@ import { useState } from "react";
 import { NotificationPrefsForm } from "./NotificationPrefsForm";
 import { OutOfOfficeSection } from "./OutOfOfficeSection";
 import { AgentGraceSection } from "./AgentGraceSection";
+import { AdminCustomNotificationForm } from "./AdminCustomNotificationForm";
 
 type Props = {
   userId: string;
@@ -26,11 +27,13 @@ export function AdminNotificationPrefsForm({ userId, userEmail }: Props) {
       </button>
       {!open && (
         <p className="mt-1 text-xs text-muted">
-          Alert channels, office schedule, and out-of-office days for {userEmail}
+          Send a custom notification, set alert channels, office schedule, and out-of-office days
+          for {userEmail}
         </p>
       )}
       {open && (
         <div className="mt-4 space-y-4">
+          <AdminCustomNotificationForm userId={userId} userEmail={userEmail} />
           <OutOfOfficeSection adminUserId={userId} />
           <AgentGraceSection adminUserId={userId} />
           <NotificationPrefsForm adminUserId={userId} />
