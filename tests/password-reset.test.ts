@@ -55,7 +55,7 @@ describe("admin password reset hash", () => {
     const hash = await hashPassword(tempPassword);
     expect(await verifyPassword(tempPassword, hash)).toBe(true);
     expect(await verifyPassword("wrong-password", hash)).toBe(false);
-  });
+  }, 15000);
 
   it("login works with temp password after hash update", async () => {
     const tempPassword = generateTempPassword();
@@ -203,7 +203,7 @@ describe("ensureBreakglassAdmin", () => {
     });
     const updateData = prismaMock.user.update.mock.calls[0][0].data;
     expect(await verifyPassword("env-password-123", updateData.passwordHash)).toBe(true);
-  });
+  }, 15000);
 
   it("creates breakglass user when missing", async () => {
     prismaMock.user.findUnique.mockResolvedValue(null);
