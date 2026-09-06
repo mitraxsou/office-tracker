@@ -5,6 +5,7 @@ import {
   daySpanMsForDay,
   effectiveVisitEnd,
   formatHours,
+  formatLastHeartbeat,
   mergeHeartbeatsIntoVisits,
   meetsHoursTarget,
   remainingHours,
@@ -473,5 +474,21 @@ describe("roundHoursToMinute", () => {
   it("leaves whole minutes untouched", () => {
     expect(roundHoursToMinute(5)).toBe(5);
     expect(roundHoursToMinute(2.5)).toBe(2.5);
+  });
+});
+
+describe("formatLastHeartbeat", () => {
+  it("shows Today with time when heartbeat is on the same day", () => {
+    const heartbeat = new Date("2026-09-07T01:14:00+05:30");
+    expect(formatLastHeartbeat(heartbeat, "2026-09-07", "Asia/Kolkata")).toBe(
+      "Today, 1:14 am",
+    );
+  });
+
+  it("shows full date when heartbeat is on a prior day", () => {
+    const heartbeat = new Date("2026-09-05T20:18:00+05:30");
+    expect(formatLastHeartbeat(heartbeat, "2026-09-07", "Asia/Kolkata")).toBe(
+      "5 Sept 2026, 8:18 pm",
+    );
   });
 });

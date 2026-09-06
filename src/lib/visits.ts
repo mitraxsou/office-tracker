@@ -309,6 +309,37 @@ export function formatDate(date: Date, timezone = DEFAULT_TIMEZONE): string {
   }).format(date);
 }
 
+function formatTimeLower(date: Date, timezone: string): string {
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: timezone,
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  })
+    .format(date)
+    .toLowerCase();
+}
+
+/** Last heartbeat label: "Today, 1:14 am" or "5 Sep 2026, 8:18 pm". */
+export function formatLastHeartbeat(
+  date: Date,
+  todayDayKey: string,
+  timezone = DEFAULT_TIMEZONE,
+): string {
+  const heartbeatDayKey = dayKeyInTimezone(date, timezone);
+  const time = formatTimeLower(date, timezone);
+  if (heartbeatDayKey === todayDayKey) {
+    return `Today, ${time}`;
+  }
+  const datePart = new Intl.DateTimeFormat("en-IN", {
+    timeZone: timezone,
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+  return `${datePart}, ${time}`;
+}
+
 export function isVisitOnDay(
   visit: VisitPoint,
   dayStart: Date,

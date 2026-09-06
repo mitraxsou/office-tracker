@@ -22,7 +22,7 @@ import { AgentHealthBanner } from "@/components/AgentHealthBanner";
 import { RecentHeartbeats } from "@/components/RecentHeartbeats";
 import { LaptopActiveCard } from "@/components/LaptopActiveCard";
 import { DashboardRefreshButton } from "@/components/DashboardRefreshButton";
-import { dayKeyInTimezone, formatTime } from "@/lib/visits";
+import { formatLastHeartbeat, formatTime } from "@/lib/visits";
 
 export default async function DashboardPage() {
   const user = await requireAuthenticatedUser();
@@ -62,12 +62,8 @@ export default async function DashboardPage() {
   );
   const pulse = await getPulseStats(user.id, graceHours);
   const isOutToday = await isUserOutOfOffice(user.id, summary.dayKey);
-  const lastHeartbeatToday =
-    summary.lastHeartbeat &&
-    dayKeyInTimezone(summary.lastHeartbeat.recordedAt, user.timezone) === summary.dayKey
-      ? summary.lastHeartbeat
-      : null;
-  const agentNeverConnected = !summary.lastHeartbeat && user.agentDevices.length === 0;
+  const lastHeartbeat = summary.lastHeartbeat;
+  const agentNeverConnected = !lastHeartbeat && user.agentDevices.length === 0;
   const agentStale = !isOutToday && !!summary.lastHeartbeat && !summary.agentHealthy;
   const agentLowPulses =
     !isOutToday &&
@@ -91,6 +87,11 @@ export default async function DashboardPage() {
       : "Stale / offline";
   const agentStatusTone: StatusTone = agentNeverConnected
     ? "neutral"
+    : summary.agentHealthy
+      ? "success"
+      : "warning";
+  const lastHeartbeatTone: StatusTone = !lastHeartbeat
+    ? "muted"
     : summary.agentHealthy
       ? "success"
       : "warning";
@@ -165,12 +166,15 @@ export default async function DashboardPage() {
           <StatusCard
             label="Last heartbeat"
             value={
-              lastHeartbeatToday
-                ? new Date(lastHeartbeatToday.recordedAt).toLocaleTimeString("en-IN", {
-                    timeZone: user.timezone,
-                  })
+              lastHeartbeat
+                ? formatLastHeartbeat(
+                    lastHeartbeat.recordedAt,
+                    summary.dayKey,
+                    user.timezone,
+                  )
                 : "None"
             }
+            tone={lastHeartbeatTone}
           />
         </div>
 
@@ -196,10 +200,10 @@ export default async function DashboardPage() {
           </p>
         )}
 
-        {adminAccess && lastHeartbeatToday && (
+        {adminAccess && lastHeartbeat && (
           <p className="text-xs text-muted">
-            Last SSID: {lastHeartbeatToday.ssid ?? "none"} · VPN (diagnostic only):{" "}
-            {lastHeartbeatToday.vpnGateway ?? "n/a"}. VPN does not count toward hours.
+            Last SSID: {lastHeartbeat.ssid ?? "none"} · VPN (diagnostic only):{" "}
+            {lastHeartbeat.vpnGateway ?? "n/a"}. VPN does not count toward hours.
           </p>
         )}
 
@@ -242,7 +246,7 @@ export default async function DashboardPage() {
   );
 }
 
-type StatusTone = "success" | "warning" | "neutral";
+type StatusTone = "success" | "warning" | "neutral" | "muted";
 
 function StatusCard({
   label,
@@ -258,7 +262,9 @@ function StatusCard({
       ? "text-green-400"
       : tone === "warning"
         ? "text-amber-400"
-        : "";
+        : tone === "muted"
+          ? "text-muted"
+          : "";
 
   return (
     <div className="card p-4">
