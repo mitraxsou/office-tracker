@@ -10,6 +10,7 @@ import {
   markIntegrationSecretUsed,
 } from "./integration-api-keys";
 import { persistInAppAlerts } from "./in-app-notifications";
+import { deliversToApp, deliversToTeams } from "./notification-prefs";
 
 export type LoginOtpWebhookPayload = {
   type: "login_otp";
@@ -132,8 +133,8 @@ async function dispatchAlerts(
   alerts: IntegrationAlert[],
   dependencies: DispatchDependencies = {},
 ) {
-  const appAlerts = alerts.filter((alert) => alert.deliveryChannel === "app");
-  const teamsAlerts = alerts.filter((alert) => alert.deliveryChannel === "teams");
+  const appAlerts = alerts.filter((alert) => deliversToApp(alert.deliveryChannel));
+  const teamsAlerts = alerts.filter((alert) => deliversToTeams(alert.deliveryChannel));
   const inApp = await persistInAppAlerts(appAlerts);
 
   const config = await resolveWebhookConfig(dependencies);

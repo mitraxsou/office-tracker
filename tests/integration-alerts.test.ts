@@ -11,10 +11,15 @@ import {
 import {
   DEFAULT_NOTIFICATION_PREFS,
   channelForAlert,
+  deliversToApp,
+  deliversToTeams,
+  deliveryChannelFromFlags,
+  deliveryFlagsFromChannel,
   getWeekdayInTimezone,
   isWorkDayNow,
   parseAlertDeliveryChannel,
   parseTimeToMinutes,
+  toggleDeliveryChannel,
 } from "../src/lib/notification-prefs";
 
 describe("notification-prefs time helpers", () => {
@@ -125,5 +130,20 @@ describe("alert delivery channels", () => {
   it("rejects unknown channel values", () => {
     expect(parseAlertDeliveryChannel("email", "app")).toBe("app");
     expect(parseAlertDeliveryChannel("teams", "app")).toBe("teams");
+    expect(parseAlertDeliveryChannel("both", "app")).toBe("both");
+  });
+
+  it("supports app, teams, or both delivery", () => {
+    expect(deliveryFlagsFromChannel("app")).toEqual({ app: true, teams: false });
+    expect(deliveryFlagsFromChannel("teams")).toEqual({ app: false, teams: true });
+    expect(deliveryFlagsFromChannel("both")).toEqual({ app: true, teams: true });
+    expect(deliversToApp("both")).toBe(true);
+    expect(deliversToTeams("both")).toBe(true);
+    expect(deliversToApp("teams")).toBe(false);
+    expect(deliversToTeams("app")).toBe(false);
+    expect(deliveryChannelFromFlags(true, true)).toBe("both");
+    expect(toggleDeliveryChannel("app", "teams", true)).toBe("both");
+    expect(toggleDeliveryChannel("both", "app", false)).toBe("teams");
+    expect(toggleDeliveryChannel("teams", "teams", false)).toBe("teams");
   });
 });

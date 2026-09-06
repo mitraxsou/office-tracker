@@ -3,7 +3,7 @@ import { prisma } from "./db";
 /** ISO weekday: 1 = Monday through 7 = Sunday */
 export const DEFAULT_WORK_DAYS = [3, 5];
 
-export type AlertDeliveryChannel = "app" | "teams";
+export type AlertDeliveryChannel = "app" | "teams" | "both";
 
 export type NotificationPrefsData = {
   workDays: number[];
@@ -53,7 +53,46 @@ export function parseAlertDeliveryChannel(
   value: unknown,
   fallback: AlertDeliveryChannel,
 ): AlertDeliveryChannel {
-  return value === "app" || value === "teams" ? value : fallback;
+  return value === "app" || value === "teams" || value === "both" ? value : fallback;
+}
+
+export function deliversToApp(channel: AlertDeliveryChannel): boolean {
+  return channel === "app" || channel === "both";
+}
+
+export function deliversToTeams(channel: AlertDeliveryChannel): boolean {
+  return channel === "teams" || channel === "both";
+}
+
+export function deliveryFlagsFromChannel(channel: AlertDeliveryChannel): {
+  app: boolean;
+  teams: boolean;
+} {
+  return {
+    app: deliversToApp(channel),
+    teams: deliversToTeams(channel),
+  };
+}
+
+export function deliveryChannelFromFlags(app: boolean, teams: boolean): AlertDeliveryChannel {
+  if (app && teams) return "both";
+  if (teams) return "teams";
+  return "app";
+}
+
+export function toggleDeliveryChannel(
+  current: AlertDeliveryChannel,
+  target: "app" | "teams",
+  checked: boolean,
+): AlertDeliveryChannel {
+  const flags = deliveryFlagsFromChannel(current);
+  if (target === "app") flags.app = checked;
+  else flags.teams = checked;
+  if (!flags.app && !flags.teams) {
+    if (target === "app") flags.app = true;
+    else flags.teams = true;
+  }
+  return deliveryChannelFromFlags(flags.app, flags.teams);
 }
 
 export function channelForAlert(

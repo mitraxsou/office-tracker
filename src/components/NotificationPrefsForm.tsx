@@ -5,6 +5,10 @@ import type {
   AlertDeliveryChannel,
   NotificationPrefsData,
 } from "@/lib/notification-prefs";
+import {
+  deliveryFlagsFromChannel,
+  toggleDeliveryChannel,
+} from "@/lib/notification-prefs";
 import { OfficeScheduleSuggestionCard } from "@/components/OfficeScheduleSuggestionCard";
 
 const WEEKDAYS: Array<{ value: number; label: string }> = [
@@ -80,6 +84,42 @@ function InfoTip({ label, text }: { label: string; text: string }) {
         {text}
       </span>
     </span>
+  );
+}
+
+function DeliveryChannelCheckboxes({
+  channel,
+  disabled,
+  onChange,
+}: {
+  channel: AlertDeliveryChannel;
+  disabled: boolean;
+  onChange: (next: AlertDeliveryChannel) => void;
+}) {
+  const { app, teams } = deliveryFlagsFromChannel(channel);
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 pl-6 text-xs text-muted">
+      <span>Deliver via</span>
+      <label className="inline-flex items-center gap-1.5">
+        <input
+          type="checkbox"
+          checked={app}
+          disabled={disabled}
+          onChange={(e) => onChange(toggleDeliveryChannel(channel, "app", e.target.checked))}
+        />
+        In the app
+      </label>
+      <label className="inline-flex items-center gap-1.5">
+        <input
+          type="checkbox"
+          checked={teams}
+          disabled={disabled}
+          onChange={(e) => onChange(toggleDeliveryChannel(channel, "teams", e.target.checked))}
+        />
+        Microsoft Teams
+      </label>
+    </div>
   );
 }
 
@@ -178,8 +218,9 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
         {adminUserId ? "Office schedule and alerts (admin)" : "Office schedule and alerts"}
       </h2>
       <p className="mb-4 text-sm text-muted">
-        Office hours alerts go to Microsoft Teams by default. Optional reminder alerts stay in the
-        app unless you change delivery. Alerts are nudges only, not HR records.
+        Office hours alerts go to Microsoft Teams by default. You can also receive them in the app,
+        or both. Optional reminder alerts stay in the app unless you add Teams. Alerts are nudges
+        only, not HR records.
       </p>
 
       <label className="mb-5 flex items-center gap-3 rounded-lg border border-[var(--border)] px-4 py-3 text-sm">
@@ -288,23 +329,11 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
                   </label>
                   <InfoTip label={row.label} text={row.help} />
                 </div>
-                <label className="mt-2 flex items-center gap-2 pl-6 text-xs text-muted">
-                  Delivery
-                  <select
-                    value={prefs[row.channelKey]}
-                    disabled={!prefs[row.enabledKey]}
-                    onChange={(e) =>
-                      setPrefs({
-                        ...prefs,
-                        [row.channelKey]: e.target.value as AlertDeliveryChannel,
-                      })
-                    }
-                    className="rounded-md border border-[var(--border)] bg-transparent px-2 py-1 text-xs text-[var(--foreground)] disabled:opacity-50"
-                  >
-                    <option value="app">In the app</option>
-                    <option value="teams">Microsoft Teams</option>
-                  </select>
-                </label>
+                <DeliveryChannelCheckboxes
+                  channel={prefs[row.channelKey]}
+                  disabled={!prefs[row.enabledKey]}
+                  onChange={(next) => setPrefs({ ...prefs, [row.channelKey]: next })}
+                />
               </div>
             ))}
           </div>
@@ -344,23 +373,11 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
                     </label>
                     <InfoTip label={row.label} text={row.help} />
                   </div>
-                  <label className="mt-2 flex items-center gap-2 pl-6 text-xs text-muted">
-                    Delivery
-                    <select
-                      value={prefs[row.channelKey]}
-                      disabled={!prefs[row.enabledKey]}
-                      onChange={(e) =>
-                        setPrefs({
-                          ...prefs,
-                          [row.channelKey]: e.target.value as AlertDeliveryChannel,
-                        })
-                      }
-                      className="rounded-md border border-[var(--border)] bg-transparent px-2 py-1 text-xs text-[var(--foreground)] disabled:opacity-50"
-                    >
-                      <option value="app">In the app</option>
-                      <option value="teams">Microsoft Teams</option>
-                    </select>
-                  </label>
+                  <DeliveryChannelCheckboxes
+                    channel={prefs[row.channelKey]}
+                    disabled={!prefs[row.enabledKey]}
+                    onChange={(next) => setPrefs({ ...prefs, [row.channelKey]: next })}
+                  />
                 </div>
               ))}
             </div>

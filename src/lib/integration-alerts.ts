@@ -5,6 +5,7 @@ import { dayBoundsFromKey, dayKeyInTimezone } from "./timezone-dates";
 import { roundHours } from "./visits";
 import {
   channelForAlert,
+  deliversToTeams,
   getMinutesInTimezone,
   getNotificationPrefs,
   isWorkDayNow,
@@ -223,7 +224,7 @@ async function evaluateUserAlerts(
         type: "stale",
         message: buildStaleMessage(pulse.minutesSinceLastPulse, baseUrl),
         deliveryChannel,
-        notifyTeams: deliveryChannel === "teams",
+        notifyTeams: deliversToTeams(deliveryChannel),
       });
     }
   }
@@ -240,7 +241,7 @@ async function evaluateUserAlerts(
           type: "absent",
           message: buildAbsentMessage(prefs, baseUrl),
           deliveryChannel,
-          notifyTeams: deliveryChannel === "teams",
+          notifyTeams: deliversToTeams(deliveryChannel),
         });
       }
     }
@@ -263,7 +264,7 @@ async function evaluateUserAlerts(
             hoursTarget,
           ),
           deliveryChannel,
-          notifyTeams: deliveryChannel === "teams",
+          notifyTeams: deliversToTeams(deliveryChannel),
         });
     }
   }
@@ -282,7 +283,7 @@ async function evaluateUserAlerts(
       type: "hours_started",
       message: buildHoursStartedMessage(hoursTarget),
       deliveryChannel,
-      notifyTeams: deliveryChannel === "teams",
+      notifyTeams: deliversToTeams(deliveryChannel),
     });
   }
 
@@ -300,7 +301,7 @@ async function evaluateUserAlerts(
       type: "hours_met",
       message: buildHoursMetMessage(summary.totalHours, hoursTarget),
       deliveryChannel,
-      notifyTeams: deliveryChannel === "teams",
+      notifyTeams: deliversToTeams(deliveryChannel),
     });
   }
 
