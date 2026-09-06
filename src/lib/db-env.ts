@@ -1,14 +1,19 @@
-function firstNonEmpty(...values: (string | undefined)[]): string {
+function isPostgresUrl(value: string | undefined): boolean {
+  const trimmed = value?.trim();
+  return Boolean(trimmed && /^postgres(ql)?:\/\//i.test(trimmed));
+}
+
+/** Non-Postgres values (a leftover SQLite DATABASE_URL, for example) are ignored. */
+function firstPostgresUrl(...values: (string | undefined)[]): string {
   for (const value of values) {
-    const trimmed = value?.trim();
-    if (trimmed) return trimmed;
+    if (isPostgresUrl(value)) return value!.trim();
   }
   return "";
 }
 
 /** Normalize Vercel Storage / legacy env vars before Prisma connects. */
 export function resolvePostgresEnv(): { prismaUrl: string; directUrl: string } {
-  const prismaUrl = firstNonEmpty(
+  const prismaUrl = firstPostgresUrl(
     process.env.POSTGRES_PRISMA_URL,
     process.env.POSTGRES_URL,
     process.env.DATABASE_URL,
@@ -16,7 +21,7 @@ export function resolvePostgresEnv(): { prismaUrl: string; directUrl: string } {
     process.env.DATABASE_URL_POSTGRES_URL,
   );
 
-  const directUrl = firstNonEmpty(
+  const directUrl = firstPostgresUrl(
     process.env.POSTGRES_URL_NON_POOLING,
     process.env.DATABASE_URL_UNPOOLED,
     process.env.DATABASE_URL_POSTGRES_URL_NON_POOLING,
@@ -31,7 +36,7 @@ export function resolvePostgresEnv(): { prismaUrl: string; directUrl: string } {
 
 export function hasPostgresEnv(): boolean {
   return Boolean(
-    firstNonEmpty(
+    firstPostgresUrl(
       process.env.POSTGRES_PRISMA_URL,
       process.env.POSTGRES_URL,
       process.env.DATABASE_URL,

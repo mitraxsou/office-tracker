@@ -381,18 +381,19 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           <div>
             <dt className="font-medium">Office schedule and alerts</dt>
             <dd className="mt-1 text-muted">
-              Choose your usual office days (Wednesday and Friday by default), delivery channels,
-              and alert types. Office Pulse can tell you when office hours start, when you meet your
-              daily target, or when the agent needs attention. A recent pulse on home or other
-              non-office Wi-Fi is treated as working from home and does not trigger a not-in-office
-              reminder.
+              Choose your usual office days (Wednesday and Friday by default) and delivery channels
+              per alert (in the app, Microsoft Teams, or both). Office Pulse can tell you when office hours
+              start, when you meet your daily target, or when the agent needs attention. A recent
+              pulse on home or other non-office Wi-Fi is treated as working from home and does not
+              trigger a not-in-office reminder. An admin can also send you a one-off in-app or Teams
+              message.
             </dd>
           </div>
           <div>
             <dt className="font-medium">Out of office</dt>
             <dd className="mt-1 text-muted">
               Mark days when you are away (leave, WFH without laptop, etc.). No reminders are sent for those
-              days. You can also mark out from a one-click link in alert emails. Open Settings → Out of
+              days. You can also mark out from a one-click link in Teams or in-app alerts. Open Settings → Out of
               office, or use the link in your alert.
             </dd>
           </div>

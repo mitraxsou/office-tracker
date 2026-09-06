@@ -85,10 +85,23 @@ export async function AppNav() {
     </form>
   );
 
-  const adminTools = (
+  const adminToolsDesktop = (
     <>
       {inbox && <AdminNotificationCorner total={inbox.total} items={inbox.items} />}
       {adminAccess && !impersonation && <AdminImpersonatePicker />}
+    </>
+  );
+
+  const adminToolsMobile = (
+    <>
+      {inbox && (
+        <AdminNotificationCorner
+          total={inbox.total}
+          items={inbox.items}
+          placement="drawer"
+        />
+      )}
+      {adminAccess && !impersonation && <AdminImpersonatePicker placement="drawer" />}
     </>
   );
 
@@ -110,7 +123,7 @@ export async function AppNav() {
           </div>
 
           <div className="hidden min-w-0 items-center gap-3 md:flex">
-            {adminTools}
+            {adminToolsDesktop}
             <ThemeToggle />
             <Link href="/help#whats-new" className="shrink-0 text-xs text-muted hover:text-accent">
               v{APP_VERSION}
@@ -126,7 +139,7 @@ export async function AppNav() {
             userName={displayName}
             userEmail={user.email}
             version={APP_VERSION}
-            adminTools={adminTools}
+            adminTools={adminToolsMobile}
             logoutForm={logoutForm}
           />
         </div>

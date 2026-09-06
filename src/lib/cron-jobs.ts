@@ -14,7 +14,7 @@ export const CRON_JOBS = [
     scheduleUtc: "Daily at 10:00 UTC",
     scheduleIst: "Daily at 15:30 IST",
     purpose:
-      "Sends eligible Office Pulse alerts through Power Automate. Vercel Hobby only allows one run per day. In-office hours_started and hours_met alerts also send from agent heartbeats.",
+      "Sends eligible Office Pulse alerts through Power Automate when the alert channel is Microsoft Teams. App-only alerts appear on the dashboard. Vercel Hobby only allows one run per day. In-office hours_started and hours_met alerts also send from agent heartbeats.",
     expectedIntervalMs: 24 * 60 * 60 * 1000,
     healthyWithinMs: 2 * 24 * 60 * 60 * 1000,
   },

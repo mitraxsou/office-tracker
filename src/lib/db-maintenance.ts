@@ -20,6 +20,7 @@ export const NEVER_PURGED_TABLES = [
   "AppConfig",
   "IntegrationApiKey",
   "UserNotificationPrefs",
+  "InAppNotification",
 ] as const;
 
 export const MAINTENANCE_TABLE_LABELS: Record<MaintenanceTable, string> = {

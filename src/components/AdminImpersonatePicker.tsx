@@ -32,7 +32,11 @@ function UserSwitchIcon() {
   );
 }
 
-export function AdminImpersonatePicker() {
+export function AdminImpersonatePicker({
+  placement = "header",
+}: {
+  placement?: "header" | "drawer";
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [searchInput, setSearchInput] = useState("");
@@ -41,6 +45,7 @@ export function AdminImpersonatePicker() {
   const [loading, setLoading] = useState(false);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const inDrawer = placement === "drawer";
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearchQuery(searchInput.trim()), SEARCH_DEBOUNCE_MS);
@@ -88,28 +93,49 @@ export function AdminImpersonatePicker() {
     router.refresh();
   }
 
+  const panelClassName = inDrawer
+    ? "mt-2 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] p-3 shadow-lg"
+    : "fixed left-4 right-4 top-20 z-50 mx-auto max-w-sm rounded-xl border border-[var(--border)] bg-[var(--background-elevated)] p-3 shadow-xl md:absolute md:inset-auto md:right-0 md:top-full md:mt-2 md:w-80 md:max-w-none";
+
   return (
-    <div className="relative">
+    <div className={inDrawer ? "min-w-0 flex-1" : "relative"}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="btn-secondary inline-flex items-center justify-center p-2"
+        className={`btn-secondary inline-flex items-center justify-center p-2 ${
+          inDrawer ? "min-h-11 w-full gap-2" : ""
+        }`}
         aria-label="View as user"
         title="View as user"
+        aria-expanded={open}
       >
         <UserSwitchIcon />
+        {inDrawer && <span className="text-xs">View as user</span>}
       </button>
 
       {open && (
         <>
-          <button
-            type="button"
-            className="fixed inset-0 z-40 cursor-default"
-            aria-label="Close user picker"
-            onClick={() => setOpen(false)}
-          />
-          <div className="fixed left-4 right-4 top-20 z-50 mx-auto max-w-sm rounded-xl border border-[var(--border)] bg-[var(--background-elevated)] p-3 shadow-xl md:absolute md:inset-auto md:right-0 md:top-full md:mt-2 md:w-80 md:max-w-none">
-            <p className="mb-2 text-sm font-medium">View as user</p>
+          {!inDrawer && (
+            <button
+              type="button"
+              className="fixed inset-0 z-40 cursor-default"
+              aria-label="Close user picker"
+              onClick={() => setOpen(false)}
+            />
+          )}
+          <div className={panelClassName}>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">View as user</p>
+              {inDrawer && (
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="text-xs text-muted hover:text-accent"
+                >
+                  Close
+                </button>
+              )}
+            </div>
             <input
               type="search"
               value={searchInput}
@@ -119,7 +145,7 @@ export function AdminImpersonatePicker() {
               autoFocus
             />
             {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
-            <ul className="mt-2 max-h-64 space-y-1 overflow-y-auto">
+            <ul className={`mt-2 space-y-1 overflow-y-auto ${inDrawer ? "max-h-40" : "max-h-64"}`}>
               {loading && users.length === 0 ? (
                 <li className="py-3 text-sm text-muted">Loading...</li>
               ) : users.length === 0 ? (

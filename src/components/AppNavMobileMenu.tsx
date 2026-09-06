@@ -107,10 +107,12 @@ export function AppNavMobileMenu({
             aria-label="Navigation menu"
             className="fixed inset-y-0 right-0 z-50 flex w-[min(100vw-3rem,20rem)] flex-col border-l border-[var(--border)] bg-[var(--background-elevated)] shadow-xl"
           >
-            <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{userName}</p>
-                <p className="truncate text-xs text-muted" title={userEmail}>{userEmail}</p>
+                <p className="truncate text-xs text-muted" title={userEmail}>
+                  {userEmail}
+                </p>
               </div>
               <button
                 type="button"
@@ -122,7 +124,7 @@ export function AppNavMobileMenu({
               </button>
             </div>
 
-            <nav className="flex-1 overflow-y-auto px-3 py-4">
+            <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
               <ul className="space-y-1">
                 {links.map((link) => (
                   <li key={`${link.href}:${link.label}`}>
@@ -136,19 +138,24 @@ export function AppNavMobileMenu({
                   </li>
                 ))}
               </ul>
-
-              <div className="mt-6 space-y-3 border-t border-[var(--border)] pt-4">
-                {adminTools && <div className="flex flex-wrap items-center gap-2 px-1">{adminTools}</div>}
-                <Link
-                  href="/help#whats-new"
-                  onClick={() => setOpen(false)}
-                  className="block px-3 py-2 text-sm text-muted hover:text-accent"
-                >
-                  Version v{version}
-                </Link>
-                <div className="px-3">{logoutForm}</div>
-              </div>
             </nav>
+
+            <div className="shrink-0 space-y-4 border-t border-[var(--border)] px-4 py-4">
+              {adminTools && (
+                <div className="flex flex-col gap-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted">Admin tools</p>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start">{adminTools}</div>
+                </div>
+              )}
+              <Link
+                href="/help#whats-new"
+                onClick={() => setOpen(false)}
+                className="block py-1 text-sm text-muted hover:text-accent"
+              >
+                Version v{version}
+              </Link>
+              <div className="border-t border-[var(--border)] pt-3">{logoutForm}</div>
+            </div>
           </div>
         </>
       )}
