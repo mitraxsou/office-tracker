@@ -108,7 +108,7 @@ export function AdminImpersonatePicker() {
             aria-label="Close user picker"
             onClick={() => setOpen(false)}
           />
-          <div className="absolute right-0 z-50 mt-2 w-80 rounded-xl border border-[var(--border)] bg-[var(--background-elevated)] p-3 shadow-xl">
+          <div className="fixed left-4 right-4 top-20 z-50 mx-auto max-w-sm rounded-xl border border-[var(--border)] bg-[var(--background-elevated)] p-3 shadow-xl md:absolute md:inset-auto md:right-0 md:top-full md:mt-2 md:w-80 md:max-w-none">
             <p className="mb-2 text-sm font-medium">View as user</p>
             <input
               type="search"

@@ -22,7 +22,7 @@ export function AdminNotificationCorner({
           </span>
         )}
       </summary>
-      <div className="absolute right-0 z-50 mt-2 w-80 rounded-xl border border-[var(--border)] bg-[var(--background-elevated)] p-3 shadow-xl">
+      <div className="absolute right-0 z-50 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-[var(--border)] bg-[var(--background-elevated)] p-3 shadow-xl">
         <div className="mb-2 flex items-center justify-between">
           <p className="font-medium">Admin requests</p>
           <Link href="/admin/inbox" className="text-xs text-accent hover:underline">

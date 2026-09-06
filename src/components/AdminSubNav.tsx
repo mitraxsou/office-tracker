@@ -15,7 +15,7 @@ export function AdminSubNav({
   active: "reports" | "inbox" | "corrections" | "users" | "audit" | "settings";
 }) {
   return (
-    <nav className="flex flex-wrap gap-2 border-b border-[var(--border)] pb-4">
+    <nav className="-mx-4 flex gap-2 overflow-x-auto border-b border-[var(--border)] px-4 pb-4 md:mx-0 md:flex-wrap md:overflow-visible md:px-0">
       {links.map((link) => {
         const isActive =
           (active === "reports" && link.href === "/admin") ||
@@ -28,7 +28,7 @@ export function AdminSubNav({
           <Link
             key={link.href}
             href={link.href}
-            className={`rounded-lg px-3 py-1.5 text-sm ${
+            className={`shrink-0 rounded-lg px-3 py-2 text-sm md:py-1.5 ${
               isActive
                 ? "bg-[var(--pwc-orange)]/20 font-medium text-accent"
                 : "text-muted hover:bg-[var(--border)] hover:text-[var(--foreground)]"

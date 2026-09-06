@@ -2,12 +2,29 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
+import {
+  AppNavMobileGuestActions,
+  AppNavMobileMenu,
+  type NavLink,
+} from "@/components/AppNavMobileMenu";
 import { destroySession, getCurrentUser, getImpersonationContext, getRealCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { APP_VERSION } from "@/lib/app-version";
 import { getAdminInbox } from "@/lib/admin-inbox";
 import { AdminNotificationCorner } from "@/components/AdminNotificationCorner";
 import { AdminImpersonatePicker } from "@/components/AdminImpersonatePicker";
+
+function NavLinks({ links, className }: { links: NavLink[]; className?: string }) {
+  return (
+    <>
+      {links.map((link) => (
+        <Link key={`${link.href}:${link.label}`} href={link.href} className={`link-nav text-sm ${className ?? ""}`}>
+          {link.label}
+        </Link>
+      ))}
+    </>
+  );
+}
 
 export async function AppNav() {
   const user = await getCurrentUser();
@@ -17,12 +34,12 @@ export async function AppNav() {
   if (!user) {
     return (
       <nav className="border-b border-[var(--border)] bg-[var(--background-elevated)]">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-          <Link href="/help" className="flex items-center gap-2 font-semibold">
-            <span className="inline-block h-2 w-2 rounded-full bg-[var(--pwc-orange)]" />
-            PwC Office Pulse
+        <div className="mx-auto flex max-w-6xl min-w-0 items-center justify-between gap-3 px-4 py-4">
+          <Link href="/help" className="flex min-w-0 shrink items-center gap-2 font-semibold">
+            <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-[var(--pwc-orange)]" />
+            <span className="truncate">PwC Office Pulse</span>
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="hidden items-center gap-3 md:flex">
             <ThemeToggle />
             <Link href="/help" className="link-nav text-sm">
               Help
@@ -31,6 +48,7 @@ export async function AppNav() {
               Sign in
             </Link>
           </div>
+          <AppNavMobileGuestActions />
         </div>
       </nav>
     );
@@ -44,6 +62,35 @@ export async function AppNav() {
 
   const adminAccess = isAdmin(realUser ?? user);
   const inbox = adminAccess ? await getAdminInbox() : null;
+  const displayName = user.name ?? user.email;
+
+  const navLinks: NavLink[] = [
+    { href: "/dashboard", label: "Today" },
+    { href: "/reports", label: "Reports" },
+    { href: "/history", label: "History" },
+    { href: "/settings", label: "Settings" },
+    ...(adminAccess ? [{ href: "/admin", label: "Admin" }] : []),
+    { href: "/help", label: "Help" },
+  ];
+
+  const logoutButton = (
+    <button type="submit" className="link-nav min-h-11 px-0 py-2 text-sm md:min-h-0 md:py-0">
+      Sign out
+    </button>
+  );
+
+  const logoutForm = (
+    <form action={logout}>
+      {logoutButton}
+    </form>
+  );
+
+  const adminTools = (
+    <>
+      {inbox && <AdminNotificationCorner total={inbox.total} items={inbox.items} />}
+      {adminAccess && !impersonation && <AdminImpersonatePicker />}
+    </>
+  );
 
   return (
     <>
@@ -51,51 +98,39 @@ export async function AppNav() {
         <ImpersonationBanner email={impersonation.email} name={impersonation.name} />
       )}
       <nav className="border-b border-[var(--border)] bg-[var(--background-elevated)]">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-        <div className="flex items-center gap-6">
-          <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-            <span className="inline-block h-2 w-2 rounded-full bg-[var(--pwc-orange)]" />
-            PwC Office Pulse
-          </Link>
-          <Link href="/dashboard" className="link-nav text-sm">
-            Today
-          </Link>
-          <Link href="/reports" className="link-nav text-sm">
-            Reports
-          </Link>
-          <Link href="/history" className="link-nav text-sm">
-            History
-          </Link>
-          <Link href="/settings" className="link-nav text-sm">
-            Settings
-          </Link>
-          {adminAccess && (
-            <Link href="/admin" className="link-nav text-sm">
-              Admin
+        <div className="mx-auto flex max-w-6xl min-w-0 items-center justify-between gap-3 px-4 py-4">
+          <div className="flex min-w-0 items-center gap-6">
+            <Link href="/dashboard" className="flex min-w-0 shrink items-center gap-2 font-semibold">
+              <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-[var(--pwc-orange)]" />
+              <span className="truncate">PwC Office Pulse</span>
             </Link>
-          )}
-          <Link href="/help" className="link-nav text-sm">
-            Help
-          </Link>
+            <div className="hidden items-center gap-6 md:flex">
+              <NavLinks links={navLinks} />
+            </div>
+          </div>
+
+          <div className="hidden min-w-0 items-center gap-3 md:flex">
+            {adminTools}
+            <ThemeToggle />
+            <Link href="/help#whats-new" className="shrink-0 text-xs text-muted hover:text-accent">
+              v{APP_VERSION}
+            </Link>
+            <span className="max-w-[10rem] truncate text-sm text-muted" title={user.email}>
+              {displayName}
+            </span>
+            <form action={logout}>{logoutButton}</form>
+          </div>
+
+          <AppNavMobileMenu
+            links={navLinks}
+            userName={displayName}
+            userEmail={user.email}
+            version={APP_VERSION}
+            adminTools={adminTools}
+            logoutForm={logoutForm}
+          />
         </div>
-        <div className="flex items-center gap-3">
-          {inbox && <AdminNotificationCorner total={inbox.total} items={inbox.items} />}
-          {adminAccess && !impersonation && <AdminImpersonatePicker />}
-          <ThemeToggle />
-          <Link href="/help#whats-new" className="text-xs text-muted hover:text-accent">
-            v{APP_VERSION}
-          </Link>
-          <span className="text-sm text-muted" title={user.email}>
-            {user.name ?? user.email}
-          </span>
-          <form action={logout}>
-            <button type="submit" className="link-nav text-sm">
-              Sign out
-            </button>
-          </form>
-        </div>
-      </div>
-    </nav>
+      </nav>
     </>
   );
 }

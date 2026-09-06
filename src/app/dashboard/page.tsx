@@ -110,8 +110,8 @@ export default async function DashboardPage() {
         </div>
 
         {agentNeverConnected && <AgentSetupBanner />}
-        {!agentNeverConnected && ssidMissing && <AgentSetupBanner ssidMissing />}
-        {agentStale && (
+        {adminAccess && !agentNeverConnected && ssidMissing && <AgentSetupBanner ssidMissing />}
+        {adminAccess && agentStale && (
           <AgentHealthBanner
             variant="stale"
             minutesSinceLastPulse={pulse.minutesSinceLastPulse}
@@ -119,7 +119,9 @@ export default async function DashboardPage() {
             timezone={user.timezone}
           />
         )}
-        {!agentStale && agentLowPulses && <AgentHealthBanner variant="low_pulses" />}
+        {adminAccess && !agentStale && agentLowPulses && (
+          <AgentHealthBanner variant="low_pulses" />
+        )}
 
         <ProgressMeter
           totalHours={summary.totalHours}
@@ -172,7 +174,7 @@ export default async function DashboardPage() {
           />
         </div>
 
-        {user.agentDevices.length > 0 && (
+        {adminAccess && user.agentDevices.length > 0 && (
           <p className="text-sm text-muted">
             Registered laptops:{" "}
             {user.agentDevices.map((d) => (
@@ -194,14 +196,14 @@ export default async function DashboardPage() {
           </p>
         )}
 
-        {lastHeartbeatToday && (
+        {adminAccess && lastHeartbeatToday && (
           <p className="text-xs text-muted">
             Last SSID: {lastHeartbeatToday.ssid ?? "none"} · VPN (diagnostic only):{" "}
             {lastHeartbeatToday.vpnGateway ?? "n/a"}. VPN does not count toward hours.
           </p>
         )}
 
-        {!agentNeverConnected && !summary.agentHealthy && !agentStale && (
+        {adminAccess && !agentNeverConnected && !summary.agentHealthy && !agentStale && (
           <p className="text-sm text-muted">
             Agent has not sent a heartbeat recently. Check Task Scheduler or re-run{" "}
             <Link href="/settings#install" className="text-accent hover:underline">
