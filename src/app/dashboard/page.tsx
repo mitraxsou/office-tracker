@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { requireAuthenticatedUser, enforcePasswordChangeIfRequired } from "@/lib/session-guards";
+import { getRealCurrentUser } from "@/lib/auth";
+import { isAdmin } from "@/lib/admin";
 import { getTodaySummary, getPulseStats } from "@/lib/heartbeat-service";
 import { getUserHoursTarget, getAppConfig, getEffectiveAgentStaleGraceHours } from "@/lib/app-config";
 import { getMonthlyProgress, getYearCompliance } from "@/lib/monthly-progress";
@@ -25,6 +27,8 @@ import { dayKeyInTimezone, formatTime } from "@/lib/visits";
 export default async function DashboardPage() {
   const user = await requireAuthenticatedUser();
   enforcePasswordChangeIfRequired(user);
+  const realUser = await getRealCurrentUser();
+  const adminAccess = isAdmin(realUser ?? user);
 
   const config = await getAppConfig();
   const hoursTarget = await getUserHoursTarget(user);
@@ -209,7 +213,7 @@ export default async function DashboardPage() {
 
         <QuickOfficeToggle inOfficeNow={summary.inOfficeNow} />
 
-        {!agentNeverConnected && pulse.recentPulses.length > 0 && (
+        {adminAccess && !agentNeverConnected && pulse.recentPulses.length > 0 && (
           <RecentHeartbeats
             pulses={pulse.recentPulses}
             timezone={user.timezone}
