@@ -69,11 +69,13 @@ describe("checkRateLimit", () => {
 
   it("blocks when at max and returns retryAfterSeconds", async () => {
     const createdAt = new Date(Date.now() - 30_000);
-    vi.mocked(prisma.authRateLimitEvent.findMany).mockResolvedValue([
-      { createdAt },
-      { createdAt },
-      { createdAt },
-    ]);
+    const event = {
+      id: "e1",
+      bucket: AUTH_RATE_LIMIT_BUCKETS.otpRequestIp,
+      key: "hashed",
+      createdAt,
+    };
+    vi.mocked(prisma.authRateLimitEvent.findMany).mockResolvedValue([event, event, event]);
     const result = await checkRateLimit(AUTH_RATE_LIMIT_BUCKETS.otpRequestIp, "1.2.3.4", {
       max: 3,
       windowMs: 60_000,
@@ -91,6 +93,9 @@ describe("checkOtpResendCooldown", () => {
 
   it("blocks resend within 60 seconds", async () => {
     vi.mocked(prisma.authRateLimitEvent.findFirst).mockResolvedValue({
+      id: "e1",
+      bucket: AUTH_RATE_LIMIT_BUCKETS.otpRequestEmail,
+      key: "hashed",
       createdAt: new Date(Date.now() - 10_000),
     });
     const result = await checkOtpResendCooldown("user@pwc.com");
@@ -109,6 +114,9 @@ describe("checkOtpRequestRateLimits", () => {
 
   it("enforces resend cooldown when isResend is true", async () => {
     vi.mocked(prisma.authRateLimitEvent.findFirst).mockResolvedValue({
+      id: "e1",
+      bucket: AUTH_RATE_LIMIT_BUCKETS.otpRequestEmail,
+      key: "hashed",
       createdAt: new Date(Date.now() - 5_000),
     });
     const result = await checkOtpRequestRateLimits("user@pwc.com", "1.2.3.4", true);

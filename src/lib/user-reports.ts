@@ -1,11 +1,11 @@
 import { prisma } from "./db";
 import { getAppConfig, getUserHoursTarget, getEffectiveAgentStaleGraceHours } from "./app-config";
-import { getTodaySummary, getPulseStats, loadDaySpanContext } from "./heartbeat-service";
+import { aggregateHoursForDay, aggregateLaptopActiveForDay } from "./day-hours";
+import { getTodaySummary, getPulseStats } from "./heartbeat-service";
 import { summarizeAgentTokens } from "./auth";
 import { getLifecycleEventsForUser } from "./agent-lifecycle";
 import { revokeExpiredPendingTokens } from "./token-expiry";
-import { daySpanMsForDay, roundHoursToMinute } from "./visits";
-import { laptopActiveHoursForDay } from "./laptop-active";
+import { roundHoursToMinute } from "./visits";
 import { heartbeatInOffice } from "./heartbeat-office";
 import { getAgentVersion } from "./agent-version";
 import { isDeviceAgentVersionStale } from "./agent-update";
@@ -23,20 +23,6 @@ function addDays(date: Date, days: number) {
   const d = new Date(date);
   d.setDate(d.getDate() + days);
   return d;
-}
-
-export async function aggregateHoursForDay(userId: string, timezone: string, dayKey: string) {
-  const { visits, params } = await loadDaySpanContext(userId, dayKey, timezone);
-  return daySpanMsForDay(visits, params) / (1000 * 60 * 60);
-}
-
-export async function aggregateLaptopActiveForDay(
-  userId: string,
-  timezone: string,
-  dayKey: string,
-) {
-  const { laptopActiveParams } = await loadDaySpanContext(userId, dayKey, timezone);
-  return laptopActiveHoursForDay(laptopActiveParams);
 }
 
 export async function getUserReport(userId: string, from: Date, to: Date) {

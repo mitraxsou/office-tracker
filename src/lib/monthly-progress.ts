@@ -1,5 +1,5 @@
 import { allDayKeysInMonth, daysInMonth, formatMonthLabel, parseMonthKey } from "./month-range";
-import { aggregateHoursForDay } from "./user-reports";
+import { aggregateHoursForDay } from "./day-hours";
 import type { ApprovedExemptions } from "./compliance-exemptions";
 import { DEFAULT_PILOT_START_MONTH_KEY } from "./app-config";
 import { prisma } from "./db";
