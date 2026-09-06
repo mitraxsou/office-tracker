@@ -1,8 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { YearCompliance } from "@/lib/monthly-progress";
-import { formatMonthLabel } from "@/lib/month-range";
+import {
+  getYearMonthVisualStatus,
+  type YearCompliance,
+  type YearMonthVisualStatus,
+  yearMonthTooltipText,
+} from "@/lib/monthly-progress";
+import { currentMonthKey, formatMonthLabel } from "@/lib/month-range";
 
 type YearComplianceMeterProps = {
   compliance: YearCompliance;
@@ -17,49 +22,24 @@ type OpenRequest = {
   status: string;
 };
 
-function monthChipTitle(
-  month: YearCompliance["monthDetails"][number],
-  timezone: string,
-): string {
-  const label = formatMonthLabel(month.monthKey, timezone);
-  if (month.status === "pending") {
-    return `${label}: Not started yet`;
+function monthCellClassName(visual: YearMonthVisualStatus, hasPendingExemption?: boolean): string {
+  const pendingRing = hasPendingExemption ? " ring-1 ring-amber-500/50" : "";
+  switch (visual) {
+    case "compliant":
+      return `bg-green-500/15 text-green-400 border border-green-500/30${pendingRing}`;
+    case "non_compliant":
+      return `bg-red-500/10 text-red-300 border border-red-500/40${pendingRing}`;
+    case "in_progress":
+      return `bg-[var(--pwc-orange)]/10 text-accent border border-[var(--pwc-orange)]/40${pendingRing}`;
+    case "no_data":
+      return `border border-dashed border-[var(--border)] text-muted${pendingRing}`;
+    case "pending":
+      return `border border-dashed border-[var(--border)]/60 text-muted/50${pendingRing}`;
   }
-  if (month.status === "no_data") {
-    if (month.noDataReason === "joined_late") {
-      return `${label}: No data - account was created after this month`;
-    }
-    if (month.noDataReason === "pre_pilot") {
-      return `${label}: No data - tracking pilot had not started`;
-    }
-    return `${label}: No data - no office visits or hours recorded`;
-  }
-  if (month.status === "exemption") {
-    return `${label}: Exempted by admin (${month.qualifyingDays}/${month.monthlyDaysTarget} days logged)`;
-  }
-  if (month.status === "earned") {
-    return `${label}: Compliant (${month.qualifyingDays}/${month.monthlyDaysTarget} days)`;
-  }
-  return `${label}: Non-compliant (${month.qualifyingDays}/${month.monthlyDaysTarget} days)`;
 }
 
-function monthChipClassName(month: YearCompliance["monthDetails"][number]): string {
-  if (month.status === "no_data") {
-    return "border border-dashed border-[var(--border)] text-muted";
-  }
-  if (month.status === "exemption") {
-    return "bg-green-500/10 text-green-300 border border-dashed border-green-500/40";
-  }
-  if (month.status === "earned") {
-    return "bg-green-500/15 text-green-400 border border-green-500/30";
-  }
-  if (month.hasPendingExemption) {
-    return "border border-dashed border-amber-500/50 text-amber-300";
-  }
-  if (month.status === "pending") {
-    return "border border-dashed border-[var(--border)] text-muted/60";
-  }
-  return "border border-red-500/40 bg-red-500/10 text-red-300";
+function monthAbbrev(monthKey: string, timezone: string): string {
+  return formatMonthLabel(monthKey, timezone).split(" ")[0]!.slice(0, 3);
 }
 
 export function YearComplianceMeter({ compliance, timezone }: YearComplianceMeterProps) {
@@ -70,6 +50,8 @@ export function YearComplianceMeter({ compliance, timezone }: YearComplianceMete
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const currentMonth = currentMonthKey(timezone);
 
   const loadRequests = useCallback(async () => {
     const res = await fetch("/api/settings/compliance-exemption");
@@ -82,7 +64,6 @@ export function YearComplianceMeter({ compliance, timezone }: YearComplianceMete
     void loadRequests();
   }, [loadRequests]);
 
-  const pct = Math.min(100, (compliance.compliantMonths / compliance.monthsInYear) * 100);
   const allElapsedCompliant =
     compliance.monthsElapsed > 0 && compliance.compliantMonths === compliance.monthsElapsed;
   const fullYearCompliant = compliance.compliantMonths === compliance.monthsInYear;
@@ -138,21 +119,20 @@ export function YearComplianceMeter({ compliance, timezone }: YearComplianceMete
         (r.monthKey === monthKey || (r.dayKey && r.dayKey.startsWith(`${monthKey}-`))),
     );
 
+  const targetDays = compliance.monthDetails[0]?.monthlyDaysTarget ?? 8;
+
   return (
     <div className="card p-6">
-      <div className="flex items-end justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm text-muted">Year compliance ({compliance.fiscalYearLabel})</p>
-          <p className="mt-1 text-4xl font-bold">
-            {compliance.compliantMonths}
-            <span className="text-lg font-normal text-muted">
-              {" "}
-              / {compliance.monthsInYear} month{compliance.monthsInYear === 1 ? "" : "s"}
-            </span>
+          <p className="text-sm font-medium">Year compliance ({compliance.fiscalYearLabel})</p>
+          <p className="mt-1 text-xs text-muted">
+            {targetDays} qualifying days per month. Green = met target or admin exemption. Empty
+            months do not count as compliant.
           </p>
         </div>
         <span
-          className={`rounded-full px-3 py-1 text-sm font-medium ${allElapsedCompliant ? "badge-met" : "badge-pending"}`}
+          className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium ${allElapsedCompliant ? "badge-met" : "badge-pending"}`}
         >
           {fullYearCompliant
             ? "Full year met"
@@ -161,47 +141,67 @@ export function YearComplianceMeter({ compliance, timezone }: YearComplianceMete
               : "Monthly days target"}
         </span>
       </div>
-      <p className="mt-2 text-xs text-muted">
-        Based on recorded office hours ({compliance.monthDetails[0]?.monthlyDaysTarget ?? 8}{" "}
-        qualifying days per month). Empty months show No data and do not count as compliant.
-        Admin-approved exemptions count as compliant.
-      </p>
-      <div className="progress-track mt-4 h-3 overflow-hidden rounded-full">
-        <div
-          className={`h-full rounded-full transition-all ${fullYearCompliant || allElapsedCompliant ? "progress-fill-met" : "progress-fill"}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+
       {compliance.monthDetails.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {compliance.monthDetails.map((month) => {
-            const pending = pendingForMonth(month.monthKey);
-            const canRequest =
-              (month.status === "not_met" || month.status === "no_data") &&
-              !pending;
-            return (
-              <span key={month.monthKey} className="inline-flex items-center gap-1">
-                <button
-                  type="button"
-                  title={monthChipTitle(month, timezone)}
-                  onClick={() => canRequest && openRequestDialog(month.monthKey)}
-                  className={`rounded-md px-2 py-1 text-xs font-medium ${monthChipClassName(month)} ${canRequest ? "cursor-pointer hover:opacity-90" : "cursor-default"}`}
-                >
-                  {formatMonthLabel(month.monthKey, timezone).split(" ")[0]}
-                </button>
-                {pending && (
-                  <button
-                    type="button"
-                    onClick={() => cancelRequest(pending.id)}
-                    className="text-[10px] text-amber-300 hover:underline"
-                    title="Cancel pending exemption request"
-                  >
-                    Cancel
-                  </button>
-                )}
-              </span>
-            );
-          })}
+        <div className="mt-4">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+            {compliance.monthDetails.map((month) => {
+              const visual = getYearMonthVisualStatus(month, currentMonth);
+              const pending = pendingForMonth(month.monthKey);
+              const canRequest =
+                (month.status === "not_met" || month.status === "no_data") && !pending;
+              const tooltip = yearMonthTooltipText(month, currentMonth, timezone);
+
+              return (
+                <div key={month.monthKey} className="flex flex-col items-stretch gap-1">
+                  <span className="group relative">
+                    <button
+                      type="button"
+                      title={tooltip}
+                      onClick={() => canRequest && openRequestDialog(month.monthKey)}
+                      className={`flex w-full flex-col items-center justify-center rounded-md px-2 py-3 text-xs font-semibold transition-opacity ${monthCellClassName(visual, month.hasPendingExemption)} ${canRequest ? "cursor-pointer hover:opacity-90" : "cursor-default"}`}
+                    >
+                      {monthAbbrev(month.monthKey, timezone)}
+                    </button>
+                    <span
+                      role="tooltip"
+                      className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 hidden w-52 -translate-x-1/2 rounded-md border border-[var(--border)] bg-[var(--background-elevated)] px-2.5 py-2 text-center text-[11px] leading-snug text-muted shadow-lg group-hover:block group-focus-within:block"
+                    >
+                      {tooltip}
+                    </span>
+                  </span>
+                  {pending && (
+                    <button
+                      type="button"
+                      onClick={() => cancelRequest(pending.id)}
+                      className="text-center text-[10px] text-amber-300 hover:underline"
+                      title="Cancel pending exemption request"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm bg-green-500/40" />
+              Compliant
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm bg-[var(--pwc-orange)]/50" />
+              In progress
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500/40" />
+              Non-compliant
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-sm border border-dashed border-[var(--border)]" />
+              No data
+            </span>
+          </div>
         </div>
       )}
 

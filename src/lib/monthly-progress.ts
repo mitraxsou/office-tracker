@@ -1,4 +1,4 @@
-import { allDayKeysInMonth, daysInMonth, parseMonthKey } from "./month-range";
+import { allDayKeysInMonth, daysInMonth, formatMonthLabel, parseMonthKey } from "./month-range";
 import { aggregateHoursForDay } from "./user-reports";
 import type { ApprovedExemptions } from "./compliance-exemptions";
 import { DEFAULT_PILOT_START_MONTH_KEY } from "./app-config";
@@ -165,6 +165,58 @@ export function isPrePilotMonth(monthKey: string, pilotStartMonthKey: string): b
 
 export function isCompliantYearMonthStatus(status: YearMonthComplianceStatus): boolean {
   return status === "earned" || status === "exemption";
+}
+
+export type YearMonthVisualStatus =
+  | "compliant"
+  | "non_compliant"
+  | "in_progress"
+  | "no_data"
+  | "pending";
+
+export function getYearMonthVisualStatus(
+  month: Pick<YearMonthCompliance, "monthKey" | "status">,
+  currentMonthKey: string,
+): YearMonthVisualStatus {
+  if (month.status === "pending") return "pending";
+  if (month.status === "no_data") return "no_data";
+  if (month.status === "earned" || month.status === "exemption") return "compliant";
+  if (month.monthKey === currentMonthKey) return "in_progress";
+  return "non_compliant";
+}
+
+export function yearMonthTooltipText(
+  month: YearMonthCompliance,
+  currentMonthKey: string,
+  timezone: string,
+): string {
+  const label = formatMonthLabel(month.monthKey, timezone);
+  if (month.hasPendingExemption) {
+    return `${label}: Exemption request pending`;
+  }
+  const visual = getYearMonthVisualStatus(month, currentMonthKey);
+  if (visual === "pending") {
+    return `${label}: Not started yet`;
+  }
+  if (visual === "no_data") {
+    if (month.noDataReason === "joined_late") {
+      return `${label}: No data for this month (account created after this month)`;
+    }
+    if (month.noDataReason === "pre_pilot") {
+      return `${label}: No data for this month (pilot had not started)`;
+    }
+    return `${label}: No data for this month`;
+  }
+  if (visual === "compliant") {
+    if (month.status === "exemption") {
+      return `${label}: Compliant via admin exemption (${month.qualifyingDays}/${month.monthlyDaysTarget} qualifying days)`;
+    }
+    return `${label}: Compliant (${month.qualifyingDays}/${month.monthlyDaysTarget} qualifying days)`;
+  }
+  if (visual === "in_progress") {
+    return `${label}: In progress (${month.qualifyingDays}/${month.monthlyDaysTarget} qualifying days so far)`;
+  }
+  return `${label}: Non-compliant (${month.qualifyingDays}/${month.monthlyDaysTarget} qualifying days)`;
 }
 
 export function yearMonthStatus(

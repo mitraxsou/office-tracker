@@ -10,6 +10,7 @@ import {
   fiscalYearLabel,
   fiscalYearStartYear,
   getMonthlyProgressState,
+  getYearMonthVisualStatus,
   isCompliantYearMonthStatus,
   isPrePilotMonth,
   monthKeyInTimezone,
@@ -20,6 +21,7 @@ import {
   validateMonthlyDaysTarget,
   yearFromDate,
   yearMonthStatus,
+  yearMonthTooltipText,
 } from "../src/lib/monthly-progress";
 
 describe("validateMonthlyDaysTarget", () => {
@@ -227,5 +229,73 @@ describe("year compliance helpers", () => {
       expect(isCompliantYearMonthStatus("no_data")).toBe(false);
     }
     expect(isPrePilotMonth("2026-09", pilotStart)).toBe(false);
+  });
+
+  it("maps year month records to visual status for the FY grid", () => {
+    const current = "2026-09";
+    expect(
+      getYearMonthVisualStatus({ monthKey: "2026-08", status: "earned" }, current),
+    ).toBe("compliant");
+    expect(
+      getYearMonthVisualStatus({ monthKey: "2026-08", status: "exemption" }, current),
+    ).toBe("compliant");
+    expect(
+      getYearMonthVisualStatus({ monthKey: "2026-08", status: "not_met" }, current),
+    ).toBe("non_compliant");
+    expect(
+      getYearMonthVisualStatus({ monthKey: "2026-09", status: "not_met" }, current),
+    ).toBe("in_progress");
+    expect(
+      getYearMonthVisualStatus({ monthKey: "2026-07", status: "no_data" }, current),
+    ).toBe("no_data");
+    expect(
+      getYearMonthVisualStatus({ monthKey: "2026-10", status: "pending" }, current),
+    ).toBe("pending");
+  });
+
+  it("builds tooltip copy for each visual status", () => {
+    const current = "2026-09";
+    expect(
+      yearMonthTooltipText(
+        {
+          monthKey: "2026-08",
+          metTarget: true,
+          qualifyingDays: 8,
+          monthlyDaysTarget: 8,
+          status: "earned",
+        },
+        current,
+        "Asia/Kolkata",
+      ),
+    ).toContain("Compliant (8/8 qualifying days)");
+
+    expect(
+      yearMonthTooltipText(
+        {
+          monthKey: "2026-09",
+          metTarget: false,
+          qualifyingDays: 3,
+          monthlyDaysTarget: 8,
+          status: "not_met",
+        },
+        current,
+        "Asia/Kolkata",
+      ),
+    ).toContain("In progress (3/8 qualifying days so far)");
+
+    expect(
+      yearMonthTooltipText(
+        {
+          monthKey: "2026-07",
+          metTarget: false,
+          qualifyingDays: 0,
+          monthlyDaysTarget: 8,
+          status: "no_data",
+          noDataReason: "no_visits",
+        },
+        current,
+        "Asia/Kolkata",
+      ),
+    ).toBe("July 2026: No data for this month");
   });
 });
