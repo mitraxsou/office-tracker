@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { isBreakglassEmail } from "@/lib/breakglass";
+import { getCurrentLegalVersion } from "@/lib/legal-config";
+import { getPostLoginRedirect } from "@/lib/terms-acceptance";
 
 export default async function Home() {
   const user = await getCurrentUser();
-  if (user?.mustChangePassword && !isBreakglassEmail(user.email)) {
-    redirect("/settings?mustChange=1");
+  if (user) {
+    const currentLegalVersion = await getCurrentLegalVersion();
+    redirect(getPostLoginRedirect(user, currentLegalVersion));
   }
-  redirect(user ? "/dashboard" : "/login");
+  redirect("/login");
 }

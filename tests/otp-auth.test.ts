@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  countRecentOtpRequests,
   findOrCreateUserByOtp,
   isPwcEmail,
-  MAX_OTP_REQUESTS_PER_WINDOW,
   MAX_OTP_VERIFY_ATTEMPTS,
-  requestLoginOtp,
+  sendLoginOtp,
   verifyLoginOtp,
 } from "../src/lib/otp-auth";
 
@@ -16,11 +14,11 @@ vi.mock("../src/lib/db", () => ({
       create: vi.fn(),
     },
     loginOtp: {
-      count: vi.fn(),
       create: vi.fn(),
       findFirst: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      deleteMany: vi.fn(),
     },
     userNotificationPrefs: {
       create: vi.fn(),
@@ -63,7 +61,7 @@ describe("isPwcEmail", () => {
   });
 });
 
-describe("requestLoginOtp", () => {
+describe("sendLoginOtp", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.AUTH_SECRET = "test-auth-secret-that-is-at-least-32-characters";
@@ -82,34 +80,31 @@ describe("requestLoginOtp", () => {
       complianceExemptionRequiresApproval: true,
       pilotStartMonthKey: "2026-09",
     });
+    vi.mocked(prisma.loginOtp.deleteMany).mockResolvedValue({ count: 0 });
   });
 
   it("rejects non-pwc email", async () => {
-    const result = await requestLoginOtp("user@gmail.com");
-    expect(result).toEqual({ ok: false, error: "Use your PwC email address" });
+    const result = await sendLoginOtp("user@gmail.com");
+    expect(result).toEqual({ ok: false, error: "Use your PwC email address", status: 400 });
   });
 
-  it("rejects unknown email when self-registration is off", async () => {
+  it("returns sent false for unknown email when self-registration is off (anti-enumeration)", async () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
-    const result = await requestLoginOtp("user@pwc.com");
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toContain("No account found");
-    }
+    const result = await sendLoginOtp("user@pwc.com");
+    expect(result).toEqual({ ok: true, sent: false });
+    expect(postWebhookPayload).not.toHaveBeenCalled();
   });
 
-  it("rate limits repeated requests", async () => {
+  it("invalidates previous otp rows before creating a new one", async () => {
     vi.mocked(prisma.user.findUnique).mockResolvedValue({
       id: "u1",
       email: "user@pwc.com",
       name: "User",
     } as never);
-    vi.mocked(prisma.loginOtp.count).mockResolvedValue(MAX_OTP_REQUESTS_PER_WINDOW);
-    const result = await requestLoginOtp("user@pwc.com");
-    expect(result).toEqual({
-      ok: false,
-      error: "Too many code requests. Try again in 15 minutes.",
-    });
+    vi.mocked(prisma.loginOtp.create).mockResolvedValue({ id: "otp1" } as never);
+
+    await sendLoginOtp("user@pwc.com");
+    expect(prisma.loginOtp.deleteMany).toHaveBeenCalledWith({ where: { email: "user@pwc.com" } });
   });
 
   it("stores otp and posts login_otp webhook for existing user", async () => {
@@ -118,11 +113,10 @@ describe("requestLoginOtp", () => {
       email: "user@pwc.com",
       name: "User",
     } as never);
-    vi.mocked(prisma.loginOtp.count).mockResolvedValue(0);
     vi.mocked(prisma.loginOtp.create).mockResolvedValue({ id: "otp1" } as never);
 
-    const result = await requestLoginOtp("user@pwc.com");
-    expect(result).toEqual({ ok: true });
+    const result = await sendLoginOtp("user@pwc.com");
+    expect(result).toEqual({ ok: true, sent: true });
     expect(prisma.loginOtp.create).toHaveBeenCalled();
     expect(postWebhookPayload).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -131,6 +125,21 @@ describe("requestLoginOtp", () => {
         otpExpiresMinutes: 10,
       }),
     );
+  });
+
+  it("returns 503 when webhook fails", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: "u1",
+      email: "user@pwc.com",
+      name: "User",
+    } as never);
+    vi.mocked(postWebhookPayload).mockResolvedValue({ ok: false });
+    const result = await sendLoginOtp("user@pwc.com");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(503);
+    }
+    expect(prisma.loginOtp.deleteMany).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -142,7 +151,7 @@ describe("verifyLoginOtp", () => {
 
   it("rejects invalid code format", async () => {
     const result = await verifyLoginOtp("user@pwc.com", "abc");
-    expect(result).toEqual({ ok: false, error: "Enter the 6-digit code" });
+    expect(result).toEqual({ ok: false, error: "Enter the 6-digit code", invalidCode: true });
   });
 
   it("rejects expired otp", async () => {
@@ -168,7 +177,7 @@ describe("verifyLoginOtp", () => {
       createdAt: new Date(),
     });
     const result = await verifyLoginOtp("user@pwc.com", "123456");
-    expect(result).toEqual({ ok: false, error: "Too many attempts. Request a new code." });
+    expect(result).toEqual({ ok: false, error: "Too many attempts. Request a new code.", invalidCode: true });
   });
 });
 
@@ -215,14 +224,5 @@ describe("findOrCreateUserByOtp", () => {
         data: expect.objectContaining({ registrationSource: "otp_self" }),
       }),
     );
-  });
-});
-
-describe("countRecentOtpRequests", () => {
-  it("counts within the request window", async () => {
-    vi.mocked(prisma.loginOtp.count).mockResolvedValue(2);
-    const count = await countRecentOtpRequests("user@pwc.com");
-    expect(count).toBe(2);
-    expect(prisma.loginOtp.count).toHaveBeenCalled();
   });
 });

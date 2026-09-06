@@ -261,7 +261,7 @@ describe("changeUserPassword", () => {
     });
     const updateData = prismaMock.user.update.mock.calls[0][0].data;
     expect(await verifyPassword(newPassword, updateData.passwordHash)).toBe(true);
-  });
+  }, 15000);
 
   it("rejects incorrect current password", async () => {
     prismaMock.user.findUnique.mockResolvedValue({

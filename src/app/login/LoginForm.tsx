@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { OTP_RESEND_COOLDOWN_MS } from "@/lib/auth-rate-limit-constants";
 
 type LoginFormProps = {
   error?: string;
@@ -25,38 +26,22 @@ export function LoginForm({
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [sentMessage, setSentMessage] = useState<string | null>(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const prevCodeLengthRef = useRef(0);
 
   const displayError = error ?? localError;
 
   useEffect(() => {
-    if (error) setLocalError(null);
-  }, [error]);
+    if (cooldownSeconds <= 0) return;
+    const timer = window.setInterval(() => {
+      setCooldownSeconds((s) => (s <= 1 ? 0 : s - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [cooldownSeconds]);
 
-  async function handleRequestCode(event: React.FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setLocalError(null);
-    setSentMessage(null);
+  const verifyCode = useCallback(async () => {
+    if (busy || lockedOut || code.length !== 6) return;
 
-    const res = await fetch("/api/auth/otp/request", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-    setBusy(false);
-
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      setLocalError(body.error ?? "Could not send code");
-      return;
-    }
-
-    setStep("code");
-    setSentMessage("Check Microsoft Teams for your 6-digit sign-in code.");
-  }
-
-  async function handleVerifyCode(event: React.FormEvent) {
-    event.preventDefault();
     setBusy(true);
     setLocalError(null);
 
@@ -67,6 +52,13 @@ export function LoginForm({
     });
     setBusy(false);
 
+    if (res.status === 429) {
+      const body = await res.json().catch(() => ({}));
+      const retry = typeof body.retryAfterSeconds === "number" ? body.retryAfterSeconds : 60;
+      setLocalError(body.error ?? `Try again in ${retry} seconds.`);
+      return;
+    }
+
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
       setLocalError(body.error ?? "Sign-in failed");
@@ -76,6 +68,83 @@ export function LoginForm({
     const body = await res.json();
     router.push(body.redirectTo ?? "/dashboard");
     router.refresh();
+  }, [busy, lockedOut, code, email, router]);
+
+  useEffect(() => {
+    if (step !== "code" || lockedOut || busy) {
+      prevCodeLengthRef.current = code.length;
+      return;
+    }
+
+    const justCompleted =
+      code.length === 6 && prevCodeLengthRef.current < 6;
+    prevCodeLengthRef.current = code.length;
+
+    if (justCompleted) {
+      void verifyCode();
+    }
+  }, [code, step, lockedOut, busy, verifyCode]);
+
+  useEffect(() => {
+    if (step === "email") {
+      prevCodeLengthRef.current = 0;
+    }
+  }, [step]);
+
+  useEffect(() => {
+    if (error) setLocalError(null);
+  }, [error]);
+
+  const requestOtp = useCallback(
+    async (resend: boolean) => {
+      setBusy(true);
+      setLocalError(null);
+      if (!resend) setSentMessage(null);
+
+      const res = await fetch("/api/auth/otp/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, resend }),
+      });
+      setBusy(false);
+
+      const body = await res.json().catch(() => ({}));
+
+      if (res.status === 429) {
+        const retry = typeof body.retryAfterSeconds === "number" ? body.retryAfterSeconds : 60;
+        setCooldownSeconds(retry);
+        setLocalError(body.error ?? `Try again in ${retry} seconds.`);
+        return;
+      }
+
+      if (!res.ok) {
+        setLocalError(body.error ?? "Could not send code");
+        return;
+      }
+
+      setStep("code");
+      setCooldownSeconds(Math.ceil(OTP_RESEND_COOLDOWN_MS / 1000));
+      setSentMessage(
+        body.message ??
+          "If this email is registered, check Microsoft Teams for your 6-digit sign-in code.",
+      );
+    },
+    [email],
+  );
+
+  async function handleRequestCode(event: React.FormEvent) {
+    event.preventDefault();
+    await requestOtp(false);
+  }
+
+  async function handleResendCode() {
+    if (busy || lockedOut || cooldownSeconds > 0) return;
+    await requestOtp(true);
+  }
+
+  async function handleVerifyCode(event: React.FormEvent) {
+    event.preventDefault();
+    await verifyCode();
   }
 
   return (
@@ -126,6 +195,7 @@ export function LoginForm({
           <p className="text-sm text-muted">
             Code sent to <strong>{email}</strong>
           </p>
+          <p className="text-xs text-muted">Up to 3 codes per 15 minutes.</p>
           <div>
             <label className="mb-1 block text-sm text-muted">6-digit code</label>
             <input
@@ -138,10 +208,19 @@ export function LoginForm({
               onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
               className="w-full rounded-lg border px-3 py-2 font-mono tracking-widest"
               autoComplete="one-time-code"
+              autoFocus
             />
           </div>
           <button type="submit" disabled={busy || lockedOut} className="btn-primary w-full px-4 py-2">
             {busy ? "Verifying..." : "Verify and sign in"}
+          </button>
+          <button
+            type="button"
+            disabled={busy || lockedOut || cooldownSeconds > 0}
+            onClick={handleResendCode}
+            className="btn-secondary w-full px-4 py-2 disabled:opacity-50"
+          >
+            {cooldownSeconds > 0 ? `Resend code (${cooldownSeconds}s)` : "Resend code"}
           </button>
           <button
             type="button"
@@ -151,6 +230,7 @@ export function LoginForm({
               setCode("");
               setSentMessage(null);
               setLocalError(null);
+              setCooldownSeconds(0);
             }}
           >
             Use a different email

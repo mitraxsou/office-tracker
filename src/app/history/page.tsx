@@ -1,4 +1,4 @@
-import { requireAuthenticatedUser, enforcePasswordChangeIfRequired } from "@/lib/session-guards";
+import { requireAuthenticatedUser, enforcePasswordChangeIfRequired, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
 import { prisma } from "@/lib/db";
 import { AppNav } from "@/components/AppNav";
 import { VisitList } from "@/components/VisitList";
@@ -8,6 +8,7 @@ import { formatDate } from "@/lib/visits";
 export default async function HistoryPage() {
   const user = await requireAuthenticatedUser();
   enforcePasswordChangeIfRequired(user);
+  await enforceTermsAcceptanceIfRequired(user, "/history");
 
   const visits = await prisma.visit.findMany({
     where: { userId: user.id },

@@ -1,15 +1,34 @@
 # PwC Office Pulse (Office Tracker)
 
-Pilot app to track **5 hours/day in the PwC office** on PwC laptops. Auto-detection uses office Wi-Fi SSIDs only:
+> **Hobby project disclaimer:** This is a personal hobby project built for fun and learning. It is **not** a PwC product, not official PwC tooling, and not endorsed by PwC. You sign up and install the Windows agent voluntarily, at your own interest. The developer is **not** responsible for any action or improper use of the website or agent.
+
+Pilot app to track **5 hours/day in the PwC office** on PwC laptops, with a default **8 office days per month** target. Auto-detection uses office Wi-Fi SSIDs only:
 
 - **OfficeConnect**
 - **ExternalConnect**
+- **pwcglb.com** (captive portal domain, admin allowlist)
 
 GlobalProtect/VPN is logged for diagnostics only and **never** counts toward office hours.
 
 The Windows agent is branded **PwC Office Pulse**.
 
 **Production:** https://github.com/mitraxsou/office-tracker → deploy on Vercel with Neon Postgres.
+
+**Legal (in app):** `/terms` · `/privacy` · `/help`
+
+---
+
+## Features (current)
+
+| Area | What it does |
+|---|---|
+| **Sign-in** | OTP via Microsoft Teams (Power Automate); password fallback for admin-issued accounts |
+| **Terms** | First sign-in (or next sign-in for existing users) requires accepting Terms and Privacy |
+| **Dashboard** | Today hours, monthly progress, year compliance calendar, manual check-in/out |
+| **Agent** | Windows background agent (2 min heartbeats); user-level install, no admin rights |
+| **Notifications** | Per-alert channel: in-app, Teams, or both; out-of-office and schedule prefs |
+| **Admin** | User/token management, org calendar, visit corrections, compliance exemptions, audit log |
+| **Integrations** | Power Automate webhook for OTP and Teams alerts ([docs/power-automate.md](docs/power-automate.md)) |
 
 ---
 
@@ -28,6 +47,23 @@ Also set `ALLOW_REGISTRATION=false` on production to block public sign-ups.
 
 ---
 
+## Login security
+
+Sign-in is protected with **Postgres-backed rate limits** (works across Vercel serverless instances):
+
+| Limit | Threshold |
+|---|---|
+| OTP codes per email | 3 per 15 minutes |
+| OTP requests per IP | 10 per 15 minutes |
+| OTP resend cooldown | 60 seconds between sends |
+| OTP verify per IP / email | 20 / 10 per 15 minutes |
+| Password attempts | 3 failures per 15 minutes (cookie lockout) |
+| Password attempts per IP | 15 per 15 minutes |
+
+OTP request responses do not reveal whether an email is registered (anti-enumeration). Volumetric DDoS is primarily handled by **Vercel's edge network**; these limits reduce OTP spam, credential stuffing, and webhook abuse.
+
+---
+
 ## Data persistence
 
 | Environment | Database |
@@ -36,6 +72,8 @@ Also set `ALLOW_REGISTRATION=false` on production to block public sign-ups.
 | **Production (Vercel)** | Vercel Storage → Postgres (Neon). Auto-injects `POSTGRES_*` env vars when linked to the project |
 
 User identity is **email + userId** in the database. Visit history lives in Postgres, not on the laptop.
+
+**Collected data (summary):** email, visit times, Wi-Fi SSID, agent tokens (hashed), laptop serial, heartbeats, notification prefs. No browsing history or screenshots. See the in-app Privacy Policy at `/privacy`.
 
 ---
 
@@ -61,7 +99,7 @@ Prisma is configured to use `POSTGRES_PRISMA_URL` and `POSTGRES_URL_NON_POOLING`
 If Vercel shows vars like `DATABASE_URL_POSTGRES_URL`, `DATABASE_URL_DATABASE_URL`, `DATABASE_URL_UNPOOLED` instead of `POSTGRES_URL`, `POSTGRES_PRISMA_URL`, `POSTGRES_URL_NON_POOLING`, the Storage connection was linked with a **custom prefix**. The app will still deploy using those prefixed vars, but you should fix the dashboard:
 
 1. Vercel project → **Settings** → **Environment Variables**
-2. **Delete** every var starting with `DATABASE_URL_` that came from Storage (e.g. `DATABASE_URL_POSTGRES_URL`, `DATABASE_URL_DATABASE_URL`, `DATABASE_URL_UNPOOLED`, `DATABASE_URL_POSTGRES_HOST`, …)
+2. **Delete** every var starting with `DATABASE_URL_` that came from Storage (e.g. `DATABASE_URL_POSTGRES_URL`, `DATABASE_URL_DATABASE_URL`, `DATABASE_URL_UNPOOLED`, …)
 
    **Bulk delete (no CLI login):** use [scripts/vercel-env-setup.md](scripts/vercel-env-setup.md) and `scripts/cleanup-vercel-env.ps1` with a [Vercel API token](https://vercel.com/account/tokens) — works on PwC laptops where `vercel login` fails SSL inspection.
 3. **Storage** tab → select your Postgres database → **Connect to Project**
@@ -159,11 +197,13 @@ Agent install commands in Settings will then use the Vercel URL automatically.
 
 ## Quick start (colleagues)
 
-1. Sign in at the **Vercel URL** → **Settings**
-2. **Download agent (.zip)** (`PwCOfficePulse-agent.zip`) → extract (may nest under `OneDrive - PwC\Downloads`)
-3. Open PowerShell in the folder that contains `install.ps1` (`dir` should list it)
-4. **Copy install command** or **Copy update command** → paste in that window
-4. Verify: `powershell -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\OfficeTracker\office-heartbeat.ps1" -DryRun`
+1. Sign in at the **Vercel URL** (OTP to Teams, or password if admin gave you one)
+2. Accept **Terms and Privacy** on first sign-in
+3. Open **Settings**
+4. **Download agent (.zip)** (`PwCOfficePulse-agent.zip`) → extract (may nest under `OneDrive - PwC\Downloads`)
+5. Open PowerShell in the folder that contains `install.ps1` (`dir` should list it)
+6. **Copy install command** or **Copy update command** → paste in that window
+7. Verify: `powershell -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\OfficeTracker\office-heartbeat.ps1" -DryRun`
 
 ---
 
@@ -190,8 +230,9 @@ npm run build
 ## Admin dashboard
 
 - **URL:** `/admin` (admin role required)
-- Summary cards, 7-day charts, user table, activity log
+- Summary cards, org calendar, 7-day charts, user table, activity log
 - Global settings: `/admin/settings`
+- Corrections inbox, compliance exemptions, custom notifications
 
 ---
 
@@ -207,4 +248,4 @@ npm run build
 
 ## Policy
 
-Opt-in pilot only. Collects SSID + timestamps only. No browsing history, process lists, or screenshots.
+Opt-in hobby pilot only. Collects SSID + timestamps (and account data listed in the Privacy Policy). No browsing history, process lists, or screenshots. Use at your own risk.

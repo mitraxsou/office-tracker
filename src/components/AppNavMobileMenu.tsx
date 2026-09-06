@@ -170,6 +170,12 @@ export function AppNavMobileGuestActions() {
       <Link href="/help" className="link-nav px-2 py-2 text-sm">
         Help
       </Link>
+      <Link href="/terms" className="link-nav px-2 py-2 text-sm">
+        Terms
+      </Link>
+      <Link href="/privacy" className="link-nav px-2 py-2 text-sm">
+        Privacy
+      </Link>
       <Link href="/login" className="btn-primary px-3 py-2 text-sm">
         Sign in
       </Link>

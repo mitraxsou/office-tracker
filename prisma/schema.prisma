@@ -19,6 +19,15 @@ model LoginOtp {
   @@index([email, createdAt])
 }
 
+model AuthRateLimitEvent {
+  id        String   @id @default(cuid())
+  bucket    String
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([bucket, key, createdAt])
+}
+
 model User {
   id                 String        @id @default(cuid())
   email              String        @unique
@@ -31,6 +40,8 @@ model User {
   agentStaleGraceHours Int?
   mustChangePassword Boolean       @default(false)
   passwordResetAt    DateTime?
+  termsAcceptedAt      DateTime?
+  termsAcceptedVersion Int?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   agentTokens  AgentToken[]
@@ -266,6 +277,20 @@ model ComplianceExemptionRequest {
   @@index([userId])
   @@index([userId, monthKey])
   @@index([userId, dayKey])
+}
+
+model LegalConfig {
+  id                  String    @id @default("global")
+  legalVersion        Int       @default(1)
+  termsContent        String    @default("[]")
+  privacyContent      String    @default("[]")
+  draftTermsContent   String?
+  draftPrivacyContent String?
+  draftChangeSummary  String?
+  changeSummary       String?
+  publishedAt         DateTime?
+  publishedById       String?
+  updatedAt           DateTime  @updatedAt
 }
 
 model AppConfig {

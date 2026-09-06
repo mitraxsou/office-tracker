@@ -1,10 +1,11 @@
-import { requireAuthenticatedUser, enforcePasswordChangeIfRequired } from "@/lib/session-guards";
+import { requireAuthenticatedUser, enforcePasswordChangeIfRequired, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
 import { AppNav } from "@/components/AppNav";
 import { UserReportsDashboard } from "@/components/UserReportsDashboard";
 
 export default async function ReportsPage() {
   const user = await requireAuthenticatedUser();
   enforcePasswordChangeIfRequired(user);
+  await enforceTermsAcceptanceIfRequired(user, "/reports");
 
   return (
     <>

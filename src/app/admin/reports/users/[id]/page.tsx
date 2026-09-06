@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
-import { enforcePasswordChangeIfRequired } from "@/lib/session-guards";
+import { enforcePasswordChangeIfRequired, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
 import { prisma } from "@/lib/db";
 import { getProfileChangeBlockReason, getUserProfileChangeRequestState } from "@/lib/profile-change-requests";
 import { AppNav } from "@/components/AppNav";
@@ -15,6 +15,7 @@ export default async function AdminUserReportPage({
   const admin = await requireAdmin();
   if (!admin) redirect("/dashboard");
   enforcePasswordChangeIfRequired(admin);
+  await enforceTermsAcceptanceIfRequired(admin, "/admin/users");
 
   const { id } = await params;
 

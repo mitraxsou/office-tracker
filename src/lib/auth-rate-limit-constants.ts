@@ -1,0 +1,1 @@
+export const OTP_RESEND_COOLDOWN_MS = 60 * 1000;

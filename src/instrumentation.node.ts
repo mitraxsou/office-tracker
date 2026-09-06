@@ -389,6 +389,31 @@ export async function registerNode() {
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "registrationSource" TEXT NOT NULL DEFAULT \'admin\';'
     );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "termsAcceptedAt" TIMESTAMP(3);'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "termsAcceptedVersion" INTEGER;'
+    );
+    await prisma.$executeRawUnsafe(
+      `UPDATE "User" SET "termsAcceptedVersion" = 1 WHERE "termsAcceptedAt" IS NOT NULL AND "termsAcceptedVersion" IS NULL;`
+    );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "LegalConfig" (
+        "id" TEXT NOT NULL,
+        "legalVersion" INTEGER NOT NULL DEFAULT 1,
+        "termsContent" TEXT NOT NULL DEFAULT '[]',
+        "privacyContent" TEXT NOT NULL DEFAULT '[]',
+        "draftTermsContent" TEXT,
+        "draftPrivacyContent" TEXT,
+        "draftChangeSummary" TEXT,
+        "changeSummary" TEXT,
+        "publishedAt" TIMESTAMP(3),
+        "publishedById" TEXT,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "LegalConfig_pkey" PRIMARY KEY ("id")
+      );
+    `);
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "LoginOtp" (
         "id" TEXT NOT NULL,
@@ -403,6 +428,18 @@ export async function registerNode() {
     await prisma.$executeRawUnsafe(
       'CREATE INDEX IF NOT EXISTS "LoginOtp_email_createdAt_idx" ON "LoginOtp"("email", "createdAt");'
     );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "AuthRateLimitEvent" (
+        "id" TEXT NOT NULL,
+        "bucket" TEXT NOT NULL,
+        "key" TEXT NOT NULL,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "AuthRateLimitEvent_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "AuthRateLimitEvent_bucket_key_createdAt_idx" ON "AuthRateLimitEvent"("bucket", "key", "createdAt");'
+    );
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "UserNotificationPrefs" ALTER COLUMN "alertIfNotInOffice" SET DEFAULT false;'
     );
@@ -410,6 +447,8 @@ export async function registerNode() {
       'ALTER TABLE "UserNotificationPrefs" ALTER COLUMN "alertIfAgentStale" SET DEFAULT false;'
     );
     await ensureAppConfig();
+    const { ensureLegalConfig } = await import("./lib/legal-config");
+    await ensureLegalConfig();
     await ensureBreakglassAdmin();
   } catch (err) {
     if (!logAppConfigSchemaDriftIfNeeded(err) && !logDatabaseAccessDeniedIfNeeded(err)) {

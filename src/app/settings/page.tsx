@@ -3,7 +3,7 @@ import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 import {
   getUserInstallTokenState,
 } from "@/lib/auth";
-import { requireAuthenticatedUser } from "@/lib/session-guards";
+import { requireAuthenticatedUser, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
 import { getUserHoursTarget, getAppConfig } from "@/lib/app-config";
 import { getEnrichedDevicesForUser } from "@/lib/device-enrichment";
 import { getUserTimezoneRequestState } from "@/lib/timezone-requests";
@@ -36,6 +36,11 @@ export default async function SettingsPage({
   const profileChangeBlockedMessage = getProfileChangeBlockReason(user.email);
   const mustChangePassword =
     !isBreakglass && (user.mustChangePassword || params.mustChange === "1");
+
+  if (!mustChangePassword) {
+    const settingsNext = params.welcome === "1" ? "/settings?welcome=1" : "/settings";
+    await enforceTermsAcceptanceIfRequired(user, settingsNext);
+  }
 
   return (
     <>

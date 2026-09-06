@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
-import { enforcePasswordChangeIfRequired } from "@/lib/session-guards";
+import { enforcePasswordChangeIfRequired, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
 import { getAppConfig } from "@/lib/app-config";
 import { isRegistrationEnvLocked } from "@/lib/auth";
 import { AppNav } from "@/components/AppNav";
@@ -14,18 +14,22 @@ import { listIntegrationApiKeys } from "@/lib/integration-api-keys";
 import { AdminCronJobs } from "@/components/AdminCronJobs";
 import { listCronJobs } from "@/lib/cron-jobs";
 import { AdminDatabaseStats } from "@/components/AdminDatabaseStats";
+import { AdminLegalSettings } from "@/components/AdminLegalSettings";
+import { formatLegalUpdatedLabel, getAdminLegalDraft } from "@/lib/legal-config";
 import { getDatabaseStats } from "@/lib/db-stats";
 
 export default async function AdminSettingsPage() {
   const admin = await requireAdmin();
   if (!admin) redirect("/dashboard");
   enforcePasswordChangeIfRequired(admin);
+  await enforceTermsAcceptanceIfRequired(admin, "/admin/settings");
 
-  const [config, integrationKeys, cronJobs, databaseStats] = await Promise.all([
+  const [config, integrationKeys, cronJobs, databaseStats, legalDraft] = await Promise.all([
     getAppConfig(),
     listIntegrationApiKeys(),
     listCronJobs(),
     getDatabaseStats(),
+    getAdminLegalDraft(),
   ]);
 
   return (
@@ -60,6 +64,13 @@ export default async function AdminSettingsPage() {
         <AdminPilotControls
           allowOtpSelfRegistration={config.allowOtpSelfRegistration}
           registrationEnvLocked={isRegistrationEnvLocked()}
+        />
+        <AdminLegalSettings
+          legalVersion={legalDraft.legalVersion}
+          updatedLabel={formatLegalUpdatedLabel(legalDraft.publishedAt)}
+          initialTermsSections={legalDraft.draftTermsSections}
+          initialPrivacySections={legalDraft.draftPrivacySections}
+          initialChangeSummary={legalDraft.draftChangeSummary}
         />
       </main>
     </>

@@ -44,6 +44,12 @@ export async function AppNav() {
             <Link href="/help" className="link-nav text-sm">
               Help
             </Link>
+            <Link href="/terms" className="link-nav text-sm">
+              Terms
+            </Link>
+            <Link href="/privacy" className="link-nav text-sm">
+              Privacy
+            </Link>
             <Link href="/login" className="btn-primary px-3 py-1.5 text-sm">
               Sign in
             </Link>

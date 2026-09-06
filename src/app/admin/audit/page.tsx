@@ -4,7 +4,7 @@ import { AppNav } from "@/components/AppNav";
 import { AdminSubNav } from "@/components/AdminSubNav";
 import { requireAdmin } from "@/lib/admin";
 import { searchAuditLogs, type AuditSearchInput } from "@/lib/audit-search";
-import { enforcePasswordChangeIfRequired } from "@/lib/session-guards";
+import { enforcePasswordChangeIfRequired, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
 
 function pageHref(filters: AuditSearchInput, page: number) {
   const params = new URLSearchParams();
@@ -22,6 +22,7 @@ export default async function AdminAuditPage({
   const admin = await requireAdmin();
   if (!admin) redirect("/dashboard");
   enforcePasswordChangeIfRequired(admin);
+  await enforceTermsAcceptanceIfRequired(admin, "/admin/audit");
   const result = await searchAuditLogs(await searchParams);
 
   return (

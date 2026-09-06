@@ -17,8 +17,6 @@ import {
 
 export const OTP_EXPIRES_MINUTES = 10;
 export const MAX_OTP_VERIFY_ATTEMPTS = 5;
-export const MAX_OTP_REQUESTS_PER_WINDOW = 3;
-export const OTP_REQUEST_WINDOW_MS = 15 * 60 * 1000;
 
 export { isPwcEmail };
 
@@ -47,33 +45,25 @@ export async function isOtpSelfRegistrationAllowed(): Promise<boolean> {
   return config.allowOtpSelfRegistration;
 }
 
-export async function countRecentOtpRequests(email: string): Promise<number> {
-  const since = new Date(Date.now() - OTP_REQUEST_WINDOW_MS);
-  return prisma.loginOtp.count({
-    where: { email, createdAt: { gte: since } },
-  });
-}
+export type SendOtpResult =
+  | { ok: true; sent: true }
+  | { ok: true; sent: false }
+  | { ok: false; error: string; status?: number };
 
-export type RequestOtpResult = { ok: true } | { ok: false; error: string };
-
-export async function requestLoginOtp(email: string): Promise<RequestOtpResult> {
+export async function sendLoginOtp(email: string): Promise<SendOtpResult> {
   const normalized = normalizeProfileEmail(email);
   if (!isPwcEmail(normalized)) {
-    return { ok: false, error: "Use your PwC email address" };
+    return { ok: false, error: "Use your PwC email address", status: 400 };
   }
 
   const existing = await prisma.user.findUnique({ where: { email: normalized } });
-  if (!existing && !(await isOtpSelfRegistrationAllowed())) {
-    return {
-      ok: false,
-      error: "No account found for this email. Contact your pilot admin.",
-    };
+  const canCreate = await isOtpSelfRegistrationAllowed();
+
+  if (!existing && !canCreate) {
+    return { ok: true, sent: false };
   }
 
-  const recentCount = await countRecentOtpRequests(normalized);
-  if (recentCount >= MAX_OTP_REQUESTS_PER_WINDOW) {
-    return { ok: false, error: "Too many code requests. Try again in 15 minutes." };
-  }
+  await prisma.loginOtp.deleteMany({ where: { email: normalized } });
 
   const code = generateOtpCode();
   const codeHash = await hashOtpCode(code);
@@ -93,7 +83,8 @@ export async function requestLoginOtp(email: string): Promise<RequestOtpResult> 
   });
 
   if (!webhookResult.ok) {
-    return { ok: false, error: "Could not send sign-in code. Try again later." };
+    await prisma.loginOtp.deleteMany({ where: { email: normalized } });
+    return { ok: false, error: "Could not send sign-in code. Try again later.", status: 503 };
   }
 
   if (existing) {
@@ -105,18 +96,18 @@ export async function requestLoginOtp(email: string): Promise<RequestOtpResult> 
     });
   }
 
-  return { ok: true };
+  return { ok: true, sent: true };
 }
 
 export type VerifyOtpResult =
   | { ok: true; userId: string; isNewUser: boolean; plainAgentToken?: string }
-  | { ok: false; error: string };
+  | { ok: false; error: string; invalidCode?: boolean };
 
 export async function verifyLoginOtp(email: string, code: string): Promise<VerifyOtpResult> {
   const normalized = normalizeProfileEmail(email);
   const trimmedCode = code.trim();
   if (!/^\d{6}$/.test(trimmedCode)) {
-    return { ok: false, error: "Enter the 6-digit code" };
+    return { ok: false, error: "Enter the 6-digit code", invalidCode: true };
   }
 
   const record = await prisma.loginOtp.findFirst({
@@ -125,11 +116,11 @@ export async function verifyLoginOtp(email: string, code: string): Promise<Verif
   });
 
   if (!record || record.expiresAt < new Date()) {
-    return { ok: false, error: "Code expired or invalid. Request a new code." };
+    return { ok: false, error: "Code expired or invalid. Request a new code.", invalidCode: true };
   }
 
   if (record.attempts >= MAX_OTP_VERIFY_ATTEMPTS) {
-    return { ok: false, error: "Too many attempts. Request a new code." };
+    return { ok: false, error: "Too many attempts. Request a new code.", invalidCode: true };
   }
 
   const valid = await verifyOtpHash(trimmedCode, record.codeHash);
@@ -147,7 +138,7 @@ export async function verifyLoginOtp(email: string, code: string): Promise<Verif
         details: { email: normalized },
       });
     }
-    return { ok: false, error: "Invalid code" };
+    return { ok: false, error: "Invalid code", invalidCode: true };
   }
 
   await prisma.loginOtp.delete({ where: { id: record.id } });
@@ -156,7 +147,7 @@ export async function verifyLoginOtp(email: string, code: string): Promise<Verif
     const result = await findOrCreateUserByOtp(normalized);
     return { ok: true, ...result };
   } catch {
-    return { ok: false, error: "Account not found" };
+    return { ok: false, error: "Account not found", invalidCode: false };
   }
 }
 

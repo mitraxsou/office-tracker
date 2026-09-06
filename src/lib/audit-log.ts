@@ -53,7 +53,9 @@ export type AuditAction =
   | "impersonate_end"
   | "otp_request"
   | "otp_verify_failed"
-  | "user_create_otp";
+  | "user_create_otp"
+  | "terms.accepted"
+  | "legal.publish";
 
 export async function logAuditEvent(params: {
   actorId: string;

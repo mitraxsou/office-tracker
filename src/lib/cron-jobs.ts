@@ -2,6 +2,7 @@ import { getAppConfig } from "./app-config";
 import { logAuditEvent } from "./audit-log";
 import { prisma } from "./db";
 import { purgeOldHeartbeats } from "./heartbeat-retention";
+import { purgeOldRateLimitEvents } from "./auth-rate-limit";
 import { syncOfficeSchedulesFromHistory } from "./office-schedule-sync";
 import { dispatchPendingAlerts } from "./power-automate-notify";
 
@@ -59,6 +60,7 @@ async function runJobLogic(jobName: CronJobName): Promise<CronResult> {
   if (jobName === "purge-heartbeats") {
     const config = await getAppConfig();
     const result = await purgeOldHeartbeats(config.heartbeatRetentionDays);
+    const rateLimitPurged = await purgeOldRateLimitEvents();
     const breakglass = await prisma.user.findFirst({ where: { role: "admin" } });
     if (breakglass && result.deleted > 0) {
       await logAuditEvent({
@@ -67,7 +69,7 @@ async function runJobLogic(jobName: CronJobName): Promise<CronResult> {
         details: { deleted: result.deleted, retentionDays: config.heartbeatRetentionDays },
       });
     }
-    return { ok: true, ...result };
+    return { ok: true, ...result, rateLimitPurged };
   }
 
   const result = await syncOfficeSchedulesFromHistory();

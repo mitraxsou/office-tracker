@@ -4,12 +4,13 @@ import { AppNav } from "@/components/AppNav";
 import { AdminSubNav } from "@/components/AdminSubNav";
 import { requireAdmin } from "@/lib/admin";
 import { getAdminInbox } from "@/lib/admin-inbox";
-import { enforcePasswordChangeIfRequired } from "@/lib/session-guards";
+import { enforcePasswordChangeIfRequired, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
 
 export default async function AdminInboxPage() {
   const admin = await requireAdmin();
   if (!admin) redirect("/dashboard");
   enforcePasswordChangeIfRequired(admin);
+  await enforceTermsAcceptanceIfRequired(admin, "/admin/inbox");
   const inbox = await getAdminInbox();
 
   return (

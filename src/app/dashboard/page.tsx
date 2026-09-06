@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireAuthenticatedUser, enforcePasswordChangeIfRequired } from "@/lib/session-guards";
+import { requireAuthenticatedUser, enforcePasswordChangeIfRequired, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
 import { getRealCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { getTodaySummary, getPulseStats } from "@/lib/heartbeat-service";
@@ -27,6 +27,7 @@ import { formatLastHeartbeat, formatTime } from "@/lib/visits";
 export default async function DashboardPage() {
   const user = await requireAuthenticatedUser();
   enforcePasswordChangeIfRequired(user);
+  await enforceTermsAcceptanceIfRequired(user, "/dashboard");
   const realUser = await getRealCurrentUser();
   const adminAccess = isAdmin(realUser ?? user);
 
