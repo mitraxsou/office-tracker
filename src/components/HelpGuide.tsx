@@ -28,6 +28,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
         <h1 className="text-2xl font-semibold">How to use PwC Office Pulse</h1>
         <p className="mt-2 text-muted">
           Step-by-step guide for the office presence pilot. You can read this before signing in.
+          This is a hobby project for fun, not official PwC tooling.
         </p>
         {!isLoggedIn && (
           <p className="mt-3 text-sm">
@@ -53,6 +54,11 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           <li>
             <a href="#overview" className="text-accent hover:underline">
               What it does
+            </a>
+          </li>
+          <li>
+            <a href="#legal" className="text-accent hover:underline">
+              Terms and privacy
             </a>
           </li>
           <li>
@@ -135,34 +141,51 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
       </section>
 
       <section className="card space-y-3 p-6">
+        <SectionAnchor id="legal">Terms and privacy</SectionAnchor>
+        <p className="text-sm text-muted">
+          PwC Office Pulse is a voluntary hobby pilot. By signing in or installing the agent you
+          agree to the{" "}
+          <Link href="/terms" className="text-accent hover:underline">
+            Terms and Conditions
+          </Link>{" "}
+          and{" "}
+          <Link href="/privacy" className="text-accent hover:underline">
+            Privacy Policy
+          </Link>
+          . On first sign-in (or your next sign-in after an update), you must accept them before
+          using the dashboard.
+        </p>
+      </section>
+
+      <section className="card space-y-3 p-6">
         <SectionAnchor id="account">Get an account</SectionAnchor>
         <ol className="list-decimal space-y-3 pl-5 text-sm text-muted">
           <li>
             <strong className="text-foreground">Contact your pilot admin</strong> to be added to Office
-            Pulse. Ask them to create your account or confirm that self-registration is enabled for the
-            pilot.
+            Pulse, or confirm that OTP self-registration is enabled for the pilot.
           </li>
           <li>
-            <strong className="text-foreground">Register or sign in.</strong>{" "}
+            <strong className="text-foreground">Sign in with OTP (default).</strong>{" "}
             {isLoggedIn ? (
               <>You are signed in. Open </>
             ) : (
               <>
                 Go to{" "}
-                <Link href="/register" className="text-accent hover:underline">
-                  Register
-                </Link>{" "}
-                or{" "}
                 <Link href="/login" className="text-accent hover:underline">
                   Sign in
                 </Link>
-                . If registration is disabled, your admin must create the account for you. Open{" "}
+                , enter your PwC email, and use the 6-digit code sent to Microsoft Teams. Open{" "}
               </>
             )}
             <Link href="/settings#install" className="text-accent hover:underline">
               Settings
             </Link>{" "}
-            after your first login.
+            after your first login and agent setup.
+          </li>
+          <li>
+            <strong className="text-foreground">Password fallback.</strong> On the sign-in page, expand{" "}
+            <strong>Sign in with password</strong> if your admin gave you a temporary password (for
+            example after a reset). You may be asked to change it before continuing.
           </li>
           <li>
             <strong className="text-foreground">Ask admin for an install token</strong> (one per laptop).
@@ -353,8 +376,9 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
         <SectionAnchor id="daily-use">Daily use</SectionAnchor>
         <h3 className="text-sm font-medium">Today dashboard</h3>
         <p className="text-sm text-muted">
-          Open <strong>Today</strong> to see progress toward your daily target, whether you are in the office
-          now, and today&apos;s visits. The agent updates this automatically when you are on office Wi-Fi.
+          Open <strong>Today</strong> to see progress toward your daily target, monthly office-day
+          progress, year compliance calendar, whether you are in the office now, and today&apos;s visits.
+          The agent updates this automatically when you are on office Wi-Fi.
         </p>
         <h3 className="text-sm font-medium">Manual check-in and check-out</h3>
         <p className="text-sm text-muted">
@@ -381,11 +405,11 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           <div>
             <dt className="font-medium">Office schedule and alerts</dt>
             <dd className="mt-1 text-muted">
-              Choose your usual office days (Wednesday and Friday by default) and delivery channels
-              per alert (in the app, Microsoft Teams, or both). Office Pulse can tell you when office hours
-              start, when you meet your daily target, or when the agent needs attention. A recent
-              pulse on home or other non-office Wi-Fi is treated as working from home and does not
-              trigger a not-in-office reminder. An admin can also send you a one-off in-app or Teams
+              Choose your usual office days (Wednesday and Friday by default) and a delivery channel
+              per alert: in the app only, Microsoft Teams only, or both. Office Pulse can tell you when
+              office hours start, when you meet your daily target, or when the agent needs attention.
+              A recent pulse on home or other non-office Wi-Fi is treated as working from home and does
+              not trigger a not-in-office reminder. An admin can also send you a one-off in-app or Teams
               message.
             </dd>
           </div>
@@ -532,6 +556,14 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
       {isAdmin && (
         <section id="admin" className="card space-y-3 p-6">
           <h2 className="text-lg font-medium text-accent">Admin notes</h2>
+          <p className="text-sm text-muted">
+            For the full admin reference (SOP, troubleshooting, global settings, Power Automate, and
+            breakglass), open the{" "}
+            <Link href="/admin/guide" className="text-accent hover:underline">
+              Admin guide
+            </Link>
+            .
+          </p>
           <ul className="list-disc space-y-2 pl-5 text-sm text-muted">
             <li>
               Issue install tokens from <Link href="/admin" className="text-accent hover:underline">Admin</Link>{" "}
@@ -544,8 +576,12 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
               </Link>
               . Normal users cannot see or edit SSID names.
             </li>
-            <li>Approve laptop removal requests from Admin → Corrections.</li>
-            <li>Visit corrections and compliance reports are available under Admin.</li>
+            <li>
+              View org-wide compliance on the admin calendar and day reports. Drill into a user from
+              the user table.
+            </li>
+            <li>Approve laptop removal, visit corrections, timezone changes, and compliance exemptions.</li>
+            <li>Send custom Teams or in-app notifications from a user&apos;s admin profile.</li>
           </ul>
         </section>
       )}

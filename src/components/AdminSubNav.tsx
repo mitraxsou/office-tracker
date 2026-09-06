@@ -10,12 +10,13 @@ const links = [
   { href: "/admin/users", label: "Users & tokens", key: "users" as const },
   { href: "/admin/audit", label: "Audit", key: "audit" as const },
   { href: "/admin/settings", label: "Global settings", key: "settings" as const },
+  { href: "/admin/guide", label: "Admin guide", key: "guide" as const },
 ];
 
 export function AdminSubNav({
   active,
 }: {
-  active: "reports" | "inbox" | "corrections" | "users" | "audit" | "settings";
+  active: "reports" | "inbox" | "corrections" | "users" | "audit" | "settings" | "guide";
 }) {
   const router = useRouter();
   const activeHref = links.find((link) => link.key === active)?.href ?? "/admin";
