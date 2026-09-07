@@ -218,7 +218,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         type: "list",
         items: [
           "Create user: email, optional name, role (user or admin). Admin-created users appear as Admin-created in the list.",
-          "OTP self-registration: when enabled in Global settings, first OTP verify creates the account (unless ALLOW_REGISTRATION=false blocks it in env).",
+          "OTP self-registration: on by default in Global settings. First OTP verify creates the account and issues an install token.",
           "Search and paginate the user list. Filter to OTP self-registered only.",
           "Bulk actions: select users for bulk token issue or other batch operations where available.",
           "Edit user: open the edit modal to change name, email, role, or per-user hours override.",
@@ -293,7 +293,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
           },
           {
             problem: "OTP login works but user not in list",
-            fix: "OTP self-registration may be off, or ALLOW_REGISTRATION=false in Vercel blocks new accounts. Create user manually or enable registration.",
+            fix: "OTP self-registration may be off in Global settings. Turn it on or create the user manually.",
           },
         ],
       },
@@ -547,7 +547,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       {
         type: "list",
         items: [
-          "OTP self-registration toggle (blocked if ALLOW_REGISTRATION=false in env).",
+          "OTP self-registration toggle (default on for the pilot).",
           "Push agent update to all devices.",
           "Danger zone: database reset (type RESET). Wipes all data; recreates breakglass admin.",
         ],
@@ -829,7 +829,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
           "Compliance numbers are indicative for the pilot, not payroll or HR evidence.",
           "Browser dashboard cannot detect Wi-Fi; only the Windows agent or manual check-in counts.",
           "Neon free tier and Vercel Hobby impose rate and cron limits.",
-          "ALLOW_REGISTRATION=false in production prevents open self-signup even if UI toggle is on.",
+          "ALLOW_REGISTRATION=false blocks the legacy /register password page only. OTP self-registration uses the admin toggle.",
           "Never commit .env.local, database files, or webhook secrets to git.",
           "Use Audit and breakglass sparingly; impersonation is for support, not routine browsing.",
           "Agent install is per-user AppData by default; Program Files install requires -RequireAdmin.",

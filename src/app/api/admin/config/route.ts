@@ -100,15 +100,6 @@ export async function PATCH(request: Request) {
     if (typeof body.allowOtpSelfRegistration !== "boolean") {
       return NextResponse.json({ error: "Invalid allowOtpSelfRegistration" }, { status: 400 });
     }
-    if (body.allowOtpSelfRegistration && isRegistrationEnvLocked()) {
-      return NextResponse.json(
-        {
-          error:
-            "OTP self-registration is locked off by ALLOW_REGISTRATION=false in environment",
-        },
-        { status: 403 },
-      );
-    }
     update.allowOtpSelfRegistration = body.allowOtpSelfRegistration;
   }
 

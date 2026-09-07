@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   findOrCreateUserByOtp,
+  isOtpSelfRegistrationAllowed,
   isPwcEmail,
   MAX_OTP_VERIFY_ATTEMPTS,
   sendLoginOtp,
@@ -27,12 +28,11 @@ vi.mock("../src/lib/db", () => ({
 }));
 
 vi.mock("../src/lib/app-config", () => ({
-  ensureAppConfig: vi.fn().mockResolvedValue({ allowOtpSelfRegistration: false }),
+  ensureAppConfig: vi.fn().mockResolvedValue({ allowOtpSelfRegistration: true }),
 }));
 
 vi.mock("../src/lib/auth", () => ({
   hashPassword: vi.fn().mockResolvedValue("hashed"),
-  isRegistrationEnvLocked: vi.fn().mockReturnValue(false),
   issueAgentToken: vi.fn().mockResolvedValue({ plainToken: "agent-token" }),
 }));
 
@@ -47,7 +47,6 @@ vi.mock("../src/lib/audit-log", () => ({
 import { prisma } from "../src/lib/db";
 import { postWebhookPayload } from "../src/lib/power-automate-notify";
 import { ensureAppConfig } from "../src/lib/app-config";
-import { isRegistrationEnvLocked } from "../src/lib/auth";
 
 describe("isPwcEmail", () => {
   it("accepts pwc.com and subdomains", () => {
@@ -61,13 +60,52 @@ describe("isPwcEmail", () => {
   });
 });
 
+describe("isOtpSelfRegistrationAllowed", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("follows allowOtpSelfRegistration from app config", async () => {
+    vi.mocked(ensureAppConfig).mockResolvedValue({
+      allowOtpSelfRegistration: true,
+      hoursTarget: 5,
+      monthlyDaysTarget: 8,
+      officeSsids: [],
+      maxDevicesPerUser: 10,
+      allowRegistration: false,
+      pendingTokenTtlDays: 7,
+      heartbeatRetentionDays: 7,
+      agentStaleMinutes: 8,
+      agentStaleGraceHours: 24,
+      complianceExemptionRequiresApproval: true,
+      pilotStartMonthKey: "2026-09",
+    });
+    await expect(isOtpSelfRegistrationAllowed()).resolves.toBe(true);
+
+    vi.mocked(ensureAppConfig).mockResolvedValue({
+      allowOtpSelfRegistration: false,
+      hoursTarget: 5,
+      monthlyDaysTarget: 8,
+      officeSsids: [],
+      maxDevicesPerUser: 10,
+      allowRegistration: false,
+      pendingTokenTtlDays: 7,
+      heartbeatRetentionDays: 7,
+      agentStaleMinutes: 8,
+      agentStaleGraceHours: 24,
+      complianceExemptionRequiresApproval: true,
+      pilotStartMonthKey: "2026-09",
+    });
+    await expect(isOtpSelfRegistrationAllowed()).resolves.toBe(false);
+  });
+});
+
 describe("sendLoginOtp", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.AUTH_SECRET = "test-auth-secret-that-is-at-least-32-characters";
-    vi.mocked(isRegistrationEnvLocked).mockReturnValue(false);
     vi.mocked(ensureAppConfig).mockResolvedValue({
-      allowOtpSelfRegistration: false,
+      allowOtpSelfRegistration: true,
       hoursTarget: 5,
       monthlyDaysTarget: 8,
       officeSsids: [],
@@ -89,6 +127,20 @@ describe("sendLoginOtp", () => {
   });
 
   it("returns sent false for unknown email when self-registration is off (anti-enumeration)", async () => {
+    vi.mocked(ensureAppConfig).mockResolvedValue({
+      allowOtpSelfRegistration: false,
+      hoursTarget: 5,
+      monthlyDaysTarget: 8,
+      officeSsids: [],
+      maxDevicesPerUser: 10,
+      allowRegistration: false,
+      pendingTokenTtlDays: 7,
+      heartbeatRetentionDays: 7,
+      agentStaleMinutes: 8,
+      agentStaleGraceHours: 24,
+      complianceExemptionRequiresApproval: true,
+      pilotStartMonthKey: "2026-09",
+    });
     vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
     const result = await sendLoginOtp("user@pwc.com");
     expect(result).toEqual({ ok: true, sent: false });
@@ -105,6 +157,15 @@ describe("sendLoginOtp", () => {
 
     await sendLoginOtp("user@pwc.com");
     expect(prisma.loginOtp.deleteMany).toHaveBeenCalledWith({ where: { email: "user@pwc.com" } });
+  });
+
+  it("stores otp and posts login_otp webhook for new email when self-registration is on", async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.loginOtp.create).mockResolvedValue({ id: "otp1" } as never);
+
+    const result = await sendLoginOtp("new@pwc.com");
+    expect(result).toEqual({ ok: true, sent: true });
+    expect(postWebhookPayload).toHaveBeenCalled();
   });
 
   it("stores otp and posts login_otp webhook for existing user", async () => {
@@ -184,7 +245,6 @@ describe("verifyLoginOtp", () => {
 describe("findOrCreateUserByOtp", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(isRegistrationEnvLocked).mockReturnValue(false);
     vi.mocked(ensureAppConfig).mockResolvedValue({
       allowOtpSelfRegistration: true,
       hoursTarget: 5,

@@ -39,6 +39,7 @@ model User {
   hoursTarget        Float?
   agentStaleGraceHours Int?
   mustChangePassword Boolean       @default(false)
+  passwordChosenAt   DateTime?
   passwordResetAt    DateTime?
   termsAcceptedAt      DateTime?
   termsAcceptedVersion Int?
@@ -300,7 +301,7 @@ model AppConfig {
   officeSsids       String   @default("[\"OfficeConnect\",\"ExternalConnect\",\"pwcglb.com\"]")
   maxDevicesPerUser Int      @default(10)
   allowRegistration         Boolean  @default(false)
-  allowOtpSelfRegistration  Boolean  @default(false)
+  allowOtpSelfRegistration  Boolean  @default(true)
   pendingTokenTtlDays   Int      @default(7)
   heartbeatRetentionDays Int     @default(1)
   agentStaleMinutes     Int      @default(8)

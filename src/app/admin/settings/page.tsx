@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { enforcePasswordChangeIfRequired, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
 import { getAppConfig } from "@/lib/app-config";
-import { isRegistrationEnvLocked } from "@/lib/auth";
 import { AppNav } from "@/components/AppNav";
 import { AdminSettingsForm } from "@/components/AdminSettingsForm";
 import { AdminPilotControls } from "@/components/AdminPilotControls";
@@ -61,10 +60,7 @@ export default async function AdminSettingsPage() {
         />
         <AdminDatabaseStats stats={databaseStats} />
         <AdminMaintenance />
-        <AdminPilotControls
-          allowOtpSelfRegistration={config.allowOtpSelfRegistration}
-          registrationEnvLocked={isRegistrationEnvLocked()}
-        />
+        <AdminPilotControls allowOtpSelfRegistration={config.allowOtpSelfRegistration} />
         <AdminLegalSettings
           legalVersion={legalDraft.legalVersion}
           updatedLabel={formatLegalUpdatedLabel(legalDraft.publishedAt)}

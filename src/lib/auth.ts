@@ -8,6 +8,7 @@ import { encryptPendingToken, decryptPendingToken } from "./token-crypto";
 import { buildInstallCommand, buildUpdateCommand } from "./agent-branding";
 import { isTokenExpired, revokeExpiredPendingTokens } from "./token-expiry";
 import type { InstallTokenForUser } from "./install-token-types";
+import { isBreakglassEmail } from "./breakglass-shared";
 
 export type { InstallTokenForUser } from "./install-token-types";
 
@@ -454,8 +455,54 @@ async function resolveRole(email: string) {
   return "user";
 }
 
+/** Blocks the legacy /register password form only. OTP self-registration uses allowOtpSelfRegistration. */
 export function isRegistrationEnvLocked() {
   return process.env.ALLOW_REGISTRATION === "false";
+}
+
+export function canSetInitialPassword(user: {
+  email: string;
+  registrationSource: string;
+  passwordChosenAt: Date | null;
+}): boolean {
+  if (isBreakglassEmail(user.email)) return false;
+  return user.registrationSource === "otp_self" && user.passwordChosenAt === null;
+}
+
+export async function setInitialUserPassword(userId: string, newPassword: string) {
+  const { validatePasswordStrength, getSelfPasswordChangeBlockReason } = await import(
+    "./password-policy"
+  );
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  const blockReason = getSelfPasswordChangeBlockReason(user.email);
+  if (blockReason) {
+    throw new Error(blockReason);
+  }
+
+  if (!canSetInitialPassword(user)) {
+    throw new Error("Use change password to update your password");
+  }
+
+  const strengthError = validatePasswordStrength(newPassword);
+  if (strengthError) {
+    throw new Error(strengthError);
+  }
+
+  const passwordHash = await hashPassword(newPassword);
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordHash,
+      passwordChosenAt: new Date(),
+      mustChangePassword: false,
+      passwordResetAt: null,
+    },
+  });
 }
 
 export async function isRegistrationAllowed() {

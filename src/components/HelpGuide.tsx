@@ -161,10 +161,6 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
         <SectionAnchor id="account">Get an account</SectionAnchor>
         <ol className="list-decimal space-y-3 pl-5 text-sm text-muted">
           <li>
-            <strong className="text-foreground">Contact your pilot admin</strong> to be added to Office
-            Pulse, or confirm that OTP self-registration is enabled for the pilot.
-          </li>
-          <li>
             <strong className="text-foreground">Sign in with OTP (default).</strong>{" "}
             {isLoggedIn ? (
               <>You are signed in. Open </>
@@ -174,27 +170,29 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
                 <Link href="/login" className="text-accent hover:underline">
                   Sign in
                 </Link>
-                , enter your PwC email, and use the 6-digit code sent to Microsoft Teams. Open{" "}
+                , enter your PwC email, and use the 6-digit code sent to Microsoft Teams. First-time
+                sign-in creates your account automatically. Open{" "}
               </>
             )}
             <Link href="/settings#install" className="text-accent hover:underline">
               Settings
             </Link>{" "}
-            after your first login and agent setup.
+            after your first login to set your profile and install the agent.
           </li>
           <li>
-            <strong className="text-foreground">Password fallback.</strong> On the sign-in page, expand{" "}
-            <strong>Sign in with password</strong> if your admin gave you a temporary password (for
-            example after a reset). You may be asked to change it before continuing.
+            <strong className="text-foreground">Password fallback (optional).</strong> On the sign-in
+            page, expand <strong>Sign in with password</strong> after you set a password in Settings,
+            or if an admin gave you a temporary password after a reset.
           </li>
           <li>
-            <strong className="text-foreground">Ask admin for an install token</strong> (one per laptop).
-            Tokens appear under <strong>Install or reinstall {AGENT_PRODUCT_NAME}</strong> in Settings.
+            <strong className="text-foreground">Install token.</strong> Your first OTP sign-in creates
+            a laptop install token automatically. Copy the install command from{" "}
+            <strong>Install or reinstall {AGENT_PRODUCT_NAME}</strong> in Settings.
           </li>
         </ol>
         <p className="text-xs text-muted">
-          Your admin manages pilot access, install tokens, and compliance reports. There is no shared
-          support inbox in the app; use your team&apos;s usual admin contact for the pilot.
+          Pilot admins can still create accounts manually for edge cases. For most colleagues, OTP
+          self-registration is enough.
         </p>
       </section>
 
@@ -202,8 +200,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
         <SectionAnchor id="setup-flow">Setup flow</SectionAnchor>
         <pre className="overflow-x-auto rounded-lg border bg-[var(--background)] p-4 text-xs leading-relaxed text-muted">
 {`  ┌──────────────────┐     ┌──────────────────┐     ┌─────────────────────┐
-  │ Contact admin    │ --> │ Sign in /        │ --> │ Admin issues        │
-  │ for account      │     │ register         │     │ laptop install token│
+  │ Sign in with OTP │ --> │ Accept terms &   │ --> │ Install token ready │
+  │ (auto account)   │     │ set profile      │     │ in Settings         │
   └──────────────────┘     └──────────────────┘     └─────────────────────┘
                                                               │
                                                               v

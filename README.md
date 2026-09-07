@@ -43,7 +43,7 @@ Set both env vars on Vercel (and locally):
 
 The account is created on app startup and seed. Sign in at `/login`, then `/admin`.
 
-Also set `ALLOW_REGISTRATION=false` on production to block public sign-ups.
+Also set `ALLOW_REGISTRATION=false` on production to block the legacy password register page. OTP self-registration is controlled separately in Admin → Global settings.
 
 ---
 
@@ -123,7 +123,7 @@ If Vercel shows vars like `DATABASE_URL_POSTGRES_URL`, `DATABASE_URL_DATABASE_UR
 | `NEXT_PUBLIC_APP_URL` | `https://YOUR-PROJECT.vercel.app` (update after first deploy) |
 | `BREAKGLASS_EMAIL` | `admin@pwc.office` |
 | `BREAKGLASS_PASSWORD` | Your secure password |
-| `ALLOW_REGISTRATION` | `false` |
+| `ALLOW_REGISTRATION` | `false` blocks legacy `/register` only. OTP self-registration uses the admin toggle (default on). |
 | `DEFAULT_OFFICE_SSIDS` | `OfficeConnect,ExternalConnect,pwcglb.com` |
 | `POWER_AUTOMATE_WEBHOOK_URL` | Power Automate HTTP trigger URL. See [docs/power-automate.md](docs/power-automate.md) |
 

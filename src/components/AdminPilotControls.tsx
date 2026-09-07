@@ -5,10 +5,8 @@ import { useRouter } from "next/navigation";
 
 export function AdminPilotControls({
   allowOtpSelfRegistration,
-  registrationEnvLocked,
 }: {
   allowOtpSelfRegistration: boolean;
-  registrationEnvLocked: boolean;
 }) {
   const router = useRouter();
   const [otpRegistrationEnabled, setOtpRegistrationEnabled] = useState(allowOtpSelfRegistration);
@@ -96,21 +94,17 @@ export function AdminPilotControls({
           <div>
             <p className="font-medium">Allow OTP self-registration</p>
             <p className="mt-1 text-sm text-muted">
-              When on, a colleague can sign in with a PwC email OTP and get an account on first
-              verify. When off, OTP works only for emails already in the database.
+              When on (default for the pilot), colleagues sign in with a PwC email OTP and get an
+              account on first verify, including an agent install token. When off, OTP works only
+              for emails already in the database. This is separate from the legacy password register
+              page, which is controlled by ALLOW_REGISTRATION in Vercel.
             </p>
-            {registrationEnvLocked && (
-              <p className="mt-2 text-sm text-accent">
-                Locked off by ALLOW_REGISTRATION=false in environment. UI toggle cannot enable
-                new user creation.
-              </p>
-            )}
           </div>
           <button
             type="button"
             role="switch"
             aria-checked={otpRegistrationEnabled}
-            disabled={regLoading || registrationEnvLocked}
+            disabled={regLoading}
             onClick={handleOtpRegistrationToggle}
             className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
               otpRegistrationEnabled ? "bg-[var(--pwc-orange)]" : "bg-[var(--border)]"

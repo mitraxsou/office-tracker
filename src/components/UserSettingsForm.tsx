@@ -140,11 +140,11 @@ export function UserSettingsForm({
     <form onSubmit={handleTimezoneRequest} className="space-y-6">
       {isWelcome && (
         <div className="rounded-lg bg-[var(--pwc-orange-muted)] px-4 py-3 text-sm">
-          Account created. If your admin issued an install token, copy the install command in the{" "}
+          Account created. Your install token is in the{" "}
           <a href="#install" className="text-accent hover:underline">
             Install or reinstall
           </a>{" "}
-          section above.
+          section above. Copy the install command and run it in PowerShell on your laptop.
         </div>
       )}
 

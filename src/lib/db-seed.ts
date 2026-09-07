@@ -12,6 +12,7 @@ export async function seedDefaults() {
       officeSsids: JSON.stringify(parseDefaultSsidsFromEnv()),
       maxDevicesPerUser: 10,
       allowRegistration: false,
+      allowOtpSelfRegistration: true,
     },
     // Seed runs on every deploy when RUN_DB_SETUP_ON_DEPLOY=true. Leave an existing row
     // alone so it cannot overwrite SSIDs and targets an admin set in /admin/settings.

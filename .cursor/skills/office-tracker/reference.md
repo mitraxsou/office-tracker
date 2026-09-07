@@ -14,7 +14,7 @@
 | `ADMIN_EMAIL` | Promote user to admin on seed |
 | `BREAKGLASS_EMAIL` | Recovery admin email (with password) |
 | `BREAKGLASS_PASSWORD` | Recovery admin password |
-| `ALLOW_REGISTRATION` | `"false"` disables `/register` in production |
+| `ALLOW_REGISTRATION` | `"false"` disables legacy `/register` only. OTP self-registration uses `allowOtpSelfRegistration` in AppConfig (default on). |
 | `AGENT_INSTALL_PATH` | Optional full path to `agent/` for local dev install copy |
 | `CRON_SECRET` | Bearer secret used by scheduled cron requests |
 | `POWER_AUTOMATE_WEBHOOK_URL` | Secret Power Automate HTTP trigger URL for outbound notifications |

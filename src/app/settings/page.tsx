@@ -1,6 +1,9 @@
 import { isBreakglassEmail } from "@/lib/breakglass";
 import { ChangePasswordForm } from "@/components/ChangePasswordForm";
+import { OnboardingForm } from "@/components/OnboardingForm";
+import { SetInitialPasswordForm } from "@/components/SetInitialPasswordForm";
 import {
+  canSetInitialPassword,
   getUserInstallTokenState,
 } from "@/lib/auth";
 import { requireAuthenticatedUser, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
@@ -36,6 +39,9 @@ export default async function SettingsPage({
   const profileChangeBlockedMessage = getProfileChangeBlockReason(user.email);
   const mustChangePassword =
     !isBreakglass && (user.mustChangePassword || params.mustChange === "1");
+  const showOnboarding = params.welcome === "1";
+  const showInitialPassword =
+    !isBreakglass && !mustChangePassword && canSetInitialPassword(user);
 
   if (!mustChangePassword) {
     const settingsNext = params.welcome === "1" ? "/settings?welcome=1" : "/settings";
@@ -53,7 +59,23 @@ export default async function SettingsPage({
           </p>
         </div>
 
-        <ChangePasswordForm required={mustChangePassword} isBreakglass={isBreakglass} />
+        {!mustChangePassword && !showInitialPassword && (
+          <ChangePasswordForm required={false} isBreakglass={isBreakglass} />
+        )}
+
+        {mustChangePassword && (
+          <ChangePasswordForm required={mustChangePassword} isBreakglass={isBreakglass} />
+        )}
+
+        {showOnboarding && (
+          <OnboardingForm
+            currentEmail={user.email}
+            currentName={user.name}
+            canSetPassword={showInitialPassword}
+          />
+        )}
+
+        {!showOnboarding && showInitialPassword && <SetInitialPasswordForm />}
 
         <SettingsPageClient
           timezone={user.timezone}

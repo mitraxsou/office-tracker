@@ -1,11 +1,7 @@
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "./db";
-import {
-  hashPassword,
-  isRegistrationEnvLocked,
-  issueAgentToken,
-} from "./auth";
+import { hashPassword, issueAgentToken } from "./auth";
 import { ensureAppConfig } from "./app-config";
 import { isPwcEmail, normalizeProfileEmail } from "./profile-change-requests";
 import { postWebhookPayload } from "./power-automate-notify";
@@ -40,7 +36,6 @@ async function verifyOtpHash(code: string, hash: string): Promise<boolean> {
 }
 
 export async function isOtpSelfRegistrationAllowed(): Promise<boolean> {
-  if (isRegistrationEnvLocked()) return false;
   const config = await ensureAppConfig();
   return config.allowOtpSelfRegistration;
 }
