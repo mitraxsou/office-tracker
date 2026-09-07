@@ -133,11 +133,46 @@ async function dispatchAlerts(
   alerts: IntegrationAlert[],
   dependencies: DispatchDependencies = {},
 ) {
-  const appAlerts = alerts.filter((alert) => deliversToApp(alert.deliveryChannel));
-  const teamsAlerts = alerts.filter((alert) => deliversToTeams(alert.deliveryChannel));
-  const inApp = await persistInAppAlerts(appAlerts);
-
   const config = await resolveWebhookConfig(dependencies);
+  let inApp = 0;
+  let sent = 0;
+  let failed = 0;
+
+  for (const alert of alerts) {
+    const needsApp = deliversToApp(alert.deliveryChannel);
+    const needsTeams = deliversToTeams(alert.deliveryChannel);
+
+    let appDelivered = !needsApp;
+    let teamsDelivered = !needsTeams;
+
+    if (needsApp) {
+      const created = await persistInAppAlerts([alert]);
+      inApp += created;
+      appDelivered = true;
+    }
+
+    if (needsTeams) {
+      if (!config) {
+        teamsDelivered = false;
+      } else {
+        const result = await postWebhookPayload(toWebhookPayload(alert), dependencies);
+        if (result.ok) {
+          teamsDelivered = true;
+          sent += 1;
+        } else {
+          failed += 1;
+        }
+      }
+    }
+
+    if (appDelivered && teamsDelivered) {
+      const actorId = config?.activeSecret.actorId ?? alert.userId;
+      await acknowledgeIntegrationAlerts(actorId, [
+        { userId: alert.userId, type: alert.type, dayKey: alert.dayKey },
+      ]);
+    }
+  }
+
   if (!config) {
     return {
       ok: true,
@@ -147,20 +182,6 @@ async function dispatchAlerts(
       failed: 0,
       inApp,
     };
-  }
-
-  let sent = 0;
-  let failed = 0;
-  for (const alert of teamsAlerts) {
-    const result = await postWebhookPayload(toWebhookPayload(alert), dependencies);
-    if (!result.ok) {
-      failed += 1;
-      continue;
-    }
-    await acknowledgeIntegrationAlerts(config.activeSecret.actorId, [
-      { userId: alert.userId, type: alert.type, dayKey: alert.dayKey },
-    ]);
-    sent += 1;
   }
 
   return {

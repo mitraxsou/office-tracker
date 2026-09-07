@@ -55,12 +55,14 @@ type AgentStatusPanelProps = {
   installTokens?: InstallTokenForUser[];
   legacyBoundCount?: number;
   appUrl?: string;
+  adminAccess?: boolean;
 };
 
 export function AgentStatusPanel({
   installTokens = [],
   legacyBoundCount = 0,
   appUrl,
+  adminAccess = false,
 }: AgentStatusPanelProps = {}) {
   const [status, setStatus] = useState<AgentStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -134,7 +136,7 @@ export function AgentStatusPanel({
         </div>
       )}
 
-      {status.pulsesLast24h < 30 && status.deviceCount > 0 && status.pulseStatus === "healthy" && (
+      {adminAccess && status.pulsesLast24h < 30 && status.deviceCount > 0 && status.pulseStatus === "healthy" && (
         <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-sm text-muted">
           <p>
             Only {status.pulsesLast24h} pulses in the last 24 hours (expected ~720). The laptop may
@@ -148,30 +150,36 @@ export function AgentStatusPanel({
       )}
 
       <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="text-muted">Pulses last 24h</dt>
-          <dd>
-            {status.pulsesLast24h} / ~{status.expectedPulsesPerDay} expected
-          </dd>
-        </div>
-        <div>
-          <dt className="text-muted">Last heartbeat</dt>
-          <dd>
-            {status.lastHeartbeat
-              ? new Date(status.lastHeartbeat).toLocaleString("en-IN")
-              : "None yet"}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-muted">Time since last pulse</dt>
-          <dd>
-            {formatPulseAge({
-              minutes: status.minutesSinceLastPulse,
-              lastPulseAt: status.lastHeartbeat,
-              timezone: status.timezone,
-            })}
-          </dd>
-        </div>
+        {adminAccess && (
+          <div>
+            <dt className="text-muted">Pulses last 24h</dt>
+            <dd>
+              {status.pulsesLast24h} / ~{status.expectedPulsesPerDay} expected
+            </dd>
+          </div>
+        )}
+        {adminAccess && (
+          <div>
+            <dt className="text-muted">Last heartbeat</dt>
+            <dd>
+              {status.lastHeartbeat
+                ? new Date(status.lastHeartbeat).toLocaleString("en-IN")
+                : "None yet"}
+            </dd>
+          </div>
+        )}
+        {adminAccess && (
+          <div>
+            <dt className="text-muted">Time since last pulse</dt>
+            <dd>
+              {formatPulseAge({
+                minutes: status.minutesSinceLastPulse,
+                lastPulseAt: status.lastHeartbeat,
+                timezone: status.timezone,
+              })}
+            </dd>
+          </div>
+        )}
         <div>
           <dt className="text-muted">In office now</dt>
           <dd>{status.inOfficeNow ? "Yes" : "No"}</dd>
@@ -182,7 +190,7 @@ export function AgentStatusPanel({
         </div>
       </dl>
 
-      {status.recentPulses.length > 0 && (
+      {adminAccess && status.recentPulses.length > 0 && (
         <div className="mt-3">
           <p className="mb-1 text-xs font-medium text-muted">Recent pulses</p>
           <ul className="space-y-1 text-xs text-muted">
@@ -197,7 +205,7 @@ export function AgentStatusPanel({
         </div>
       )}
 
-      {status.devices.length > 0 && (
+      {adminAccess && status.devices.length > 0 && (
         <ul className="mt-3 space-y-1 text-xs">
           {status.devices.map((d) => (
             <li key={d.id}>

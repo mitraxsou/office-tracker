@@ -106,12 +106,13 @@ export async function POST(request: Request) {
     allowlist,
   });
 
-  if (result.inOffice) {
-    try {
-      await dispatchUserAlerts(user.id, ["hours_started", "hours_met"]);
-    } catch {
-      console.error("[heartbeat] Failed to evaluate Power Automate notifications");
-    }
+  try {
+    const alertTypes = result.inOffice
+      ? (["hours_started", "hours_met"] as const)
+      : (["hours_met"] as const);
+    await dispatchUserAlerts(user.id, [...alertTypes]);
+  } catch {
+    console.error("[heartbeat] Failed to evaluate Power Automate notifications");
   }
 
   return NextResponse.json({

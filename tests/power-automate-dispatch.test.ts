@@ -68,6 +68,9 @@ describe("dispatchUserAlerts delivery channels", () => {
       expect.objectContaining({ deliveryChannel: "both" }),
     ]);
     expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(acknowledgeIntegrationAlerts).toHaveBeenCalledWith("admin-1", [
+      expect.objectContaining({ userId: "user-1", type: "hours_started", dayKey: "2026-09-07" }),
+    ]);
     expect(result).toMatchObject({ configured: true, sent: 1, inApp: 1 });
   });
 
@@ -91,6 +94,33 @@ describe("dispatchUserAlerts delivery channels", () => {
 
     expect(persistInAppAlerts).toHaveBeenCalledTimes(1);
     expect(fetcher).not.toHaveBeenCalled();
+    expect(acknowledgeIntegrationAlerts).toHaveBeenCalledWith("admin-1", [
+      expect.objectContaining({ userId: "user-1", type: "absent", dayKey: "2026-09-07" }),
+    ]);
     expect(result).toMatchObject({ sent: 0, inApp: 1 });
+  });
+
+  it("does not acknowledge when Teams delivery fails for a both-channel alert", async () => {
+    getIntegrationAlertsForUser.mockResolvedValue([
+      {
+        ...baseAlert,
+        type: "hours_met",
+        message: "Hours met",
+        deliveryChannel: "both",
+        notifyTeams: true,
+      },
+    ]);
+
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 500 }));
+    const result = await dispatchUserAlerts("user-1", ["hours_met"], {
+      webhookUrl: "https://example.invalid/webhook",
+      getSecret: async () => ({ id: "key-1", actorId: "admin-1", secret: "header-secret" }),
+      fetcher,
+    });
+
+    expect(persistInAppAlerts).toHaveBeenCalledTimes(1);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(acknowledgeIntegrationAlerts).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ configured: true, sent: 0, failed: 1, inApp: 1 });
   });
 });

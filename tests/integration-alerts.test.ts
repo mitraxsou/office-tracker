@@ -112,6 +112,11 @@ describe("presence reminder rules", () => {
     expect(shouldQueueDailyAlert(true, true)).toBe(false);
     expect(shouldQueueDailyAlert(false, false)).toBe(false);
   });
+
+  it("queues hours_met from metTarget alone without requiring in-office heartbeats", () => {
+    expect(shouldQueueDailyAlert(true, false)).toBe(true);
+    expect(shouldQueueDailyAlert(false, false)).toBe(false);
+  });
 });
 
 describe("alert delivery channels", () => {

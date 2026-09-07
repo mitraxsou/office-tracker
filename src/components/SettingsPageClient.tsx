@@ -33,6 +33,7 @@ type SettingsPageClientProps = {
   hoursTarget: number;
   monthlyDaysTarget: number;
   appUrl: string;
+  adminAccess?: boolean;
   isWelcome?: boolean;
   devices: Device[];
   installTokens: InstallTokenForUser[];
@@ -52,6 +53,7 @@ export function SettingsPageClient({
   hoursTarget,
   monthlyDaysTarget,
   appUrl,
+  adminAccess = false,
   isWelcome,
   devices: initialDevices,
   installTokens,
@@ -91,6 +93,7 @@ export function SettingsPageClient({
         installTokens={installTokens}
         legacyBoundCount={legacyBoundCount}
         appUrl={appUrl}
+        adminAccess={adminAccess}
       />
 
       <AgentSetupPanel

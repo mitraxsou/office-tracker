@@ -7,6 +7,8 @@ import {
   getUserInstallTokenState,
 } from "@/lib/auth";
 import { requireAuthenticatedUser, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
+import { getRealCurrentUser } from "@/lib/auth";
+import { isAdmin } from "@/lib/admin";
 import { getUserHoursTarget, getAppConfig } from "@/lib/app-config";
 import { getEnrichedDevicesForUser } from "@/lib/device-enrichment";
 import { getUserTimezoneRequestState } from "@/lib/timezone-requests";
@@ -24,6 +26,8 @@ export default async function SettingsPage({
   searchParams: Promise<{ welcome?: string; mustChange?: string }>;
 }) {
   const user = await requireAuthenticatedUser();
+  const realUser = await getRealCurrentUser();
+  const adminAccess = isAdmin(realUser ?? user);
 
   const params = await searchParams;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -82,6 +86,7 @@ export default async function SettingsPage({
           hoursTarget={hoursTarget}
           monthlyDaysTarget={config.monthlyDaysTarget}
           appUrl={appUrl}
+          adminAccess={adminAccess}
           isWelcome={params.welcome === "1"}
           devices={enrichedDevices}
           installTokens={installTokens}

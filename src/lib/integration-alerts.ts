@@ -291,7 +291,7 @@ async function evaluateUserAlerts(
     types.has("hours_met") &&
     prefs.alertIfHoursMet &&
     shouldQueueDailyAlert(
-      inOfficeToday && summary.totalHours >= hoursTarget,
+      summary.metTarget,
       await wasAlertSentToday(user.id, "hours_met", dayKey),
     )
   ) {

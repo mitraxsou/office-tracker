@@ -1,8 +1,5 @@
 import { prisma } from "./db";
-import {
-  acknowledgeIntegrationAlerts,
-  type IntegrationAlert,
-} from "./integration-alerts";
+import type { IntegrationAlert } from "./integration-alerts";
 
 export type InAppNotificationView = {
   id: string;
@@ -12,30 +9,32 @@ export type InAppNotificationView = {
   createdAt: string;
 };
 
-export async function persistInAppAlerts(alerts: IntegrationAlert[]) {
-  let created = 0;
-  for (const alert of alerts) {
-    const existing = await prisma.inAppNotification.findUnique({
-      where: {
-        userId_type_dayKey: {
-          userId: alert.userId,
-          type: alert.type,
-          dayKey: alert.dayKey,
-        },
-      },
-    });
-    if (!existing) {
-      await createInAppNotification({
+export async function persistInAppAlert(alert: IntegrationAlert): Promise<boolean> {
+  const existing = await prisma.inAppNotification.findUnique({
+    where: {
+      userId_type_dayKey: {
         userId: alert.userId,
         type: alert.type,
         dayKey: alert.dayKey,
-        message: alert.message,
-      });
+      },
+    },
+  });
+  if (existing) return false;
+  await createInAppNotification({
+    userId: alert.userId,
+    type: alert.type,
+    dayKey: alert.dayKey,
+    message: alert.message,
+  });
+  return true;
+}
+
+export async function persistInAppAlerts(alerts: IntegrationAlert[]) {
+  let created = 0;
+  for (const alert of alerts) {
+    if (await persistInAppAlert(alert)) {
       created += 1;
     }
-    await acknowledgeIntegrationAlerts(alert.userId, [
-      { userId: alert.userId, type: alert.type, dayKey: alert.dayKey },
-    ]);
   }
   return created;
 }
