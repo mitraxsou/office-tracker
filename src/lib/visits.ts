@@ -82,8 +82,12 @@ export function daySpanMsForDay(
       : null);
 
   let firstIn: number | null = null;
+  const isCurrentDay = isCurrentCalendarDay(params.dayStart, params.dayEnd, params.now);
 
   for (const v of visits) {
+    if (v.endAt === null && !isCurrentDay) {
+      continue;
+    }
     const start = clipToDay(v.startAt.getTime(), params.dayStart, params.dayEnd);
     if (start === null) continue;
     if (firstIn === null || start < firstIn) firstIn = start;
@@ -99,12 +103,14 @@ export function daySpanMsForDay(
   if (firstIn === null) return 0;
 
   const openVisit = visits.find((v) => v.endAt === null);
-  const isCurrentDay = isCurrentCalendarDay(params.dayStart, params.dayEnd, params.now);
 
   let lastOut: number | null = null;
 
   for (const v of visits) {
     if (v.endAt === null && isManualSource(v.source) && isCurrentDay) {
+      continue;
+    }
+    if (v.endAt === null && !isCurrentDay) {
       continue;
     }
     const end = effectiveVisitEnd({
@@ -141,6 +147,12 @@ export function daySpanMsForDay(
         });
     const endMs = Math.min(end.getTime(), dayEndMs);
     if (lastOut === null || endMs > lastOut) lastOut = endMs;
+  } else if (openVisit && !isCurrentDay && lastHb) {
+    // Past day: credit an open visit only when there was in-office activity that day.
+    const hbEnd = Math.min(lastHb.getTime(), dayEndMs);
+    if (firstIn !== null && hbEnd >= firstIn) {
+      if (lastOut === null || hbEnd > lastOut) lastOut = hbEnd;
+    }
   }
 
   if (lastOut === null) return 0;

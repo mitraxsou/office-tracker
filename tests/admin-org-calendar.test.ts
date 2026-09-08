@@ -117,6 +117,34 @@ describe("computeUserDayComplianceRow OOO override", () => {
     expect(row.status).toBe("excluded_stale");
   });
 
+  it("counts stale agent with logged manual visit as attended", () => {
+    const row = computeUserDayComplianceRow({
+      user,
+      dayKey: "2026-09-03",
+      hadInstalledDevice: true,
+      lastHeartbeatBeforeDayEnd: null,
+      ooo: false,
+      visits: [
+        {
+          id: "v1",
+          source: "manual",
+          ssid: "OfficeConnect",
+          startAt: new Date("2026-09-03T09:00:00+05:30"),
+          endAt: new Date("2026-09-03T16:00:00+05:30"),
+        },
+      ],
+      dayHeartbeats: [],
+      officeSsids: ["OfficeConnect"],
+      hoursTarget: 5,
+      graceHours: 24,
+      now: new Date("2026-09-08T12:00:00+05:30"),
+    });
+
+    expect(row.attended).toBe(true);
+    expect(row.status).toBe("attended_met");
+    expect(row.agentStaleOnDay).toBe(true);
+  });
+
   it("does not penalize stale agents on weekends", () => {
     const row = computeUserDayComplianceRow({
       user,

@@ -195,6 +195,28 @@ describe("userAttendedOnDay", () => {
       }),
     ).toBe(true);
   });
+
+  it("counts open visit on a past day when there was in-office activity that day", () => {
+    const now = new Date("2026-09-08T12:00:00+05:30");
+    const dayStart = new Date("2026-09-03T00:00:00+05:30");
+    const dayEnd = new Date("2026-09-03T23:59:59.999+05:30");
+
+    expect(
+      userAttendedOnDay({
+        visits: [
+          {
+            startAt: new Date("2026-09-01T09:00:00+05:30"),
+            endAt: null,
+          },
+        ],
+        dayStart,
+        dayEnd,
+        inOfficeHeartbeats: [new Date("2026-09-03T10:00:00+05:30")],
+        totalMs: 0,
+        now,
+      }),
+    ).toBe(true);
+  });
 });
 
 describe("resolveDayUserStatus", () => {
@@ -237,6 +259,25 @@ describe("resolveDayUserStatus", () => {
         metTarget: false,
       }),
     ).toBe("excluded_stale");
+  });
+
+  it("office presence overrides stale-agent exclusion", () => {
+    expect(
+      resolveDayUserStatus({
+        ooo: false,
+        agentStaleOnDay: true,
+        attended: true,
+        metTarget: true,
+      }),
+    ).toBe("attended_met");
+    expect(
+      resolveDayUserStatus({
+        ooo: false,
+        agentStaleOnDay: true,
+        attended: true,
+        metTarget: false,
+      }),
+    ).toBe("attended_not_met");
   });
 });
 

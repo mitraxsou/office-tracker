@@ -77,8 +77,8 @@ export function wasAgentStaleAtDayEnd(input: {
 
 /**
  * Resolve compliance status for one user on one day.
- * Office presence overrides OOO: users with logged hours or in-office activity count as attended
- * even when an OOO range covers the day (incorrect range, partial day, or came in anyway).
+ * Office presence overrides OOO and stale-agent exclusion: users with logged hours or
+ * in-office activity count as attended even when OOO or agent health would otherwise exclude them.
  */
 export function resolveDayUserStatus(input: {
   ooo: boolean;
@@ -86,19 +86,19 @@ export function resolveDayUserStatus(input: {
   attended: boolean;
   metTarget: boolean;
 }): AdminDayUserStatus {
+  if (input.attended) {
+    if (input.metTarget) {
+      return "attended_met";
+    }
+    return "attended_not_met";
+  }
   if (input.agentStaleOnDay) {
     return "excluded_stale";
   }
-  if (input.ooo && !input.attended) {
+  if (input.ooo) {
     return "excluded_ooo";
   }
-  if (!input.attended) {
-    return "no_visit";
-  }
-  if (input.metTarget) {
-    return "attended_met";
-  }
-  return "attended_not_met";
+  return "no_visit";
 }
 
 /** True when the user had office presence on the day (visit segment or in-office pulse). */
@@ -121,7 +121,15 @@ export function userAttendedOnDay(input: {
   for (const visit of input.visits) {
     const start = visit.startAt.getTime();
     if (visit.endAt === null) {
-      if (!isCurrentDay) continue;
+      if (!isCurrentDay) {
+        if (
+          input.inOfficeHeartbeats.length > 0 &&
+          start <= input.dayEnd.getTime()
+        ) {
+          return true;
+        }
+        continue;
+      }
       const end = now.getTime();
       if (start <= input.dayEnd.getTime() && end >= input.dayStart.getTime()) return true;
       continue;
