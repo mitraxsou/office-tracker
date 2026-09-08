@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { enforcePasswordChangeIfRequired, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
+import { getAppConfig } from "@/lib/app-config";
 import { AppNav } from "@/components/AppNav";
 import { AdminDashboard } from "@/components/AdminDashboard";
 import { AdminSubNav } from "@/components/AdminSubNav";
@@ -10,6 +11,8 @@ export default async function AdminPage() {
   if (!admin) redirect("/dashboard");
   enforcePasswordChangeIfRequired(admin);
   await enforceTermsAcceptanceIfRequired(admin, "/admin");
+
+  const config = await getAppConfig();
 
   return (
     <>
@@ -23,7 +26,10 @@ export default async function AdminPage() {
           </p>
         </div>
         <AdminSubNav active="reports" />
-        <AdminDashboard />
+        <AdminDashboard
+          fiscalYearStartMonth={config.fiscalYearStartMonth}
+          fiscalYearEndMonth={config.fiscalYearEndMonth}
+        />
       </main>
     </>
   );

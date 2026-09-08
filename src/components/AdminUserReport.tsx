@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AdminVisitManager } from "./AdminVisitManager";
+import { ComplianceExportButton } from "@/components/reports/ComplianceExportButton";
 import { NotificationPrefsForm } from "./NotificationPrefsForm";
 import { OutOfOfficeSection } from "./OutOfOfficeSection";
 import { VisitCalendar } from "./reports/VisitCalendar";
@@ -116,11 +117,15 @@ export function AdminUserReport({
   profileChangeBlocked,
   profileChangeBlockedMessage,
   profileChangeOpenRequest,
+  fiscalYearStartMonth,
+  fiscalYearEndMonth,
 }: {
   userId: string;
   profileChangeBlocked?: boolean;
   profileChangeBlockedMessage?: string | null;
   profileChangeOpenRequest?: ProfileChangeRequestSummary | null;
+  fiscalYearStartMonth: number;
+  fiscalYearEndMonth: number;
 }) {
   const router = useRouter();
   const [monthKey, setMonthKey] = useState(() => currentMonthKey("Asia/Kolkata"));
@@ -659,6 +664,22 @@ export function AdminUserReport({
         <NotificationPrefsForm adminUserId={userId} />
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-medium">Visit data</h3>
+          <p className="mt-1 text-sm text-muted">
+            Compliance visit records are permanent. Admins can add or correct entries, not delete them.
+          </p>
+        </div>
+        <ComplianceExportButton
+          hrefBase={`/api/admin/users/${userId}/reports/export`}
+          monthKey={monthKey}
+          timezone={data.user.timezone}
+          label="Download user report"
+          fiscalYearStartMonth={fiscalYearStartMonth}
+          fiscalYearEndMonth={fiscalYearEndMonth}
+        />
+      </div>
       <AdminVisitManager
         userId={userId}
         officeSsids={officeSsids}
@@ -669,8 +690,9 @@ export function AdminUserReport({
       <section className="card border-red-500/30 p-6">
         <h3 className="mb-2 text-lg font-medium text-red-400">Clear tracking data</h3>
         <p className="mb-4 text-sm text-muted">
-          Clear visits and pulses for a day, a month, a year, or a custom range when the data is
-          wrong. Deleting the user account removes everything permanently.
+          Clear agent heartbeats (pulses) for a day, month, year, or custom range. Office visit
+          records are kept for compliance and are not removed here. Deleting the user account
+          removes everything permanently.
         </p>
 
         <div className="mb-4 grid gap-3 sm:grid-cols-2">

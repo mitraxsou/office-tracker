@@ -79,6 +79,8 @@ describe("isOtpSelfRegistrationAllowed", () => {
       agentStaleGraceHours: 24,
       complianceExemptionRequiresApproval: true,
       pilotStartMonthKey: "2026-09",
+      fiscalYearStartMonth: 4,
+      fiscalYearEndMonth: 3,
     });
     await expect(isOtpSelfRegistrationAllowed()).resolves.toBe(true);
 
@@ -95,6 +97,8 @@ describe("isOtpSelfRegistrationAllowed", () => {
       agentStaleGraceHours: 24,
       complianceExemptionRequiresApproval: true,
       pilotStartMonthKey: "2026-09",
+      fiscalYearStartMonth: 4,
+      fiscalYearEndMonth: 3,
     });
     await expect(isOtpSelfRegistrationAllowed()).resolves.toBe(false);
   });
@@ -117,6 +121,8 @@ describe("sendLoginOtp", () => {
       agentStaleGraceHours: 24,
       complianceExemptionRequiresApproval: true,
       pilotStartMonthKey: "2026-09",
+      fiscalYearStartMonth: 4,
+      fiscalYearEndMonth: 3,
     });
     vi.mocked(prisma.loginOtp.deleteMany).mockResolvedValue({ count: 0 });
   });
@@ -140,6 +146,8 @@ describe("sendLoginOtp", () => {
       agentStaleGraceHours: 24,
       complianceExemptionRequiresApproval: true,
       pilotStartMonthKey: "2026-09",
+      fiscalYearStartMonth: 4,
+      fiscalYearEndMonth: 3,
     });
     vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
     const result = await sendLoginOtp("user@pwc.com");
@@ -258,6 +266,8 @@ describe("findOrCreateUserByOtp", () => {
       agentStaleGraceHours: 24,
       complianceExemptionRequiresApproval: true,
       pilotStartMonthKey: "2026-09",
+      fiscalYearStartMonth: 4,
+      fiscalYearEndMonth: 3,
     });
   });
 

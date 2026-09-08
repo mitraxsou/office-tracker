@@ -309,6 +309,8 @@ model AppConfig {
   agentStaleGraceHours  Int      @default(24)
   complianceExemptionRequiresApproval Boolean @default(true)
   pilotStartMonthKey    String   @default("2026-09")
+  fiscalYearStartMonth  Int      @default(4)
+  fiscalYearEndMonth    Int      @default(3)
   updatedAt             DateTime @updatedAt
 }
 

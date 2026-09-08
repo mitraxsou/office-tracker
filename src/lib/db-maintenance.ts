@@ -1,6 +1,5 @@
 export type MaintenanceTable =
   | "heartbeats"
-  | "old_visits"
   | "agent_lifecycle_events"
   | "audit_logs"
   | "resolved_corrections"
@@ -15,6 +14,7 @@ export type RetentionPeriod = "1_month" | "3_months" | "6_months" | "1_year";
 /** Tables that must never be purged via data maintenance (revoke keys separately). */
 export const NEVER_PURGED_TABLES = [
   "User",
+  "Visit",
   "AgentDevice",
   "AgentToken",
   "AppConfig",
@@ -25,7 +25,6 @@ export const NEVER_PURGED_TABLES = [
 
 export const MAINTENANCE_TABLE_LABELS: Record<MaintenanceTable, string> = {
   heartbeats: "Heartbeats",
-  old_visits: "Visits (closed only)",
   agent_lifecycle_events: "Agent lifecycle events",
   audit_logs: "Audit logs",
   resolved_corrections: "Resolved correction requests",
@@ -97,13 +96,6 @@ export async function countRowsForPurge(table: MaintenanceTable, cutoff: Date): 
       return prisma.deviceRemovalRequest.count({
         where: { status: { not: "open" }, resolvedAt: { lt: cutoff } },
       });
-    case "old_visits":
-      return prisma.visit.count({
-        where: {
-          endAt: { not: null, lt: cutoff },
-          correctionRequests: { none: { status: "open" } },
-        },
-      });
     case "agent_lifecycle_events":
       return prisma.agentLifecycleEvent.count({ where: { createdAt: { lt: cutoff } } });
     case "resolved_timezone_requests":
@@ -157,15 +149,6 @@ export async function purgeTableRows(
     case "resolved_device_removals": {
       const result = await prisma.deviceRemovalRequest.deleteMany({
         where: { status: { not: "open" }, resolvedAt: { lt: cutoff } },
-      });
-      return { deleted: result.count };
-    }
-    case "old_visits": {
-      const result = await prisma.visit.deleteMany({
-        where: {
-          endAt: { not: null, lt: cutoff },
-          correctionRequests: { none: { status: "open" } },
-        },
       });
       return { deleted: result.count };
     }

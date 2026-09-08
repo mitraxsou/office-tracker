@@ -49,6 +49,8 @@ export default async function AdminSettingsPage() {
           heartbeatRetentionDays={config.heartbeatRetentionDays}
           agentStaleMinutes={config.agentStaleMinutes}
           agentStaleGraceHours={config.agentStaleGraceHours}
+          fiscalYearStartMonth={config.fiscalYearStartMonth}
+          fiscalYearEndMonth={config.fiscalYearEndMonth}
         />
         <AdminComplianceExemptionControls
           complianceExemptionRequiresApproval={config.complianceExemptionRequiresApproval}

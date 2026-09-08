@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { enforcePasswordChangeIfRequired, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
 import { prisma } from "@/lib/db";
+import { getAppConfig } from "@/lib/app-config";
 import { getProfileChangeBlockReason, getUserProfileChangeRequestState } from "@/lib/profile-change-requests";
 import { AppNav } from "@/components/AppNav";
 import { AdminSubNav } from "@/components/AdminSubNav";
@@ -19,10 +20,13 @@ export default async function AdminUserReportPage({
 
   const { id } = await params;
 
-  const target = await prisma.user.findUnique({
-    where: { id },
-    select: { email: true },
-  });
+  const [target, config] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id },
+      select: { email: true },
+    }),
+    getAppConfig(),
+  ]);
   const profileChangeBlockedMessage = target
     ? getProfileChangeBlockReason(target.email)
     : null;
@@ -38,6 +42,8 @@ export default async function AdminUserReportPage({
           profileChangeBlocked={!!profileChangeBlockedMessage}
           profileChangeBlockedMessage={profileChangeBlockedMessage}
           profileChangeOpenRequest={profileChangeState?.openRequest ?? null}
+          fiscalYearStartMonth={config.fiscalYearStartMonth}
+          fiscalYearEndMonth={config.fiscalYearEndMonth}
         />
       </main>
     </>

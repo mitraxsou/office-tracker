@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  fiscalYearEndMonthForStart,
+  formatFiscalYearSpanLabel,
+  MONTH_NAMES,
+} from "@/lib/fiscal-year";
 
 export function AdminSettingsForm({
   hoursTarget,
@@ -12,6 +17,8 @@ export function AdminSettingsForm({
   heartbeatRetentionDays,
   agentStaleMinutes,
   agentStaleGraceHours,
+  fiscalYearStartMonth,
+  fiscalYearEndMonth,
 }: {
   hoursTarget: number;
   monthlyDaysTarget: number;
@@ -21,6 +28,8 @@ export function AdminSettingsForm({
   heartbeatRetentionDays: number;
   agentStaleMinutes: number;
   agentStaleGraceHours: number;
+  fiscalYearStartMonth: number;
+  fiscalYearEndMonth: number;
 }) {
   const router = useRouter();
   const [target, setTarget] = useState(hoursTarget);
@@ -31,9 +40,16 @@ export function AdminSettingsForm({
   const [heartbeatRetention, setHeartbeatRetention] = useState(heartbeatRetentionDays);
   const [staleMinutes, setStaleMinutes] = useState(agentStaleMinutes);
   const [graceHours, setGraceHours] = useState(agentStaleGraceHours);
+  const [fyStartMonth, setFyStartMonth] = useState(fiscalYearStartMonth);
+  const [fyEndMonth, setFyEndMonth] = useState(fiscalYearEndMonth);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  function handleFyStartChange(month: number) {
+    setFyStartMonth(month);
+    setFyEndMonth(fiscalYearEndMonthForStart(month));
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -58,6 +74,8 @@ export function AdminSettingsForm({
         heartbeatRetentionDays: heartbeatRetention,
         agentStaleMinutes: staleMinutes,
         agentStaleGraceHours: graceHours,
+        fiscalYearStartMonth: fyStartMonth,
+        fiscalYearEndMonth: fyEndMonth,
       }),
     });
 
@@ -102,6 +120,47 @@ export function AdminSettingsForm({
             />
           </label>
         </div>
+      </section>
+
+      <section className="card p-6">
+        <h2 className="mb-2 text-lg font-medium">Fiscal year</h2>
+        <p className="mb-4 text-sm text-muted">
+          Defines which months count as a fiscal year for year compliance and FY exports. The year
+          always spans exactly 12 months.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block text-sm">
+            <span className="text-muted">Start month</span>
+            <select
+              value={fyStartMonth}
+              onChange={(e) => handleFyStartChange(Number(e.target.value))}
+              className="mt-1 w-full max-w-xs rounded-lg border px-3 py-2"
+            >
+              {MONTH_NAMES.map((name, index) => (
+                <option key={name} value={index + 1}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm">
+            <span className="text-muted">End month</span>
+            <select
+              value={fyEndMonth}
+              disabled
+              className="mt-1 w-full max-w-xs rounded-lg border bg-muted/20 px-3 py-2"
+            >
+              {MONTH_NAMES.map((name, index) => (
+                <option key={name} value={index + 1}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <p className="mt-2 text-xs text-muted">
+          Current span: {formatFiscalYearSpanLabel({ startMonth: fyStartMonth, endMonth: fyEndMonth })}
+        </p>
       </section>
 
       <section className="card p-6">

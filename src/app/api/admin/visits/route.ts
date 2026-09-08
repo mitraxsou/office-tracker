@@ -4,8 +4,7 @@ import { prisma } from "@/lib/db";
 import { createManualVisit } from "@/lib/heartbeat-service";
 import { logAuditEvent } from "@/lib/audit-log";
 import { validateVisitTimestamps } from "@/lib/visit-validation";
-
-const MAX_BULK_DELETE = 500;
+import { VISIT_DELETE_DENIED_MESSAGE } from "@/lib/visit-preservation";
 
 export async function GET(request: Request) {
   const admin = await requireAdmin();
@@ -170,47 +169,6 @@ export async function PATCH(request: Request) {
   return NextResponse.json({ visit });
 }
 
-export async function DELETE(request: Request) {
-  const admin = await requireAdmin();
-  if (!admin) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  const { searchParams } = new URL(request.url);
-  const idsParam = searchParams.get("ids");
-  const singleId = searchParams.get("id");
-  const ids = (idsParam ? idsParam.split(",") : singleId ? [singleId] : [])
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  if (ids.length === 0) {
-    return NextResponse.json({ error: "id or ids required" }, { status: 400 });
-  }
-  if (ids.length > MAX_BULK_DELETE) {
-    return NextResponse.json(
-      { error: `Select ${MAX_BULK_DELETE} visits or fewer` },
-      { status: 400 },
-    );
-  }
-
-  const existing = await prisma.visit.findMany({
-    where: { id: { in: ids } },
-    select: { id: true, userId: true },
-  });
-  if (existing.length === 0) {
-    return NextResponse.json({ error: "Visit not found" }, { status: 404 });
-  }
-
-  const result = await prisma.visit.deleteMany({
-    where: { id: { in: existing.map((v) => v.id) } },
-  });
-
-  await logAuditEvent({
-    actorId: admin.id,
-    action: "visit_delete",
-    targetUserId: existing[0].userId,
-    details: { visitIds: existing.map((v) => v.id), deleted: result.count },
-  });
-
-  return NextResponse.json({ ok: true, deleted: result.count });
+export async function DELETE() {
+  return NextResponse.json({ error: VISIT_DELETE_DENIED_MESSAGE }, { status: 403 });
 }

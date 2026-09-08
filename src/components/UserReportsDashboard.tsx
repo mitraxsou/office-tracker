@@ -8,10 +8,8 @@ import {
   type DailyHoursPoint,
 } from "@/components/reports/ReportCharts";
 import { GroupedVisitList } from "@/components/reports/GroupedVisitList";
-import {
-  exportDailyTrendCsv,
-  MonthReportToolbar,
-} from "@/components/reports/ReportToolbar";
+import { ComplianceExportButton } from "@/components/reports/ComplianceExportButton";
+import { MonthReportToolbar } from "@/components/reports/ReportToolbar";
 import { VisitCalendar } from "@/components/reports/VisitCalendar";
 import { currentMonthKey } from "@/lib/month-range";
 import type { MonthlyProgressState } from "@/lib/monthly-progress";
@@ -69,7 +67,13 @@ const KPI_BORDER_CLASSES: Record<KpiTone, string> = {
   neutral: "border-[var(--border)]",
 };
 
-export function UserReportsDashboard() {
+export function UserReportsDashboard({
+  fiscalYearStartMonth,
+  fiscalYearEndMonth,
+}: {
+  fiscalYearStartMonth: number;
+  fiscalYearEndMonth: number;
+}) {
   const [monthKey, setMonthKey] = useState(() => currentMonthKey("Asia/Kolkata"));
   const [data, setData] = useState<UserReportData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -146,14 +150,16 @@ export function UserReportsDashboard() {
 
   return (
     <div className="space-y-6">
-      <MonthReportToolbar
-        monthKey={monthKey}
-        timezone={timezone}
-        onMonthChange={setMonthKey}
-        onExport={() =>
-          exportDailyTrendCsv(`office-pulse-${monthKey}.csv`, chartData)
-        }
-      />
+      <MonthReportToolbar monthKey={monthKey} timezone={timezone} onMonthChange={setMonthKey}>
+        <ComplianceExportButton
+          hrefBase="/api/user/reports/export"
+          monthKey={monthKey}
+          timezone={timezone}
+          label="Download compliance report"
+          fiscalYearStartMonth={fiscalYearStartMonth}
+          fiscalYearEndMonth={fiscalYearEndMonth}
+        />
+      </MonthReportToolbar>
 
       <div className="flex gap-2">
         <ViewTab active={viewMode === "charts"} onClick={() => setViewMode("charts")}>

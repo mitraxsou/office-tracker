@@ -1,8 +1,15 @@
 import { allDayKeysInMonth, daysInMonth, formatMonthLabel, parseMonthKey } from "./month-range";
 import { aggregateHoursForDay } from "./day-hours";
 import type { ApprovedExemptions } from "./compliance-exemptions";
-import { DEFAULT_PILOT_START_MONTH_KEY } from "./app-config";
+import { DEFAULT_PILOT_START_MONTH_KEY, fiscalYearConfigFromApp, getAppConfig } from "./app-config";
 import { prisma } from "./db";
+import {
+  fiscalYearLabel,
+  fiscalYearStartYear,
+  monthKeysInFiscalYear,
+} from "./fiscal-year";
+
+export { fiscalYearLabel, fiscalYearStartYear, monthKeysInFiscalYear } from "./fiscal-year";
 
 export function validateMonthlyDaysTarget(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > 31) {
@@ -119,33 +126,6 @@ export function monthKeysInYear(year: number): string[] {
     const month = String(index + 1).padStart(2, "0");
     return `${year}-${month}`;
   });
-}
-
-export function fiscalYearStartYear(
-  date: Date,
-  timezone: string,
-): number {
-  const monthKey = monthKeyInTimezone(date, timezone);
-  const calendarYear = Number(monthKey.slice(0, 4));
-  const calendarMonth = Number(monthKey.slice(5, 7));
-  return calendarMonth >= 5 ? calendarYear : calendarYear - 1;
-}
-
-export function monthKeysInFiscalYear(startYear: number): string[] {
-  return [
-    ...Array.from({ length: 8 }, (_, index) => {
-      const month = String(index + 5).padStart(2, "0");
-      return `${startYear}-${month}`;
-    }),
-    ...Array.from({ length: 4 }, (_, index) => {
-      const month = String(index + 1).padStart(2, "0");
-      return `${startYear + 1}-${month}`;
-    }),
-  ];
-}
-
-export function fiscalYearLabel(startYear: number): string {
-  return `FY ${startYear}-${String(startYear + 1).slice(-2)}`;
 }
 
 export function monthKeysInYearUpToMonth(
@@ -377,9 +357,11 @@ export async function getYearCompliance(
   pendingExemptionMonthKeys: string[] = [],
   pilotStartMonthKey: string = DEFAULT_PILOT_START_MONTH_KEY,
 ): Promise<YearCompliance> {
-  const year = fiscalYearStartYear(referenceDate, timezone);
+  const appConfig = await getAppConfig();
+  const fyConfig = fiscalYearConfigFromApp(appConfig);
+  const year = fiscalYearStartYear(referenceDate, timezone, fyConfig);
   const currentMonthKey = monthKeyInTimezone(referenceDate, timezone);
-  const monthKeys = monthKeysInFiscalYear(year);
+  const monthKeys = monthKeysInFiscalYear(year, fyConfig);
   const monthsElapsed = monthKeys.filter((monthKey) => monthKey <= currentMonthKey).length;
   const exemptions = approvedExemptions ?? { monthKeys: [], dayKeys: [] };
   const pendingMonths = new Set(pendingExemptionMonthKeys);
@@ -455,7 +437,7 @@ export async function getYearCompliance(
 
   return {
     year,
-    fiscalYearLabel: fiscalYearLabel(year),
+    fiscalYearLabel: fiscalYearLabel(year, fyConfig),
     compliantMonths: monthDetails.filter((month) => isCompliantYearMonthStatus(month.status)).length,
     monthsInYear: 12,
     monthsElapsed,

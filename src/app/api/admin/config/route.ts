@@ -8,6 +8,10 @@ import { normalizeSsid, officeSsidAllowlistChanged } from "@/lib/constants";
 import { logAuditEvent } from "@/lib/audit-log";
 import { isRegistrationEnvLocked } from "@/lib/auth";
 import { backfillHeartbeatsAndVisitsAfterAllowlistChange } from "@/lib/ssid-backfill";
+import {
+  fiscalYearEndMonthForStart,
+  isValidFiscalYearSpan,
+} from "@/lib/fiscal-year";
 
 export async function GET() {
   const admin = await requireAdmin();
@@ -41,6 +45,8 @@ export async function PATCH(request: Request) {
     agentStaleGraceHours?: number;
     complianceExemptionRequiresApproval?: boolean;
     pilotStartMonthKey?: string;
+    fiscalYearStartMonth?: number;
+    fiscalYearEndMonth?: number;
   };
 
   try {
@@ -143,6 +149,27 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Invalid pilotStartMonthKey (expected YYYY-MM)" }, { status: 400 });
     }
     update.pilotStartMonthKey = body.pilotStartMonthKey;
+  }
+
+  if (body.fiscalYearStartMonth !== undefined || body.fiscalYearEndMonth !== undefined) {
+    const startMonth = body.fiscalYearStartMonth ?? prevConfig.fiscalYearStartMonth;
+    const endMonth =
+      body.fiscalYearEndMonth ??
+      (body.fiscalYearStartMonth !== undefined
+        ? fiscalYearEndMonthForStart(startMonth)
+        : prevConfig.fiscalYearEndMonth);
+    if (
+      typeof startMonth !== "number" ||
+      typeof endMonth !== "number" ||
+      !isValidFiscalYearSpan(startMonth, endMonth)
+    ) {
+      return NextResponse.json(
+        { error: "Invalid fiscal year months (must span exactly 12 months)" },
+        { status: 400 },
+      );
+    }
+    update.fiscalYearStartMonth = startMonth;
+    update.fiscalYearEndMonth = endMonth;
   }
 
   const config = await updateAppConfig(update);

@@ -5,7 +5,15 @@ import {
   DEFAULT_MONTHLY_DAYS_TARGET,
   parseDefaultSsidsFromEnv,
 } from "./constants";
-import { backfillHeartbeatsAndVisitsAfterAllowlistChange, hasHeartbeatAllowlistMismatches } from "./ssid-backfill";
+import {
+  DEFAULT_FISCAL_YEAR_END_MONTH,
+  DEFAULT_FISCAL_YEAR_START_MONTH,
+  normalizeFiscalYearConfig,
+} from "./fiscal-year";
+import {
+  backfillHeartbeatsAndVisitsAfterAllowlistChange,
+  hasHeartbeatAllowlistMismatches,
+} from "./ssid-backfill";
 
 export const DEFAULT_PENDING_TOKEN_TTL_DAYS = 7;
 export const DEFAULT_HEARTBEAT_RETENTION_DAYS = 7;
@@ -74,6 +82,8 @@ export type AppConfigData = {
   agentStaleGraceHours: number;
   complianceExemptionRequiresApproval: boolean;
   pilotStartMonthKey: string;
+  fiscalYearStartMonth: number;
+  fiscalYearEndMonth: number;
 };
 
 const CONFIG_ID = "global";
@@ -111,6 +121,8 @@ export async function ensureAppConfig(): Promise<AppConfigData> {
           agentStaleGraceHours: DEFAULT_AGENT_STALE_GRACE_HOURS,
           complianceExemptionRequiresApproval: true,
           pilotStartMonthKey: resolvePilotStartMonthKey(),
+          fiscalYearStartMonth: DEFAULT_FISCAL_YEAR_START_MONTH,
+          fiscalYearEndMonth: DEFAULT_FISCAL_YEAR_END_MONTH,
         },
       });
     } else {
@@ -148,6 +160,8 @@ export async function updateAppConfig(data: Partial<AppConfigData>) {
     update.complianceExemptionRequiresApproval = data.complianceExemptionRequiresApproval;
   }
   if (data.pilotStartMonthKey !== undefined) update.pilotStartMonthKey = data.pilotStartMonthKey;
+  if (data.fiscalYearStartMonth !== undefined) update.fiscalYearStartMonth = data.fiscalYearStartMonth;
+  if (data.fiscalYearEndMonth !== undefined) update.fiscalYearEndMonth = data.fiscalYearEndMonth;
 
   const config = await prisma.appConfig.update({
     where: { id: CONFIG_ID },
@@ -190,6 +204,8 @@ function parseConfig(config: {
   agentStaleGraceHours?: number;
   complianceExemptionRequiresApproval?: boolean;
   pilotStartMonthKey?: string;
+  fiscalYearStartMonth?: number;
+  fiscalYearEndMonth?: number;
 }): AppConfigData {
   let ssids: string[] = parseDefaultSsidsFromEnv();
   try {
@@ -198,6 +214,10 @@ function parseConfig(config: {
   } catch {
     /* use default */
   }
+  const fiscalYear = normalizeFiscalYearConfig({
+    startMonth: config.fiscalYearStartMonth,
+    endMonth: config.fiscalYearEndMonth,
+  });
   return {
     hoursTarget: config.hoursTarget,
     monthlyDaysTarget: config.monthlyDaysTarget ?? DEFAULT_MONTHLY_DAYS_TARGET,
@@ -211,5 +231,14 @@ function parseConfig(config: {
     agentStaleGraceHours: config.agentStaleGraceHours ?? DEFAULT_AGENT_STALE_GRACE_HOURS,
     complianceExemptionRequiresApproval: config.complianceExemptionRequiresApproval ?? true,
     pilotStartMonthKey: resolvePilotStartMonthKey(config.pilotStartMonthKey),
+    fiscalYearStartMonth: fiscalYear.startMonth,
+    fiscalYearEndMonth: fiscalYear.endMonth,
   };
+}
+
+export function fiscalYearConfigFromApp(config: AppConfigData) {
+  return normalizeFiscalYearConfig({
+    startMonth: config.fiscalYearStartMonth,
+    endMonth: config.fiscalYearEndMonth,
+  });
 }

@@ -152,8 +152,9 @@ describe("year compliance helpers", () => {
     ]);
   });
 
-  it("orders a fiscal year from May through April", () => {
+  it("orders a fiscal year from April through March", () => {
     expect(monthKeysInFiscalYear(2026)).toEqual([
+      "2026-04",
       "2026-05",
       "2026-06",
       "2026-07",
@@ -165,12 +166,11 @@ describe("year compliance helpers", () => {
       "2027-01",
       "2027-02",
       "2027-03",
-      "2027-04",
     ]);
     expect(fiscalYearLabel(2026)).toBe("FY 2026-27");
   });
 
-  it("uses the prior calendar year for January through April", () => {
+  it("uses the prior calendar year for January through March", () => {
     expect(
       fiscalYearStartYear(new Date("2027-02-10T10:00:00+05:30"), "Asia/Kolkata"),
     ).toBe(2026);

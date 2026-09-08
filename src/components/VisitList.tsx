@@ -33,21 +33,6 @@ export function VisitList({
     return <p className="text-sm text-muted">No visits recorded.</p>;
   }
 
-  async function handleDelete(visitId: string) {
-    if (!confirm("Delete this manual visit? This cannot be undone.")) return;
-    setActionError(null);
-    setActionSuccess(null);
-    setActionLoading(true);
-    const res = await fetch(`/api/visits?id=${visitId}`, { method: "DELETE" });
-    setActionLoading(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setActionError(data.error ?? "Failed to delete visit");
-      return;
-    }
-    router.refresh();
-  }
-
   async function handleReport(visitId: string) {
     const message = reportMessage.trim();
     if (message.length < 5) {
@@ -107,16 +92,6 @@ export function VisitList({
                   <span className="text-sm font-medium text-accent">{formatHours(hours)}</span>
                   {showActions && (
                     <div className="flex flex-wrap justify-end gap-2">
-                      {isManual && (
-                        <button
-                          type="button"
-                          disabled={actionLoading}
-                          onClick={() => handleDelete(visit.id)}
-                          className="text-xs text-red-400 hover:underline disabled:opacity-50"
-                        >
-                          Delete
-                        </button>
-                      )}
                       <button
                         type="button"
                         disabled={actionLoading}

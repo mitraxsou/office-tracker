@@ -390,6 +390,12 @@ export async function registerNode() {
       'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "allowOtpSelfRegistration" BOOLEAN NOT NULL DEFAULT true;'
     );
     await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "fiscalYearStartMonth" INTEGER NOT NULL DEFAULT 4;'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "fiscalYearEndMonth" INTEGER NOT NULL DEFAULT 3;'
+    );
+    await prisma.$executeRawUnsafe(
       'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "passwordChosenAt" TIMESTAMP(3);'
     );
     await prisma.$executeRawUnsafe(

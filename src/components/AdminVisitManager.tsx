@@ -83,7 +83,6 @@ export function AdminVisitManager({ userId, officeSsids, timezone, onChanged }: 
 
   const [filterSsid, setFilterSsid] = useState("all");
   const [filterDay, setFilterDay] = useState("");
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,7 +94,6 @@ export function AdminVisitManager({ userId, officeSsids, timezone, onChanged }: 
     }
     const data = await res.json();
     setVisits(data.visits ?? []);
-    setSelectedIds(new Set());
   }, [userId]);
 
   useEffect(() => {
@@ -138,39 +136,6 @@ export function AdminVisitManager({ userId, officeSsids, timezone, onChanged }: 
       }))
       .sort((a, b) => b.dayKey.localeCompare(a.dayKey));
   }, [filtered, timezone]);
-
-  const allFilteredSelected =
-    filtered.length > 0 && filtered.every((visit) => selectedIds.has(visit.id));
-
-  function toggleSelected(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleDaySelected(group: DayGroup) {
-    const daySelected = group.visits.every((visit) => selectedIds.has(visit.id));
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      for (const visit of group.visits) {
-        if (daySelected) next.delete(visit.id);
-        else next.add(visit.id);
-      }
-      return next;
-    });
-  }
-
-  function toggleAllFiltered() {
-    setSelectedIds((prev) => {
-      if (allFilteredSelected) return new Set();
-      const next = new Set(prev);
-      for (const visit of filtered) next.add(visit.id);
-      return next;
-    });
-  }
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -227,24 +192,6 @@ export function AdminVisitManager({ userId, officeSsids, timezone, onChanged }: 
     onChanged?.();
   }
 
-  async function deleteIds(ids: string[], label: string) {
-    if (ids.length === 0) return;
-    if (!confirm(`Delete ${label}? This cannot be undone.`)) return;
-    setError(null);
-    setBusy(true);
-    const res = await fetch(`/api/admin/visits?ids=${ids.join(",")}`, { method: "DELETE" });
-    setBusy(false);
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error ?? "Failed to delete visits");
-      return;
-    }
-    const data = await res.json().catch(() => ({ deleted: ids.length }));
-    setMessage(`Deleted ${data.deleted ?? ids.length} visit${data.deleted === 1 ? "" : "s"}.`);
-    load();
-    onChanged?.();
-  }
-
   function startEdit(visit: Visit) {
     setEditingId(visit.id);
     setEditStart(toLocalDateTimeInput(new Date(visit.startAt)));
@@ -257,8 +204,9 @@ export function AdminVisitManager({ userId, officeSsids, timezone, onChanged }: 
     <section className="card p-6">
       <h2 className="mb-1 text-lg font-medium">Visit data</h2>
       <p className="mb-5 text-sm text-muted">
-        Add a visit when the agent missed one, correct a wrong entry, or clear bad data. Times use
-        the calendar and clock pickers and are saved in {timezone}.
+        Add a visit when the agent missed one, or correct times on an existing entry. Visit records
+        are kept for compliance and cannot be deleted. Times use the calendar pickers and are saved
+        in {timezone}.
       </p>
 
       <form onSubmit={handleAdd} className="mb-6 space-y-4">
@@ -358,29 +306,6 @@ export function AdminVisitManager({ userId, officeSsids, timezone, onChanged }: 
         </p>
       </div>
 
-      {filtered.length > 0 && (
-        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-[var(--border)] px-3 py-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={allFilteredSelected} onChange={toggleAllFiltered} />
-            Select all shown
-          </label>
-          <span className="text-sm text-muted">{selectedIds.size} selected</span>
-          <button
-            type="button"
-            disabled={busy || selectedIds.size === 0}
-            onClick={() =>
-              deleteIds(
-                [...selectedIds],
-                `${selectedIds.size} selected visit${selectedIds.size === 1 ? "" : "s"}`,
-              )
-            }
-            className="ml-auto text-sm text-red-400 hover:underline disabled:opacity-40 disabled:no-underline"
-          >
-            Delete selected
-          </button>
-        </div>
-      )}
-
       {loading && <p className="text-sm text-muted">Loading visits...</p>}
       {!loading && visits.length === 0 && <p className="text-sm text-muted">No visits in range.</p>}
       {!loading && visits.length > 0 && filtered.length === 0 && (
@@ -389,41 +314,19 @@ export function AdminVisitManager({ userId, officeSsids, timezone, onChanged }: 
 
       <div className="space-y-4">
         {groups.map((group) => {
-          const daySelected = group.visits.every((visit) => selectedIds.has(visit.id));
           return (
             <div key={group.dayKey} className="rounded-lg border border-[var(--border)]">
               <div className="flex flex-wrap items-center gap-3 border-b border-[var(--border)] px-3 py-2">
-                <label className="flex items-center gap-2 text-sm font-medium">
-                  <input
-                    type="checkbox"
-                    checked={daySelected}
-                    onChange={() => toggleDaySelected(group)}
-                  />
-                  {group.dayKey}
-                </label>
+                <span className="text-sm font-medium">{group.dayKey}</span>
                 <span className="text-xs text-muted">
                   {group.visits.length} visit{group.visits.length === 1 ? "" : "s"}
                 </span>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() =>
-                    deleteIds(
-                      group.visits.map((visit) => visit.id),
-                      `all ${group.visits.length} visits on ${group.dayKey}`,
-                    )
-                  }
-                  className="ml-auto text-xs text-red-400 hover:underline disabled:opacity-40"
-                >
-                  Delete day
-                </button>
               </div>
 
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[var(--border)] text-left text-xs text-muted">
-                    <th className="w-8 py-2 pl-3" />
-                    <th className="py-2 pr-3">Start</th>
+                    <th className="py-2 pl-3 pr-3">Start</th>
                     <th className="py-2 pr-3">End</th>
                     <th className="py-2 pr-3">Duration</th>
                     <th className="py-2 pr-3">Source</th>
@@ -438,8 +341,7 @@ export function AdminVisitManager({ userId, officeSsids, timezone, onChanged }: 
                       <tr key={visit.id} className="border-b border-[var(--border)] last:border-0">
                         {editingId === visit.id ? (
                           <>
-                            <td className="py-2 pl-3 align-top" />
-                            <td className="py-2 pr-3 align-top">
+                            <td className="py-2 pl-3 pr-3 align-top">
                               <DateTimeField label="" value={editStart} onChange={setEditStart} required />
                             </td>
                             <td className="py-2 pr-3 align-top" colSpan={2}>
@@ -488,15 +390,7 @@ export function AdminVisitManager({ userId, officeSsids, timezone, onChanged }: 
                           </>
                         ) : (
                           <>
-                            <td className="py-2 pl-3">
-                              <input
-                                type="checkbox"
-                                checked={selectedIds.has(visit.id)}
-                                onChange={() => toggleSelected(visit.id)}
-                                aria-label={`Select visit starting ${formatTime(new Date(visit.startAt), timezone)}`}
-                              />
-                            </td>
-                            <td className="py-2 pr-3 text-xs">
+                            <td className="py-2 pl-3 pr-3 text-xs">
                               {formatTime(new Date(visit.startAt), timezone)}
                             </td>
                             <td className="py-2 pr-3 text-xs">
@@ -515,17 +409,9 @@ export function AdminVisitManager({ userId, officeSsids, timezone, onChanged }: 
                               <button
                                 type="button"
                                 onClick={() => startEdit(visit)}
-                                className="mr-2 text-xs text-accent hover:underline"
+                                className="text-xs text-accent hover:underline"
                               >
                                 Edit
-                              </button>
-                              <button
-                                type="button"
-                                disabled={busy}
-                                onClick={() => deleteIds([visit.id], "this visit")}
-                                className="text-xs text-red-400 hover:underline disabled:opacity-40"
-                              >
-                                Delete
                               </button>
                             </td>
                           </>

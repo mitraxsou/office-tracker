@@ -8,6 +8,7 @@ import {
   StatusDonutChart,
   type DailyHoursPoint,
 } from "@/components/reports/ReportCharts";
+import { ComplianceExportButton } from "@/components/reports/ComplianceExportButton";
 import {
   exportDailyTrendCsv,
   MonthReportToolbar,
@@ -86,7 +87,13 @@ type ReportsData = {
   }>;
 };
 
-export function AdminDashboard() {
+export function AdminDashboard({
+  fiscalYearStartMonth,
+  fiscalYearEndMonth,
+}: {
+  fiscalYearStartMonth: number;
+  fiscalYearEndMonth: number;
+}) {
   const [monthKey, setMonthKey] = useState(() => currentMonthKey("Asia/Kolkata"));
   const [fromKey, setFromKey] = useState("");
   const [toKey, setToKey] = useState("");
@@ -220,16 +227,27 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <MonthReportToolbar
-        monthKey={monthKey}
-        onMonthChange={(m) => load(m)}
-        onExport={() => {
-          if (data) {
-            exportDailyTrendCsv(`admin-office-hours-${monthKey}.csv`, chartData);
-          }
-        }}
-      >
+      <MonthReportToolbar monthKey={monthKey} onMonthChange={(m) => load(m)}>
         {refreshing && <span className="text-xs text-muted">Refreshing...</span>}
+        <ComplianceExportButton
+          hrefBase="/api/admin/reports/export"
+          monthKey={monthKey}
+          showFyOption
+          label="Download org report"
+          fiscalYearStartMonth={fiscalYearStartMonth}
+          fiscalYearEndMonth={fiscalYearEndMonth}
+        />
+        <button
+          type="button"
+          onClick={() => {
+            if (data) {
+              exportDailyTrendCsv(`admin-office-hours-${monthKey}.csv`, chartData);
+            }
+          }}
+          className="btn-secondary px-3 py-1.5 text-xs"
+        >
+          Quick chart CSV
+        </button>
         <button
           type="button"
           onClick={() => load(monthKey, true)}

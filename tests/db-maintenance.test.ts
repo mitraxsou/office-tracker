@@ -26,7 +26,6 @@ describe("db-maintenance retention", () => {
   it("lists all purgeable tables for the admin UI", () => {
     expect(Object.keys(MAINTENANCE_TABLE_LABELS)).toEqual([
       "heartbeats",
-      "old_visits",
       "agent_lifecycle_events",
       "audit_logs",
       "resolved_corrections",
