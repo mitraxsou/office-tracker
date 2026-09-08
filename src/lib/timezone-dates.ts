@@ -73,3 +73,19 @@ export function dayBoundsFromKey(dayKey: string, timezone: string) {
   const end = wallClockToUtc(dayKey, 23, 59, 59, 999, timezone);
   return { dayKey, start, end };
 }
+
+/** True when `now` falls within [dayStart, dayEnd] inclusive. */
+export function isCurrentCalendarDay(dayStart: Date, dayEnd: Date, now: Date): boolean {
+  const nowMs = now.getTime();
+  return nowMs >= dayStart.getTime() && nowMs <= dayEnd.getTime();
+}
+
+/** Compare ISO day keys (YYYY-MM-DD). */
+export function isDayKeyAfter(dayKey: string, otherDayKey: string): boolean {
+  return dayKey > otherDayKey;
+}
+
+export function isFutureDayKey(dayKey: string, timezone: string, now = new Date()): boolean {
+  const todayKey = dayKeyInTimezone(now, timezone);
+  return isDayKeyAfter(dayKey, todayKey);
+}

@@ -8,6 +8,7 @@ import {
   todayKeyForTimezone,
   type AdminOrgCalendarDay,
 } from "./admin-day-compliance";
+import { userHasInstalledAgentForStaleChecks } from "./agent-deregister";
 import { summarizeAgentTokens } from "./auth";
 import { prisma } from "./db";
 import { getAppConfig, getEffectiveAgentStaleGraceHours, getUserHoursTarget } from "./app-config";
@@ -15,7 +16,7 @@ import { getTodaySummary } from "./heartbeat-service";
 import { allDayKeysInMonth, currentMonthKey, monthBoundsFromKey } from "./month-range";
 import { revokeExpiredPendingTokens } from "./token-expiry";
 import { roundHours, type VisitForDaySpan } from "./visits";
-import { dayKeyInTimezone, dayBoundsFromKey } from "./timezone-dates";
+import { dayKeyInTimezone, dayBoundsFromKey, isFutureDayKey } from "./timezone-dates";
 import { isDayKeyInRange } from "./out-of-office";
 
 type CalendarUserRow = {
@@ -25,6 +26,7 @@ type CalendarUserRow = {
   timezone: string;
   hoursTarget: number | null;
   agentStaleGraceHours: number | null;
+  agentDeregisteredAt: Date | null;
   agentDevices: Array<{ id: string; lastSeenAt: Date | null }>;
 };
 
@@ -148,7 +150,10 @@ async function preloadUserCalendarData(
   return Promise.all(
     users.map(async (user) => ({
       user,
-      hadInstalledDevice: user.agentDevices.some((d) => d.lastSeenAt !== null),
+      hadInstalledDevice: userHasInstalledAgentForStaleChecks({
+        agentDeregisteredAt: user.agentDeregisteredAt,
+        agentDevices: user.agentDevices,
+      }),
       hoursTarget: await getUserHoursTarget(user),
       graceHours: await getEffectiveAgentStaleGraceHours(user),
       oooRanges: oooByUser.get(user.id) ?? [],
@@ -174,6 +179,7 @@ export async function getAdminOrgCalendarDays(
       timezone: true,
       hoursTarget: true,
       agentStaleGraceHours: true,
+      agentDeregisteredAt: true,
       agentDevices: { select: { id: true, lastSeenAt: true } },
     },
   });
@@ -182,6 +188,22 @@ export async function getAdminOrgCalendarDays(
   const now = new Date();
 
   const days: AdminOrgCalendarDay[] = monthDayKeys.map((dayKey) => {
+    if (isFutureDayKey(dayKey, timezone, now)) {
+      return toAdminOrgCalendarDay(
+        dayKey,
+        {
+          totalUsers: users.length,
+          attendedCount: 0,
+          metTargetCount: 0,
+          compliancePct: 0,
+          excludedStale: 0,
+          excludedOoo: 0,
+          excludedNoVisit: users.length,
+        },
+        0,
+      );
+    }
+
     let totalAttendedHours = 0;
     const rows = preloaded.map((ctx) => {
       const { start: dayStart, end: dayEnd } = dayBoundsFromKey(dayKey, ctx.user.timezone);
@@ -231,7 +253,10 @@ export async function getAdminReports(options?: { days?: number; monthKey?: stri
     users.map(async (user) => {
       const todayKey = todayKeyForTimezone(user.timezone, now);
       const { end: dayEnd } = dayBoundsFromKey(todayKey, user.timezone);
-      const hadInstalledDevice = user.agentDevices.some((d) => d.lastSeenAt !== null);
+      const hadInstalledDevice = userHasInstalledAgentForStaleChecks({
+        agentDeregisteredAt: user.agentDeregisteredAt,
+        agentDevices: user.agentDevices,
+      });
       const lastHeartbeat = await prisma.heartbeat.findFirst({
         where: { userId: user.id, recordedAt: { lte: dayEnd } },
         orderBy: { recordedAt: "desc" },

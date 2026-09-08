@@ -133,6 +133,34 @@ describe("computeUserDayComplianceRow OOO override", () => {
     expect(row.status).toBe("no_visit");
     expect(row.agentStaleOnDay).toBe(false);
   });
+
+  it("does not mark attended on a future day from an open visit", () => {
+    const row = computeUserDayComplianceRow({
+      user,
+      dayKey: "2026-09-12",
+      hadInstalledDevice: true,
+      lastHeartbeatBeforeDayEnd: new Date("2026-09-08T18:00:00+05:30"),
+      ooo: false,
+      visits: [
+        {
+          id: "v1",
+          source: "wifi",
+          ssid: "OfficeConnect",
+          startAt: new Date("2026-09-08T09:00:00+05:30"),
+          endAt: null,
+        },
+      ],
+      dayHeartbeats: [],
+      officeSsids: ["OfficeConnect"],
+      hoursTarget: 5,
+      graceHours: 24,
+      now: new Date("2026-09-08T12:00:00+05:30"),
+    });
+
+    expect(row.attended).toBe(false);
+    expect(row.hours).toBe(0);
+    expect(row.status).toBe("no_visit");
+  });
 });
 
 describe("org calendar day aggregation", () => {

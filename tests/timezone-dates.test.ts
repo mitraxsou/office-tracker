@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDayBounds } from "../src/lib/timezone-dates";
+import { getDayBounds, isFutureDayKey, isCurrentCalendarDay } from "../src/lib/timezone-dates";
 import { dayKeyInTimezone, effectiveVisitEnd } from "../src/lib/visits";
 import { VISIT_GAP_MS } from "../src/lib/constants";
 
@@ -44,5 +44,16 @@ describe("timezone day bounds (Asia/Kolkata)", () => {
     const hours = (clippedEnd.getTime() - clippedStart.getTime()) / (1000 * 60 * 60);
     expect(hours).toBeGreaterThan(1);
     expect(hours).toBeLessThan(2);
+  });
+});
+
+describe("isCurrentCalendarDay and isFutureDayKey", () => {
+  it("detects current calendar day in timezone", () => {
+    const now = new Date("2026-09-08T12:00:00+05:30");
+    const { start, end } = getDayBounds(now, "Asia/Kolkata");
+    expect(isCurrentCalendarDay(start, end, now)).toBe(true);
+    expect(isFutureDayKey("2026-09-12", "Asia/Kolkata", now)).toBe(true);
+    expect(isFutureDayKey("2026-09-08", "Asia/Kolkata", now)).toBe(false);
+    expect(isFutureDayKey("2026-09-07", "Asia/Kolkata", now)).toBe(false);
   });
 });

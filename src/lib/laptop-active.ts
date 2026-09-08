@@ -1,3 +1,5 @@
+import { isCurrentCalendarDay } from "./timezone-dates";
+
 const MS_PER_HOUR = 1000 * 60 * 60;
 const MS_PER_DAY = 24 * MS_PER_HOUR;
 
@@ -29,7 +31,7 @@ export function laptopActiveMsForDay(params: LaptopActiveParams): number {
   const first = Math.max(firstHeartbeatAt.getTime(), dayStartMs);
   let last = Math.min(lastHeartbeatAt.getTime(), dayEndMs);
 
-  const isCurrentDay = params.now.getTime() <= dayEndMs;
+  const isCurrentDay = isCurrentCalendarDay(params.dayStart, params.dayEnd, params.now);
   const agentRecent =
     params.lastHeartbeatOverall !== null &&
     params.now.getTime() - params.lastHeartbeatOverall.getTime() <= params.staleMs;

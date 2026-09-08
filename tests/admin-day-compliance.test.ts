@@ -129,6 +129,72 @@ describe("userAttendedOnDay", () => {
       }),
     ).toBe(false);
   });
+
+  it("does not count open visit bleeding into a future day", () => {
+    const futureStart = new Date("2026-09-12T00:00:00+05:30");
+    const futureEnd = new Date("2026-09-12T23:59:59.999+05:30");
+    const now = new Date("2026-09-08T12:00:00+05:30");
+
+    expect(
+      userAttendedOnDay({
+        visits: [
+          {
+            startAt: new Date("2026-09-08T09:00:00+05:30"),
+            endAt: null,
+          },
+        ],
+        dayStart: futureStart,
+        dayEnd: futureEnd,
+        inOfficeHeartbeats: [],
+        totalMs: 0,
+        now,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not count open visit bleeding into a weekend without activity", () => {
+    const saturdayStart = new Date("2026-09-06T00:00:00+05:30");
+    const saturdayEnd = new Date("2026-09-06T23:59:59.999+05:30");
+    const now = new Date("2026-09-08T12:00:00+05:30");
+
+    expect(
+      userAttendedOnDay({
+        visits: [
+          {
+            startAt: new Date("2026-09-05T09:00:00+05:30"),
+            endAt: null,
+          },
+        ],
+        dayStart: saturdayStart,
+        dayEnd: saturdayEnd,
+        inOfficeHeartbeats: [],
+        totalMs: 0,
+        now,
+      }),
+    ).toBe(false);
+  });
+
+  it("counts open visit on the current day", () => {
+    const now = new Date("2026-09-08T12:00:00+05:30");
+    const dayStart = new Date("2026-09-08T00:00:00+05:30");
+    const dayEnd = new Date("2026-09-08T23:59:59.999+05:30");
+
+    expect(
+      userAttendedOnDay({
+        visits: [
+          {
+            startAt: new Date("2026-09-08T09:00:00+05:30"),
+            endAt: null,
+          },
+        ],
+        dayStart,
+        dayEnd,
+        inOfficeHeartbeats: [],
+        totalMs: 0,
+        now,
+      }),
+    ).toBe(true);
+  });
 });
 
 describe("resolveDayUserStatus", () => {

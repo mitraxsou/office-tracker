@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser, getSessionUserId } from "@/lib/auth";
 import { createManualVisit } from "@/lib/heartbeat-service";
 import { prisma } from "@/lib/db";
+import { validateVisitTimestamps } from "@/lib/visit-validation";
 
 export async function GET() {
   const userId = await getSessionUserId();
@@ -49,16 +50,26 @@ export async function POST(request: Request) {
     }
   }
 
+  const timestampError = validateVisitTimestamps(start, end);
+  if (timestampError) {
+    return NextResponse.json({ error: timestampError }, { status: 400 });
+  }
+
   const resolvedSsid = typeof ssid === "string" && ssid.trim() ? ssid.trim() : "manual";
 
-  const visit = await createManualVisit({
-    userId: user.id,
-    startAt: start,
-    endAt: end,
-    ssid: resolvedSsid,
-  });
+  try {
+    const visit = await createManualVisit({
+      userId: user.id,
+      startAt: start,
+      endAt: end,
+      ssid: resolvedSsid,
+    });
 
-  return NextResponse.json({ visit }, { status: 201 });
+    return NextResponse.json({ visit }, { status: 201 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to create visit";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 }
 
 export async function DELETE(request: Request) {

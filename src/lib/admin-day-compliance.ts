@@ -1,10 +1,11 @@
+import { userHasInstalledAgentForStaleChecks } from "./agent-deregister";
 import { getAppConfig, getEffectiveAgentStaleGraceHours, getUserHoursTarget } from "./app-config";
 import { heartbeatInOffice } from "./heartbeat-office";
 import { loadDaySpanContext } from "./heartbeat-service";
 import { isoWeekdayFromDayKey } from "./office-schedule";
 import { isUserOutOfOffice } from "./out-of-office";
 import { prisma } from "./db";
-import { dayBoundsFromKey, dayKeyInTimezone } from "./timezone-dates";
+import { dayBoundsFromKey, dayKeyInTimezone, isCurrentCalendarDay, isFutureDayKey } from "./timezone-dates";
 import { daySpanMsForDay, roundHoursToMinute, type VisitForDaySpan } from "./visits";
 
 export type AdminDayUserStatus =
@@ -107,12 +108,25 @@ export function userAttendedOnDay(input: {
   dayEnd: Date;
   inOfficeHeartbeats: Date[];
   totalMs: number;
+  now?: Date;
 }): boolean {
   if (input.totalMs > 0) return true;
   if (input.inOfficeHeartbeats.length > 0) return true;
+
+  const now = input.now ?? new Date();
+  if (now.getTime() < input.dayStart.getTime()) return false;
+
+  const isCurrentDay = isCurrentCalendarDay(input.dayStart, input.dayEnd, now);
+
   for (const visit of input.visits) {
     const start = visit.startAt.getTime();
-    const end = (visit.endAt ?? input.dayEnd).getTime();
+    if (visit.endAt === null) {
+      if (!isCurrentDay) continue;
+      const end = now.getTime();
+      if (start <= input.dayEnd.getTime() && end >= input.dayStart.getTime()) return true;
+      continue;
+    }
+    const end = visit.endAt.getTime();
     if (start <= input.dayEnd.getTime() && end >= input.dayStart.getTime()) return true;
   }
   return false;
@@ -173,6 +187,7 @@ type ComplianceUser = {
   timezone: string;
   hoursTarget: number | null;
   agentStaleGraceHours: number | null;
+  agentDeregisteredAt: Date | null;
 };
 
 type DayHeartbeatRow = {
@@ -235,6 +250,7 @@ export function computeUserDayComplianceRow(input: {
     dayEnd,
     inOfficeHeartbeats,
     totalMs,
+    now,
   });
 
   const status = resolveDayUserStatus({
@@ -306,15 +322,30 @@ export async function getAdminDayCompliance(
       timezone: true,
       hoursTarget: true,
       agentStaleGraceHours: true,
+      agentDeregisteredAt: true,
       agentDevices: { select: { id: true, lastSeenAt: true } },
     },
   });
+
+  const now = new Date();
+  if (isFutureDayKey(dayKey, timezone, now)) {
+    const hoursTargets = new Map<string, number>();
+    await Promise.all(
+      users.map(async (user) => {
+        hoursTargets.set(user.id, await getUserHoursTarget(user));
+      }),
+    );
+    return emptyFutureDayCompliance(dayKey, users, hoursTargets);
+  }
 
   const { end: dayEnd } = dayBoundsFromKey(dayKey, timezone);
 
   const rows = await Promise.all(
     users.map(async (user) => {
-      const hadInstalledDevice = user.agentDevices.some((d) => d.lastSeenAt !== null);
+      const hadInstalledDevice = userHasInstalledAgentForStaleChecks({
+        agentDeregisteredAt: user.agentDeregisteredAt,
+        agentDevices: user.agentDevices,
+      });
       const lastHeartbeat = await prisma.heartbeat.findFirst({
         where: { userId: user.id, recordedAt: { lte: dayEnd } },
         orderBy: { recordedAt: "desc" },
@@ -340,4 +371,35 @@ export async function getAdminDayCompliance(
 
 export function todayKeyForTimezone(timezone: string, now = new Date()): string {
   return dayKeyInTimezone(now, timezone);
+}
+
+function emptyFutureDayUserRow(user: ComplianceUser, hoursTarget: number): AdminDayUserRow {
+  return {
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    hours: 0,
+    hoursTarget,
+    metTarget: false,
+    attended: false,
+    status: "no_visit",
+    agentHealthy: true,
+    agentStaleOnDay: false,
+  };
+}
+
+export function emptyFutureDayCompliance(
+  dayKey: string,
+  users: ComplianceUser[],
+  hoursTargets: Map<string, number>,
+): AdminDayComplianceSummary {
+  const rows = users.map((user) =>
+    emptyFutureDayUserRow(user, hoursTargets.get(user.id) ?? 0),
+  );
+  return {
+    date: dayKey,
+    isWeekend: isWeekendDay(dayKey),
+    ...summarizeDayCompliance(rows),
+    users: rows,
+  };
 }

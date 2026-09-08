@@ -3,7 +3,12 @@ import {
   DEFAULT_TIMEZONE,
   VISIT_GAP_MS,
 } from "./constants";
-import { dayBoundsFromKey, dayKeyInTimezone, getDayBounds } from "./timezone-dates";
+import {
+  dayBoundsFromKey,
+  dayKeyInTimezone,
+  getDayBounds,
+  isCurrentCalendarDay,
+} from "./timezone-dates";
 
 export { dayKeyInTimezone, getDayBounds, dayBoundsFromKey };
 
@@ -94,7 +99,7 @@ export function daySpanMsForDay(
   if (firstIn === null) return 0;
 
   const openVisit = visits.find((v) => v.endAt === null);
-  const isCurrentDay = params.now.getTime() <= dayEndMs;
+  const isCurrentDay = isCurrentCalendarDay(params.dayStart, params.dayEnd, params.now);
 
   let lastOut: number | null = null;
 

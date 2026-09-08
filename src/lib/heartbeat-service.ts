@@ -6,6 +6,7 @@ import { maybePurgeOldHeartbeats } from "./heartbeat-retention";
 import { laptopActiveHoursForDay, type LaptopActiveParams } from "./laptop-active";
 import { daySpanMsForDay, dayKeyInTimezone, effectiveVisitEnd, type DaySpanParams } from "./visits";
 import { dayBoundsFromKey, getDayBounds } from "./timezone-dates";
+import { validateVisitTimestamps } from "./visit-validation";
 
 export async function loadDaySpanContext(
   userId: string,
@@ -251,6 +252,10 @@ export async function createManualVisit(params: {
   endAt?: Date | null;
   ssid?: string | null;
 }) {
+  const timestampError = validateVisitTimestamps(params.startAt, params.endAt);
+  if (timestampError) {
+    throw new Error(timestampError);
+  }
   if (params.endAt && params.endAt <= params.startAt) {
     throw new Error("endAt must be after startAt");
   }

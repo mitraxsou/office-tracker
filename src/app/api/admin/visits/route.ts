@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 import { createManualVisit } from "@/lib/heartbeat-service";
 import { logAuditEvent } from "@/lib/audit-log";
+import { validateVisitTimestamps } from "@/lib/visit-validation";
 
 const MAX_BULK_DELETE = 500;
 
@@ -90,16 +91,26 @@ export async function POST(request: Request) {
     }
   }
 
-  const visit = await createManualVisit({ userId, startAt: start, endAt: end, ssid: ssid ?? null });
+  const timestampError = validateVisitTimestamps(start, end);
+  if (timestampError) {
+    return NextResponse.json({ error: timestampError }, { status: 400 });
+  }
 
-  await logAuditEvent({
-    actorId: admin.id,
-    action: "visit_create",
-    targetUserId: userId,
-    details: { visitId: visit.id, startAt, endAt },
-  });
+  try {
+    const visit = await createManualVisit({ userId, startAt: start, endAt: end, ssid: ssid ?? null });
 
-  return NextResponse.json({ visit }, { status: 201 });
+    await logAuditEvent({
+      actorId: admin.id,
+      action: "visit_create",
+      targetUserId: userId,
+      details: { visitId: visit.id, startAt, endAt },
+    });
+
+    return NextResponse.json({ visit }, { status: 201 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to create visit";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 }
 
 export async function PATCH(request: Request) {
@@ -137,6 +148,11 @@ export async function PATCH(request: Request) {
   }
   if (nextEnd && (Number.isNaN(nextEnd.getTime()) || nextEnd <= nextStart)) {
     return NextResponse.json({ error: "Check-out must be after check-in" }, { status: 400 });
+  }
+
+  const timestampError = validateVisitTimestamps(nextStart, nextEnd);
+  if (timestampError) {
+    return NextResponse.json({ error: timestampError }, { status: 400 });
   }
 
   const visit = await prisma.visit.update({
