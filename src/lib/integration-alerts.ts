@@ -23,6 +23,7 @@ export type IntegrationAlertType =
   | "behind"
   | "hours_started"
   | "hours_met"
+  | "ooo_cleared"
   | "custom";
 
 export type IntegrationAlert = {
@@ -130,6 +131,10 @@ function buildHoursStartedMessage(hoursTarget: number): string {
 
 function buildHoursMetMessage(hoursToday: number, hoursTarget: number): string {
   return `You have completed your ${hoursTarget}h office target for today. Office Pulse has counted ${hoursToday.toFixed(1)}h.`;
+}
+
+function buildOooClearedMessage(): string {
+  return "Office presence detected while you were marked out of office. Your out-of-office status for today has been cleared and office hours tracking has resumed.";
 }
 
 export function classifyPresenceReminder(input: {
@@ -305,6 +310,20 @@ async function evaluateUserAlerts(
     });
   }
 
+  if (
+    types.has("ooo_cleared") &&
+    !(await wasAlertSentToday(user.id, "ooo_cleared", dayKey))
+  ) {
+    const deliveryChannel = channelForAlert(prefs, "ooo_cleared");
+    alerts.push({
+      ...base,
+      type: "ooo_cleared",
+      message: buildOooClearedMessage(),
+      deliveryChannel,
+      notifyTeams: deliversToTeams(deliveryChannel),
+    });
+  }
+
   return alerts;
 }
 
@@ -379,4 +398,5 @@ export {
   buildBehindMessage,
   buildHoursStartedMessage,
   buildHoursMetMessage,
+  buildOooClearedMessage,
 };

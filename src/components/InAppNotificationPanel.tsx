@@ -9,6 +9,7 @@ const TITLES: Record<string, string> = {
   behind: "Behind on office hours",
   hours_started: "Office hours started",
   hours_met: "Daily hours target met",
+  ooo_cleared: "Out of office cleared",
   custom: "Message from admin",
 };
 

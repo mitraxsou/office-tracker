@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll } from "vitest";
+import { describe, expect, it, beforeAll, vi } from "vitest";
 import {
   createOutOfOfficeLinkToken,
   redeemOutOfOfficeLinkToken,
@@ -40,6 +40,59 @@ describe("out-of-office links", () => {
   it("creates a verifiable token payload shape", async () => {
     const token = await createOutOfOfficeLinkToken("user-test-id", "2026-09-02");
     expect(token.split(".")).toHaveLength(3);
+  });
+});
+
+describe("maybeClearOutOfOfficeOnOfficePresence", () => {
+  it("clears OOO for the matching day when user is marked out", async () => {
+    const prismaFindFirst = vi.fn().mockResolvedValue({ id: "ooo-1" });
+    const prismaDelete = vi.fn().mockResolvedValue({});
+    vi.doMock("../src/lib/db", () => ({
+      prisma: {
+        userOutOfOffice: {
+          findFirst: prismaFindFirst,
+          findMany: vi.fn().mockResolvedValue([
+            {
+              id: "ooo-1",
+              startDate: "2026-09-08",
+              endDate: "2026-09-08",
+              source: "settings",
+            },
+          ]),
+          delete: prismaDelete,
+        },
+      },
+    }));
+
+    vi.resetModules();
+    const { maybeClearOutOfOfficeOnOfficePresence } = await import("../src/lib/out-of-office");
+    const at = new Date("2026-09-08T10:00:00+05:30");
+    const result = await maybeClearOutOfOfficeOnOfficePresence("user-1", "Asia/Kolkata", at);
+
+    expect(result).toEqual({ cleared: true, dayKey: "2026-09-08" });
+    expect(prismaDelete).toHaveBeenCalled();
+    vi.doUnmock("../src/lib/db");
+    vi.resetModules();
+  });
+
+  it("does nothing when user is not marked out for that day", async () => {
+    vi.doMock("../src/lib/db", () => ({
+      prisma: {
+        userOutOfOffice: {
+          findFirst: vi.fn().mockResolvedValue(null),
+          findMany: vi.fn(),
+          delete: vi.fn(),
+        },
+      },
+    }));
+
+    vi.resetModules();
+    const { maybeClearOutOfOfficeOnOfficePresence } = await import("../src/lib/out-of-office");
+    const result = await maybeClearOutOfOfficeOnOfficePresence("user-1", "Asia/Kolkata");
+
+    expect(result.cleared).toBe(false);
+    vi.doUnmock("../src/lib/db");
+    vi.resetModules();
   });
 });
 

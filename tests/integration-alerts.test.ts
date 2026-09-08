@@ -4,6 +4,7 @@ import {
   buildBehindMessage,
   buildHoursMetMessage,
   buildHoursStartedMessage,
+  buildOooClearedMessage,
   buildStaleMessage,
   classifyPresenceReminder,
   shouldQueueDailyAlert,
@@ -71,6 +72,12 @@ describe("integration alert messages", () => {
     expect(buildHoursStartedMessage(5)).toContain("started");
     expect(buildHoursMetMessage(5.1, 5)).toContain("completed");
   });
+
+  it("builds out-of-office cleared message", () => {
+    const msg = buildOooClearedMessage();
+    expect(msg).toContain("out of office");
+    expect(msg).toContain("cleared");
+  });
 });
 
 describe("presence reminder rules", () => {
@@ -125,6 +132,7 @@ describe("alert delivery channels", () => {
     expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "stale")).toBe("app");
     expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "behind")).toBe("app");
     expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "hours_started")).toBe("teams");
+    expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "ooo_cleared")).toBe("teams");
     expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "hours_met")).toBe("teams");
     expect(DEFAULT_NOTIFICATION_PREFS.alertIfHoursStarted).toBe(true);
     expect(DEFAULT_NOTIFICATION_PREFS.alertIfHoursMet).toBe(true);

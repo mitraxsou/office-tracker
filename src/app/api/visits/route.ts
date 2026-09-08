@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, getSessionUserId } from "@/lib/auth";
 import { createManualVisit } from "@/lib/heartbeat-service";
+import { handleOfficePresenceDetected } from "@/lib/ooo-presence";
 import { prisma } from "@/lib/db";
 import { validateVisitTimestamps } from "@/lib/visit-validation";
 
@@ -64,6 +65,10 @@ export async function POST(request: Request) {
       endAt: end,
       ssid: resolvedSsid,
     });
+
+    if (!end) {
+      await handleOfficePresenceDetected(user.id, user.timezone, start);
+    }
 
     return NextResponse.json({ visit }, { status: 201 });
   } catch (err) {

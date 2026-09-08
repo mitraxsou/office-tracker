@@ -122,6 +122,20 @@ export async function removeOutOfOfficeRange(userId: string, rangeId: string) {
   });
 }
 
+/** Clears OOO for the given calendar day when office presence is detected. */
+export async function maybeClearOutOfOfficeOnOfficePresence(
+  userId: string,
+  timezone: string,
+  at: Date = new Date(),
+): Promise<{ cleared: boolean; dayKey: string }> {
+  const dayKey = dayKeyInTimezone(at, timezone);
+  if (!(await isUserOutOfOffice(userId, dayKey))) {
+    return { cleared: false, dayKey };
+  }
+  await clearUserOutOfOffice(userId, dayKey);
+  return { cleared: true, dayKey };
+}
+
 export async function clearUserOutOfOffice(userId: string, dayKey: string) {
   assertValidDayKey(dayKey);
   const covering = await prisma.userOutOfOffice.findMany({
