@@ -69,6 +69,7 @@ describe("computeUserDayComplianceRow OOO override", () => {
     timezone: "Asia/Kolkata",
     hoursTarget: 5,
     agentStaleGraceHours: 24,
+    agentDeregisteredAt: null,
   };
 
   it("counts OOO user with logged hours as attended", () => {

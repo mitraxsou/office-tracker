@@ -38,6 +38,7 @@ model User {
   timezone           String        @default("Asia/Kolkata")
   hoursTarget        Float?
   agentStaleGraceHours Int?
+  agentDeregisteredAt  DateTime?
   mustChangePassword Boolean       @default(false)
   passwordChosenAt   DateTime?
   passwordResetAt    DateTime?

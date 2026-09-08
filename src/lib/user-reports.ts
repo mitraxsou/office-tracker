@@ -1,3 +1,4 @@
+import { isUserAgentDeregistered } from "./agent-deregister";
 import { prisma } from "./db";
 import { getAppConfig, getUserHoursTarget, getEffectiveAgentStaleGraceHours } from "./app-config";
 import { aggregateHoursForDay, aggregateLaptopActiveForDay } from "./day-hours";
@@ -97,12 +98,13 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
       role: user.role,
       timezone: user.timezone,
       hoursTarget,
+      agentDeregisteredAt: user.agentDeregisteredAt?.toISOString() ?? null,
     },
     today: {
       totalHours: today.totalHours,
       laptopActiveHours: today.laptopActiveHours,
       metTarget: today.metTarget,
-      agentHealthy: today.agentHealthy,
+      agentHealthy: isUserAgentDeregistered(user.agentDeregisteredAt) ? true : today.agentHealthy,
       inOfficeNow: today.inOfficeNow,
       lastHeartbeat: today.lastHeartbeat?.recordedAt?.toISOString() ?? null,
     },

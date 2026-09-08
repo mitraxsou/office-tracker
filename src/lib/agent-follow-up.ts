@@ -110,7 +110,14 @@ export async function getAgentFollowUpReport(options?: {
     prisma.agentDevice.findMany({
       include: {
         user: {
-          select: { id: true, email: true, name: true, timezone: true, agentStaleGraceHours: true },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            timezone: true,
+            agentStaleGraceHours: true,
+            agentDeregisteredAt: true,
+          },
         },
       },
       orderBy: { lastSeenAt: "asc" },
@@ -142,6 +149,8 @@ export async function getAgentFollowUpReport(options?: {
   const oooCache = new Map<string, boolean>();
 
   for (const device of devices) {
+    if (device.user.agentDeregisteredAt) continue;
+
     const userDayKey = dayKeyInTimezone(now, device.user.timezone);
     if (isWeekendDay(userDayKey)) continue;
 

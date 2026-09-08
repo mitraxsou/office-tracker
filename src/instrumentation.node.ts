@@ -53,6 +53,9 @@ export async function registerNode() {
       'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "agentStaleGraceHours" INTEGER;'
     );
     await prisma.$executeRawUnsafe(
+      'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "agentDeregisteredAt" TIMESTAMP(3);'
+    );
+    await prisma.$executeRawUnsafe(
       'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "monthlyDaysTarget" INTEGER NOT NULL DEFAULT 8;'
     );
     await prisma.$executeRawUnsafe(`

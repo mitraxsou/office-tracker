@@ -8,7 +8,7 @@ import {
   todayKeyForTimezone,
   type AdminOrgCalendarDay,
 } from "./admin-day-compliance";
-import { userHasInstalledAgentForStaleChecks } from "./agent-deregister";
+import { userHasInstalledAgentForStaleChecks, isUserAgentDeregistered } from "./agent-deregister";
 import { summarizeAgentTokens } from "./auth";
 import { prisma } from "./db";
 import { getAppConfig, getEffectiveAgentStaleGraceHours, getUserHoursTarget } from "./app-config";
@@ -278,10 +278,9 @@ export async function getAdminReports(options?: { days?: number; monthKey?: stri
       const summary = await getTodaySummary(user.id, user.timezone, hoursTarget);
       const todayKey = dayKeyInTimezone(now, user.timezone);
       const complianceRow = todayComplianceRows.find((row) => row.userId === user.id);
-      const agentStaleForReporting = isAgentStaleForReporting(
-        todayKey,
-        !summary.agentHealthy,
-      );
+      const agentStaleForReporting = isUserAgentDeregistered(user.agentDeregisteredAt)
+        ? false
+        : isAgentStaleForReporting(todayKey, !summary.agentHealthy);
       return {
         id: user.id,
         email: user.email,

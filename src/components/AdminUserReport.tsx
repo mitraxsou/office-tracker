@@ -36,6 +36,7 @@ type UserReport = {
     role: string;
     timezone: string;
     hoursTarget: number;
+    agentDeregisteredAt: string | null;
   };
   today: {
     totalHours: number;
@@ -142,6 +143,7 @@ export function AdminUserReport({
   const [actionError, setActionError] = useState<string | null>(null);
   const [impersonating, setImpersonating] = useState(false);
   const [pushingDeviceId, setPushingDeviceId] = useState<string | null>(null);
+  const [deregistering, setDeregistering] = useState(false);
 
   const load = useCallback(async (month: string) => {
     setLoading(true);
@@ -183,6 +185,27 @@ export function AdminUserReport({
           }
         : current,
     );
+  }
+
+  async function deregisterAgent() {
+    if (
+      !confirm(
+        "Deregister this user's agent? Active tokens will be revoked, registered laptops removed, and stale-agent checks will stop for this user. Issue a new token to re-enable the agent.",
+      )
+    ) {
+      return;
+    }
+    setDeregistering(true);
+    setActionError(null);
+    const response = await fetch(`/api/admin/users/${userId}/agent-deregister`, {
+      method: "POST",
+    });
+    setDeregistering(false);
+    if (!response.ok) {
+      setActionError("Failed to deregister agent");
+      return;
+    }
+    await load(monthKey);
   }
 
   useEffect(() => {
@@ -424,9 +447,28 @@ export function AdminUserReport({
       <section className="card p-6">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-medium">Agent pulse</h3>
-          <span className="text-xs text-muted">
-            Expected agent version: {data.serverAgentVersion}
-          </span>
+          <div className="flex flex-wrap items-center gap-3">
+            {data.user.agentDeregisteredAt ? (
+              <span className="text-xs text-muted">
+                Agent deregistered{" "}
+                {new Date(data.user.agentDeregisteredAt).toLocaleString("en-IN", {
+                  timeZone: data.user.timezone,
+                })}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void deregisterAgent()}
+                disabled={deregistering}
+                className="text-xs text-red-400 hover:underline disabled:opacity-50"
+              >
+                {deregistering ? "Deregistering..." : "Deregister agent"}
+              </button>
+            )}
+            <span className="text-xs text-muted">
+              Expected agent version: {data.serverAgentVersion}
+            </span>
+          </div>
         </div>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
           <div>

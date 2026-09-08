@@ -215,6 +215,12 @@ export async function getLifecycleEventsForUser(userId: string, limit = 20) {
 }
 
 export async function userHasActiveInstalledDevice(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { agentDeregisteredAt: true },
+  });
+  if (user?.agentDeregisteredAt) return false;
+
   const devices = await prisma.agentDevice.findMany({
     where: { userId },
     select: { id: true, lastSeenAt: true, uninstalledAt: true },

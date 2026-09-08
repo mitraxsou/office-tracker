@@ -7,6 +7,7 @@ import crypto from "node:crypto";
 import { encryptPendingToken, decryptPendingToken } from "./token-crypto";
 import { buildInstallCommand, buildUpdateCommand } from "./agent-branding";
 import { isTokenExpired, revokeExpiredPendingTokens } from "./token-expiry";
+import { clearAgentDeregistration } from "./agent-deregister";
 import type { InstallTokenForUser } from "./install-token-types";
 import { isBreakglassEmail } from "./breakglass-shared";
 
@@ -283,6 +284,7 @@ export async function issueAgentToken(
   userId: string,
   opts?: { label?: string; issuedById?: string | null },
 ) {
+  await clearAgentDeregistration(userId);
   const plainToken = generateAgentToken();
   const record = await createAgentTokenRecord(userId, plainToken, opts);
   return { record, plainToken };
