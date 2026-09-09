@@ -38,7 +38,7 @@ describe("compliance exemption validation", () => {
         hasApprovedMonth: false,
         hasApprovedDay: false,
       }),
-    ).toBe("Cannot request exemption for a future month");
+    ).toBe("Cannot notify admin about an HR exemption for a future month");
   });
 
   it("allows valid month exemption submission", () => {

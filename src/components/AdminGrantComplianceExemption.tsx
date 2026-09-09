@@ -33,7 +33,7 @@ export function AdminGrantComplianceExemption({ userId }: { userId: string }) {
     setLoading(false);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      setError(data.error ?? "Failed to grant exemption");
+      setError(data.error ?? "Failed to log exemption");
       return;
     }
 
@@ -46,9 +46,10 @@ export function AdminGrantComplianceExemption({ userId }: { userId: string }) {
 
   return (
     <section className="card p-6">
-      <h2 className="mb-1 text-lg font-medium">Grant compliance exemption</h2>
+      <h2 className="mb-1 text-lg font-medium">Log HR exemption</h2>
       <p className="mb-4 text-sm text-muted">
-        Approve an HR exemption directly for this user (whole month or single day).
+        Record an HR exemption for this user (whole month or single day). Use when the user has HR
+        approval.
       </p>
       <form onSubmit={handleGrant} className="space-y-3">
         <div className="flex flex-wrap gap-4 text-sm">
@@ -105,9 +106,9 @@ export function AdminGrantComplianceExemption({ userId }: { userId: string }) {
           />
         </label>
         {error && <p className="text-sm text-red-400">{error}</p>}
-        {success && <p className="text-sm text-green-400">Exemption granted.</p>}
+        {success && <p className="text-sm text-green-400">HR exemption logged.</p>}
         <button type="submit" disabled={loading} className="btn-primary px-4 py-2 text-sm disabled:opacity-50">
-          {loading ? "Granting..." : "Grant exemption"}
+          {loading ? "Logging..." : "Log exemption"}
         </button>
       </form>
     </section>

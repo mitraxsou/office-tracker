@@ -388,6 +388,12 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           <strong>History</strong> lists past visits. <strong>Reports</strong> shows weekly summaries for
           your own data.
         </p>
+        <h3 className="text-sm font-medium">HR exemptions on the year calendar</h3>
+        <p className="text-sm text-muted">
+          If you have HR approval for a month or day you could not meet the office target, click that
+          month on the year compliance calendar and use <strong>Notify admin</strong>. An admin will log
+          the exemption after verification. The month shows as compliant only after it is logged.
+        </p>
       </section>
 
       <section className="card space-y-4 p-6">
@@ -578,7 +584,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
               View org-wide compliance on the admin calendar and day reports. Drill into a user from
               the user table.
             </li>
-            <li>Approve laptop removal, visit corrections, timezone changes, and compliance exemptions.</li>
+            <li>Approve laptop removal, visit corrections, timezone changes, and log HR exemptions.</li>
             <li>Send custom Teams or in-app notifications from a user&apos;s admin profile.</li>
           </ul>
         </section>

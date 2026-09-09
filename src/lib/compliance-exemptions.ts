@@ -97,13 +97,13 @@ export function validateComplianceExemptionSubmission(params: {
       return "Invalid monthKey (expected YYYY-MM)";
     }
     if (params.monthKey > params.currentMonthKey) {
-      return "Cannot request exemption for a future month";
+      return "Cannot notify admin about an HR exemption for a future month";
     }
     if (params.hasOpenMonthRequest) {
-      return "You already have a pending exemption request for this month";
+      return "You already have a pending HR exemption notification for this month";
     }
     if (params.hasApprovedMonth) {
-      return "This month already has an approved exemption";
+      return "An HR exemption is already logged for this month";
     }
     return null;
   }
@@ -112,13 +112,13 @@ export function validateComplianceExemptionSubmission(params: {
     return "Invalid dayKey (expected YYYY-MM-DD)";
   }
   if (params.dayKey > params.currentDayKey) {
-    return "Cannot request exemption for a future day";
+    return "Cannot notify admin about an HR exemption for a future day";
   }
   if (params.hasOpenDayRequest) {
-    return "You already have a pending exemption request for this day";
+    return "You already have a pending HR exemption notification for this day";
   }
   if (params.hasApprovedDay) {
-    return "This day already has an approved exemption";
+    return "An HR exemption is already logged for this day";
   }
   return null;
 }

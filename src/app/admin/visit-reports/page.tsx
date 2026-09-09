@@ -22,7 +22,7 @@ export default async function AdminVisitReportsPage() {
         <div>
           <h1 className="text-2xl font-semibold">User requests</h1>
           <p className="text-sm text-muted">
-            Visit corrections, timezone changes, profile changes, compliance exemptions, and laptop removal requests.
+            Visit corrections, timezone changes, profile changes, HR exemption notifications, and laptop removal requests.
           </p>
         </div>
         <AdminSubNav active="corrections" />

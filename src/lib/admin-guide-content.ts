@@ -89,7 +89,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         ordered: true,
         items: [
           "Open Admin reports. Check summary cards: in-office now, attended today, met target %, stale exclusions.",
-          "Review the Inbox for open user requests (visit corrections, timezone, profile, exemptions, laptop removal).",
+          "Review the Inbox for open user requests (visit corrections, timezone, profile, HR exemptions, laptop removal).",
           "Scan Agent follow-up panel for stale agents or users who need a nudge.",
           "Approve or deny pending requests on the Corrections page within 1 business day.",
         ],
@@ -273,7 +273,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
           "Reset password: issues a temporary password; user must change it on next login.",
           "Notifications and OOO: custom Teams/in-app message, out-of-office days, agent grace extension, alert channel prefs.",
           "Visit manager: add, edit, or delete visits on the user report.",
-          "Grant compliance exemption: admin can grant month or day exemptions without a user request.",
+          "Log HR exemption: admin can log month or day exemptions without a user notification.",
         ],
       },
       {
@@ -322,7 +322,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
           "Visit correction: user disputes hours or missing visit. Review message, approve with edit, or deny.",
           "Timezone change: user requests a new IANA timezone. Approve to apply or deny.",
           "Profile change: user requests name or email update. Approve or deny.",
-          "Compliance exemption: user requests month or day exemption from targets. Approve or deny (unless auto-approve is on).",
+          "HR exemption: user notifies admin they have HR approval for a month or day. Log the exemption after verification (unless auto-log is on).",
           "Laptop removal: user wants a device de-registered. Approve removes device and frees a token slot.",
         ],
       },
@@ -393,7 +393,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         items: [
           "Timezone: applies IANA timezone to future day boundaries for that user.",
           "Profile: updates name or email on approval.",
-          "Compliance exemption: month-level or day-level exemption from targets.",
+          "HR exemption: month-level or day-level exemption logged by admin after user notification.",
           "Device removal: unbinds serial; user can install again with a new token.",
         ],
       },
@@ -405,8 +405,8 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
             fix: "Hard refresh user dashboard. Confirm visit dates overlap the corrected day in user timezone. Check for overlapping visits.",
           },
           {
-            problem: "Cannot approve exemption",
-            fix: "User may already have an active exemption. Check user report compliance section.",
+            problem: "Cannot log exemption",
+            fix: "User may already have an active exemption logged. Check user report compliance section.",
           },
         ],
       },
@@ -495,13 +495,13 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       },
       {
         type: "subheading",
-        text: "Compliance exemptions toggle",
+        text: "HR exemption workflow toggle",
       },
       {
         type: "list",
         items: [
-          "When on, user exemption requests need admin approval.",
-          "When off, month and day exemption requests auto-approve.",
+          "When on, users must wait for admin to log HR exemptions after notifying.",
+          "When off, month and day notifications are auto-logged without admin review.",
         ],
       },
       {

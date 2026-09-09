@@ -108,7 +108,7 @@ export async function getAdminInbox(): Promise<{
       ),
     ),
     ...exemptions.map((row) =>
-      item("compliance_exemption", "Compliance exemption", row.type, row),
+      item("compliance_exemption", "HR exemption", row.type, row),
     ),
     ...removals.map((row) =>
       item("device_removal", "Laptop removal", row.device.serialNumber, row),

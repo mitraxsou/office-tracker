@@ -25,7 +25,7 @@ function describeRequest(r: ExemptionRequest) {
   if (r.type === "day" && r.dayKey) {
     return `Single day: ${r.dayKey}`;
   }
-  return "Compliance exemption";
+  return "HR exemption notification";
 }
 
 export function AdminComplianceExemptionRequests() {
@@ -44,7 +44,7 @@ export function AdminComplianceExemptionRequests() {
     );
     setLoading(false);
     if (!res.ok) {
-      setError("Failed to load compliance exemption requests");
+      setError("Failed to load HR exemption notifications");
       return;
     }
     const data = await res.json();
@@ -79,10 +79,10 @@ export function AdminComplianceExemptionRequests() {
     <section className="card p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-medium">Compliance exemption requests</h2>
+          <h2 className="text-lg font-medium">HR exemption notifications</h2>
           <p className="text-sm text-muted">
-            HR exemptions for whole months or individual days. Approved exemptions count toward year
-            compliance.
+            Users notify you when they have HR approval for a month or day. Log the exemption after
+            verification so their compliance view updates.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -106,7 +106,7 @@ export function AdminComplianceExemptionRequests() {
       {loading && <p className="text-sm text-muted">Loading...</p>}
       {error && <p className="text-sm text-red-400">{error}</p>}
       {!loading && requests.length === 0 && (
-        <p className="text-sm text-muted">No requests in this filter.</p>
+        <p className="text-sm text-muted">No notifications in this filter.</p>
       )}
 
       <ul className="space-y-4">
@@ -123,7 +123,7 @@ export function AdminComplianceExemptionRequests() {
                 <p className="mt-1 text-muted">{describeRequest(r)}</p>
                 {r.message && <p className="mt-2">{r.message}</p>}
                 <p className="mt-1 text-xs text-muted">
-                  Requested {new Date(r.createdAt).toLocaleString("en-IN")}
+                  Notified {new Date(r.createdAt).toLocaleString("en-IN")}
                   {r.reviewedAt && (
                     <>
                       {" "}
@@ -166,7 +166,7 @@ export function AdminComplianceExemptionRequests() {
                         onClick={() => resolveRequest(r.id, "approved")}
                         className="btn-primary px-3 py-1 text-xs"
                       >
-                        Approve exemption
+                        Log exemption
                       </button>
                       <button
                         type="button"
@@ -193,7 +193,7 @@ export function AdminComplianceExemptionRequests() {
                     onClick={() => setResolvingId(r.id)}
                     className="text-xs text-accent hover:underline"
                   >
-                    Review request
+                    Review and log
                   </button>
                 )}
               </div>

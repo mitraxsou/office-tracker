@@ -31,7 +31,7 @@ export const MAINTENANCE_TABLE_LABELS: Record<MaintenanceTable, string> = {
   resolved_device_removals: "Resolved device removal requests",
   resolved_timezone_requests: "Resolved timezone requests",
   resolved_profile_changes: "Resolved profile change requests",
-  resolved_compliance_exemptions: "Resolved compliance exemption requests",
+  resolved_compliance_exemptions: "Resolved HR exemption notifications",
   past_out_of_office: "Past out-of-office ranges",
 };
 

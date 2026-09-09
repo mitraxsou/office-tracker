@@ -40,16 +40,17 @@ export function AdminComplianceExemptionControls({
 
   return (
     <section className="card p-6">
-      <h2 className="mb-1 text-lg font-medium">Compliance exemptions</h2>
+      <h2 className="mb-1 text-lg font-medium">HR exemption workflow</h2>
       <p className="mb-4 text-sm text-muted">
-        Control whether HR exemption requests need admin approval or apply immediately.
+        Control whether users must wait for admin to log HR exemptions, or exemptions apply
+        immediately when notified.
       </p>
 
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="font-medium">Compliance exemptions require admin approval</p>
+          <p className="font-medium">HR exemptions require admin to log</p>
           <p className="mt-1 text-sm text-muted">
-            When off, month and day exemption requests are auto-approved for the requester.
+            When off, month and day notifications are auto-logged for the user without admin review.
           </p>
         </div>
         <button

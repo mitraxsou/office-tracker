@@ -172,7 +172,7 @@ export function yearMonthTooltipText(
 ): string {
   const label = formatMonthLabel(month.monthKey, timezone);
   if (month.hasPendingExemption) {
-    return `${label}: Exemption request pending`;
+    return `${label}: HR exemption pending admin review`;
   }
   const visual = getYearMonthVisualStatus(month, currentMonthKey);
   if (visual === "pending") {
@@ -189,7 +189,7 @@ export function yearMonthTooltipText(
   }
   if (visual === "compliant") {
     if (month.status === "exemption") {
-      return `${label}: Compliant via admin exemption (${month.qualifyingDays}/${month.monthlyDaysTarget} qualifying days)`;
+      return `${label}: Compliant (HR exemption logged by admin, ${month.qualifyingDays}/${month.monthlyDaysTarget} qualifying days)`;
     }
     return `${label}: Compliant (${month.qualifyingDays}/${month.monthlyDaysTarget} qualifying days)`;
   }

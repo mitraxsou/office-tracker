@@ -137,7 +137,7 @@ export function YearComplianceMeter({ compliance, timezone, hoursTarget }: YearC
     setSubmitting(false);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      setError(data.error ?? "Failed to submit request");
+      setError(data.error ?? "Failed to notify admin");
       return;
     }
     setSelectedMonth(null);
@@ -184,8 +184,8 @@ export function YearComplianceMeter({ compliance, timezone, hoursTarget }: YearC
         <div>
           <p className="text-sm font-medium">Year compliance ({compliance.fiscalYearLabel})</p>
           <p className="mt-1 text-xs text-muted">
-            {targetDays} qualifying days per month. Green = met target or admin exemption. Empty
-            months do not count as compliant.
+            {targetDays} qualifying days per month. Green = met target or HR exemption logged by
+            admin. Click a month to view details or notify admin of an HR exemption you already have.
           </p>
         </div>
         <span
@@ -232,7 +232,7 @@ export function YearComplianceMeter({ compliance, timezone, hoursTarget }: YearC
                       type="button"
                       onClick={() => cancelRequest(pending.id)}
                       className="text-center text-[10px] text-amber-300 hover:underline"
-                      title="Cancel pending exemption request"
+                      title="Cancel pending HR exemption notification"
                     >
                       Cancel
                     </button>
@@ -308,7 +308,11 @@ export function YearComplianceMeter({ compliance, timezone, hoursTarget }: YearC
           {canRequestExemption && (
             <div className="mt-4 border-t border-[var(--border)] pt-4">
               <p className="text-sm font-medium">
-                Request HR exemption for {formatMonthLabel(selectedMonth, timezone)}
+                Notify admin of HR exemption for {formatMonthLabel(selectedMonth, timezone)}
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                If you have HR approval for this month or day, tell admin so they can log it here.
+                This month will show as compliant only after admin logs the exemption.
               </p>
               <div className="mt-3 flex flex-wrap gap-3 text-sm">
                 <label className="flex items-center gap-2">
@@ -342,13 +346,13 @@ export function YearComplianceMeter({ compliance, timezone, hoursTarget }: YearC
                 </label>
               )}
               <label className="mt-3 block text-sm">
-                <span className="text-muted">Reason (optional)</span>
+                <span className="text-muted">Details for admin (optional)</span>
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   rows={2}
                   className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-                  placeholder="e.g. client travel, medical leave"
+                  placeholder="e.g. approved leave reference, client travel dates"
                 />
               </label>
               {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
@@ -359,7 +363,7 @@ export function YearComplianceMeter({ compliance, timezone, hoursTarget }: YearC
                   onClick={() => void submitRequest()}
                   className="btn-primary px-3 py-1.5 text-sm disabled:opacity-50"
                 >
-                  {submitting ? "Submitting..." : "Submit exemption request"}
+                  {submitting ? "Submitting..." : "Notify admin"}
                 </button>
               </div>
             </div>
