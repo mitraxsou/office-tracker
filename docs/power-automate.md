@@ -46,15 +46,17 @@ Save the flow once. Copy the generated HTTP POST URL into the Vercel environment
 
 ## 2. Set the header secret
 
-**Recommended (Vercel):** set `POWER_AUTOMATE_WEBHOOK_SECRET` in the Vercel project environment (Production scope). Office Pulse sends this value in the `X-Office-Pulse-Token` header. It is independent of `AUTH_SECRET`, so rotating session secrets does not break OTP or Teams notifications.
+Set `POWER_AUTOMATE_WEBHOOK_SECRET` in the Vercel project environment (Production scope on both `office-tracker` and `office-tracker-dev`). Office Pulse sends this value in the `X-Office-Pulse-Token` header for OTP login and all Teams alert webhooks. It is independent of `AUTH_SECRET`, so rotating session secrets does not break notifications.
+
+For the pilot, both dev and prod can share the same Power Automate flow URL and secret (see [deploy-branches.md](deploy-branches.md)).
 
 1. Generate a 64-character hex secret (for example `openssl rand -hex 32`).
-2. Add it as `POWER_AUTOMATE_WEBHOOK_SECRET` on Vercel.
+2. Add it as `POWER_AUTOMATE_WEBHOOK_SECRET` on both Vercel projects.
 3. Paste the same value into the Power Automate Condition below.
 
-**Optional fallback (Admin UI):** if the env var is unset, Office Pulse uses the active secret from **Admin > Global settings**. Generate one there, copy it once, and paste it into Power Automate. That copy is AES-encrypted in Postgres with `AUTH_SECRET`; rotating `AUTH_SECRET` without re-generating the admin secret will break dispatch until you fix one or the other.
+Local dev: set both `POWER_AUTOMATE_WEBHOOK_URL` and `POWER_AUTOMATE_WEBHOOK_SECRET` in `.env.local`.
 
-Generating a new admin secret revokes the previous active DB secret.
+The Admin UI no longer generates webhook secrets when the env var is set. Rotate by updating Vercel env and the Power Automate Condition.
 
 ## 3. Reject requests with the wrong secret
 

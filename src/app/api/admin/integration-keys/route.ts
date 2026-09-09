@@ -3,9 +3,13 @@ import { requireAdmin } from "@/lib/admin";
 import { logAuditEvent } from "@/lib/audit-log";
 import {
   createIntegrationApiKey,
+  isWebhookSecretEnvManaged,
   listIntegrationApiKeys,
   revokeIntegrationApiKey,
 } from "@/lib/integration-api-keys";
+
+const ENV_SECRET_MESSAGE =
+  "Webhook secrets are managed via POWER_AUTOMATE_WEBHOOK_SECRET in the Vercel project environment. Update the Power Automate Condition to match.";
 
 export async function GET() {
   const admin = await requireAdmin();
@@ -28,6 +32,10 @@ export async function POST(request: Request) {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  if (isWebhookSecretEnvManaged()) {
+    return NextResponse.json({ error: ENV_SECRET_MESSAGE }, { status: 400 });
   }
 
   const label = body.label?.trim();
@@ -60,6 +68,10 @@ export async function DELETE(request: Request) {
   const admin = await requireAdmin();
   if (!admin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (isWebhookSecretEnvManaged()) {
+    return NextResponse.json({ error: ENV_SECRET_MESSAGE }, { status: 400 });
   }
 
   const id = new URL(request.url).searchParams.get("id");

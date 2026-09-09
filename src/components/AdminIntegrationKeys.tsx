@@ -136,22 +136,24 @@ export function AdminIntegrationKeys({
 
   const activeKeys = keys.filter((k) => !k.revokedAt);
   const revokedKeys = keys.filter((k) => k.revokedAt);
-  const secretReady = envSecretConfigured || activeKeys.length > 0;
+  const secretReady = envSecretConfigured;
 
   return (
     <section className="card p-6">
       <h2 className="mb-2 text-lg font-medium">Power Automate webhook secret</h2>
       <p className="mb-4 text-sm text-muted">
-        Generate one shared secret for the Power Automate trigger Condition. My Office Pulse sends
-        the same value in <code className="rounded bg-[var(--border)] px-1">X-Office-Pulse-Token</code>.
-        The secret is shown once. Generating a new secret revokes the current one.
+        OTP sign-in and Teams alerts share one header secret. My Office Pulse sends it in{" "}
+        <code className="rounded bg-[var(--border)] px-1">X-Office-Pulse-Token</code>. Set{" "}
+        <code className="rounded bg-[var(--border)] px-1">POWER_AUTOMATE_WEBHOOK_SECRET</code> in
+        the Vercel project environment (dev and prod) and paste the same value into the Power
+        Automate Condition.
       </p>
 
       {envSecretConfigured && (
         <div className="mb-4 rounded-lg border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm text-green-200">
-          <span className="font-medium">POWER_AUTOMATE_WEBHOOK_SECRET</span> is set in the server
-          environment and takes precedence over any secret generated below. Update the Power
-          Automate Condition to match that value.
+          <span className="font-medium">POWER_AUTOMATE_WEBHOOK_SECRET</span> is configured in the
+          server environment. Secrets are managed in Vercel, not in this UI. To rotate, update the
+          env var on both Vercel projects and the Power Automate Condition.
         </div>
       )}
 
@@ -173,22 +175,29 @@ export function AdminIntegrationKeys({
         </button>
       </div>
 
-      <form onSubmit={handleGenerate} className="mb-6 flex flex-wrap items-end gap-3">
-        <label className="block min-w-[200px] flex-1 text-sm">
-          <span className="text-muted">Label</span>
-          <input
-            type="text"
-            required
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="Power Automate production"
-            className="mt-1 w-full rounded-lg border px-3 py-2"
-          />
-        </label>
-        <button type="submit" disabled={loading} className="btn-primary px-4 py-2 disabled:opacity-50">
-          {loading ? "Generating..." : "Generate new secret"}
-        </button>
-      </form>
+      {envSecretConfigured ? (
+        <p className="mb-6 text-sm text-muted">
+          Generate new secret is disabled while the env var is set. Use Vercel project settings to
+          change <span className="font-medium">POWER_AUTOMATE_WEBHOOK_SECRET</span>.
+        </p>
+      ) : (
+        <form onSubmit={handleGenerate} className="mb-6 flex flex-wrap items-end gap-3">
+          <label className="block min-w-[200px] flex-1 text-sm">
+            <span className="text-muted">Label</span>
+            <input
+              type="text"
+              required
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Power Automate production"
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+          <button type="submit" disabled={loading} className="btn-primary px-4 py-2 disabled:opacity-50">
+            {loading ? "Generating..." : "Generate new secret"}
+          </button>
+        </form>
+      )}
 
       {newKey && (
         <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4">
@@ -235,16 +244,15 @@ export function AdminIntegrationKeys({
             {activeKeys.length === 0 && !envSecretConfigured && (
               <tr>
                 <td colSpan={5} className="py-4 text-muted">
-                  No active secret. Set POWER_AUTOMATE_WEBHOOK_SECRET in Vercel, or generate one
-                  above and paste it into the Power Automate Condition.
+                  No active secret. Set POWER_AUTOMATE_WEBHOOK_SECRET in Vercel (or .env.local for
+                  local dev) and paste the same value into the Power Automate Condition.
                 </td>
               </tr>
             )}
             {activeKeys.length === 0 && envSecretConfigured && (
               <tr>
                 <td colSpan={5} className="py-4 text-muted">
-                  Using the server environment secret. DB-generated secrets below are optional
-                  fallbacks when the env var is unset.
+                  Using the server environment secret (POWER_AUTOMATE_WEBHOOK_SECRET).
                 </td>
               </tr>
             )}
@@ -255,14 +263,18 @@ export function AdminIntegrationKeys({
                 <td className="py-2 pr-4 text-muted">{formatDate(key.createdAt)}</td>
                 <td className="py-2 pr-4 text-muted">{formatDate(key.lastUsedAt)}</td>
                 <td className="py-2 text-right">
-                  <button
-                    type="button"
-                    disabled={revokingId === key.id}
-                    onClick={() => handleRevoke(key.id)}
-                    className="text-sm text-red-400 hover:text-red-300 disabled:opacity-50"
-                  >
-                    {revokingId === key.id ? "Revoking..." : "Revoke"}
-                  </button>
+                  {envSecretConfigured ? (
+                    <span className="text-xs text-muted">Legacy (inactive)</span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={revokingId === key.id}
+                      onClick={() => handleRevoke(key.id)}
+                      className="text-sm text-red-400 hover:text-red-300 disabled:opacity-50"
+                    >
+                      {revokingId === key.id ? "Revoking..." : "Revoke"}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

@@ -524,9 +524,9 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       {
         type: "list",
         items: [
-          "Set POWER_AUTOMATE_WEBHOOK_SECRET in Vercel (recommended) or generate X-Office-Pulse-Token secret in Global settings.",
+          "Set POWER_AUTOMATE_WEBHOOK_SECRET in Vercel on both dev and prod projects.",
           "Webhook URL lives in POWER_AUTOMATE_WEBHOOK_URL env (never shown in UI).",
-          "Env secret takes precedence over any DB-generated secret.",
+          "Secrets are env-only; the Generate new secret button is disabled when the env var is set.",
           "Send test notification to your admin email.",
         ],
       },
@@ -610,8 +610,8 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         type: "list",
         ordered: true,
         items: [
-          "Set POWER_AUTOMATE_WEBHOOK_URL in Vercel to your HTTP trigger URL.",
-          "Set POWER_AUTOMATE_WEBHOOK_SECRET in Vercel (recommended), or generate a webhook secret in Global settings.",
+          "Set POWER_AUTOMATE_WEBHOOK_URL in Vercel to your HTTP trigger URL (both dev and prod projects).",
+          "Set POWER_AUTOMATE_WEBHOOK_SECRET in Vercel (required; same value in Power Automate Condition).",
           "In Power Automate, add a Condition on trigger header X-Office-Pulse-Token equals your secret.",
           "Parse JSON body fields (alert type, user email, message) in subsequent steps.",
           "Send test notification from Global settings to verify.",
@@ -887,7 +887,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
           "Sign in with breakglass. Re-seed office SSIDs and targets if reset.",
           "Re-create pilot users or re-enable OTP self-registration temporarily.",
           "Have users re-install agent with new tokens after a full reset.",
-          "Set or rotate POWER_AUTOMATE_WEBHOOK_SECRET in Vercel and update the PA Condition (or re-generate an admin DB secret if env is unset).",
+          "Set or rotate POWER_AUTOMATE_WEBHOOK_SECRET in Vercel (both projects) and update the PA Condition.",
         ],
       },
       {

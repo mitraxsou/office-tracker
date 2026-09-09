@@ -3,6 +3,7 @@ import {
   decryptIntegrationSecret,
   encryptIntegrationSecret,
   generateIntegrationApiKey,
+  getActiveIntegrationSecret,
 } from "../src/lib/integration-api-keys";
 import { dispatchAlert, postWebhookPayload } from "../src/lib/power-automate-notify";
 import type { IntegrationAlert } from "../src/lib/integration-alerts";
@@ -126,6 +127,16 @@ describe("Power Automate webhook secrets", () => {
     expect(body.otp).toBe("123456");
     expect(body).not.toHaveProperty("notifyEmail");
     expect(body).not.toHaveProperty("dashboardUrl");
+  });
+
+  it("returns null from getActiveIntegrationSecret when env is unset", async () => {
+    expect(await getActiveIntegrationSecret()).toBeNull();
+  });
+
+  it("reads secret from POWER_AUTOMATE_WEBHOOK_SECRET env only", async () => {
+    process.env.POWER_AUTOMATE_WEBHOOK_SECRET = "env-only-secret";
+    const active = await getActiveIntegrationSecret();
+    expect(active).toMatchObject({ secret: "env-only-secret", id: "env" });
   });
 
   it("uses POWER_AUTOMATE_WEBHOOK_SECRET env without calling getSecret", async () => {

@@ -69,8 +69,8 @@ Dev project vars are on **Production** scope of `office-tracker-dev` (that proje
 | `RUN_DB_SETUP_ON_DEPLOY` | Production only | `true` during pilot; set `false` when schema is stable |
 | `SCHEMA_AUTO_MIGRATE` | Production only | Set `false` on prod to skip startup ALTER TABLE block (saves cold-start CPU) |
 | `BREAKGLASS_*`, `ALLOW_REGISTRATION`, `DEFAULT_OFFICE_SSIDS` | Production only | Same as before |
-| `POWER_AUTOMATE_WEBHOOK_URL` | Production only | OTP / Teams |
-| `POWER_AUTOMATE_WEBHOOK_SECRET` | Production only | `X-Office-Pulse-Token` header (recommended; survives AUTH_SECRET rotation) |
+| `POWER_AUTOMATE_WEBHOOK_URL` | Production only | OTP / Teams (shared PA flow URL) |
+| `POWER_AUTOMATE_WEBHOOK_SECRET` | Production only | `X-Office-Pulse-Token` header (required; survives AUTH_SECRET rotation) |
 
 ### `office-tracker-dev` (dev project)
 
@@ -82,8 +82,8 @@ Dev project vars are on **Production** scope of `office-tracker-dev` (that proje
 | `RUN_DB_SETUP_ON_DEPLOY` | Production | `true` (schema + seed on deploy) |
 | `SCHEMA_AUTO_MIGRATE` | Production | unset (migrate on cold start); set `false` on prod when stable |
 | `BREAKGLASS_*` | Production | Copied for dev login testing |
-| `POWER_AUTOMATE_WEBHOOK_URL` | Production | Dev webhook URL (if testing Teams/OTP on dev) |
-| `POWER_AUTOMATE_WEBHOOK_SECRET` | Production | Dev header secret (can differ from prod) |
+| `POWER_AUTOMATE_WEBHOOK_URL` | Production | Same PA flow URL as prod (pilot shares one flow) |
+| `POWER_AUTOMATE_WEBHOOK_SECRET` | Production | Same header secret as prod (required for OTP/Teams on dev) |
 | `ALLOW_REGISTRATION`, `DEFAULT_OFFICE_SSIDS` | Production | Same values as prod |
 
 ## GitHub branch protection

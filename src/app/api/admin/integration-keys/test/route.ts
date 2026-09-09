@@ -15,7 +15,7 @@ export async function POST() {
   if (!result.sent) {
     const message =
       result.reason === "not_configured"
-        ? "Configure POWER_AUTOMATE_WEBHOOK_URL and POWER_AUTOMATE_WEBHOOK_SECRET (or generate an active DB secret)."
+        ? "Configure POWER_AUTOMATE_WEBHOOK_URL and POWER_AUTOMATE_WEBHOOK_SECRET in the Vercel project environment."
         : "Power Automate did not accept the test notification.";
     return NextResponse.json({ error: message }, { status: 502 });
   }

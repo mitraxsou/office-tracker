@@ -14,6 +14,11 @@ export function getPowerAutomateWebhookSecretFromEnv(): string | null {
   return secret || null;
 }
 
+/** True when webhook auth is managed via POWER_AUTOMATE_WEBHOOK_SECRET (required on Vercel). */
+export function isWebhookSecretEnvManaged(): boolean {
+  return getPowerAutomateWebhookSecretFromEnv() !== null;
+}
+
 function encryptionKey() {
   const secret = process.env.AUTH_SECRET;
   if (!secret || secret.length < 32) {
@@ -101,23 +106,8 @@ export async function getActiveIntegrationSecret(): Promise<{
   secret: string;
 } | null> {
   const envSecret = getPowerAutomateWebhookSecretFromEnv();
-  if (envSecret) {
-    return { id: ENV_WEBHOOK_SECRET_ID, actorId: ENV_WEBHOOK_SECRET_ID, secret: envSecret };
-  }
-
-  const record = await prisma.integrationApiKey.findFirst({
-    where: {
-      revokedAt: null,
-      encryptedSecret: { not: null },
-    },
-    orderBy: { createdAt: "desc" },
-    select: { id: true, createdById: true, encryptedSecret: true },
-  });
-  if (!record?.encryptedSecret) return null;
-
-  const secret = decryptIntegrationSecret(record.encryptedSecret);
-  if (!secret) return null;
-  return { id: record.id, actorId: record.createdById, secret };
+  if (!envSecret) return null;
+  return { id: ENV_WEBHOOK_SECRET_ID, actorId: ENV_WEBHOOK_SECRET_ID, secret: envSecret };
 }
 
 export async function markIntegrationSecretUsed(id: string) {
