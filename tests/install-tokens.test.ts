@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { revealStoredPendingToken, persistPendingTokenEnc } from "../src/lib/auth";
-import { encryptPendingToken } from "../src/lib/token-crypto";
+import {
+  backfillInstallTokenEncIfNeeded,
+  revealStoredPendingToken,
+  persistPendingTokenEnc,
+} from "../src/lib/auth";
+import { decryptPendingToken, encryptPendingToken } from "../src/lib/token-crypto";
 import {
   buildInstallCommand,
   buildInstallCommandFromLocalConfig,
@@ -104,6 +108,75 @@ describe("persistPendingTokenEnc", () => {
 
     expect(ok).toBe(true);
     expect(prisma.agentToken.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("backfillInstallTokenEncIfNeeded", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("persists encrypted copy when legacy token has no pendingTokenEnc", async () => {
+    const plain = `${"g".repeat(8)}${"h".repeat(56)}`;
+    vi.mocked(prisma.agentToken.findFirst).mockResolvedValue({
+      id: "tok-3",
+      pendingTokenEnc: null,
+      boundSerialNumber: "PG04YGZF",
+      revokedAt: null,
+      expiresAt: null,
+    } as never);
+    vi.mocked(prisma.agentToken.update).mockResolvedValue({} as never);
+
+    await backfillInstallTokenEncIfNeeded("user-1", plain, {
+      pendingTokenEnc: null,
+      boundSerialNumber: "PG04YGZF",
+      revokedAt: null,
+      expiresAt: null,
+    });
+
+    expect(prisma.agentToken.update).toHaveBeenCalled();
+  });
+
+  it("skips backfill when encrypted copy already exists", async () => {
+    const plain = `${"i".repeat(8)}${"j".repeat(56)}`;
+    const enc = encryptPendingToken(plain);
+
+    await backfillInstallTokenEncIfNeeded("user-1", plain, {
+      pendingTokenEnc: enc,
+      boundSerialNumber: "PG04YGZF",
+      revokedAt: null,
+      expiresAt: null,
+    });
+
+    expect(prisma.agentToken.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("post-backfill install commands", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("enables plain-token install command after persistPendingTokenEnc", async () => {
+    const plain = `${"k".repeat(8)}${"l".repeat(56)}`;
+    vi.mocked(prisma.agentToken.findFirst).mockResolvedValue({
+      id: "tok-4",
+      pendingTokenEnc: null,
+      boundSerialNumber: "PG04YGZF",
+      revokedAt: null,
+      expiresAt: null,
+    } as never);
+    vi.mocked(prisma.agentToken.update).mockResolvedValue({} as never);
+
+    await persistPendingTokenEnc("user-1", plain);
+
+    const enc = vi.mocked(prisma.agentToken.update).mock.calls[0]?.[0].data
+      .pendingTokenEnc as string;
+    const revealed = decryptPendingToken(enc);
+    expect(revealed).toBe(plain);
+    const command = buildInstallCommand("https://office.example", revealed!);
+    expect(command).toContain(`-Token "${plain}"`);
+    expect(command).not.toContain("config.json");
   });
 });
 

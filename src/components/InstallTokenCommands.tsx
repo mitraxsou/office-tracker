@@ -119,9 +119,10 @@ export function InstallTokenCommands({
             )}
             {t.usesLocalConfig && (
               <p className="mt-2 text-xs text-muted">
-                These commands reuse your existing token from{" "}
-                <code>{AGENT_INSTALL_DIR}\config.json</code> on this laptop. No token change is
-                required.
+                Showing commands from your laptop{" "}
+                <code>{AGENT_INSTALL_DIR}\config.json</code> until your agent sends its next
+                heartbeat (~2 min). Refresh this page afterward to copy commands with your full
+                token from the server.
               </p>
             )}
 

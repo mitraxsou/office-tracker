@@ -455,6 +455,21 @@ export async function getInstallTokensForUser(
   return state.installTokens;
 }
 
+/** Backfill encrypted install copy from a verified plain token (e.g. agent heartbeat). */
+export async function backfillInstallTokenEncIfNeeded(
+  userId: string,
+  plainToken: string,
+  tokenRow: {
+    pendingTokenEnc: string | null;
+    boundSerialNumber: string | null;
+    revokedAt: Date | null;
+    expiresAt?: Date | null;
+  },
+): Promise<void> {
+  if (revealStoredPendingToken(tokenRow)) return;
+  await persistPendingTokenEnc(userId, plainToken);
+}
+
 /** Save or refresh encrypted install token copy when plain token is available (e.g. OTP signup cookie). */
 export async function persistPendingTokenEnc(userId: string, plainToken: string): Promise<boolean> {
   if (plainToken.length < 16) return false;

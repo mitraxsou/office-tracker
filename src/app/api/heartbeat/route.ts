@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getUserByAgentToken } from "@/lib/auth";
+import { backfillInstallTokenEncIfNeeded, getUserByAgentToken } from "@/lib/auth";
 import {
   authenticateAgentToken,
   bindAgentTokenToSerial,
@@ -47,6 +47,12 @@ export async function POST(request: Request) {
   const auth = await authenticateAgentToken(token);
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
+  try {
+    await backfillInstallTokenEncIfNeeded(auth.userId, token, auth.agentToken);
+  } catch {
+    console.error("[heartbeat] Failed to backfill pendingTokenEnc");
   }
 
   const bindResult = await bindAgentTokenToSerial(auth.agentTokenId, serialNumber);
