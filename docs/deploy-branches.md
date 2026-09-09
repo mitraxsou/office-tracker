@@ -9,6 +9,27 @@ Office Pulse uses **two Vercel projects** and **two Git branches** so developmen
 
 The legacy `main` branch is frozen at the same commit as `dev` / `production` when the split was created. Do not deploy from `main`.
 
+## Manual step required (one-time)
+
+Vercel's public REST API does **not** reliably change `link.productionBranch` (POST `/link` returns 200 but keeps `main`). Set this in the dashboard:
+
+1. Open [office-tracker settings](https://vercel.com/soumitra-pwc/office-tracker/settings/git) → **Git** → **Production Branch** → set to **`production`** → Save.
+2. Open [office-tracker-dev settings](https://vercel.com/soumitra-pwc/office-tracker-dev/settings/git) → **Git** → **Production Branch** → set to **`dev`** → Save.
+
+Until step 2 is done, pushes to `dev` will not auto-deploy. Trigger manually:
+
+```powershell
+$env:NODE_TLS_REJECT_UNAUTHORIZED = "0"
+# Creates a production deployment of office-tracker-dev from the dev branch
+curl.exe -sS --ssl-no-revoke -X POST "https://api.vercel.com/v13/deployments?teamId=team_3LPxagkp9owYBE8nVXkQAg7H" `
+  -H "Authorization: Bearer $env:VERCEL_TOKEN" -H "Content-Type: application/json" `
+  --data-binary '{"name":"office-tracker-dev","project":"prj_8e1WU41N2AV7BIaKDydrmeQ6oL2x","target":"production","gitSource":{"type":"github","org":"mitraxsou","repo":"office-tracker","ref":"dev","repoId":1348589415}}'
+```
+
+Or: **Deployments** → **Create Deployment** → branch **`dev`**.
+
+**Verified (2026-09-09):** https://office-tracker-dev.vercel.app/login returns HTTP 200. Dev Neon host is separate from prod (`ep-hidden-recipe-*` vs `ep-cool-mountain-*`).
+
 ## Day-to-day workflow
 
 1. **Feature work** - branch from `dev`, open PR into `dev`.
@@ -26,15 +47,7 @@ Do not merge to `production` without explicit approval.
 | Framework | Next.js | Next.js |
 | Team | `soumitra-pwc` | `soumitra-pwc` |
 
-To change the production branch via API (undocumented but used by the dashboard):
-
-```powershell
-$env:NODE_TLS_REJECT_UNAUTHORIZED = "0"
-# PATCH https://api.vercel.com/v9/projects/{projectId}/branch?teamId=team_3LPxagkp9owYBE8nVXkQAg7H
-# Body: {"branch":"production"} or {"branch":"dev"}
-```
-
-Or: Project Settings - Environments - Production - Branch Tracking.
+Use the dashboard (see **Manual step required** above). Do not rely on `PATCH /v9/projects/{id}` or `POST /link` with `productionBranch` alone; those calls did not change the branch in testing.
 
 ## Databases (Vercel Storage only)
 
@@ -44,7 +57,7 @@ Both databases were created with the Vercel CLI Neon integration (no manual Neon
 $env:NODE_TLS_REJECT_UNAUTHORIZED = "0"
 $env:VERCEL_PROJECT_ID = "prj_8e1WU41N2AV7BIaKDydrmeQ6oL2x"   # office-tracker-dev
 $env:VERCEL_ORG_ID = "team_3LPxagkp9owYBE8nVXkQAg7H"
-npx vercel integration add neon -e production -m region=iad1 -m auth=false --plan free_v3 --name office-tracker-dev-db
+npx vercel integration add neon -e production -m region=sin1 -m auth=false --plan free_v3 --name office-tracker-dev-db
 ```
 
 Production keeps the existing resource **`neon-canary-blanket`** on **`office-tracker`**. All `POSTGRES_*`, `DATABASE_*`, `PG*`, and `NEON_*` vars on that project are scoped to **Production only** (Preview has no DB credentials).
@@ -59,7 +72,7 @@ Dev project vars are on **Production** scope of `office-tracker-dev` (that proje
 |---|---|---|
 | `POSTGRES_*`, `DATABASE_*`, `PG*`, `NEON_*` | Production only | From Storage `neon-canary-blanket` |
 | `NEXT_PUBLIC_APP_URL` | Production only | `https://office-tracker-theta.vercel.app` |
-| `AUTH_SECRET` | Production only | Prod-only secret |
+| `AUTH_SECRET` | Production only | Prod-only secret (regenerated during split; users must sign in again) |
 | `RUN_DB_SETUP_ON_DEPLOY` | Production only | `true` during pilot |
 | `BREAKGLASS_*`, `ALLOW_REGISTRATION`, `DEFAULT_OFFICE_SSIDS` | Production only | Same as before |
 | `POWER_AUTOMATE_WEBHOOK_URL` | Production only | OTP / Teams |
