@@ -6,6 +6,7 @@ export const ADMIN_INBOX_KINDS = [
   "profile_change",
   "compliance_exemption",
   "device_removal",
+  "admin_contact",
 ] as const;
 
 export type AdminInboxKind = (typeof ADMIN_INBOX_KINDS)[number];
@@ -35,7 +36,7 @@ export async function getAdminInbox(): Promise<{
 }> {
   const { prisma } = await import("./db");
   const userSelect = { id: true, email: true, name: true } satisfies Prisma.UserSelect;
-  const [corrections, timezones, profiles, exemptions, removals] = await Promise.all([
+  const [corrections, timezones, profiles, exemptions, removals, adminContacts] = await Promise.all([
     prisma.visitCorrectionRequest.findMany({
       where: { status: "open" },
       select: { id: true, createdAt: true, message: true, user: { select: userSelect } },
@@ -69,6 +70,16 @@ export async function getAdminInbox(): Promise<{
         id: true,
         createdAt: true,
         device: { select: { serialNumber: true } },
+        user: { select: userSelect },
+      },
+    }),
+    prisma.adminContactSubmission.findMany({
+      where: { status: "open" },
+      select: {
+        id: true,
+        createdAt: true,
+        category: true,
+        message: true,
         user: { select: userSelect },
       },
     }),
@@ -113,6 +124,9 @@ export async function getAdminInbox(): Promise<{
     ...removals.map((row) =>
       item("device_removal", "Laptop removal", row.device.serialNumber, row),
     ),
+    ...adminContacts.map((row) =>
+      item("admin_contact", "Reach out to admin", `${row.category}: ${row.message.slice(0, 80)}`, row),
+    ),
   ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   const counts: AdminInboxCounts = {
@@ -121,6 +135,7 @@ export async function getAdminInbox(): Promise<{
     profile_change: profiles.length,
     compliance_exemption: exemptions.length,
     device_removal: removals.length,
+    admin_contact: adminContacts.length,
   };
 
   return { counts, total: totalAdminInboxCount(counts), items };

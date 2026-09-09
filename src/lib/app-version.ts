@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.0";
+export const APP_VERSION = "1.5.2";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,29 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-09-09",
+    userBullets: [
+      "Added global search from the nav bar with Ctrl+K.",
+      "Report a bug or request a feature from search quick actions.",
+    ],
+    adminBullets: [
+      "Search includes admin pages such as inbox, audit, and visit corrections.",
+    ],
+  },
+  {
+    version: "1.5.1",
+    date: "2026-09-09",
+    userBullets: [
+      "Added Contact pilot team for issues, concerns, or feedback.",
+      "You get an in-app notification when your message is answered.",
+    ],
+    adminBullets: [
+      "Added reach-out-to-admin queue on the User requests page with respond and resolve.",
+      "Open admin contact messages appear in the admin inbox.",
+    ],
+  },
+  {
+    version: "1.5.0",
     date: "2026-09-09",
     userBullets: [
       "Rebranded the app as My Office Pulse with a new pulse-style icon.",

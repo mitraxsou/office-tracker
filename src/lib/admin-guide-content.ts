@@ -370,7 +370,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       {
         type: "paragraph",
         text:
-          "The Corrections page (/admin/visit-reports) hosts all approval queues. Sections are anchored: timezone_change, profile_change, compliance_exemption, device_removal, visit_correction.",
+          "The Corrections page (/admin/visit-reports) hosts all approval queues. Sections are anchored: admin_contact, timezone_change, profile_change, compliance_exemption, device_removal, visit_correction.",
       },
       {
         type: "subheading",

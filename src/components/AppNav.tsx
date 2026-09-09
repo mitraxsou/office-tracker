@@ -14,6 +14,7 @@ import { APP_VERSION } from "@/lib/app-version";
 import { getAdminInbox } from "@/lib/admin-inbox";
 import { AdminNotificationCorner } from "@/components/AdminNotificationCorner";
 import { AdminImpersonatePicker } from "@/components/AdminImpersonatePicker";
+import { GlobalSearch } from "@/components/GlobalSearch";
 
 function NavLinks({ links, className }: { links: NavLink[]; className?: string }) {
   return (
@@ -76,6 +77,7 @@ export async function AppNav() {
     { href: "/reports", label: "Reports" },
     { href: "/history", label: "History" },
     { href: "/settings", label: "Settings" },
+    { href: "/contact-admin", label: "Contact admin" },
     ...(adminAccess ? [{ href: "/admin", label: "Admin" }] : []),
     { href: "/help", label: "Help" },
   ];
@@ -130,6 +132,7 @@ export async function AppNav() {
           </div>
 
           <div className="hidden min-w-0 items-center gap-3 md:flex">
+            <GlobalSearch isAdmin={adminAccess} />
             {adminToolsDesktop}
             <ThemeToggle />
             <Link href="/help#whats-new" className="shrink-0 text-xs text-muted hover:text-accent">
@@ -141,14 +144,17 @@ export async function AppNav() {
             <form action={logout}>{logoutButton}</form>
           </div>
 
-          <AppNavMobileMenu
-            links={navLinks}
-            userName={displayName}
-            userEmail={user.email}
-            version={APP_VERSION}
-            adminTools={adminToolsMobile}
-            logoutForm={logoutForm}
-          />
+          <div className="flex shrink-0 items-center gap-2 md:hidden">
+            <GlobalSearch isAdmin={adminAccess} />
+            <AppNavMobileMenu
+              links={navLinks}
+              userName={displayName}
+              userEmail={user.email}
+              version={APP_VERSION}
+              adminTools={adminToolsMobile}
+              logoutForm={logoutForm}
+            />
+          </div>
         </div>
       </nav>
     </>

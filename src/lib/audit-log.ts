@@ -56,7 +56,9 @@ export type AuditAction =
   | "otp_verify_failed"
   | "user_create_otp"
   | "terms.accepted"
-  | "legal.publish";
+  | "legal.publish"
+  | "admin_contact_submit"
+  | "admin_contact_resolve";
 
 export async function logAuditEvent(params: {
   actorId: string;

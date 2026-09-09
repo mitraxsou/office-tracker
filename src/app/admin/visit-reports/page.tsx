@@ -8,6 +8,7 @@ import { AdminComplianceExemptionRequests } from "@/components/AdminComplianceEx
 import { AdminDeviceRemovalRequests } from "@/components/AdminDeviceRemovalRequests";
 import { AdminTimezoneChangeRequests } from "@/components/AdminTimezoneChangeRequests";
 import { AdminProfileChangeRequests } from "@/components/AdminProfileChangeRequests";
+import { AdminContactSubmissions } from "@/components/AdminContactSubmissions";
 
 export default async function AdminVisitReportsPage() {
   const admin = await requireAdmin();
@@ -22,10 +23,12 @@ export default async function AdminVisitReportsPage() {
         <div>
           <h1 className="text-2xl font-semibold">User requests</h1>
           <p className="text-sm text-muted">
-            Visit corrections, timezone changes, profile changes, HR exemption notifications, and laptop removal requests.
+            Visit corrections, timezone changes, profile changes, HR exemption notifications, laptop
+            removal requests, and reach-out-to-admin messages.
           </p>
         </div>
         <AdminSubNav active="corrections" />
+        <div id="admin_contact" className="scroll-mt-6"><AdminContactSubmissions /></div>
         <div id="timezone_change" className="scroll-mt-6"><AdminTimezoneChangeRequests /></div>
         <div id="profile_change" className="scroll-mt-6"><AdminProfileChangeRequests /></div>
         <div id="compliance_exemption" className="scroll-mt-6"><AdminComplianceExemptionRequests /></div>

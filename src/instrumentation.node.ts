@@ -386,6 +386,27 @@ export async function registerNode() {
     await prisma.$executeRawUnsafe(
       'CREATE INDEX IF NOT EXISTS "ComplianceExemptionRequest_userId_dayKey_idx" ON "ComplianceExemptionRequest"("userId", "dayKey");'
     );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "AdminContactSubmission" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "category" TEXT NOT NULL,
+        "message" TEXT NOT NULL,
+        "status" TEXT NOT NULL DEFAULT 'open',
+        "adminResponse" TEXT,
+        "reviewedAt" TIMESTAMP(3),
+        "reviewedById" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "AdminContactSubmission_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "AdminContactSubmission_status_createdAt_idx" ON "AdminContactSubmission"("status", "createdAt");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "AdminContactSubmission_userId_idx" ON "AdminContactSubmission"("userId");'
+    );
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "allowOtpSelfRegistration" BOOLEAN NOT NULL DEFAULT true;'
     );
