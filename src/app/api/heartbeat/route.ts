@@ -19,8 +19,7 @@ import {
   sanitizeVpnGateway,
 } from "@/lib/security";
 import { recordDeviceScriptVersion } from "@/lib/agent-update";
-import { dispatchUserAlerts } from "@/lib/power-automate-notify";
-import { handleOfficePresenceDetected } from "@/lib/ooo-presence";
+import { maybeDispatchHeartbeatAlerts } from "@/lib/heartbeat-alerts";
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -108,11 +107,14 @@ export async function POST(request: Request) {
   });
 
   try {
-    if (result.inOffice) {
-      await handleOfficePresenceDetected(user.id, user.timezone, recordedAt);
-    } else {
-      await dispatchUserAlerts(user.id, ["hours_met"]);
-    }
+    const hoursTarget = await getUserHoursTarget(user);
+    await maybeDispatchHeartbeatAlerts({
+      userId: user.id,
+      timezone: user.timezone,
+      recordedAt,
+      inOffice: result.inOffice,
+      hoursTarget,
+    });
   } catch {
     console.error("[heartbeat] Failed to evaluate Power Automate notifications");
   }

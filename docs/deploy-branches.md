@@ -66,7 +66,8 @@ Dev project vars are on **Production** scope of `office-tracker-dev` (that proje
 | `POSTGRES_*`, `DATABASE_*`, `PG*`, `NEON_*` | Production only | From Storage `neon-canary-blanket` |
 | `NEXT_PUBLIC_APP_URL` | Production only | `https://office-tracker-theta.vercel.app` |
 | `AUTH_SECRET` | Production only | Prod-only secret (regenerated during split; users must sign in again) |
-| `RUN_DB_SETUP_ON_DEPLOY` | Production only | `true` during pilot |
+| `RUN_DB_SETUP_ON_DEPLOY` | Production only | `true` during pilot; set `false` when schema is stable |
+| `SCHEMA_AUTO_MIGRATE` | Production only | Set `false` on prod to skip startup ALTER TABLE block (saves cold-start CPU) |
 | `BREAKGLASS_*`, `ALLOW_REGISTRATION`, `DEFAULT_OFFICE_SSIDS` | Production only | Same as before |
 | `POWER_AUTOMATE_WEBHOOK_URL` | Production only | OTP / Teams |
 
@@ -78,6 +79,7 @@ Dev project vars are on **Production** scope of `office-tracker-dev` (that proje
 | `NEXT_PUBLIC_APP_URL` | Production | `https://office-tracker-dev.vercel.app` |
 | `AUTH_SECRET` | Production | Separate dev secret |
 | `RUN_DB_SETUP_ON_DEPLOY` | Production | `true` (schema + seed on deploy) |
+| `SCHEMA_AUTO_MIGRATE` | Production | unset (migrate on cold start); set `false` on prod when stable |
 | `BREAKGLASS_*` | Production | Copied for dev login testing |
 | `ALLOW_REGISTRATION`, `DEFAULT_OFFICE_SSIDS` | Production | Same values as prod |
 

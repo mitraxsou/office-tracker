@@ -1,3 +1,4 @@
+import { recordAlertDispatches, wasAlertDispatchedToday } from "./alert-dispatch";
 import { prisma } from "./db";
 import { getAppConfig, getUserHoursTarget, getEffectiveAgentStaleGraceHours } from "./app-config";
 import { getTodaySummary, getPulseStats } from "./heartbeat-service";
@@ -51,34 +52,19 @@ function appBaseUrl() {
   return process.env.NEXT_PUBLIC_APP_URL ?? "https://office-tracker-theta.vercel.app";
 }
 
-async function wasAlertSentToday(
-  userId: string,
-  type: IntegrationAlertType,
-  dayKey: string,
-): Promise<boolean> {
-  const existing = await prisma.auditLog.findFirst({
-    where: {
-      targetUserId: userId,
-      action: INTEGRATION_ALERT_ACTION,
-      details: { contains: `"type":"${type}"` },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-  if (!existing?.details) return false;
-  try {
-    const parsed = JSON.parse(existing.details) as { type?: string; dayKey?: string };
-    return parsed.type === type && parsed.dayKey === dayKey;
-  } catch {
-    return false;
-  }
-}
-
 export async function acknowledgeIntegrationAlerts(
   actorId: string,
   items: Array<{ userId: string; type: IntegrationAlertType; dayKey: string }>,
 ) {
+  const pending: Array<{ userId: string; type: IntegrationAlertType; dayKey: string }> = [];
   for (const item of items) {
-    if (await wasAlertSentToday(item.userId, item.type, item.dayKey)) continue;
+    if (await wasAlertDispatchedToday(item.userId, item.type, item.dayKey)) continue;
+    pending.push(item);
+  }
+  if (pending.length === 0) return;
+
+  await recordAlertDispatches(pending);
+  for (const item of pending) {
     await prisma.auditLog.create({
       data: {
         actorId,
@@ -222,7 +208,7 @@ async function evaluateUserAlerts(
     presenceReminder === "stale"
   ) {
     const hasDevice = await userHasActiveInstalledDevice(user.id);
-    if (hasDevice && !(await wasAlertSentToday(user.id, "stale", dayKey))) {
+    if (hasDevice && !(await wasAlertDispatchedToday(user.id, "stale", dayKey))) {
       const deliveryChannel = channelForAlert(prefs, "stale");
       alerts.push({
         ...base,
@@ -238,7 +224,7 @@ async function evaluateUserAlerts(
     const startMinutes = parseTimeToMinutes(prefs.officeStartTime) + prefs.graceMinutes;
     if (nowMinutes >= startMinutes && presenceReminder === "absent") {
       if (
-        !(await wasAlertSentToday(user.id, "absent", dayKey))
+        !(await wasAlertDispatchedToday(user.id, "absent", dayKey))
       ) {
         const deliveryChannel = channelForAlert(prefs, "absent");
         alerts.push({
@@ -257,7 +243,7 @@ async function evaluateUserAlerts(
     if (
       nowMinutes >= checkMinutes &&
       summary.totalHours < prefs.behindHoursMinExpected &&
-      !(await wasAlertSentToday(user.id, "behind", dayKey))
+      !(await wasAlertDispatchedToday(user.id, "behind", dayKey))
     ) {
         const deliveryChannel = channelForAlert(prefs, "behind");
         alerts.push({
@@ -279,7 +265,7 @@ async function evaluateUserAlerts(
     prefs.alertIfHoursStarted &&
     shouldQueueDailyAlert(
       inOfficeToday,
-      await wasAlertSentToday(user.id, "hours_started", dayKey),
+      await wasAlertDispatchedToday(user.id, "hours_started", dayKey),
     )
   ) {
     const deliveryChannel = channelForAlert(prefs, "hours_started");
@@ -297,7 +283,7 @@ async function evaluateUserAlerts(
     prefs.alertIfHoursMet &&
     shouldQueueDailyAlert(
       summary.metTarget,
-      await wasAlertSentToday(user.id, "hours_met", dayKey),
+      await wasAlertDispatchedToday(user.id, "hours_met", dayKey),
     )
   ) {
     const deliveryChannel = channelForAlert(prefs, "hours_met");
@@ -312,7 +298,7 @@ async function evaluateUserAlerts(
 
   if (
     types.has("ooo_cleared") &&
-    !(await wasAlertSentToday(user.id, "ooo_cleared", dayKey))
+    !(await wasAlertDispatchedToday(user.id, "ooo_cleared", dayKey))
   ) {
     const deliveryChannel = channelForAlert(prefs, "ooo_cleared");
     alerts.push({
@@ -387,7 +373,17 @@ export async function getIntegrationAlertsForUser(
     },
   });
   if (!user) return [];
-  return evaluateUserAlerts(user, new Set(types), new Date());
+
+  const dayKey = dayKeyInTimezone(new Date(), user.timezone);
+  const pending: IntegrationAlertType[] = [];
+  for (const type of types) {
+    if (!(await wasAlertDispatchedToday(userId, type, dayKey))) {
+      pending.push(type);
+    }
+  }
+  if (pending.length === 0) return [];
+
+  return evaluateUserAlerts(user, new Set(pending), new Date());
 }
 
 /** Exported for unit tests */

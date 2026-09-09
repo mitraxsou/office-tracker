@@ -6,7 +6,9 @@ export async function registerNode() {
   const { ensureBreakglassAdmin } = await import("./lib/breakglass");
   const { ensureAppConfig, logAppConfigSchemaDriftIfNeeded, logDatabaseAccessDeniedIfNeeded } =
     await import("./lib/app-config");
+  const skipSchemaMigrations = process.env.SCHEMA_AUTO_MIGRATE?.trim().toLowerCase() === "false";
   try {
+    if (!skipSchemaMigrations) {
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "allowRegistration" BOOLEAN NOT NULL DEFAULT false;'
     );
@@ -524,6 +526,23 @@ export async function registerNode() {
     );
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "UserNotificationPrefs" ALTER COLUMN "alertIfAgentStale" SET DEFAULT false;'
+    );
+    }
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "AlertDispatch" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "type" TEXT NOT NULL,
+        "dayKey" TEXT NOT NULL,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "AlertDispatch_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "AlertDispatch_userId_type_dayKey_key" ON "AlertDispatch"("userId", "type", "dayKey");',
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "AlertDispatch_userId_dayKey_idx" ON "AlertDispatch"("userId", "dayKey");',
     );
     await ensureAppConfig();
     const { ensureLegalConfig } = await import("./lib/legal-config");

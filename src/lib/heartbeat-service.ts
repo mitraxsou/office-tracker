@@ -345,6 +345,19 @@ export async function getTodaySummary(
   };
 }
 
+/** Lightweight hours-target check for heartbeat alert short-circuit. */
+export async function getQuickMetTarget(
+  userId: string,
+  timezone: string,
+  hoursTarget: number,
+): Promise<boolean> {
+  const now = new Date();
+  const { dayKey } = getDayBounds(now, timezone);
+  const { visits, params } = await loadDaySpanContext(userId, dayKey, timezone);
+  const totalMs = daySpanMsForDay(visits, params);
+  return totalMs / (1000 * 60 * 60) >= hoursTarget;
+}
+
 export function laptopActiveHoursFromContext(
   laptopActiveParams: LaptopActiveParams,
 ): number {

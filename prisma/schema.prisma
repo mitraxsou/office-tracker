@@ -74,6 +74,19 @@ model User {
   priorComplianceDeclarations PriorComplianceDeclaration[]
   reviewedPriorComplianceDeclarations PriorComplianceDeclaration[] @relation("PriorComplianceReviewer")
   agentLifecycleEvents AgentLifecycleEvent[]
+  alertDispatches      AlertDispatch[]
+}
+
+model AlertDispatch {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  dayKey    String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, type, dayKey])
+  @@index([userId, dayKey])
 }
 
 model UserOutOfOffice {

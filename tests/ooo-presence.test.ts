@@ -8,6 +8,10 @@ const { dispatchUserAlerts } = vi.hoisted(() => ({
   dispatchUserAlerts: vi.fn(),
 }));
 
+const { filterUndispatchedAlertTypes } = vi.hoisted(() => ({
+  filterUndispatchedAlertTypes: vi.fn(),
+}));
+
 vi.mock("../src/lib/out-of-office", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../src/lib/out-of-office")>();
   return {
@@ -20,12 +24,17 @@ vi.mock("../src/lib/power-automate-notify", () => ({
   dispatchUserAlerts,
 }));
 
+vi.mock("../src/lib/alert-dispatch", () => ({
+  filterUndispatchedAlertTypes,
+}));
+
 import { handleOfficePresenceDetected } from "../src/lib/ooo-presence";
 
 describe("handleOfficePresenceDetected", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     dispatchUserAlerts.mockResolvedValue({ ok: true });
+    filterUndispatchedAlertTypes.mockImplementation(async (_userId, _dayKey, types) => types);
   });
 
   it("dispatches ooo_cleared when OOO was cleared", async () => {
