@@ -417,6 +417,50 @@ export async function getInstallTokensForUser(
   return state.installTokens;
 }
 
+/** Save or refresh encrypted install token copy when plain token is available (e.g. OTP signup cookie). */
+export async function persistPendingTokenEnc(userId: string, plainToken: string): Promise<boolean> {
+  if (plainToken.length < 16) return false;
+
+  const tokenPrefix = plainToken.slice(0, 8);
+  const agentToken = await prisma.agentToken.findFirst({
+    where: { userId, tokenPrefix, revokedAt: null },
+  });
+  if (!agentToken) return false;
+
+  const revealed = revealStoredPendingToken(agentToken);
+  if (revealed === plainToken) return true;
+
+  await prisma.agentToken.update({
+    where: { id: agentToken.id },
+    data: { pendingTokenEnc: encryptPendingToken(plainToken) },
+  });
+  return true;
+}
+
+/** Ensure the user can see install commands in Settings without admin help. */
+export async function ensureUserInstallCommands(
+  userId: string,
+  appUrl: string,
+  sessionPlainToken?: string | null,
+): Promise<UserInstallTokenState> {
+  if (sessionPlainToken) {
+    await persistPendingTokenEnc(userId, sessionPlainToken);
+  }
+
+  let state = await getUserInstallTokenState(userId, appUrl);
+  if (state.installTokens.length > 0) return state;
+
+  const activeCount = await prisma.agentToken.count({
+    where: { userId, revokedAt: null },
+  });
+  if (activeCount === 0) {
+    await issueAgentToken(userId, { label: "Initial laptop" });
+    state = await getUserInstallTokenState(userId, appUrl);
+  }
+
+  return state;
+}
+
 export async function getPendingInstallTokensForUser(userId: string, appUrl: string) {
   const all = await getInstallTokensForUser(userId, appUrl);
   return all.filter((t) => t.status === "pending");

@@ -4,8 +4,9 @@ import { OnboardingForm } from "@/components/OnboardingForm";
 import { SetInitialPasswordForm } from "@/components/SetInitialPasswordForm";
 import {
   canSetInitialPassword,
-  getUserInstallTokenState,
+  ensureUserInstallCommands,
 } from "@/lib/auth";
+import { peekInstallToken } from "@/lib/welcome-token";
 import { requireAuthenticatedUser, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
 import { getRealCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
@@ -37,7 +38,12 @@ export default async function SettingsPage({
   const hoursTarget = await getUserHoursTarget(user);
   const config = await getAppConfig();
 
-  const { installTokens, legacyBoundCount } = await getUserInstallTokenState(user.id, appUrl);
+  const sessionInstallToken = await peekInstallToken();
+  const { installTokens, legacyBoundCount } = await ensureUserInstallCommands(
+    user.id,
+    appUrl,
+    sessionInstallToken,
+  );
   const enrichedDevices = await getEnrichedDevicesForUser(user.id);
   const timezoneRequestState = await getUserTimezoneRequestState(user.id);
   const profileChangeState = await getUserProfileChangeRequestState(user.id);

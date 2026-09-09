@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { InstallTokenForUser } from "@/lib/install-token-types";
@@ -16,8 +17,32 @@ export function InstallTokenCommands({
   legacyBoundCount = 0,
   compact = false,
 }: InstallTokenCommandsProps) {
+  const router = useRouter();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+
+  async function handleGenerateInstallCommand() {
+    if (
+      !confirm(
+        "This creates a new laptop token and invalidates any old token until you run the new install or update command. Continue?",
+      )
+    ) {
+      return;
+    }
+
+    setGenerating(true);
+    setGenerateError(null);
+    const res = await fetch("/api/settings/regenerate-token", { method: "POST" });
+    setGenerating(false);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setGenerateError(body.error ?? "Could not generate install command");
+      return;
+    }
+    router.refresh();
+  }
 
   async function handleCopy(text: string, tokenId: string) {
     setCopyError(null);
@@ -34,9 +59,22 @@ export function InstallTokenCommands({
     return (
       <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-sm text-muted">
         <p>
-          Your laptop token was issued before reinstall commands were saved. Ask your admin to
-          reissue a token from Admin → Users &amp; tokens, then run the new install command here.
+          Your laptop token was issued before reinstall commands were saved. Generate a new token
+          here, then run the new install or update command below.
         </p>
+        <button
+          type="button"
+          onClick={() => void handleGenerateInstallCommand()}
+          disabled={generating}
+          className="btn-primary mt-3 px-3 py-1.5 text-xs"
+        >
+          {generating ? "Generating..." : "Generate install command"}
+        </button>
+        {generateError && (
+          <p className="mt-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
+            {generateError}
+          </p>
+        )}
         <Link href="/help#troubleshooting" className="mt-2 inline-block text-accent hover:underline">
           Troubleshooting help
         </Link>
@@ -46,9 +84,22 @@ export function InstallTokenCommands({
 
   if (installTokens.length === 0) {
     return (
-      <p className="text-sm text-muted">
-        No install tokens yet. Ask your admin to issue one from Admin → Users &amp; tokens.
-      </p>
+      <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-sm text-muted">
+        <p>No install token is ready yet. Generate one here to copy the install and update commands.</p>
+        <button
+          type="button"
+          onClick={() => void handleGenerateInstallCommand()}
+          disabled={generating}
+          className="btn-primary mt-3 px-3 py-1.5 text-xs"
+        >
+          {generating ? "Generating..." : "Generate install command"}
+        </button>
+        {generateError && (
+          <p className="mt-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
+            {generateError}
+          </p>
+        )}
+      </div>
     );
   }
 

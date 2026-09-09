@@ -1,7 +1,18 @@
-import { describe, expect, it } from "vitest";
-import { revealStoredPendingToken } from "../src/lib/auth";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { revealStoredPendingToken, persistPendingTokenEnc } from "../src/lib/auth";
 import { encryptPendingToken } from "../src/lib/token-crypto";
 import { buildInstallCommand, buildUpdateCommand } from "../src/lib/agent-branding";
+
+vi.mock("../src/lib/db", () => ({
+  prisma: {
+    agentToken: {
+      findFirst: vi.fn(),
+      update: vi.fn(),
+    },
+  },
+}));
+
+import { prisma } from "../src/lib/db";
 
 describe("revealStoredPendingToken", () => {
   it("returns plain token for bound laptop when encrypted copy is kept", () => {
@@ -45,6 +56,49 @@ describe("revealStoredPendingToken", () => {
         expiresAt: null,
       }),
     ).toBeNull();
+  });
+});
+
+describe("persistPendingTokenEnc", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("stores encrypted copy when legacy token has no pendingTokenEnc", async () => {
+    const plain = `${"c".repeat(8)}${"d".repeat(56)}`;
+    vi.mocked(prisma.agentToken.findFirst).mockResolvedValue({
+      id: "tok-1",
+      pendingTokenEnc: null,
+      boundSerialNumber: "PG04YGZF",
+      revokedAt: null,
+      expiresAt: null,
+    } as never);
+    vi.mocked(prisma.agentToken.update).mockResolvedValue({} as never);
+
+    const ok = await persistPendingTokenEnc("user-1", plain);
+
+    expect(ok).toBe(true);
+    expect(prisma.agentToken.update).toHaveBeenCalledWith({
+      where: { id: "tok-1" },
+      data: { pendingTokenEnc: expect.any(String) },
+    });
+  });
+
+  it("skips update when encrypted copy already matches", async () => {
+    const plain = `${"e".repeat(8)}${"f".repeat(56)}`;
+    const enc = encryptPendingToken(plain);
+    vi.mocked(prisma.agentToken.findFirst).mockResolvedValue({
+      id: "tok-2",
+      pendingTokenEnc: enc,
+      boundSerialNumber: null,
+      revokedAt: null,
+      expiresAt: new Date(Date.now() + 86400000),
+    } as never);
+
+    const ok = await persistPendingTokenEnc("user-1", plain);
+
+    expect(ok).toBe(true);
+    expect(prisma.agentToken.update).not.toHaveBeenCalled();
   });
 });
 

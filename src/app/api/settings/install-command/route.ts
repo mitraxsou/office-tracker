@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, getInstallTokensForUser } from "@/lib/auth";
+import {
+  ensureUserInstallCommands,
+  getCurrentUser,
+} from "@/lib/auth";
 import {
   AGENT_EXTRACT_FOLDER,
   AGENT_EXTRACT_PATH_PS,
 } from "@/lib/agent-branding";
+import { peekInstallToken } from "@/lib/welcome-token";
 
 export async function POST() {
   const user = await getCurrentUser();
@@ -14,7 +18,12 @@ export async function POST() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const extractPath = process.env.AGENT_INSTALL_PATH || AGENT_EXTRACT_PATH_PS;
 
-  const tokens = await getInstallTokensForUser(user.id, appUrl);
+  const sessionInstallToken = await peekInstallToken();
+  const { installTokens: tokens } = await ensureUserInstallCommands(
+    user.id,
+    appUrl,
+    sessionInstallToken,
+  );
   const first = tokens[0];
 
   if (!first) {
