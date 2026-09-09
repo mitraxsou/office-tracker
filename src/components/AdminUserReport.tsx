@@ -7,9 +7,9 @@ import { AdminVisitManager } from "./AdminVisitManager";
 import { ComplianceExportButton } from "@/components/reports/ComplianceExportButton";
 import { NotificationPrefsForm } from "./NotificationPrefsForm";
 import { OutOfOfficeSection } from "./OutOfOfficeSection";
-import { VisitCalendar } from "./reports/VisitCalendar";
-import { HoursTrendChart } from "./reports/ReportCharts";
+import { MonthlyReportSection } from "./reports/MonthlyReportSection";
 import { exportDailyTrendCsv, MonthReportToolbar } from "./reports/ReportToolbar";
+import type { MonthlyProgressState } from "@/lib/monthly-progress";
 import { currentMonthKey } from "@/lib/month-range";
 import { dayKeyInTimezone, formatHours, formatTime } from "@/lib/visits";
 import {
@@ -107,8 +107,11 @@ type UserReport = {
   monthlyProgress: {
     monthKey: string;
     qualifyingDays: number;
+    officeVisitDays: number;
+    daysInMonth: number;
     monthlyDaysTarget: number;
     metTarget: boolean;
+    progressState: MonthlyProgressState;
   };
 };
 
@@ -357,54 +360,23 @@ export function AdminUserReport({
         </button>
       </MonthReportToolbar>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
-        <SummaryCard label="Today (office)" value={`${data.today.totalHours.toFixed(1)}h / ${data.user.hoursTarget}h`} />
-        <SummaryCard
-          label="Laptop active"
-          value={`${data.today.laptopActiveHours.toFixed(1)}h`}
-        />
-        <SummaryCard label="5h met" value={data.today.metTarget ? "Yes" : "No"} />
-        <SummaryCard
-          label="Office days"
-          value={`${data.monthlyProgress.qualifyingDays} / ${data.monthlyDaysTarget}`}
-        />
-        <SummaryCard
-          label={`Agent (expected ${data.serverAgentVersion})`}
-          value={`${agentHealthLabel} · ${installedVersionSummary}`}
-        />
-        <SummaryCard label="Pulses (24h)" value={`${data.pulse.pulsesLast24h} / ~${data.pulse.expectedPulsesPerDay}`} />
-      </div>
+      <MonthlyReportSection
+        monthKey={monthKey}
+        timezone={data.user.timezone}
+        hoursTarget={data.user.hoursTarget}
+        monthlyProgress={data.monthlyProgress}
+        dailyTrend={data.dailyTrend}
+        visits={data.visits}
+        pulse={data.pulse}
+        selectedDate={selectedDate}
+        onSelectDate={setSelectedDate}
+        agentHealthLabel={agentHealthLabel}
+        agentHealthDetail={`Expected agent ${data.serverAgentVersion}. Installed: ${installedVersionSummary}. ${data.pulse.pulsesLast24h} pulses in the last 24h (expected ~${data.pulse.expectedPulsesPerDay}).`}
+      />
 
-      <section className="card p-6">
-        <h3 className="mb-4 text-sm font-medium">Office visit calendar</h3>
-        <VisitCalendar
-          monthKey={monthKey}
-          timezone={data.user.timezone}
-          hoursTarget={data.user.hoursTarget}
-          dailyTrend={data.dailyTrend}
-          visits={data.visits}
-          selectedDate={selectedDate}
-          onSelectDate={setSelectedDate}
-        />
-      </section>
-
-      <section className="card p-6">
-        <HoursTrendChart
-          data={data.dailyTrend.map((d) => ({
-            date: d.date,
-            totalHours: d.totalHours,
-            metTarget: d.metTarget,
-          }))}
-          targetHours={data.user.hoursTarget}
-          title={`Daily hours (${monthKey})`}
-          selectedDate={selectedDate}
-          onBarClick={(date) => setSelectedDate((prev) => (prev === date ? null : date))}
-        />
-      </section>
-
-      <section className="card p-6">
+      <section className="card p-4">
         <h3 className="mb-3 text-sm font-medium">
-          {selectedDate ? `Visits on ${selectedDate}` : "Visits this month"}
+          {selectedDate ? `Visits on ${selectedDate}` : `Visits in ${monthKey}`}
         </h3>
         {filteredVisits.length === 0 ? (
           <p className="text-sm text-muted">No visits in this period.</p>
@@ -826,11 +798,3 @@ export function AdminUserReport({
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="card p-4">
-      <p className="text-xs text-muted">{label}</p>
-      <p className="mt-1 text-lg font-semibold">{value}</p>
-    </div>
-  );
-}

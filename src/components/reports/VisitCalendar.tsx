@@ -30,6 +30,7 @@ type VisitCalendarProps = {
   visits: VisitCalendarVisit[];
   selectedDate: string | null;
   onSelectDate: (date: string | null) => void;
+  compact?: boolean;
 };
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -52,7 +53,10 @@ export function VisitCalendar({
   visits,
   selectedDate,
   onSelectDate,
+  compact = false,
 }: VisitCalendarProps) {
+  const cellHeight = compact ? "h-14" : "h-20";
+  const emptyCellHeight = compact ? "h-14" : "h-20";
   const trendByDate = useMemo(() => dailyTrendMap(dailyTrend), [dailyTrend]);
   const weeks = useMemo(() => calendarWeeksForMonth(monthKey, 1), [monthKey]);
   const visitPoints = useMemo(() => toVisitPoints(visits), [visits]);
@@ -66,17 +70,17 @@ export function VisitCalendar({
   const selectedSummary = selectedDate ? trendByDate.get(selectedDate) : null;
 
   return (
-    <div className="space-y-4">
+    <div className={compact ? "space-y-2" : "space-y-4"}>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[320px] border-collapse text-sm">
+        <table className="w-full min-w-[280px] border-collapse text-sm">
           <thead>
             <tr>
               {WEEKDAY_LABELS.map((label) => (
                 <th
                   key={label}
-                  className="border-b border-[var(--border)] pb-2 text-center text-xs font-medium text-muted"
+                  className={`border-b border-[var(--border)] text-center font-medium text-muted ${compact ? "pb-1 text-[10px]" : "pb-2 text-xs"}`}
                 >
-                  {label}
+                  {compact ? label.slice(0, 1) : label}
                 </th>
               ))}
             </tr>
@@ -89,7 +93,7 @@ export function VisitCalendar({
                     return (
                       <td
                         key={ci}
-                        className="h-20 border border-[var(--border)] bg-[var(--background)]/50 p-1"
+                        className={`${emptyCellHeight} border border-[var(--border)] bg-[var(--background)]/50 p-0.5`}
                       />
                     );
                   }
@@ -101,13 +105,13 @@ export function VisitCalendar({
                   const hasVisits = hours > 0;
 
                   return (
-                    <td key={ci} className="h-20 border border-[var(--border)] p-1 align-top">
+                    <td key={ci} className={`${cellHeight} border border-[var(--border)] p-0.5 align-top`}>
                       <button
                         type="button"
                         onClick={() =>
                           onSelectDate(isSelected ? null : cell.dayKey)
                         }
-                        className={`flex h-full w-full flex-col rounded-md p-1.5 text-left transition-colors ${
+                        className={`flex h-full w-full flex-col rounded-md text-left transition-colors ${compact ? "p-1" : "p-1.5"} ${
                           isSelected
                             ? "bg-[var(--pwc-orange)]/20 ring-2 ring-[var(--pwc-orange)]"
                             : hasVisits
@@ -117,26 +121,30 @@ export function VisitCalendar({
                               : "hover:bg-[var(--border)]/40"
                         }`}
                       >
-                        <span className="text-xs font-medium">{cell.dayOfMonth}</span>
+                        <span className={compact ? "text-[10px] font-medium" : "text-xs font-medium"}>
+                          {cell.dayOfMonth}
+                        </span>
                         {hasVisits ? (
                           <>
                             <span
-                              className={`mt-1 text-xs font-semibold ${
+                              className={`font-semibold ${compact ? "text-[10px]" : "mt-1 text-xs"} ${
                                 met ? "text-green-400" : "text-accent"
                               }`}
                             >
                               {roundHours(hours)}h
                             </span>
-                            <span
-                              className={`mt-auto text-[10px] ${
-                                met ? "text-green-400" : "text-muted"
-                              }`}
-                            >
-                              {met ? "Target met" : `Below ${hoursTarget}h`}
-                            </span>
+                            {!compact && (
+                              <span
+                                className={`mt-auto text-[10px] ${
+                                  met ? "text-green-400" : "text-muted"
+                                }`}
+                              >
+                                {met ? "Target met" : `Below ${hoursTarget}h`}
+                              </span>
+                            )}
                           </>
                         ) : (
-                          <span className="mt-1 text-[10px] text-muted">No visits</span>
+                          !compact && <span className="mt-1 text-[10px] text-muted">No visits</span>
                         )}
                       </button>
                     </td>
@@ -148,11 +156,13 @@ export function VisitCalendar({
         </table>
       </div>
 
-      <p className="text-xs text-muted">
-        Green = daily target met ({hoursTarget}h). Orange tint = visits but below target. Daily
-        total is first check-in to last check-out (gaps count). Last in-office heartbeat counts as
-        checkout unless you checked out manually. Click a day for visit details.
-      </p>
+      {!compact && (
+        <p className="text-xs text-muted">
+          Green = daily target met ({hoursTarget}h). Orange tint = visits but below target. Daily
+          total is first check-in to last check-out (gaps count). Last in-office heartbeat counts as
+          checkout unless you checked out manually. Click a day for visit details.
+        </p>
+      )}
 
       {selectedDate && (
         <VisitDayDetail
