@@ -27,8 +27,9 @@ describe("app version", () => {
 
   it("keeps prior releases in changelog history", () => {
     expect(APP_CHANGELOG.length).toBeGreaterThan(2);
-    expect(APP_CHANGELOG[1].version).toBe("1.5.1");
-    expect(APP_CHANGELOG[2].version).toBe("1.5.0");
-    expect(APP_CHANGELOG[3].version).toBe("1.4.0");
+    expect(APP_CHANGELOG[1].version).toBe("1.5.2");
+    expect(APP_CHANGELOG[2].version).toBe("1.5.1");
+    expect(APP_CHANGELOG[3].version).toBe("1.5.0");
+    expect(APP_CHANGELOG[4].version).toBe("1.4.0");
   });
 });

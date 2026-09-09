@@ -10,6 +10,8 @@ import {
 
 type GlobalSearchProps = {
   isAdmin: boolean;
+  /** Icon-only trigger for narrow headers (mobile nav). */
+  compact?: boolean;
 };
 
 function SearchIcon() {
@@ -37,7 +39,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
 }
 
-export function GlobalSearch({ isAdmin }: GlobalSearchProps) {
+export function GlobalSearch({ isAdmin, compact = false }: GlobalSearchProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
@@ -139,14 +141,22 @@ export function GlobalSearch({ isAdmin }: GlobalSearchProps) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="btn-secondary inline-flex min-h-11 items-center gap-2 px-3 py-2 text-sm md:min-h-0"
-        aria-label="Open search"
+        className={`btn-secondary inline-flex items-center gap-2 text-sm ${
+          compact
+            ? "min-h-11 min-w-11 justify-center p-2"
+            : "min-h-11 px-3 py-2 md:min-h-0"
+        }`}
+        aria-label="Open search (Ctrl+K)"
       >
         <SearchIcon />
-        <span className="hidden sm:inline">Search</span>
-        <kbd className="hidden rounded border border-[var(--border)] px-1.5 py-0.5 text-[10px] text-muted lg:inline">
-          Ctrl K
-        </kbd>
+        {!compact && (
+          <>
+            <span className="hidden md:inline">Search</span>
+            <kbd className="hidden rounded border border-[var(--border)] px-1.5 py-0.5 text-[10px] text-muted lg:inline">
+              Ctrl K
+            </kbd>
+          </>
+        )}
       </button>
 
       {open && (

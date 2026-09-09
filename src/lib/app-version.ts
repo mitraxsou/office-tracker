@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.2";
+export const APP_VERSION = "1.5.3";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,18 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-09-09",
+    userBullets: [
+      "Simplified the main navigation with fewer items in the top bar.",
+      "Mobile nav uses a slide-over menu; search is a compact icon on small screens.",
+      "Account menu groups pilot contact, version, and sign out on desktop.",
+    ],
+    adminBullets: [
+      "Admin link and tools stay available from the account menu and mobile drawer.",
+    ],
+  },
+  {
+    version: "1.5.2",
     date: "2026-09-09",
     userBullets: [
       "Added global search from the nav bar with Ctrl+K.",
