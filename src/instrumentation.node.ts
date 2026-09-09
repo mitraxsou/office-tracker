@@ -407,6 +407,22 @@ export async function registerNode() {
     await prisma.$executeRawUnsafe(
       'CREATE INDEX IF NOT EXISTS "AdminContactSubmission_userId_idx" ON "AdminContactSubmission"("userId");'
     );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "AdminContactMessage" (
+        "id" TEXT NOT NULL,
+        "threadId" TEXT NOT NULL,
+        "authorId" TEXT NOT NULL,
+        "authorRole" TEXT NOT NULL,
+        "body" TEXT NOT NULL,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "AdminContactMessage_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "AdminContactMessage_threadId_createdAt_idx" ON "AdminContactMessage"("threadId", "createdAt");'
+    );
+    const { migrateAdminContactThreads } = await import("./lib/admin-contact");
+    await migrateAdminContactThreads().catch(() => undefined);
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "priorComplianceOnboardingAt" TIMESTAMP(3);'
     );

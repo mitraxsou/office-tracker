@@ -4,7 +4,7 @@ import { ContactAdminForm } from "@/components/ContactAdminForm";
 import { getCurrentUser } from "@/lib/auth";
 import {
   isValidAdminContactCategory,
-  listUserAdminContactSubmissions,
+  listUserAdminContactThreads,
   type AdminContactCategory,
 } from "@/lib/admin-contact";
 import { enforcePasswordChangeIfRequired, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
@@ -26,7 +26,7 @@ export default async function ContactAdminPage({
     ? (params.category as AdminContactCategory)
     : undefined;
 
-  const submissions = await listUserAdminContactSubmissions(user.id);
+  const threads = await listUserAdminContactThreads(user.id);
 
   return (
     <>
@@ -39,7 +39,7 @@ export default async function ContactAdminPage({
           </p>
         </div>
         <ContactAdminForm
-          initialSubmissions={submissions}
+          initialThreads={threads}
           initialCategory={initialCategory}
         />
       </main>

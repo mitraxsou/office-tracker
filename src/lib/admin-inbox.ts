@@ -80,9 +80,15 @@ export async function getAdminInbox(): Promise<{
       select: {
         id: true,
         createdAt: true,
+        updatedAt: true,
         category: true,
         message: true,
         user: { select: userSelect },
+        messages: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { body: true },
+        },
       },
     }),
     prisma.priorComplianceDeclaration.findMany({
@@ -137,7 +143,12 @@ export async function getAdminInbox(): Promise<{
       item("device_removal", "Laptop removal", row.device.serialNumber, row),
     ),
     ...adminContacts.map((row) =>
-      item("admin_contact", "Reach out to admin", `${row.category}: ${row.message.slice(0, 80)}`, row),
+      item(
+        "admin_contact",
+        "Reach out to admin",
+        `${row.category}: ${(row.messages[0]?.body ?? row.message).slice(0, 80)}`,
+        { ...row, createdAt: row.updatedAt ?? row.createdAt },
+      ),
     ),
     ...priorCompliance.map((row) =>
       item(

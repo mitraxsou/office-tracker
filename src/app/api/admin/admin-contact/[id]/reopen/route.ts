@@ -1,17 +1,22 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin";
-import { getAdminContactThread } from "@/lib/admin-contact";
+import { reopenAdminContactThread } from "@/lib/admin-contact";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
-export async function GET(_request: Request, { params }: RouteParams) {
+export async function POST(_request: Request, { params }: RouteParams) {
   const admin = await requireAdmin();
   if (!admin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { id } = await params;
-  const result = await getAdminContactThread(id);
+  const result = await reopenAdminContactThread({
+    threadId: id,
+    actorId: admin.id,
+    actorRole: "admin",
+  });
+
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }

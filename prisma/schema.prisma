@@ -70,6 +70,7 @@ model User {
   reviewedComplianceExemptionRequests ComplianceExemptionRequest[] @relation("ComplianceExemptionReviewer")
   adminContactSubmissions AdminContactSubmission[]
   reviewedAdminContactSubmissions AdminContactSubmission[] @relation("AdminContactReviewer")
+  adminContactMessages AdminContactMessage[]
   priorComplianceDeclarations PriorComplianceDeclaration[]
   reviewedPriorComplianceDeclarations PriorComplianceDeclaration[] @relation("PriorComplianceReviewer")
   agentLifecycleEvents AgentLifecycleEvent[]
@@ -321,9 +322,23 @@ model AdminContactSubmission {
   reviewedBy     User?    @relation("AdminContactReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  messages       AdminContactMessage[]
 
   @@index([status, createdAt])
   @@index([userId])
+}
+
+model AdminContactMessage {
+  id         String                 @id @default(cuid())
+  threadId   String
+  thread     AdminContactSubmission @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User                   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorRole String
+  body       String
+  createdAt  DateTime               @default(now())
+
+  @@index([threadId, createdAt])
 }
 
 model LegalConfig {

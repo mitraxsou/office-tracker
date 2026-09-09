@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import {
-  createAdminContactSubmission,
-  listUserAdminContactSubmissions,
+  createAdminContactThread,
+  listUserAdminContactThreads,
 } from "@/lib/admin-contact";
 
 export async function GET() {
@@ -11,8 +11,8 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const submissions = await listUserAdminContactSubmissions(user.id);
-  return NextResponse.json({ submissions });
+  const threads = await listUserAdminContactThreads(user.id);
+  return NextResponse.json({ threads, submissions: threads });
 }
 
 export async function POST(request: Request) {
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "category and message required" }, { status: 400 });
   }
 
-  const result = await createAdminContactSubmission({
+  const result = await createAdminContactThread({
     userId: user.id,
     category: body.category,
     message: body.message,
@@ -42,5 +42,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  return NextResponse.json({ submission: result.submission }, { status: 201 });
+  return NextResponse.json({ thread: result.thread, submission: result.thread }, { status: 201 });
 }

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   isValidAdminContactCategory,
   isValidAdminContactStatus,
-  validateAdminContactResolution,
+  normalizeAdminContactStatus,
+  validateAdminContactMessage,
+  validateAdminContactStatusTransition,
   validateAdminContactSubmission,
 } from "../src/lib/admin-contact";
 
@@ -20,13 +22,19 @@ describe("isValidAdminContactCategory", () => {
 });
 
 describe("isValidAdminContactStatus", () => {
-  it("accepts open and resolved", () => {
+  it("accepts open and closed", () => {
     expect(isValidAdminContactStatus("open")).toBe(true);
-    expect(isValidAdminContactStatus("resolved")).toBe(true);
+    expect(isValidAdminContactStatus("closed")).toBe(true);
   });
 
   it("rejects unknown statuses", () => {
-    expect(isValidAdminContactStatus("closed")).toBe(false);
+    expect(isValidAdminContactStatus("resolved")).toBe(false);
+  });
+});
+
+describe("normalizeAdminContactStatus", () => {
+  it("maps legacy resolved to closed", () => {
+    expect(normalizeAdminContactStatus("resolved")).toBe("closed");
   });
 });
 
@@ -56,19 +64,39 @@ describe("validateAdminContactSubmission", () => {
   });
 });
 
-describe("validateAdminContactResolution", () => {
-  it("requires admin response when resolving", () => {
-    expect(validateAdminContactResolution({ status: "resolved", adminResponse: "" })).toBe(
-      "Admin response is required when resolving",
-    );
+describe("validateAdminContactMessage", () => {
+  it("rejects empty or short replies", () => {
+    expect(validateAdminContactMessage(" ")).toBe("Message is required");
+    expect(validateAdminContactMessage("a")).toBe("Message must be at least 2 characters");
   });
 
-  it("allows resolve with response", () => {
+  it("allows valid thread messages", () => {
+    expect(validateAdminContactMessage("Thanks for the update.")).toBeNull();
+  });
+});
+
+describe("validateAdminContactStatusTransition", () => {
+  it("blocks closing an already closed thread", () => {
     expect(
-      validateAdminContactResolution({
-        status: "resolved",
-        adminResponse: "Thanks, we fixed this.",
-      }),
+      validateAdminContactStatusTransition({ currentStatus: "closed", action: "close" }),
+    ).toBe("Conversation is already closed");
+  });
+
+  it("blocks reopening an open thread", () => {
+    expect(
+      validateAdminContactStatusTransition({ currentStatus: "open", action: "reopen" }),
+    ).toBe("Conversation is already open");
+  });
+
+  it("allows close from open and reopen from closed", () => {
+    expect(
+      validateAdminContactStatusTransition({ currentStatus: "open", action: "close" }),
+    ).toBeNull();
+    expect(
+      validateAdminContactStatusTransition({ currentStatus: "closed", action: "reopen" }),
+    ).toBeNull();
+    expect(
+      validateAdminContactStatusTransition({ currentStatus: "resolved", action: "reopen" }),
     ).toBeNull();
   });
 });
