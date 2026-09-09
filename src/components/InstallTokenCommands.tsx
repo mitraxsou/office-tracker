@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AGENT_INSTALL_DIR } from "@/lib/agent-branding";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { InstallTokenForUser } from "@/lib/install-token-types";
 
@@ -14,7 +15,6 @@ type InstallTokenCommandsProps = {
 
 export function InstallTokenCommands({
   installTokens,
-  legacyBoundCount = 0,
   compact = false,
 }: InstallTokenCommandsProps) {
   const router = useRouter();
@@ -53,33 +53,6 @@ export function InstallTokenCommands({
     }
     setCopiedId(tokenId);
     setTimeout(() => setCopiedId(null), 2000);
-  }
-
-  if (installTokens.length === 0 && legacyBoundCount > 0) {
-    return (
-      <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-sm text-muted">
-        <p>
-          Your laptop token was issued before reinstall commands were saved. Generate a new token
-          here, then run the new install or update command below.
-        </p>
-        <button
-          type="button"
-          onClick={() => void handleGenerateInstallCommand()}
-          disabled={generating}
-          className="btn-primary mt-3 px-3 py-1.5 text-xs"
-        >
-          {generating ? "Generating..." : "Generate install command"}
-        </button>
-        {generateError && (
-          <p className="mt-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
-            {generateError}
-          </p>
-        )}
-        <Link href="/help#troubleshooting" className="mt-2 inline-block text-accent hover:underline">
-          Troubleshooting help
-        </Link>
-      </div>
-    );
   }
 
   if (installTokens.length === 0) {
@@ -133,14 +106,23 @@ export function InstallTokenCommands({
                 <p className="text-xs text-muted">
                   Issued {new Date(t.createdAt).toLocaleString("en-IN")}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => handleCopy(t.plainToken, `${t.id}-token`)}
-                  className="btn-secondary px-3 py-1 text-xs"
-                >
-                  {copiedId === `${t.id}-token` ? "Copied!" : "Copy token"}
-                </button>
+                {t.plainToken && (
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(t.plainToken!, `${t.id}-token`)}
+                    className="btn-secondary px-3 py-1 text-xs"
+                  >
+                    {copiedId === `${t.id}-token` ? "Copied!" : "Copy token"}
+                  </button>
+                )}
               </div>
+            )}
+            {t.usesLocalConfig && (
+              <p className="mt-2 text-xs text-muted">
+                These commands reuse your existing token from{" "}
+                <code>{AGENT_INSTALL_DIR}\config.json</code> on this laptop. No token change is
+                required.
+              </p>
             )}
 
             <div className="mt-3 rounded border border-[var(--border)] p-3">
@@ -183,6 +165,11 @@ export function InstallTokenCommands({
       </div>
       {copyError && (
         <p className="mt-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{copyError}</p>
+      )}
+      {!compact && (
+        <Link href="/help#troubleshooting" className="mt-3 inline-block text-xs text-accent hover:underline">
+          Troubleshooting help
+        </Link>
       )}
     </>
   );

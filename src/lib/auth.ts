@@ -5,7 +5,12 @@ import { prisma } from "./db";
 import { ensureAppConfig, getAppConfig } from "./app-config";
 import crypto from "node:crypto";
 import { encryptPendingToken, decryptPendingToken } from "./token-crypto";
-import { buildInstallCommand, buildUpdateCommand } from "./agent-branding";
+import {
+  buildInstallCommand,
+  buildInstallCommandFromLocalConfig,
+  buildUpdateCommand,
+  buildUpdateCommandFromLocalConfig,
+} from "./agent-branding";
 import { isTokenExpired, revokeExpiredPendingTokens } from "./token-expiry";
 import { clearAgentDeregistration } from "./agent-deregister";
 import type { InstallTokenForUser } from "./install-token-types";
@@ -367,6 +372,54 @@ export function revealStoredPendingToken(
   return decryptPendingToken(token.pendingTokenEnc);
 }
 
+function buildInstallTokenEntry(
+  token: {
+    id: string;
+    label: string | null;
+    tokenPrefix: string;
+    boundSerialNumber: string | null;
+    createdAt: Date;
+    pendingTokenEnc: string | null;
+    revokedAt: Date | null;
+    expiresAt: Date | null;
+  },
+  appUrl: string,
+): InstallTokenForUser | null {
+  const plain = revealStoredPendingToken(token);
+  const status: "pending" | "bound" = token.boundSerialNumber ? "bound" : "pending";
+
+  if (plain) {
+    return {
+      id: token.id,
+      label: token.label,
+      prefix: token.tokenPrefix,
+      plainToken: plain,
+      installCommand: buildInstallCommand(appUrl, plain),
+      updateCommand: buildUpdateCommand(appUrl, plain),
+      createdAt: token.createdAt.toISOString(),
+      status,
+      boundSerialNumber: token.boundSerialNumber,
+    };
+  }
+
+  if (token.boundSerialNumber) {
+    return {
+      id: token.id,
+      label: token.label,
+      prefix: token.tokenPrefix,
+      plainToken: null,
+      installCommand: buildInstallCommandFromLocalConfig(appUrl),
+      updateCommand: buildUpdateCommandFromLocalConfig(appUrl),
+      createdAt: token.createdAt.toISOString(),
+      status,
+      boundSerialNumber: token.boundSerialNumber,
+      usesLocalConfig: true,
+    };
+  }
+
+  return null;
+}
+
 export type UserInstallTokenState = {
   installTokens: InstallTokenForUser[];
   legacyBoundCount: number;
@@ -384,22 +437,7 @@ export async function getUserInstallTokenState(
   });
 
   const installTokens = tokens
-    .map((t) => {
-      const plain = revealStoredPendingToken(t);
-      if (!plain) return null;
-      const status: "pending" | "bound" = t.boundSerialNumber ? "bound" : "pending";
-      return {
-        id: t.id,
-        label: t.label,
-        prefix: t.tokenPrefix,
-        plainToken: plain,
-        installCommand: buildInstallCommand(appUrl, plain),
-        updateCommand: buildUpdateCommand(appUrl, plain),
-        createdAt: t.createdAt.toISOString(),
-        status,
-        boundSerialNumber: t.boundSerialNumber,
-      };
-    })
+    .map((t) => buildInstallTokenEntry(t, appUrl))
     .filter((t): t is InstallTokenForUser => t !== null);
 
   const legacyBoundCount = tokens.filter(

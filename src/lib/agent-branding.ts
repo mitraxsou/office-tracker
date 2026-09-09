@@ -55,6 +55,18 @@ export function buildUpdateCommand(appUrl: string, token: string) {
   return buildRelativeScriptCommand(AGENT_RELATIVE_UPDATE_SCRIPT, appUrl, token);
 }
 
+const AGENT_LOCAL_CONFIG_PS = `$env:LOCALAPPDATA\\${AGENT_INSTALL_FOLDER}\\config.json`;
+
+/** Install command for laptops that already have the agent token in local config.json. */
+export function buildInstallCommandFromLocalConfig(appUrl: string) {
+  return `Unblock-File -LiteralPath "${AGENT_RELATIVE_INSTALL_SCRIPT}"; $cfg = Get-Content "${AGENT_LOCAL_CONFIG_PS}" -Raw | ConvertFrom-Json; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${AGENT_RELATIVE_INSTALL_SCRIPT}" -ApiUrl "${appUrl}" -Token $cfg.token`;
+}
+
+/** Update command for laptops that already have the agent token in local config.json. */
+export function buildUpdateCommandFromLocalConfig(appUrl: string) {
+  return `Unblock-File -LiteralPath "${AGENT_RELATIVE_UPDATE_SCRIPT}"; $cfg = Get-Content "${AGENT_LOCAL_CONFIG_PS}" -Raw | ConvertFrom-Json; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${AGENT_RELATIVE_UPDATE_SCRIPT}" -ApiUrl "${appUrl}" -Token $cfg.token`;
+}
+
 /** Full-path install command (legacy / local dev with explicit script dir) */
 export function buildInstallCommandWithPath(appUrl: string, token: string, installScriptDir: string) {
   const scriptPath = `${installScriptDir}\\install.ps1`.replace(/\\\\/g, "\\");

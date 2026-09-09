@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { revealStoredPendingToken, persistPendingTokenEnc } from "../src/lib/auth";
 import { encryptPendingToken } from "../src/lib/token-crypto";
-import { buildInstallCommand, buildUpdateCommand } from "../src/lib/agent-branding";
+import {
+  buildInstallCommand,
+  buildInstallCommandFromLocalConfig,
+  buildUpdateCommand,
+  buildUpdateCommandFromLocalConfig,
+} from "../src/lib/agent-branding";
 
 vi.mock("../src/lib/db", () => ({
   prisma: {
@@ -120,5 +125,21 @@ describe("copy-paste agent commands", () => {
     expect(command).toBe(expectedUpdate);
     expect(command).toContain('-ApiUrl "https://office.example"');
     expect(command).toContain('-Token "tok"');
+  });
+
+  it("builds install command from local config.json for legacy bound tokens", () => {
+    const command = buildInstallCommandFromLocalConfig("https://office.example");
+    expect(command).toContain("config.json");
+    expect(command).toContain('-ApiUrl "https://office.example"');
+    expect(command).toContain("-Token $cfg.token");
+    expect(command).toContain(".\\install.ps1");
+  });
+
+  it("builds update command from local config.json for legacy bound tokens", () => {
+    const command = buildUpdateCommandFromLocalConfig("https://office.example");
+    expect(command).toContain("config.json");
+    expect(command).toContain('-ApiUrl "https://office.example"');
+    expect(command).toContain("-Token $cfg.token");
+    expect(command).toContain(".\\update.ps1");
   });
 });
