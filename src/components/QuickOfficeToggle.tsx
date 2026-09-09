@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export function QuickOfficeToggle({ inOfficeNow }: { inOfficeNow: boolean }) {
+export function QuickOfficeToggle({
+  inOfficeNow,
+  variant = "card",
+}: {
+  inOfficeNow: boolean;
+  variant?: "card" | "inline";
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +26,29 @@ export function QuickOfficeToggle({ inOfficeNow }: { inOfficeNow: boolean }) {
       return;
     }
     router.refresh();
+  }
+
+  if (variant === "inline") {
+    return (
+      <div className="flex flex-col items-end gap-1">
+        {error && (
+          <p className="max-w-xs rounded bg-red-500/10 px-2 py-1 text-right text-xs text-red-400">
+            {error}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={handleClick}
+          disabled={loading}
+          title="Wi-Fi detection not working? Check in or out manually."
+          className={`px-3 py-1.5 text-xs font-medium disabled:opacity-50 sm:text-sm ${
+            inOfficeNow ? "btn-secondary" : "btn-primary"
+          }`}
+        >
+          {loading ? "Saving..." : inOfficeNow ? "Check out" : "Check in"}
+        </button>
+      </div>
+    );
   }
 
   return (

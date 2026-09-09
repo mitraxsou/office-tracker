@@ -34,7 +34,13 @@ function CheckOutIcon() {
   );
 }
 
-export function ManualVisitForm({ timezone }: { timezone: string }) {
+export function ManualVisitForm({
+  timezone,
+  embedded = false,
+}: {
+  timezone: string;
+  embedded?: boolean;
+}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -68,11 +74,13 @@ export function ManualVisitForm({ timezone }: { timezone: string }) {
     router.refresh();
   }
 
+  const wrapperClass = embedded ? "" : "card p-6";
+
   return (
-    <section className="card p-6">
-      <div className="mb-5">
-        <h2 className="text-lg font-medium">Manual visit</h2>
-        <p className="mt-1 text-sm text-muted">
+    <section className={wrapperClass}>
+      <div className={embedded ? "mb-3" : "mb-5"}>
+        {!embedded && <h2 className="text-lg font-medium">Manual visit</h2>}
+        <p className={`text-sm text-muted ${embedded ? "" : "mt-1"}`}>
           Log a past office session when the agent missed it, or for guest Wi-Fi and Ethernet.
           Pick date and time from the calendar and clock controls.
         </p>

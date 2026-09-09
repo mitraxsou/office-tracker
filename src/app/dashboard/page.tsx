@@ -12,18 +12,13 @@ import {
 import { getPendingPriorComplianceMonthKeys } from "@/lib/prior-compliance";
 import { isUserOutOfOffice } from "@/lib/out-of-office";
 import { AppNav } from "@/components/AppNav";
-import { ProgressMeter } from "@/components/ProgressMeter";
 import { MonthlyProgressMeter } from "@/components/MonthlyProgressMeter";
-import { VisitList } from "@/components/VisitList";
-import { ManualVisitForm } from "@/components/ManualVisitForm";
-import { QuickOfficeToggle } from "@/components/QuickOfficeToggle";
 import { YearComplianceMeter } from "@/components/YearComplianceMeter";
-import { AgentSetupBanner } from "@/components/AgentSetupBanner";
-import { AgentHealthBanner } from "@/components/AgentHealthBanner";
-import { RecentHeartbeats } from "@/components/RecentHeartbeats";
-import { LaptopActiveCard } from "@/components/LaptopActiveCard";
 import { DashboardRefreshButton } from "@/components/DashboardRefreshButton";
-import { formatLastHeartbeat, formatTime } from "@/lib/visits";
+import { DashboardHeroSummary } from "@/components/dashboard/DashboardHeroSummary";
+import { DashboardAlerts } from "@/components/dashboard/DashboardAlerts";
+import { DashboardDetailsPanel } from "@/components/dashboard/DashboardDetailsPanel";
+import { formatLastHeartbeat } from "@/lib/visits";
 
 export default async function DashboardPage() {
   const user = await requireAuthenticatedUser();
@@ -94,6 +89,9 @@ export default async function DashboardPage() {
     : summary.agentHealthy
       ? "success"
       : "warning";
+  const lastHeartbeatLabel = lastHeartbeat
+    ? formatLastHeartbeat(lastHeartbeat.recordedAt, summary.dayKey, user.timezone)
+    : "None";
   const lastHeartbeatTone: StatusTone = !lastHeartbeat
     ? "muted"
     : summary.agentHealthy
@@ -103,108 +101,70 @@ export default async function DashboardPage() {
   return (
     <>
       <AppNav />
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-8">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <main className="mx-auto max-w-5xl space-y-4 px-4 py-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold">Today</h1>
-            <p className="text-sm text-muted">
+            <h1 className="text-xl font-semibold sm:text-2xl">Today</h1>
+            <p className="text-xs text-muted sm:text-sm">
               {summary.dayKey} · Your hours only
             </p>
           </div>
           <DashboardRefreshButton />
         </div>
 
-        {agentNeverConnected && <AgentSetupBanner />}
-        {adminAccess && !agentNeverConnected && ssidMissing && <AgentSetupBanner ssidMissing />}
-        {adminAccess && agentStale && (
-          <AgentHealthBanner
-            variant="stale"
-            minutesSinceLastPulse={pulse.minutesSinceLastPulse}
-            lastPulseAt={pulse.lastHeartbeat}
-            timezone={user.timezone}
-          />
-        )}
-        {adminAccess && !agentStale && agentLowPulses && (
-          <AgentHealthBanner variant="low_pulses" />
-        )}
+        <DashboardAlerts
+          agentNeverConnected={agentNeverConnected}
+          ssidMissing={ssidMissing}
+          agentStale={agentStale}
+          agentLowPulses={agentLowPulses}
+          adminAccess={adminAccess}
+          minutesSinceLastPulse={pulse.minutesSinceLastPulse}
+          lastPulseAt={pulse.lastHeartbeat}
+          timezone={user.timezone}
+        />
 
-        <ProgressMeter
+        <DashboardHeroSummary
           totalHours={summary.totalHours}
           targetHours={summary.hoursTarget}
           metTarget={summary.metTarget}
-        />
-
-        <LaptopActiveCard laptopActiveHours={summary.laptopActiveHours} />
-
-        <div className="card border border-green-500/30 p-4">
-          <p className="text-sm text-muted">First check-in today</p>
-          <p
-            className={`mt-1 text-2xl font-semibold ${firstCheckIn ? "text-green-400" : "text-muted"}`}
-          >
-            {firstCheckIn ? formatTime(firstCheckIn, user.timezone) : "No check-in yet"}
-          </p>
-          {firstCheckIn && (
-            <p className="mt-1 text-xs text-muted">
-              Earliest office session start for {summary.dayKey}.
-            </p>
-          )}
-        </div>
-
-        <MonthlyProgressMeter
-          qualifyingDays={monthlyProgress.qualifyingDays}
-          monthlyDaysTarget={monthlyProgress.monthlyDaysTarget}
-          metTarget={monthlyProgress.metTarget}
-          monthKey={monthlyProgress.monthKey}
-          totalHours={monthlyProgress.totalHours}
-        />
-
-        <YearComplianceMeter
-          compliance={yearCompliance}
+          laptopActiveHours={summary.laptopActiveHours}
+          firstCheckIn={firstCheckIn}
+          dayKey={summary.dayKey}
           timezone={user.timezone}
-          hoursTarget={hoursTarget}
+          inOfficeNow={summary.inOfficeNow}
+          agentStatusValue={agentStatusValue}
+          agentStatusTone={agentStatusTone}
+          lastHeartbeatLabel={lastHeartbeatLabel}
+          lastHeartbeatTone={lastHeartbeatTone}
+          openVisitStartAt={openVisit?.startAt ?? null}
+          openVisitSsid={openVisit?.ssid ?? null}
         />
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <StatusCard
-            label="In office now"
-            value={summary.inOfficeNow ? "Yes" : "No"}
-            tone={summary.inOfficeNow ? "success" : "neutral"}
+        <div className="grid gap-4 lg:grid-cols-2">
+          <MonthlyProgressMeter
+            qualifyingDays={monthlyProgress.qualifyingDays}
+            monthlyDaysTarget={monthlyProgress.monthlyDaysTarget}
+            metTarget={monthlyProgress.metTarget}
+            monthKey={monthlyProgress.monthKey}
+            totalHours={monthlyProgress.totalHours}
+            compact
           />
-          <StatusCard label="Agent status" value={agentStatusValue} tone={agentStatusTone} />
-          <StatusCard
-            label="Last heartbeat"
-            value={
-              lastHeartbeat
-                ? formatLastHeartbeat(
-                    lastHeartbeat.recordedAt,
-                    summary.dayKey,
-                    user.timezone,
-                  )
-                : "None"
-            }
-            tone={lastHeartbeatTone}
+          <YearComplianceMeter
+            compliance={yearCompliance}
+            timezone={user.timezone}
+            hoursTarget={hoursTarget}
+            compact
           />
         </div>
 
         {adminAccess && user.agentDevices.length > 0 && (
-          <p className="text-sm text-muted">
+          <p className="text-xs text-muted">
             Registered laptops:{" "}
             {user.agentDevices.map((d) => (
               <code key={d.id} className="mr-2 text-accent">
                 {d.serialNumber}
               </code>
             ))}
-          </p>
-        )}
-
-        {summary.inOfficeNow && openVisit && (
-          <p className="text-sm text-muted">
-            Office session since{" "}
-            <strong className="text-accent">
-              {formatTime(openVisit.startAt, user.timezone)}
-            </strong>
-            {openVisit.ssid ? ` on ${openVisit.ssid}` : ""}
-            . This is when your current visit started (not your first heartbeat ever).
           </p>
         )}
 
@@ -216,7 +176,7 @@ export default async function DashboardPage() {
         )}
 
         {adminAccess && !agentNeverConnected && !summary.agentHealthy && !agentStale && (
-          <p className="text-sm text-muted">
+          <p className="text-xs text-muted">
             Agent has not sent a heartbeat recently. Check Task Scheduler or re-run{" "}
             <Link href="/settings#install" className="text-accent hover:underline">
               install.ps1
@@ -225,15 +185,14 @@ export default async function DashboardPage() {
           </p>
         )}
 
-        <QuickOfficeToggle inOfficeNow={summary.inOfficeNow} />
-
-        {adminAccess && !agentNeverConnected && pulse.recentPulses.length > 0 && (
-          <RecentHeartbeats
-            pulses={pulse.recentPulses}
-            timezone={user.timezone}
-            retentionDays={config.heartbeatRetentionDays}
-          />
-        )}
+        <DashboardDetailsPanel
+          visits={summary.visits}
+          timezone={user.timezone}
+          visitCount={summary.visits.length}
+          showPulses={adminAccess && !agentNeverConnected && pulse.recentPulses.length > 0}
+          pulses={pulse.recentPulses}
+          retentionDays={config.heartbeatRetentionDays}
+        />
 
         <p className="text-xs text-muted">
           Manage Teams and email alerts in{" "}
@@ -242,42 +201,9 @@ export default async function DashboardPage() {
           </Link>
           .
         </p>
-
-        <section className="card p-6">
-          <h2 className="mb-4 text-lg font-medium">Today&apos;s visits</h2>
-          <VisitList visits={summary.visits} timezone={user.timezone} />
-        </section>
-
-        <ManualVisitForm timezone={user.timezone} />
       </main>
     </>
   );
 }
 
 type StatusTone = "success" | "warning" | "neutral" | "muted";
-
-function StatusCard({
-  label,
-  value,
-  tone = "neutral",
-}: {
-  label: string;
-  value: string;
-  tone?: StatusTone;
-}) {
-  const valueClass =
-    tone === "success"
-      ? "text-green-400"
-      : tone === "warning"
-        ? "text-amber-400"
-        : tone === "muted"
-          ? "text-muted"
-          : "";
-
-  return (
-    <div className="card p-4">
-      <p className="text-sm text-muted">{label}</p>
-      <p className={`mt-1 text-lg font-semibold ${valueClass}`}>{value}</p>
-    </div>
-  );
-}

@@ -8,24 +8,28 @@ export function RecentHeartbeats({
   pulses,
   timezone,
   retentionDays,
+  embedded = false,
 }: {
   pulses: Pulse[];
   timezone: string;
   retentionDays: number;
+  embedded?: boolean;
 }) {
+  const wrapperClass = embedded ? "" : "card p-6";
+
   if (pulses.length === 0) {
     return (
-      <section className="card p-6">
-        <h2 className="mb-2 text-lg font-medium">Recent agent pulses</h2>
+      <section className={wrapperClass}>
+        {!embedded && <h2 className="mb-2 text-lg font-medium">Recent agent pulses</h2>}
         <p className="text-sm text-muted">No heartbeats recorded yet.</p>
       </section>
     );
   }
 
   return (
-    <section className="card p-6">
-      <h2 className="mb-1 text-lg font-medium">Recent agent pulses</h2>
-      <p className="mb-4 text-sm text-muted">
+    <section className={wrapperClass}>
+      {!embedded && <h2 className="mb-1 text-lg font-medium">Recent agent pulses</h2>}
+      <p className={`text-sm text-muted ${embedded ? "mb-2" : "mb-4"}`}>
         Raw Wi-Fi heartbeats from your laptop agent (up to {retentionDays} day
         {retentionDays === 1 ? "" : "s"} kept on the server). This is separate from
         &quot;Office session since&quot;, which tracks your current visit window.

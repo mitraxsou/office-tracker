@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.3";
+export const APP_VERSION = "1.5.4";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,18 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-09-09",
+    userBullets: [
+      "Redesigned the Today dashboard with a compact hero summary and less scrolling.",
+      "Monthly and year compliance now sit side by side on larger screens.",
+      "Visits, manual entry, and agent pulses are grouped under Activity details.",
+    ],
+    adminBullets: [
+      "Agent health alerts stay visible at the top of Today in a tighter layout.",
+    ],
+  },
+  {
+    version: "1.5.3",
     date: "2026-09-09",
     userBullets: [
       "Simplified the main navigation with fewer items in the top bar.",

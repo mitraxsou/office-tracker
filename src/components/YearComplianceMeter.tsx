@@ -14,6 +14,7 @@ type YearComplianceMeterProps = {
   compliance: YearCompliance;
   timezone: string;
   hoursTarget: number;
+  compact?: boolean;
 };
 
 type MonthReportData = {
@@ -65,7 +66,12 @@ function monthAbbrev(monthKey: string, timezone: string): string {
   return formatMonthLabel(monthKey, timezone).split(" ")[0]!.slice(0, 3);
 }
 
-export function YearComplianceMeter({ compliance, timezone, hoursTarget }: YearComplianceMeterProps) {
+export function YearComplianceMeter({
+  compliance,
+  timezone,
+  hoursTarget,
+  compact = false,
+}: YearComplianceMeterProps) {
   const [openRequests, setOpenRequests] = useState<OpenRequest[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [monthReport, setMonthReport] = useState<MonthReportData | null>(null);
@@ -184,17 +190,21 @@ export function YearComplianceMeter({ compliance, timezone, hoursTarget }: YearC
     !pendingForMonth(selectedMonth!);
 
   return (
-    <div className="card p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium">Year compliance ({compliance.fiscalYearLabel})</p>
-          <p className="mt-1 text-xs text-muted">
-            {targetDays} qualifying days per month. Green = met target or HR exemption logged by
-            admin. Click a month to view details or notify admin of an HR exemption you already have.
+    <div className={compact ? "card h-full p-4" : "card p-6"}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className={compact ? "text-xs font-medium" : "text-sm font-medium"}>
+            Year compliance ({compliance.fiscalYearLabel})
           </p>
+          {!compact && (
+            <p className="mt-1 text-xs text-muted">
+              {targetDays} qualifying days per month. Green = met target or HR exemption logged by
+              admin. Click a month to view details or notify admin of an HR exemption you already have.
+            </p>
+          )}
         </div>
         <span
-          className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium ${allElapsedCompliant ? "badge-met" : "badge-pending"}`}
+          className={`shrink-0 rounded-full font-medium ${compact ? "px-2 py-0.5 text-xs" : "px-3 py-1 text-sm"} ${allElapsedCompliant ? "badge-met" : "badge-pending"}`}
         >
           {fullYearCompliant
             ? "Full year met"
@@ -205,8 +215,10 @@ export function YearComplianceMeter({ compliance, timezone, hoursTarget }: YearC
       </div>
 
       {compliance.monthDetails.length > 0 && (
-        <div className="mt-4">
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+        <div className={compact ? "mt-3" : "mt-4"}>
+          <div
+            className={`grid gap-1.5 sm:gap-2 ${compact ? "grid-cols-4 sm:grid-cols-6" : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6"}`}
+          >
             {compliance.monthDetails.map((month) => {
               const visual = getYearMonthVisualStatus(month, currentMonth);
               const pending = pendingForMonth(month.monthKey);
@@ -221,7 +233,7 @@ export function YearComplianceMeter({ compliance, timezone, hoursTarget }: YearC
                       type="button"
                       title={tooltip}
                       onClick={() => canSelect && selectMonth(month.monthKey)}
-                      className={`flex w-full flex-col items-center justify-center rounded-md px-2 py-3 text-xs font-semibold transition-opacity ${monthCellClassName(visual, month.hasPendingExemption, month.hasPendingPriorCompliance)} ${canSelect ? "cursor-pointer hover:opacity-90" : "cursor-default"} ${isSelected ? "ring-2 ring-[var(--pwc-orange)]/70" : ""}`}
+                      className={`flex w-full flex-col items-center justify-center rounded-md font-semibold transition-opacity ${compact ? "px-1 py-2 text-[10px] sm:text-xs" : "px-2 py-3 text-xs"} ${monthCellClassName(visual, month.hasPendingExemption, month.hasPendingPriorCompliance)} ${canSelect ? "cursor-pointer hover:opacity-90" : "cursor-default"} ${isSelected ? "ring-2 ring-[var(--pwc-orange)]/70" : ""}`}
                     >
                       {monthAbbrev(month.monthKey, timezone)}
                     </button>
