@@ -134,6 +134,7 @@ If Vercel shows vars like `DATABASE_URL_POSTGRES_URL`, `DATABASE_URL_DATABASE_UR
 | `ALLOW_REGISTRATION` | `false` blocks legacy `/register` only. OTP self-registration uses the admin toggle (default on). |
 | `DEFAULT_OFFICE_SSIDS` | `OfficeConnect,ExternalConnect,pwcglb.com` |
 | `POWER_AUTOMATE_WEBHOOK_URL` | Power Automate HTTP trigger URL. See [docs/power-automate.md](docs/power-automate.md) |
+| `POWER_AUTOMATE_WEBHOOK_SECRET` | `X-Office-Pulse-Token` header secret (recommended; survives AUTH_SECRET rotation) |
 
 6. Deploy
 

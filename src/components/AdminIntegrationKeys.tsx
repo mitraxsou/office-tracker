@@ -25,9 +25,11 @@ function formatDate(iso: string | null) {
 export function AdminIntegrationKeys({
   initialKeys,
   webhookConfigured,
+  envSecretConfigured,
 }: {
   initialKeys: IntegrationKeyRow[];
   webhookConfigured: boolean;
+  envSecretConfigured: boolean;
 }) {
   const router = useRouter();
   const [keys, setKeys] = useState(initialKeys);
@@ -134,6 +136,7 @@ export function AdminIntegrationKeys({
 
   const activeKeys = keys.filter((k) => !k.revokedAt);
   const revokedKeys = keys.filter((k) => k.revokedAt);
+  const secretReady = envSecretConfigured || activeKeys.length > 0;
 
   return (
     <section className="card p-6">
@@ -143,6 +146,14 @@ export function AdminIntegrationKeys({
         the same value in <code className="rounded bg-[var(--border)] px-1">X-Office-Pulse-Token</code>.
         The secret is shown once. Generating a new secret revokes the current one.
       </p>
+
+      {envSecretConfigured && (
+        <div className="mb-4 rounded-lg border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm text-green-200">
+          <span className="font-medium">POWER_AUTOMATE_WEBHOOK_SECRET</span> is set in the server
+          environment and takes precedence over any secret generated below. Update the Power
+          Automate Condition to match that value.
+        </div>
+      )}
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border)] px-4 py-3">
         <div className="text-sm">
@@ -155,7 +166,7 @@ export function AdminIntegrationKeys({
         <button
           type="button"
           onClick={handleTest}
-          disabled={testing || !webhookConfigured || activeKeys.length === 0}
+          disabled={testing || !webhookConfigured || !secretReady}
           className="btn-secondary px-3 py-2 text-sm disabled:opacity-50"
         >
           {testing ? "Sending..." : "Send test notification"}
@@ -221,10 +232,19 @@ export function AdminIntegrationKeys({
             </tr>
           </thead>
           <tbody>
-            {activeKeys.length === 0 && (
+            {activeKeys.length === 0 && !envSecretConfigured && (
               <tr>
                 <td colSpan={5} className="py-4 text-muted">
-                  No active secret. Generate one above, then paste it into the Power Automate Condition.
+                  No active secret. Set POWER_AUTOMATE_WEBHOOK_SECRET in Vercel, or generate one
+                  above and paste it into the Power Automate Condition.
+                </td>
+              </tr>
+            )}
+            {activeKeys.length === 0 && envSecretConfigured && (
+              <tr>
+                <td colSpan={5} className="py-4 text-muted">
+                  Using the server environment secret. DB-generated secrets below are optional
+                  fallbacks when the env var is unset.
                 </td>
               </tr>
             )}

@@ -29,10 +29,12 @@ const alert: IntegrationAlert = {
 describe("Power Automate webhook secrets", () => {
   const originalAuthSecret = process.env.AUTH_SECRET;
   const originalWebhookUrl = process.env.POWER_AUTOMATE_WEBHOOK_URL;
+  const originalWebhookSecret = process.env.POWER_AUTOMATE_WEBHOOK_SECRET;
 
   beforeEach(() => {
     process.env.AUTH_SECRET = "test-auth-secret-that-is-at-least-32-characters";
     delete process.env.POWER_AUTOMATE_WEBHOOK_URL;
+    delete process.env.POWER_AUTOMATE_WEBHOOK_SECRET;
   });
 
   afterEach(() => {
@@ -41,6 +43,8 @@ describe("Power Automate webhook secrets", () => {
     else process.env.AUTH_SECRET = originalAuthSecret;
     if (originalWebhookUrl === undefined) delete process.env.POWER_AUTOMATE_WEBHOOK_URL;
     else process.env.POWER_AUTOMATE_WEBHOOK_URL = originalWebhookUrl;
+    if (originalWebhookSecret === undefined) delete process.env.POWER_AUTOMATE_WEBHOOK_SECRET;
+    else process.env.POWER_AUTOMATE_WEBHOOK_SECRET = originalWebhookSecret;
   });
 
   it("generates a 32-byte hex secret", () => {
@@ -122,5 +126,21 @@ describe("Power Automate webhook secrets", () => {
     expect(body.otp).toBe("123456");
     expect(body).not.toHaveProperty("notifyEmail");
     expect(body).not.toHaveProperty("dashboardUrl");
+  });
+
+  it("uses POWER_AUTOMATE_WEBHOOK_SECRET env without calling getSecret", async () => {
+    process.env.POWER_AUTOMATE_WEBHOOK_SECRET = "env-header-secret";
+    const fetcher = vi.fn().mockResolvedValue(new Response(null, { status: 202 }));
+    const markUsed = vi.fn().mockResolvedValue(undefined);
+    const result = await dispatchAlert(alert, {
+      webhookUrl: "https://example.invalid/webhook",
+      fetcher,
+      markUsed,
+    });
+
+    expect(result).toMatchObject({ sent: true, skipped: false });
+    const [, init] = fetcher.mock.calls[0];
+    expect(init.headers["X-Office-Pulse-Token"]).toBe("env-header-secret");
+    expect(markUsed).not.toHaveBeenCalled();
   });
 });

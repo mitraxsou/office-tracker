@@ -59,6 +59,7 @@ export default async function AdminSettingsPage() {
         <AdminIntegrationKeys
           initialKeys={integrationKeys}
           webhookConfigured={Boolean(process.env.POWER_AUTOMATE_WEBHOOK_URL?.trim())}
+          envSecretConfigured={Boolean(process.env.POWER_AUTOMATE_WEBHOOK_SECRET?.trim())}
         />
         <AdminDatabaseStats stats={databaseStats} />
         <AdminMaintenance />

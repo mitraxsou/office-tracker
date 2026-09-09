@@ -6,6 +6,7 @@ import {
   type IntegrationAlertType,
 } from "./integration-alerts";
 import {
+  ENV_WEBHOOK_SECRET_ID,
   getActiveIntegrationSecret,
   markIntegrationSecretUsed,
 } from "./integration-api-keys";
@@ -103,10 +104,12 @@ export async function postWebhookPayload(
       console.error(`[power-automate] Webhook returned HTTP ${response.status}`);
       return { ok: false, status: response.status };
     }
-    try {
-      await (dependencies.markUsed ?? markIntegrationSecretUsed)(config.activeSecret.id);
-    } catch {
-      console.error("[power-automate] Failed to update secret usage timestamp");
+    if (config.activeSecret.id !== ENV_WEBHOOK_SECRET_ID) {
+      try {
+        await (dependencies.markUsed ?? markIntegrationSecretUsed)(config.activeSecret.id);
+      } catch {
+        console.error("[power-automate] Failed to update secret usage timestamp");
+      }
     }
     return { ok: true, status: response.status };
   } catch {
@@ -166,7 +169,10 @@ async function dispatchAlerts(
     }
 
     if (appDelivered && teamsDelivered) {
-      const actorId = config?.activeSecret.actorId ?? alert.userId;
+      const actorId =
+        config?.activeSecret.actorId === ENV_WEBHOOK_SECRET_ID
+          ? alert.userId
+          : (config?.activeSecret.actorId ?? alert.userId);
       await acknowledgeIntegrationAlerts(actorId, [
         { userId: alert.userId, type: alert.type, dayKey: alert.dayKey },
       ]);

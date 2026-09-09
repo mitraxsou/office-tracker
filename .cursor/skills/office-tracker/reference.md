@@ -18,6 +18,7 @@
 | `AGENT_INSTALL_PATH` | Optional full path to `agent/` for local dev install copy |
 | `CRON_SECRET` | Bearer secret used by scheduled cron requests |
 | `POWER_AUTOMATE_WEBHOOK_URL` | Secret Power Automate HTTP trigger URL for outbound notifications |
+| `POWER_AUTOMATE_WEBHOOK_SECRET` | `X-Office-Pulse-Token` header secret (recommended on Vercel; env takes precedence over DB) |
 
 ## API routes
 

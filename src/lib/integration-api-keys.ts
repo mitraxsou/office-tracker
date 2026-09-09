@@ -2,8 +2,16 @@ import crypto from "node:crypto";
 import { prisma } from "./db";
 import { hashPassword } from "./auth";
 
+export const ENV_WEBHOOK_SECRET_ID = "env";
+
 export function generateIntegrationApiKey() {
   return crypto.randomBytes(32).toString("hex");
+}
+
+/** Server env secret for X-Office-Pulse-Token (survives AUTH_SECRET rotation). */
+export function getPowerAutomateWebhookSecretFromEnv(): string | null {
+  const secret = process.env.POWER_AUTOMATE_WEBHOOK_SECRET?.trim();
+  return secret || null;
 }
 
 function encryptionKey() {
@@ -92,6 +100,11 @@ export async function getActiveIntegrationSecret(): Promise<{
   actorId: string;
   secret: string;
 } | null> {
+  const envSecret = getPowerAutomateWebhookSecretFromEnv();
+  if (envSecret) {
+    return { id: ENV_WEBHOOK_SECRET_ID, actorId: ENV_WEBHOOK_SECRET_ID, secret: envSecret };
+  }
+
   const record = await prisma.integrationApiKey.findFirst({
     where: {
       revokedAt: null,

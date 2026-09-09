@@ -524,8 +524,9 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       {
         type: "list",
         items: [
-          "Generate X-Office-Pulse-Token secret for Power Automate Condition.",
+          "Set POWER_AUTOMATE_WEBHOOK_SECRET in Vercel (recommended) or generate X-Office-Pulse-Token secret in Global settings.",
           "Webhook URL lives in POWER_AUTOMATE_WEBHOOK_URL env (never shown in UI).",
+          "Env secret takes precedence over any DB-generated secret.",
           "Send test notification to your admin email.",
         ],
       },
@@ -578,7 +579,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
           },
           {
             problem: "Power Automate test fails",
-            fix: "Verify POWER_AUTOMATE_WEBHOOK_URL in Vercel. Confirm active webhook secret matches PA Condition. Check flow run history in Power Automate.",
+            fix: "Verify POWER_AUTOMATE_WEBHOOK_URL and POWER_AUTOMATE_WEBHOOK_SECRET in Vercel. Confirm the active secret matches the PA Condition. Check flow run history in Power Automate.",
           },
           {
             problem: "Save global config returns error",
@@ -610,7 +611,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         ordered: true,
         items: [
           "Set POWER_AUTOMATE_WEBHOOK_URL in Vercel to your HTTP trigger URL.",
-          "In Global settings, generate a webhook secret. Copy the full value once.",
+          "Set POWER_AUTOMATE_WEBHOOK_SECRET in Vercel (recommended), or generate a webhook secret in Global settings.",
           "In Power Automate, add a Condition on trigger header X-Office-Pulse-Token equals your secret.",
           "Parse JSON body fields (alert type, user email, message) in subsequent steps.",
           "Send test notification from Global settings to verify.",
@@ -882,11 +883,11 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         type: "list",
         ordered: true,
         items: [
-          "Verify Vercel env: AUTH_SECRET, NEXT_PUBLIC_APP_URL, POSTGRES_*, BREAKGLASS_*, POWER_AUTOMATE_WEBHOOK_URL.",
+          "Verify Vercel env: AUTH_SECRET, NEXT_PUBLIC_APP_URL, POSTGRES_*, BREAKGLASS_*, POWER_AUTOMATE_WEBHOOK_URL, POWER_AUTOMATE_WEBHOOK_SECRET.",
           "Sign in with breakglass. Re-seed office SSIDs and targets if reset.",
           "Re-create pilot users or re-enable OTP self-registration temporarily.",
           "Have users re-install agent with new tokens after a full reset.",
-          "Re-generate Power Automate webhook secret and update PA Condition.",
+          "Set or rotate POWER_AUTOMATE_WEBHOOK_SECRET in Vercel and update the PA Condition (or re-generate an admin DB secret if env is unset).",
         ],
       },
       {
