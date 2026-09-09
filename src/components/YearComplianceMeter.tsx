@@ -8,10 +8,28 @@ import {
   yearMonthTooltipText,
 } from "@/lib/monthly-progress";
 import { currentMonthKey, formatMonthLabel } from "@/lib/month-range";
+import { GroupedVisitList } from "@/components/reports/GroupedVisitList";
 
 type YearComplianceMeterProps = {
   compliance: YearCompliance;
   timezone: string;
+  hoursTarget: number;
+};
+
+type MonthReportData = {
+  dailyTrend: Array<{ date: string; totalHours: number; metTarget: boolean }>;
+  visits: Array<{
+    id: string;
+    startAt: string;
+    endAt: string | null;
+    source: string;
+    ssid: string | null;
+  }>;
+  monthlyProgress: {
+    qualifyingDays: number;
+    officeVisitDays: number;
+    monthlyDaysTarget: number;
+  };
 };
 
 type OpenRequest = {
@@ -42,9 +60,12 @@ function monthAbbrev(monthKey: string, timezone: string): string {
   return formatMonthLabel(monthKey, timezone).split(" ")[0]!.slice(0, 3);
 }
 
-export function YearComplianceMeter({ compliance, timezone }: YearComplianceMeterProps) {
+export function YearComplianceMeter({ compliance, timezone, hoursTarget }: YearComplianceMeterProps) {
   const [openRequests, setOpenRequests] = useState<OpenRequest[]>([]);
-  const [requestMonth, setRequestMonth] = useState<string | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [monthReport, setMonthReport] = useState<MonthReportData | null>(null);
+  const [monthLoading, setMonthLoading] = useState(false);
+  const [monthError, setMonthError] = useState<string | null>(null);
   const [requestType, setRequestType] = useState<"month" | "day">("month");
   const [requestDay, setRequestDay] = useState("");
   const [message, setMessage] = useState("");
@@ -64,12 +85,43 @@ export function YearComplianceMeter({ compliance, timezone }: YearComplianceMete
     void loadRequests();
   }, [loadRequests]);
 
+  useEffect(() => {
+    if (!selectedMonth) {
+      setMonthReport(null);
+      setMonthError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setMonthLoading(true);
+    setMonthError(null);
+
+    void fetch(`/api/user/reports?month=${encodeURIComponent(selectedMonth)}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Failed to load month details");
+        return res.json() as Promise<MonthReportData>;
+      })
+      .then((data) => {
+        if (!cancelled) setMonthReport(data);
+      })
+      .catch(() => {
+        if (!cancelled) setMonthError("Failed to load office days for this month.");
+      })
+      .finally(() => {
+        if (!cancelled) setMonthLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedMonth]);
+
   const allElapsedCompliant =
     compliance.monthsElapsed > 0 && compliance.compliantMonths === compliance.monthsElapsed;
   const fullYearCompliant = compliance.compliantMonths === compliance.monthsInYear;
 
   async function submitRequest() {
-    if (!requestMonth) return;
+    if (!selectedMonth) return;
     setSubmitting(true);
     setError(null);
     const res = await fetch("/api/settings/compliance-exemption", {
@@ -77,7 +129,7 @@ export function YearComplianceMeter({ compliance, timezone }: YearComplianceMete
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         type: requestType,
-        monthKey: requestType === "month" ? requestMonth : undefined,
+        monthKey: requestType === "month" ? selectedMonth : undefined,
         dayKey: requestType === "day" ? requestDay : undefined,
         message: message.trim() || undefined,
       }),
@@ -88,7 +140,7 @@ export function YearComplianceMeter({ compliance, timezone }: YearComplianceMete
       setError(data.error ?? "Failed to submit request");
       return;
     }
-    setRequestMonth(null);
+    setSelectedMonth(null);
     setRequestDay("");
     setMessage("");
     await loadRequests();
@@ -104,8 +156,8 @@ export function YearComplianceMeter({ compliance, timezone }: YearComplianceMete
     window.location.reload();
   }
 
-  function openRequestDialog(monthKey: string) {
-    setRequestMonth(monthKey);
+  function selectMonth(monthKey: string) {
+    setSelectedMonth(monthKey);
     setRequestType("month");
     setRequestDay(`${monthKey}-01`);
     setMessage("");
@@ -120,6 +172,11 @@ export function YearComplianceMeter({ compliance, timezone }: YearComplianceMete
     );
 
   const targetDays = compliance.monthDetails[0]?.monthlyDaysTarget ?? 8;
+  const selectedMonthDetail = compliance.monthDetails.find((m) => m.monthKey === selectedMonth);
+  const canRequestExemption =
+    !!selectedMonthDetail &&
+    (selectedMonthDetail.status === "not_met" || selectedMonthDetail.status === "no_data") &&
+    !pendingForMonth(selectedMonth!);
 
   return (
     <div className="card p-6">
@@ -148,9 +205,9 @@ export function YearComplianceMeter({ compliance, timezone }: YearComplianceMete
             {compliance.monthDetails.map((month) => {
               const visual = getYearMonthVisualStatus(month, currentMonth);
               const pending = pendingForMonth(month.monthKey);
-              const canRequest =
-                (month.status === "not_met" || month.status === "no_data") && !pending;
+              const canSelect = month.status !== "pending";
               const tooltip = yearMonthTooltipText(month, currentMonth, timezone);
+              const isSelected = selectedMonth === month.monthKey;
 
               return (
                 <div key={month.monthKey} className="flex flex-col items-stretch gap-1">
@@ -158,8 +215,8 @@ export function YearComplianceMeter({ compliance, timezone }: YearComplianceMete
                     <button
                       type="button"
                       title={tooltip}
-                      onClick={() => canRequest && openRequestDialog(month.monthKey)}
-                      className={`flex w-full flex-col items-center justify-center rounded-md px-2 py-3 text-xs font-semibold transition-opacity ${monthCellClassName(visual, month.hasPendingExemption)} ${canRequest ? "cursor-pointer hover:opacity-90" : "cursor-default"}`}
+                      onClick={() => canSelect && selectMonth(month.monthKey)}
+                      className={`flex w-full flex-col items-center justify-center rounded-md px-2 py-3 text-xs font-semibold transition-opacity ${monthCellClassName(visual, month.hasPendingExemption)} ${canSelect ? "cursor-pointer hover:opacity-90" : "cursor-default"} ${isSelected ? "ring-2 ring-[var(--pwc-orange)]/70" : ""}`}
                     >
                       {monthAbbrev(month.monthKey, timezone)}
                     </button>
@@ -205,70 +262,108 @@ export function YearComplianceMeter({ compliance, timezone }: YearComplianceMete
         </div>
       )}
 
-      {requestMonth && (
+      {selectedMonth && (
         <div className="mt-4 rounded-lg border border-[var(--border)] p-4">
-          <p className="text-sm font-medium">
-            Request HR exemption for {formatMonthLabel(requestMonth, timezone)}
-          </p>
-          <div className="mt-3 flex flex-wrap gap-3 text-sm">
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="exemption-type"
-                checked={requestType === "month"}
-                onChange={() => setRequestType("month")}
-              />
-              Whole month
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="radio"
-                name="exemption-type"
-                checked={requestType === "day"}
-                onChange={() => setRequestType("day")}
-              />
-              Single day
-            </label>
-          </div>
-          {requestType === "day" && (
-            <label className="mt-3 block text-sm">
-              <span className="text-muted">Day (YYYY-MM-DD)</span>
-              <input
-                type="date"
-                value={requestDay}
-                onChange={(e) => setRequestDay(e.target.value)}
-                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-              />
-            </label>
-          )}
-          <label className="mt-3 block text-sm">
-            <span className="text-muted">Reason (optional)</span>
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={2}
-              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-              placeholder="e.g. client travel, medical leave"
-            />
-          </label>
-          {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <p className="text-sm font-medium">
+              {formatMonthLabel(selectedMonth, timezone)} office days
+            </p>
             <button
               type="button"
-              disabled={submitting || (requestType === "day" && !requestDay)}
-              onClick={() => void submitRequest()}
-              className="btn-primary px-3 py-1.5 text-sm disabled:opacity-50"
-            >
-              {submitting ? "Submitting..." : "Submit exemption request"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setRequestMonth(null)}
+              onClick={() => setSelectedMonth(null)}
               className="text-sm text-muted hover:underline"
             >
-              Cancel
+              Close
             </button>
           </div>
+
+          {monthLoading && (
+            <p className="mt-3 text-sm text-muted">Loading office days...</p>
+          )}
+          {monthError && <p className="mt-3 text-sm text-red-400">{monthError}</p>}
+          {monthReport && !monthLoading && (
+            <>
+              <p className="mt-2 text-xs text-muted">
+                {monthReport.monthlyProgress.qualifyingDays}/
+                {monthReport.monthlyProgress.monthlyDaysTarget} qualifying days ·{" "}
+                {monthReport.monthlyProgress.officeVisitDays} day
+                {monthReport.monthlyProgress.officeVisitDays === 1 ? "" : "s"} with office
+                presence
+              </p>
+              <div className="mt-4">
+                {monthReport.visits.length === 0 ? (
+                  <p className="text-sm text-muted">No office visits recorded this month.</p>
+                ) : (
+                  <GroupedVisitList
+                    visits={monthReport.visits}
+                    dailyTrend={monthReport.dailyTrend}
+                    timezone={timezone}
+                    hoursTarget={hoursTarget}
+                  />
+                )}
+              </div>
+            </>
+          )}
+
+          {canRequestExemption && (
+            <div className="mt-4 border-t border-[var(--border)] pt-4">
+              <p className="text-sm font-medium">
+                Request HR exemption for {formatMonthLabel(selectedMonth, timezone)}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-3 text-sm">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="exemption-type"
+                    checked={requestType === "month"}
+                    onChange={() => setRequestType("month")}
+                  />
+                  Whole month
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="exemption-type"
+                    checked={requestType === "day"}
+                    onChange={() => setRequestType("day")}
+                  />
+                  Single day
+                </label>
+              </div>
+              {requestType === "day" && (
+                <label className="mt-3 block text-sm">
+                  <span className="text-muted">Day (YYYY-MM-DD)</span>
+                  <input
+                    type="date"
+                    value={requestDay}
+                    onChange={(e) => setRequestDay(e.target.value)}
+                    className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                  />
+                </label>
+              )}
+              <label className="mt-3 block text-sm">
+                <span className="text-muted">Reason (optional)</span>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={2}
+                  className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+                  placeholder="e.g. client travel, medical leave"
+                />
+              </label>
+              {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+              <div className="mt-3">
+                <button
+                  type="button"
+                  disabled={submitting || (requestType === "day" && !requestDay)}
+                  onClick={() => void submitRequest()}
+                  className="btn-primary px-3 py-1.5 text-sm disabled:opacity-50"
+                >
+                  {submitting ? "Submitting..." : "Submit exemption request"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

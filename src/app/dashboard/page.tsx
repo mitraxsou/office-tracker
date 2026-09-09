@@ -155,7 +155,11 @@ export default async function DashboardPage() {
           totalHours={monthlyProgress.totalHours}
         />
 
-        <YearComplianceMeter compliance={yearCompliance} timezone={user.timezone} />
+        <YearComplianceMeter
+          compliance={yearCompliance}
+          timezone={user.timezone}
+          hoursTarget={hoursTarget}
+        />
 
         <div className="grid gap-4 md:grid-cols-3">
           <StatusCard
