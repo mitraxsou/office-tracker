@@ -1,4 +1,4 @@
-# PwC Office Pulse agent updater. Downloads latest scripts from the server.
+# My Office Pulse agent updater. Downloads latest scripts from the server.
 # NO admin required. Safe to run manually or from the heartbeat auto-update check.
 #
 # Usage:
@@ -17,8 +17,8 @@ param(
 $ErrorActionPreference = "Stop"
 $TaskName = "PwCOfficePulse"
 $UpdateTaskName = "PwCOfficePulseUpdate"
-$TaskDescription = "PwC Office Pulse - office hours tracker"
-$UpdateTaskDescription = "PwC Office Pulse - hourly agent update check"
+$TaskDescription = "My Office Pulse - office hours tracker"
+$UpdateTaskDescription = "My Office Pulse - hourly agent update check"
 $LegacyTaskNames = @("OfficeTrackerHeartbeat", "PwCOfficePulse")
 $ExtractFolder = "PwCOfficePulse"
 $AgentFiles = @("office-heartbeat.ps1", "update.ps1", "uninstall.ps1", "install.ps1", "version.txt")
@@ -209,7 +209,7 @@ function Refresh-ScheduledTask {
     }
 
     $startupDir = [Environment]::GetFolderPath("Startup")
-    $shortcutPath = Join-Path $startupDir "PwC Office Pulse.lnk"
+    $shortcutPath = Join-Path $startupDir "My Office Pulse.lnk"
     $wsh = New-Object -ComObject WScript.Shell
     $shortcut = $wsh.CreateShortcut($shortcutPath)
     $shortcut.TargetPath = $wscript
@@ -319,7 +319,7 @@ try {
 
         Write-UpdateLog "OK updated to v$newVersion"
         if (-not $Silent) {
-            Write-Host "PwC Office Pulse updated to v$newVersion." -ForegroundColor Green
+            Write-Host "My Office Pulse updated to v$newVersion." -ForegroundColor Green
         }
     }
 } catch {

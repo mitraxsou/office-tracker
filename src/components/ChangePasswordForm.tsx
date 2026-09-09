@@ -60,7 +60,7 @@ export function ChangePasswordForm({ required, isBreakglass }: Props) {
       <h2 className="text-lg font-semibold">Change password</h2>
       {required && (
         <p className="mt-2 rounded-lg border border-[var(--pwc-orange)]/40 bg-[var(--pwc-orange-muted)]/20 px-3 py-2 text-sm">
-          Set a new password before using the rest of Office Pulse.
+          Set a new password before using the rest of My Office Pulse.
         </p>
       )}
       <p className="mt-2 text-sm text-muted">
@@ -111,7 +111,7 @@ export function ChangePasswordForm({ required, isBreakglass }: Props) {
 
       {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
       {success && (
-        <p className="mt-3 text-sm text-green-500">Password updated. You can continue using Office Pulse.</p>
+        <p className="mt-3 text-sm text-green-500">Password updated. You can continue using My Office Pulse.</p>
       )}
     </section>
   );

@@ -139,7 +139,7 @@ export function AdminIntegrationKeys({
     <section className="card p-6">
       <h2 className="mb-2 text-lg font-medium">Power Automate webhook secret</h2>
       <p className="mb-4 text-sm text-muted">
-        Generate one shared secret for the Power Automate trigger Condition. Office Pulse sends
+        Generate one shared secret for the Power Automate trigger Condition. My Office Pulse sends
         the same value in <code className="rounded bg-[var(--border)] px-1">X-Office-Pulse-Token</code>.
         The secret is shown once. Generating a new secret revokes the current one.
       </p>

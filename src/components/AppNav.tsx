@@ -9,6 +9,7 @@ import {
 } from "@/components/AppNavMobileMenu";
 import { destroySession, getCurrentUser, getImpersonationContext, getRealCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
+import { APP_NAME } from "@/lib/agent-branding";
 import { APP_VERSION } from "@/lib/app-version";
 import { getAdminInbox } from "@/lib/admin-inbox";
 import { AdminNotificationCorner } from "@/components/AdminNotificationCorner";
@@ -37,7 +38,7 @@ export async function AppNav() {
         <div className="mx-auto flex max-w-6xl min-w-0 items-center justify-between gap-3 px-4 py-4">
           <Link href="/help" className="flex min-w-0 shrink items-center gap-2 font-semibold">
             <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-[var(--pwc-orange)]" />
-            <span className="truncate">PwC Office Pulse</span>
+            <span className="truncate">{APP_NAME}</span>
           </Link>
           <div className="hidden items-center gap-3 md:flex">
             <ThemeToggle />
@@ -121,7 +122,7 @@ export async function AppNav() {
           <div className="flex min-w-0 items-center gap-6">
             <Link href="/dashboard" className="flex min-w-0 shrink items-center gap-2 font-semibold">
               <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-[var(--pwc-orange)]" />
-              <span className="truncate">PwC Office Pulse</span>
+              <span className="truncate">{APP_NAME}</span>
             </Link>
             <div className="hidden items-center gap-6 md:flex">
               <NavLinks links={navLinks} />

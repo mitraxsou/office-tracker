@@ -1,4 +1,4 @@
-# PwC Office Pulse installer. No admin required by default.
+# My Office Pulse installer. No admin required by default.
 #
 # Installs to:  %LOCALAPPDATA%\OfficeTracker\
 # Scheduled:   PwCOfficePulse task every 2 minutes (hidden via VBS wrapper)
@@ -23,8 +23,8 @@ param(
 $ErrorActionPreference = "Stop"
 $TaskName = "PwCOfficePulse"
 $UpdateTaskName = "PwCOfficePulseUpdate"
-$TaskDescription = "PwC Office Pulse - office hours tracker"
-$UpdateTaskDescription = "PwC Office Pulse - hourly agent update check"
+$TaskDescription = "My Office Pulse - office hours tracker"
+$UpdateTaskDescription = "My Office Pulse - hourly agent update check"
 $LegacyTaskNames = @("OfficeTrackerHeartbeat", "PwCOfficePulse")
 
 function Test-IsAdmin {
@@ -165,12 +165,12 @@ function Register-HiddenTask {
     }
 
     $startupDir = [Environment]::GetFolderPath("Startup")
-    foreach ($legacy in @("OfficeTrackerHeartbeat.lnk", "PwC Office Pulse.lnk")) {
+    foreach ($legacy in @("OfficeTrackerHeartbeat.lnk", "PwC Office Pulse.lnk", "My Office Pulse.lnk")) {
         $legacyPath = Join-Path $startupDir $legacy
         if (Test-Path $legacyPath) { Remove-Item $legacyPath -Force }
     }
 
-    $shortcutPath = Join-Path $startupDir "PwC Office Pulse.lnk"
+    $shortcutPath = Join-Path $startupDir "My Office Pulse.lnk"
     $wsh = New-Object -ComObject WScript.Shell
     $shortcut = $wsh.CreateShortcut($shortcutPath)
     $shortcut.TargetPath = $wscript
@@ -278,13 +278,13 @@ function Install-UserLevel {
     }
 
     if ($IsReinstall) {
-        Write-Host "PwC Office Pulse refreshed (existing install updated)." -ForegroundColor Green
+        Write-Host "My Office Pulse refreshed (existing install updated)." -ForegroundColor Green
     } else {
         Write-Host ""
-        Write-Host "PwC Office Pulse installed (user-level)" -ForegroundColor Green
+        Write-Host "My Office Pulse installed (user-level)" -ForegroundColor Green
         Write-Host "Install dir:     $installDir"
         Write-Host "Scheduled task:  $TaskName (hidden, every 2 min)"
-        Write-Host "Startup shortcut: PwC Office Pulse.lnk"
+        Write-Host "Startup shortcut: My Office Pulse.lnk"
         Write-Host "Config:          $(Join-Path $installDir 'config.json')"
         Write-Host ""
         Write-Host "The agent auto-updates silently when new versions are published."
@@ -324,7 +324,7 @@ function Install-AdminLevel {
     Register-HourlyUpdateTask -InstallDir $localConfigDir
 
     Write-Host ""
-    Write-Host "PwC Office Pulse installed (admin / Program Files)" -ForegroundColor Green
+    Write-Host "My Office Pulse installed (admin / Program Files)" -ForegroundColor Green
     Write-Host "Scripts:  $installDir"
     Write-Host "Config:   $(Join-Path $localConfigDir 'config.json')"
 }
@@ -332,7 +332,7 @@ function Install-AdminLevel {
 $isReinstall = Test-ExistingInstall
 
 if (-not $isReinstall) {
-    Write-Host "PwC Office Pulse installer"
+    Write-Host "My Office Pulse installer"
     Write-Host "Admin required: NO (default user-level install)"
     Write-Host ""
 }

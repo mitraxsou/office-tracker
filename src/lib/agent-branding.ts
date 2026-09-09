@@ -1,5 +1,8 @@
-/** User-facing product name for PwC Office Pulse agent */
-export const AGENT_PRODUCT_NAME = "PwC Office Pulse";
+/** User-facing web app and agent product name */
+export const APP_NAME = "My Office Pulse";
+
+/** @deprecated Use APP_NAME */
+export const AGENT_PRODUCT_NAME = APP_NAME;
 
 /** Windows Task Scheduler task name (no spaces, schtasks-safe) */
 export const AGENT_TASK_NAME = "PwCOfficePulse";
@@ -13,10 +16,14 @@ export const AGENT_INSTALL_FOLDER = "OfficeTracker";
 export const AGENT_INSTALL_DIR = `%LOCALAPPDATA%\\${AGENT_INSTALL_FOLDER}`;
 
 /** Startup shortcut filename */
-export const AGENT_STARTUP_SHORTCUT = "PwC Office Pulse.lnk";
+export const AGENT_STARTUP_SHORTCUT = "My Office Pulse.lnk";
 
 /** Legacy startup shortcuts removed on uninstall */
-export const LEGACY_STARTUP_SHORTCUTS = ["OfficeTrackerHeartbeat.lnk", "PwC Office Pulse.lnk"];
+export const LEGACY_STARTUP_SHORTCUTS = [
+  "OfficeTrackerHeartbeat.lnk",
+  "PwC Office Pulse.lnk",
+  "My Office Pulse.lnk",
+];
 
 /** Default folder name inside the agent zip */
 export const AGENT_EXTRACT_FOLDER = "PwCOfficePulse";

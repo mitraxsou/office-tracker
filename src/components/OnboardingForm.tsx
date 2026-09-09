@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AGENT_PRODUCT_NAME } from "@/lib/agent-branding";
+import { AGENT_PRODUCT_NAME, APP_NAME } from "@/lib/agent-branding";
 
 type Props = {
   currentEmail: string;
@@ -49,7 +49,7 @@ export function OnboardingForm({ currentEmail, currentName, canSetPassword }: Pr
 
   return (
     <section className="card border border-[var(--pwc-orange)]/40 p-6">
-      <h2 className="text-lg font-semibold">Welcome to PwC Office Pulse</h2>
+      <h2 className="text-lg font-semibold">Welcome to {APP_NAME}</h2>
       <p className="mt-2 text-sm text-muted">
         Your account is ready. Add a display name and optional password, then install the{" "}
         {AGENT_PRODUCT_NAME} agent on your laptop. Your install token was created automatically.

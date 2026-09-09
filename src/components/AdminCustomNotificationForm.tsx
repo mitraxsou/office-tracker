@@ -52,7 +52,7 @@ export function AdminCustomNotificationForm({
           maxLength={1000}
           rows={3}
           className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-          placeholder="Example: Please update the Office Pulse agent today."
+          placeholder="Example: Please update the My Office Pulse agent today."
         />
       </label>
       <label className="mt-3 block text-sm">

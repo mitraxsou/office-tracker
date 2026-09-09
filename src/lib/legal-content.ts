@@ -1,7 +1,7 @@
 export const HOBBY_DISCLAIMER = {
   title: "Hobby project disclaimer",
   paragraphs: [
-    "PwC Office Pulse (Office Tracker) is a hobby project built for fun and personal interest. It is not a PwC product, not official PwC tooling, and not endorsed by PwC.",
+    "My Office Pulse (Office Tracker) is a hobby project built for fun and personal interest. It is not a PwC product, not official PwC tooling, and not endorsed by PwC.",
     "The app and Windows agent are provided for educational and experimental use. You sign up and install the agent voluntarily, at your own interest and benefit.",
     "The developer is not responsible for any action, outcome, or improper use of the website, API, or Windows agent. Use at your own risk.",
   ],

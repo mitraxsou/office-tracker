@@ -3,7 +3,7 @@ import "./globals.css";
 import { themeInitScript } from "@/lib/theme";
 
 export const metadata: Metadata = {
-  title: "PwC Office Pulse | Office Tracker",
+  title: "My Office Pulse | Office Tracker",
   description: "Track your 5-hour office presence via Wi-Fi",
 };
 

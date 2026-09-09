@@ -1,8 +1,8 @@
-# PwC Office Pulse uninstaller. No admin for default user-level install.
+# My Office Pulse uninstaller. No admin for default user-level install.
 
 $ErrorActionPreference = "Stop"
 $LegacyTaskNames = @("OfficeTrackerHeartbeat", "PwCOfficePulse", "PwCOfficePulseUpdate")
-$LegacyStartupShortcuts = @("OfficeTrackerHeartbeat.lnk", "PwC Office Pulse.lnk")
+$LegacyStartupShortcuts = @("OfficeTrackerHeartbeat.lnk", "PwC Office Pulse.lnk", "My Office Pulse.lnk")
 
 function Write-UninstallLog([string]$Message) {
     $logDir = Join-Path $env:LOCALAPPDATA "OfficeTracker\logs"
@@ -53,7 +53,7 @@ function Send-LifecycleUninstall {
     }
 }
 
-Write-Host "Uninstalling PwC Office Pulse..."
+Write-Host "Uninstalling My Office Pulse..."
 
 $configPath = Join-Path $env:LOCALAPPDATA "OfficeTracker\config.json"
 if (Test-Path $configPath) {

@@ -280,7 +280,7 @@ export function LoginForm({
       </div>
 
       <p className="mt-4 text-center text-sm text-muted">
-        New to Office Pulse?{" "}
+        New to My Office Pulse?{" "}
         <Link href="/help" className="text-accent hover:underline">
           Read the setup guide
         </Link>

@@ -76,7 +76,7 @@ export async function buildUserComplianceCsvSections(
   const officeDays = dailyRows.filter((r) => r[3] === "Yes").length;
 
   return [
-    csvSection("Office Pulse compliance export", ["Field", "Value"], [
+    csvSection("My Office Pulse compliance export", ["Field", "Value"], [
       ["Generated at", generatedAt],
       ["User", user.email],
       ["Name", user.name ?? ""],

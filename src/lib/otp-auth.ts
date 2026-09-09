@@ -72,7 +72,7 @@ export async function sendLoginOtp(email: string): Promise<SendOtpResult> {
     type: "login_otp",
     email: normalized,
     name: existing?.name ?? normalized.split("@")[0] ?? normalized,
-    message: `Your PwC Office Pulse sign-in code is ${code}. It expires in ${OTP_EXPIRES_MINUTES} minutes.`,
+    message: `Your My Office Pulse sign-in code is ${code}. It expires in ${OTP_EXPIRES_MINUTES} minutes.`,
     otp: code,
     otpExpiresMinutes: OTP_EXPIRES_MINUTES,
   });

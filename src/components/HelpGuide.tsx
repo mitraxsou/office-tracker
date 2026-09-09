@@ -6,7 +6,8 @@ import {
   AGENT_TASK_NAME,
   AGENT_ZIP_STEM,
 } from "@/lib/agent-branding";
-import { APP_VERSION, getCurrentRelease } from "@/lib/app-version";
+import { APP_VERSION, getCurrentRelease, getVisibleReleaseBullets } from "@/lib/app-version";
+import { APP_NAME } from "@/lib/agent-branding";
 
 type HelpGuideProps = {
   isLoggedIn: boolean;
@@ -25,7 +26,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold">How to use PwC Office Pulse</h1>
+        <h1 className="text-2xl font-semibold">How to use {APP_NAME}</h1>
         <p className="mt-2 text-muted">
           Step-by-step guide for the office presence pilot. You can read this before signing in.
           This is a hobby project for fun, not official PwC tooling.
@@ -120,7 +121,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
         <h2 className="text-lg font-medium text-accent">What&apos;s new in v{APP_VERSION}</h2>
         <p className="text-xs text-muted">Released {getCurrentRelease().date}</p>
         <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
-          {getCurrentRelease().bullets.map((bullet) => (
+          {getVisibleReleaseBullets(getCurrentRelease(), isAdmin).map((bullet) => (
             <li key={bullet}>{bullet}</li>
           ))}
         </ul>
@@ -129,7 +130,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
       <section className="card space-y-3 p-6">
         <SectionAnchor id="overview">What it does</SectionAnchor>
         <p className="text-sm text-muted">
-          PwC Office Pulse tracks whether you spend at least <strong>5 hours per day in the office</strong>{" "}
+          {APP_NAME} tracks whether you spend at least <strong>5 hours per day in the office</strong>{" "}
           during the pilot. A small Windows agent on your PwC laptop reports presence automatically while
           you are connected to office Wi-Fi. You can also check in or out manually if auto-detection fails.
         </p>
@@ -143,7 +144,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
       <section className="card space-y-3 p-6">
         <SectionAnchor id="legal">Terms and privacy</SectionAnchor>
         <p className="text-sm text-muted">
-          PwC Office Pulse is a voluntary hobby pilot. By signing in or installing the agent you
+          {APP_NAME} is a voluntary hobby pilot. By signing in or installing the agent you
           agree to the{" "}
           <Link href="/terms" className="text-accent hover:underline">
             Terms and Conditions
@@ -410,7 +411,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             <dt className="font-medium">Office schedule and alerts</dt>
             <dd className="mt-1 text-muted">
               Choose your usual office days (Wednesday and Friday by default) and a delivery channel
-              per alert: in the app only, Microsoft Teams only, or both. Office Pulse can tell you when
+              per alert: in the app only, Microsoft Teams only, or both. {APP_NAME} can tell you when
               office hours start, when you meet your daily target, or when the agent needs attention.
               A recent pulse on home or other non-office Wi-Fi is treated as working from home and does
               not trigger a not-in-office reminder. An admin can also send you a one-off in-app or Teams

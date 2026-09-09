@@ -219,7 +219,7 @@ export async function sendTestNotification(
       type: "hours_started",
       email: admin.email,
       name: admin.name ?? admin.email,
-      message: "This is a test notification from PwC Office Pulse.",
+      message: "This is a test notification from My Office Pulse.",
       hoursToday: 1,
       hoursTarget: 5,
       notifyTeams: true,

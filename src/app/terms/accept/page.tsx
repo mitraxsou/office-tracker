@@ -39,8 +39,8 @@ export default async function TermsAcceptPage({
             </h1>
             <p className="mt-2 text-sm text-muted">
               {isReaccept
-                ? `We published new Terms and Privacy Policy on ${updatedLabel}. Please review and accept to continue using PwC Office Pulse.`
-                : "Before using PwC Office Pulse, please read and accept the Terms and Privacy Policy."}
+                ? `We published new Terms and Privacy Policy on ${updatedLabel}. Please review and accept to continue using My Office Pulse.`
+                : "Before using My Office Pulse, please read and accept the Terms and Privacy Policy."}
             </p>
           </div>
 

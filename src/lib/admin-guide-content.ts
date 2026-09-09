@@ -20,12 +20,12 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       {
         type: "paragraph",
         text:
-          "PwC Office Pulse tracks whether pilot users spend at least the configured daily hours in the office (default 5 hours) and meet a monthly office-days target (default 8 days). A Windows agent on each PwC laptop sends heartbeats every 2 minutes. The web app stores visits, compliance, and admin settings in Postgres (Neon on Vercel).",
+          "My Office Pulse tracks whether pilot users spend at least the configured daily hours in the office (default 5 hours) and meet a monthly office-days target (default 8 days). A Windows agent on each PwC laptop sends heartbeats every 2 minutes. The web app stores visits, compliance, and admin settings in Postgres (Neon on Vercel).",
       },
       {
         type: "diagram",
         lines: [
-          "  Windows agent (PwC Office Pulse)",
+          "  Windows agent (My Office Pulse)",
           "       |  POST /api/heartbeat (token + serial + SSID)",
           "       v",
           "  Vercel / Next.js app  <---- session cookie ----  Web dashboard",
@@ -728,7 +728,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       {
         type: "paragraph",
         text:
-          "The Windows agent (PwC Office Pulse) runs every 2 minutes via scheduled task PwCOfficePulse. No IT admin rights required for default install to %LOCALAPPDATA%\\OfficeTracker\\.",
+          "The Windows agent (My Office Pulse) runs every 2 minutes via scheduled task PwCOfficePulse. No IT admin rights required for default install to %LOCALAPPDATA%\\OfficeTracker\\.",
       },
       {
         type: "subheading",
@@ -800,7 +800,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       {
         type: "list",
         items: [
-          "Q: Is this official PwC software? A: No. Office Pulse is a voluntary hobby pilot, not IT-approved production tooling.",
+          "Q: Is this official PwC software? A: No. My Office Pulse is a voluntary hobby pilot, not IT-approved production tooling.",
           "Q: Can users see office SSID names? A: No. SSIDs are server-side only. Users see whether they are in office, not which network matched.",
           "Q: Does VPN count as office? A: No. GlobalProtect and other VPNs are ignored for presence.",
           "Q: How many laptops per person? A: Configurable max (default from global settings). One token per laptop.",
@@ -821,7 +821,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       {
         type: "paragraph",
         text:
-          "Office Pulse is a hobby project for a small pilot. It is not supported by PwC IT, Global Security, or HR systems of record.",
+          "My Office Pulse is a hobby project for a small pilot. It is not supported by PwC IT, Global Security, or HR systems of record.",
       },
       {
         type: "list",

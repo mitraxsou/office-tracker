@@ -121,7 +121,7 @@ export function AdminGuide() {
       <div className="min-w-0 space-y-6">
         <div className="card p-4 text-sm text-muted lg:hidden">
           <p>
-            Full admin reference for PwC Office Pulse. Use the section list above to jump. On desktop,
+            Full admin reference for My Office Pulse. Use the section list above to jump. On desktop,
             the nav stays visible while you scroll.
           </p>
         </div>

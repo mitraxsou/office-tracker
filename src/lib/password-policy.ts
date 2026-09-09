@@ -37,12 +37,12 @@ export function buildPasswordResetMailto(params: {
   tempPassword: string;
   loginUrl: string;
 }): string {
-  const subject = encodeURIComponent("PwC Office Pulse - temporary password");
+  const subject = encodeURIComponent("My Office Pulse - temporary password");
   const body = encodeURIComponent(
     [
       "Hello,",
       "",
-      "Your PwC Office Pulse password has been reset.",
+      "Your My Office Pulse password has been reset.",
       "",
       `Temporary password: ${params.tempPassword}`,
       "",

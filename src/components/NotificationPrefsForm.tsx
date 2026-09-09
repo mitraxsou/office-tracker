@@ -51,19 +51,19 @@ const ADVANCED_ALERT_ROWS: Array<{
     enabledKey: "alertIfNotInOffice",
     channelKey: "channelNotInOffice",
     label: "Remind me if the agent has no Wi-Fi name (after grace period)",
-    help: "On a usual office day, after start time plus grace, Office Pulse reminds you if the agent is healthy but cannot report a Wi-Fi name. Working from home on a known non-office network does not trigger this. Default delivery is in the app only.",
+    help: "On a usual office day, after start time plus grace, My Office Pulse reminds you if the agent is healthy but cannot report a Wi-Fi name. Working from home on a known non-office network does not trigger this. Default delivery is in the app only.",
   },
   {
     enabledKey: "alertIfAgentStale",
     channelKey: "channelAgentStale",
     label: "Remind me if the agent stops sending heartbeats",
-    help: "On a usual office day, after start time plus grace, Office Pulse reminds you if a registered laptop has gone quiet past the stale threshold. Default delivery is in the app only.",
+    help: "On a usual office day, after start time plus grace, My Office Pulse reminds you if a registered laptop has gone quiet past the stale threshold. Default delivery is in the app only.",
   },
   {
     enabledKey: "alertIfBehindHours",
     channelKey: "channelBehindHours",
     label: "Remind me if I am behind on hours by a set time",
-    help: "On a usual office day, after the check time you set below, Office Pulse reminds you if logged office hours are still below the minimum you chose. Off by default. Default delivery is in the app only.",
+    help: "On a usual office day, after the check time you set below, My Office Pulse reminds you if logged office hours are still below the minimum you chose. Off by default. Default delivery is in the app only.",
   },
 ];
 
@@ -232,7 +232,7 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
         <span>
           <span className="font-medium">Enable notifications</span>
           <span className="mt-0.5 block text-xs text-muted">
-            Turn off to stop all in-app and Teams alerts from Office Pulse.
+            Turn off to stop all in-app and Teams alerts from My Office Pulse.
           </span>
         </span>
       </label>

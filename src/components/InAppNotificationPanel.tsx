@@ -43,7 +43,7 @@ export function InAppNotificationPanel({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="font-medium text-[var(--pwc-orange)]">
-                {TITLES[item.type] ?? "Office Pulse"}
+                {TITLES[item.type] ?? "My Office Pulse"}
               </p>
               <p className="mt-1 text-sm text-muted">{item.message}</p>
             </div>

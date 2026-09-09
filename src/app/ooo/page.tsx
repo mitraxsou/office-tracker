@@ -26,7 +26,7 @@ export default async function OutOfOfficePage({
       <main className="mx-auto max-w-lg px-4 py-16 text-center">
         <h1 className="text-xl font-semibold text-green-400">You&apos;re marked out of office</h1>
         <p className="mt-3 text-sm text-muted">
-          No Office Pulse reminders will be sent for{" "}
+          No My Office Pulse reminders will be sent for{" "}
           <strong className="text-foreground">{result.dayKey}</strong>.
           {result.name || result.email ? (
             <>
