@@ -148,7 +148,7 @@ git -c user.name="mitraxsou" -c user.email="16998608+mitraxsou@users.noreply.git
 4. `prisma` provider **postgresql**; schema uses `POSTGRES_PRISMA_URL` + `POSTGRES_URL_NON_POOLING`
 5. Release: PR `dev` → `production` only after review
 6. Agent install commands on laptops use **production** `NEXT_PUBLIC_APP_URL` only
-7. **One-time dashboard:** set Production Branch on each Vercel project (`production` on `office-tracker`, `dev` on `office-tracker-dev`) - see `docs/deploy-branches.md`
+7. Production branches verified: `production` on `office-tracker`, `dev` on `office-tracker-dev` — see `docs/deploy-branches.md`
 
 ## Common pitfalls
 

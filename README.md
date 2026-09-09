@@ -21,8 +21,6 @@ The Windows agent is branded **PwC Office Pulse**.
 
 Release workflow: PR to `dev` (auto-deploy dev) → PR `dev` → `production` (auto-deploy prod). See [docs/deploy-branches.md](docs/deploy-branches.md).
 
-**One-time:** In each Vercel project, set **Production Branch** in Git settings (`dev` on `office-tracker-dev`, `production` on `office-tracker`). The API does not reliably apply this change.
-
 **Legal (in app):** `/terms` · `/privacy` · `/help`
 
 ---
