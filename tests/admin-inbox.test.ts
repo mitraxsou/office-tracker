@@ -11,7 +11,8 @@ describe("admin inbox count", () => {
         compliance_exemption: 3,
         device_removal: 2,
         admin_contact: 1,
+        prior_compliance: 2,
       }),
-    ).toBe(13);
+    ).toBe(15);
   });
 });

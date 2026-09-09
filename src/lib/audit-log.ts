@@ -58,7 +58,11 @@ export type AuditAction =
   | "terms.accepted"
   | "legal.publish"
   | "admin_contact_submit"
-  | "admin_contact_resolve";
+  | "admin_contact_resolve"
+  | "prior_compliance_request"
+  | "prior_compliance_cancel"
+  | "prior_compliance_approve"
+  | "prior_compliance_reject";
 
 export async function logAuditEvent(params: {
   actorId: string;

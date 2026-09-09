@@ -74,6 +74,15 @@ export function dayBoundsFromKey(dayKey: string, timezone: string) {
   return { dayKey, start, end };
 }
 
+export function datetimeInTimezone(
+  dayKey: string,
+  hour: number,
+  minute: number,
+  timezone: string,
+): Date {
+  return wallClockToUtc(dayKey, hour, minute, 0, 0, timezone);
+}
+
 /** True when `now` falls within [dayStart, dayEnd] inclusive. */
 export function isCurrentCalendarDay(dayStart: Date, dayEnd: Date, now: Date): boolean {
   const nowMs = now.getTime();

@@ -7,6 +7,7 @@ export const ADMIN_INBOX_KINDS = [
   "compliance_exemption",
   "device_removal",
   "admin_contact",
+  "prior_compliance",
 ] as const;
 
 export type AdminInboxKind = (typeof ADMIN_INBOX_KINDS)[number];
@@ -36,7 +37,8 @@ export async function getAdminInbox(): Promise<{
 }> {
   const { prisma } = await import("./db");
   const userSelect = { id: true, email: true, name: true } satisfies Prisma.UserSelect;
-  const [corrections, timezones, profiles, exemptions, removals, adminContacts] = await Promise.all([
+  const [corrections, timezones, profiles, exemptions, removals, adminContacts, priorCompliance] =
+    await Promise.all([
     prisma.visitCorrectionRequest.findMany({
       where: { status: "open" },
       select: { id: true, createdAt: true, message: true, user: { select: userSelect } },
@@ -80,6 +82,16 @@ export async function getAdminInbox(): Promise<{
         createdAt: true,
         category: true,
         message: true,
+        user: { select: userSelect },
+      },
+    }),
+    prisma.priorComplianceDeclaration.findMany({
+      where: { status: "open" },
+      select: {
+        id: true,
+        createdAt: true,
+        monthKey: true,
+        typicalCheckInTime: true,
         user: { select: userSelect },
       },
     }),
@@ -127,6 +139,14 @@ export async function getAdminInbox(): Promise<{
     ...adminContacts.map((row) =>
       item("admin_contact", "Reach out to admin", `${row.category}: ${row.message.slice(0, 80)}`, row),
     ),
+    ...priorCompliance.map((row) =>
+      item(
+        "prior_compliance",
+        "Prior compliance",
+        `${row.monthKey} · check-in ${row.typicalCheckInTime}`,
+        row,
+      ),
+    ),
   ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   const counts: AdminInboxCounts = {
@@ -136,6 +156,7 @@ export async function getAdminInbox(): Promise<{
     compliance_exemption: exemptions.length,
     device_removal: removals.length,
     admin_contact: adminContacts.length,
+    prior_compliance: priorCompliance.length,
   };
 
   return { counts, total: totalAdminInboxCount(counts), items };

@@ -408,6 +408,36 @@ export async function registerNode() {
       'CREATE INDEX IF NOT EXISTS "AdminContactSubmission_userId_idx" ON "AdminContactSubmission"("userId");'
     );
     await prisma.$executeRawUnsafe(
+      'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "priorComplianceOnboardingAt" TIMESTAMP(3);'
+    );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "PriorComplianceDeclaration" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "monthKey" TEXT NOT NULL,
+        "typicalCheckInTime" TEXT NOT NULL,
+        "qualifyingDaysCount" INTEGER NOT NULL,
+        "message" TEXT,
+        "status" TEXT NOT NULL DEFAULT 'open',
+        "source" TEXT NOT NULL DEFAULT 'onboarding',
+        "adminNote" TEXT,
+        "reviewedAt" TIMESTAMP(3),
+        "reviewedById" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "PriorComplianceDeclaration_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "PriorComplianceDeclaration_status_createdAt_idx" ON "PriorComplianceDeclaration"("status", "createdAt");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "PriorComplianceDeclaration_userId_idx" ON "PriorComplianceDeclaration"("userId");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "PriorComplianceDeclaration_userId_monthKey_idx" ON "PriorComplianceDeclaration"("userId", "monthKey");'
+    );
+    await prisma.$executeRawUnsafe(
       'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "allowOtpSelfRegistration" BOOLEAN NOT NULL DEFAULT true;'
     );
     await prisma.$executeRawUnsafe(

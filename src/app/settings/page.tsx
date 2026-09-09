@@ -18,7 +18,9 @@ import {
 } from "@/lib/profile-change-requests";
 import { AppNav } from "@/components/AppNav";
 import { SettingsPageClient } from "@/components/SettingsPageClient";
+import { PriorComplianceSettings } from "@/components/PriorComplianceSettings";
 import { AGENT_PRODUCT_NAME } from "@/lib/agent-branding";
+import { needsPriorComplianceOnboarding } from "@/lib/prior-compliance";
 
 export default async function SettingsPage({
   searchParams,
@@ -46,7 +48,8 @@ export default async function SettingsPage({
   const showOnboarding = params.welcome === "1";
   const showInitialPassword =
     !isBreakglass && !mustChangePassword && canSetInitialPassword(user);
-
+  const needsPriorComplianceStep =
+    showOnboarding && (await needsPriorComplianceOnboarding(user.id));
   if (!mustChangePassword) {
     const settingsNext = params.welcome === "1" ? "/settings?welcome=1" : "/settings";
     await enforceTermsAcceptanceIfRequired(user, settingsNext);
@@ -76,8 +79,12 @@ export default async function SettingsPage({
             currentEmail={user.email}
             currentName={user.name}
             canSetPassword={showInitialPassword}
+            timezone={user.timezone}
+            needsPriorComplianceStep={needsPriorComplianceStep}
           />
         )}
+
+        {!showOnboarding && <PriorComplianceSettings timezone={user.timezone} />}
 
         {!showOnboarding && showInitialPassword && <SetInitialPasswordForm />}
 

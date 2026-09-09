@@ -40,8 +40,13 @@ type OpenRequest = {
   status: string;
 };
 
-function monthCellClassName(visual: YearMonthVisualStatus, hasPendingExemption?: boolean): string {
-  const pendingRing = hasPendingExemption ? " ring-1 ring-amber-500/50" : "";
+function monthCellClassName(
+  visual: YearMonthVisualStatus,
+  hasPendingExemption?: boolean,
+  hasPendingPriorCompliance?: boolean,
+): string {
+  const pendingRing =
+    hasPendingExemption || hasPendingPriorCompliance ? " ring-1 ring-amber-500/50" : "";
   switch (visual) {
     case "compliant":
       return `bg-green-500/15 text-green-400 border border-green-500/30${pendingRing}`;
@@ -216,7 +221,7 @@ export function YearComplianceMeter({ compliance, timezone, hoursTarget }: YearC
                       type="button"
                       title={tooltip}
                       onClick={() => canSelect && selectMonth(month.monthKey)}
-                      className={`flex w-full flex-col items-center justify-center rounded-md px-2 py-3 text-xs font-semibold transition-opacity ${monthCellClassName(visual, month.hasPendingExemption)} ${canSelect ? "cursor-pointer hover:opacity-90" : "cursor-default"} ${isSelected ? "ring-2 ring-[var(--pwc-orange)]/70" : ""}`}
+                      className={`flex w-full flex-col items-center justify-center rounded-md px-2 py-3 text-xs font-semibold transition-opacity ${monthCellClassName(visual, month.hasPendingExemption, month.hasPendingPriorCompliance)} ${canSelect ? "cursor-pointer hover:opacity-90" : "cursor-default"} ${isSelected ? "ring-2 ring-[var(--pwc-orange)]/70" : ""}`}
                     >
                       {monthAbbrev(month.monthKey, timezone)}
                     </button>

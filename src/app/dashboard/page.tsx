@@ -9,6 +9,7 @@ import {
   getApprovedExemptionsForUser,
   getPendingExemptionMonthKeys,
 } from "@/lib/compliance-exemptions";
+import { getPendingPriorComplianceMonthKeys } from "@/lib/prior-compliance";
 import { isUserOutOfOffice } from "@/lib/out-of-office";
 import { AppNav } from "@/components/AppNav";
 import { ProgressMeter } from "@/components/ProgressMeter";
@@ -42,6 +43,7 @@ export default async function DashboardPage() {
   );
   const approvedExemptions = await getApprovedExemptionsForUser(user.id);
   const pendingExemptionMonthKeys = await getPendingExemptionMonthKeys(user.id);
+  const pendingPriorComplianceMonthKeys = await getPendingPriorComplianceMonthKeys(user.id);
   const monthlyProgress = await getMonthlyProgress(
     user.id,
     user.timezone,
@@ -60,6 +62,7 @@ export default async function DashboardPage() {
     approvedExemptions,
     pendingExemptionMonthKeys,
     config.pilotStartMonthKey,
+    pendingPriorComplianceMonthKeys,
   );
   const pulse = await getPulseStats(user.id, graceHours);
   const isOutToday = await isUserOutOfOffice(user.id, summary.dayKey);

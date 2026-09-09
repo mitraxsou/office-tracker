@@ -4,15 +4,27 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AGENT_PRODUCT_NAME, APP_NAME } from "@/lib/agent-branding";
+import { PriorComplianceOnboardingStep } from "@/components/PriorComplianceOnboardingStep";
 
 type Props = {
   currentEmail: string;
   currentName: string | null;
   canSetPassword: boolean;
+  timezone: string;
+  needsPriorComplianceStep: boolean;
 };
 
-export function OnboardingForm({ currentEmail, currentName, canSetPassword }: Props) {
+export function OnboardingForm({
+  currentEmail,
+  currentName,
+  canSetPassword,
+  timezone,
+  needsPriorComplianceStep,
+}: Props) {
   const router = useRouter();
+  const [step, setStep] = useState<"profile" | "prior_compliance">(
+    needsPriorComplianceStep && currentName ? "prior_compliance" : "profile",
+  );
   const [name, setName] = useState(currentName ?? "");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -44,7 +56,20 @@ export function OnboardingForm({ currentEmail, currentName, canSetPassword }: Pr
     }
 
     setSaved(true);
-    router.refresh();
+    if (needsPriorComplianceStep) {
+      setStep("prior_compliance");
+    } else {
+      router.refresh();
+    }
+  }
+
+  if (step === "prior_compliance") {
+    return (
+      <PriorComplianceOnboardingStep
+        timezone={timezone}
+        onComplete={() => router.refresh()}
+      />
+    );
   }
 
   return (
@@ -103,16 +128,26 @@ export function OnboardingForm({ currentEmail, currentName, canSetPassword }: Pr
 
         <div className="flex flex-wrap items-center gap-3">
           <button type="submit" disabled={saving} className="btn-primary px-4 py-2 disabled:opacity-50">
-            {saving ? "Saving..." : "Save and continue"}
+            {saving ? "Saving..." : needsPriorComplianceStep ? "Save and continue" : "Save and continue"}
           </button>
-          <Link href="/dashboard" className="text-sm text-accent hover:underline">
-            Skip for now
-          </Link>
+          {needsPriorComplianceStep ? (
+            <button
+              type="button"
+              onClick={() => setStep("prior_compliance")}
+              className="text-sm text-accent hover:underline"
+            >
+              Skip profile for now
+            </button>
+          ) : (
+            <Link href="/dashboard" className="text-sm text-accent hover:underline">
+              Skip for now
+            </Link>
+          )}
         </div>
       </form>
 
       {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
-      {saved && (
+      {saved && !needsPriorComplianceStep && (
         <p className="mt-3 text-sm text-green-500">
           Profile saved. Copy the install command in the section below, or open the dashboard.
         </p>

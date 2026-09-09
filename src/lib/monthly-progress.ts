@@ -106,6 +106,7 @@ export type YearMonthCompliance = {
   status: YearMonthComplianceStatus;
   noDataReason?: YearMonthNoDataReason;
   hasPendingExemption?: boolean;
+  hasPendingPriorCompliance?: boolean;
 };
 
 export type YearCompliance = {
@@ -155,9 +156,10 @@ export type YearMonthVisualStatus =
   | "pending";
 
 export function getYearMonthVisualStatus(
-  month: Pick<YearMonthCompliance, "monthKey" | "status">,
+  month: Pick<YearMonthCompliance, "monthKey" | "status" | "hasPendingPriorCompliance">,
   currentMonthKey: string,
 ): YearMonthVisualStatus {
+  if (month.hasPendingPriorCompliance) return "pending";
   if (month.status === "pending") return "pending";
   if (month.status === "no_data") return "no_data";
   if (month.status === "earned" || month.status === "exemption") return "compliant";
@@ -171,6 +173,9 @@ export function yearMonthTooltipText(
   timezone: string,
 ): string {
   const label = formatMonthLabel(month.monthKey, timezone);
+  if (month.hasPendingPriorCompliance) {
+    return `${label}: Prior compliance declaration pending admin review`;
+  }
   if (month.hasPendingExemption) {
     return `${label}: HR exemption pending admin review`;
   }
@@ -231,13 +236,18 @@ export function resolveMonthCompliance(params: {
   exemptDayKeysInMonth: string[];
   qualifyingDayKeys: Set<string>;
   hasPendingExemption?: boolean;
-}): Pick<YearMonthCompliance, "metTarget" | "qualifyingDays" | "status" | "hasPendingExemption"> {
+  hasPendingPriorCompliance?: boolean;
+}): Pick<
+  YearMonthCompliance,
+  "metTarget" | "qualifyingDays" | "status" | "hasPendingExemption" | "hasPendingPriorCompliance"
+> {
   if (params.monthKey > params.currentMonthKey) {
     return {
       metTarget: false,
       qualifyingDays: params.qualifyingDays,
       status: "pending",
       hasPendingExemption: params.hasPendingExemption,
+      hasPendingPriorCompliance: params.hasPendingPriorCompliance,
     };
   }
 
@@ -247,6 +257,7 @@ export function resolveMonthCompliance(params: {
       qualifyingDays: params.qualifyingDays,
       status: "exemption",
       hasPendingExemption: params.hasPendingExemption,
+      hasPendingPriorCompliance: params.hasPendingPriorCompliance,
     };
   }
 
@@ -266,6 +277,7 @@ export function resolveMonthCompliance(params: {
     qualifyingDays: effectiveQualifyingDays,
     status,
     hasPendingExemption: params.hasPendingExemption,
+    hasPendingPriorCompliance: params.hasPendingPriorCompliance,
   };
 }
 
@@ -356,6 +368,7 @@ export async function getYearCompliance(
   approvedExemptions?: ApprovedExemptions,
   pendingExemptionMonthKeys: string[] = [],
   pilotStartMonthKey: string = DEFAULT_PILOT_START_MONTH_KEY,
+  pendingPriorComplianceMonthKeys: string[] = [],
 ): Promise<YearCompliance> {
   const appConfig = await getAppConfig();
   const fyConfig = fiscalYearConfigFromApp(appConfig);
@@ -365,6 +378,7 @@ export async function getYearCompliance(
   const monthsElapsed = monthKeys.filter((monthKey) => monthKey <= currentMonthKey).length;
   const exemptions = approvedExemptions ?? { monthKeys: [], dayKeys: [] };
   const pendingMonths = new Set(pendingExemptionMonthKeys);
+  const pendingPriorMonths = new Set(pendingPriorComplianceMonthKeys);
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { createdAt: true },
@@ -381,6 +395,7 @@ export async function getYearCompliance(
           monthlyDaysTarget,
           status: "pending" as const,
           hasPendingExemption: pendingMonths.has(monthKey),
+          hasPendingPriorCompliance: pendingPriorMonths.has(monthKey),
         };
       }
 
@@ -405,6 +420,7 @@ export async function getYearCompliance(
         exemptDayKeysInMonth,
         qualifyingDayKeys,
         hasPendingExemption: pendingMonths.has(monthKey),
+        hasPendingPriorCompliance: pendingPriorMonths.has(monthKey),
       });
 
       if (!hasOfficeData && resolved.status !== "exemption") {
@@ -424,6 +440,7 @@ export async function getYearCompliance(
           status: "no_data" as const,
           noDataReason,
           hasPendingExemption: pendingMonths.has(monthKey),
+          hasPendingPriorCompliance: pendingPriorMonths.has(monthKey),
         };
       }
 

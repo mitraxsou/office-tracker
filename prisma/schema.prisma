@@ -44,6 +44,7 @@ model User {
   passwordResetAt    DateTime?
   termsAcceptedAt      DateTime?
   termsAcceptedVersion Int?
+  priorComplianceOnboardingAt DateTime?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
   agentTokens  AgentToken[]
@@ -69,6 +70,8 @@ model User {
   reviewedComplianceExemptionRequests ComplianceExemptionRequest[] @relation("ComplianceExemptionReviewer")
   adminContactSubmissions AdminContactSubmission[]
   reviewedAdminContactSubmissions AdminContactSubmission[] @relation("AdminContactReviewer")
+  priorComplianceDeclarations PriorComplianceDeclaration[]
+  reviewedPriorComplianceDeclarations PriorComplianceDeclaration[] @relation("PriorComplianceReviewer")
   agentLifecycleEvents AgentLifecycleEvent[]
 }
 
@@ -281,6 +284,28 @@ model ComplianceExemptionRequest {
   @@index([userId])
   @@index([userId, monthKey])
   @@index([userId, dayKey])
+}
+
+model PriorComplianceDeclaration {
+  id                   String   @id @default(cuid())
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monthKey             String
+  typicalCheckInTime   String
+  qualifyingDaysCount  Int
+  message              String?
+  status               String   @default("open")
+  source               String   @default("onboarding")
+  adminNote            String?
+  reviewedAt           DateTime?
+  reviewedById         String?
+  reviewedBy           User?    @relation("PriorComplianceReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId])
+  @@index([userId, monthKey])
 }
 
 model AdminContactSubmission {
