@@ -45,3 +45,4 @@ prisma/prisma/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.env*

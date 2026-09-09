@@ -19,9 +19,11 @@ Web dashboard ← session cookie              Admin /admin ← role=admin
 Config: GET /api/agent/config (Bearer token) — SSIDs & hours target server-side only
 ```
 
-- **Local dev:** SQLite `file:./prisma/dev.db`, `npm run dev` → http://localhost:3000
-- **Production:** Vercel + Neon Postgres; GitHub `mitraxsou/office-tracker`
-- **Do not** reuse `lsc-impact-analyser-dashboard` Vercel project
+- **Local dev:** Postgres via `.env.local`, `npm run dev` → http://localhost:3000
+- **Dev deploy:** branch `dev` → Vercel project `office-tracker-dev` → https://office-tracker-dev.vercel.app (separate Neon via Vercel Storage)
+- **Production:** branch `production` → Vercel project `office-tracker` → https://office-tracker-theta.vercel.app (Neon `neon-canary-blanket`)
+- **Workflow:** PR to `dev`, then PR `dev` → `production`. GitHub default branch is `dev`. See `docs/deploy-branches.md`
+- **Do not** reuse `lsc-impact-analyser-dashboard` Vercel project or point dev at prod Postgres
 
 ## Office presence rules
 
@@ -133,12 +135,19 @@ git -c user.name="mitraxsou" -c user.email="16998608+mitraxsou@users.noreply.git
 
 ## Deploy checklist (Vercel)
 
-1. Push to GitHub (private repo ok)
-2. Import in Vercel; **Storage → Postgres** → connect to project with **no env prefix** (auto-injects `POSTGRES_URL`, `POSTGRES_PRISMA_URL`, `POSTGRES_URL_NON_POOLING`). If prefixed as `DATABASE_URL_*`, delete and reconnect — app auto-maps prefixed vars as fallback.
-3. Set manual env: `AUTH_SECRET`, `NEXT_PUBLIC_APP_URL`, `BREAKGLASS_*`, `ALLOW_REGISTRATION=false`, `DEFAULT_OFFICE_SSIDS`
+**Two projects** (see `docs/deploy-branches.md`):
+
+| Project | Branch | URL |
+|---|---|---|
+| `office-tracker-dev` | `dev` | https://office-tracker-dev.vercel.app |
+| `office-tracker` | `production` | https://office-tracker-theta.vercel.app |
+
+1. Push/merge to the correct branch (not `main`)
+2. **Storage → Postgres** per project via `npx vercel integration add neon` (no env prefix). Prod DB vars must be **Production-only** on `office-tracker`
+3. Manual env per project: `AUTH_SECRET` (separate secrets), `NEXT_PUBLIC_APP_URL`, `BREAKGLASS_*`, `ALLOW_REGISTRATION=false`, `DEFAULT_OFFICE_SSIDS`, `RUN_DB_SETUP_ON_DEPLOY=true` on dev
 4. `prisma` provider **postgresql**; schema uses `POSTGRES_PRISMA_URL` + `POSTGRES_URL_NON_POOLING`
-5. Post-deploy: `npx vercel env pull` then `npm run db:push` and `npm run db:seed` against Neon
-6. Re-run agent install on laptops with **production URL**
+5. Release: PR `dev` → `production` only after review
+6. Agent install commands on laptops use **production** `NEXT_PUBLIC_APP_URL` only
 
 ## Common pitfalls
 

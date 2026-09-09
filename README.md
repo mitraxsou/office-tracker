@@ -12,7 +12,14 @@ GlobalProtect/VPN is logged for diagnostics only and **never** counts toward off
 
 The Windows agent is branded **PwC Office Pulse**.
 
-**Production:** https://github.com/mitraxsou/office-tracker → deploy on Vercel with Neon Postgres.
+**Repositories:** https://github.com/mitraxsou/office-tracker
+
+| Environment | URL | Branch | Vercel project |
+|---|---|---|---|
+| **Development** | https://office-tracker-dev.vercel.app | `dev` | `office-tracker-dev` |
+| **Production** | https://office-tracker-theta.vercel.app | `production` | `office-tracker` |
+
+Release workflow: PR to `dev` (auto-deploy dev) → PR `dev` → `production` (auto-deploy prod). See [docs/deploy-branches.md](docs/deploy-branches.md).
 
 **Legal (in app):** `/terms` · `/privacy` · `/help`
 
@@ -69,7 +76,8 @@ OTP request responses do not reveal whether an email is registered (anti-enumera
 | Environment | Database |
 |---|---|
 | **Local dev** | Neon Postgres (recommended) or local Postgres via `DATABASE_URL` or `POSTGRES_PRISMA_URL` |
-| **Production (Vercel)** | Vercel Storage → Postgres (Neon). Auto-injects `POSTGRES_*` env vars when linked to the project |
+| **Dev (Vercel)** | Vercel Storage Postgres on `office-tracker-dev` (`office-tracker-dev-db`) |
+| **Production (Vercel)** | Vercel Storage Postgres on `office-tracker` (`neon-canary-blanket`). Production-scoped env vars only |
 
 User identity is **email + userId** in the database. Visit history lives in Postgres, not on the laptop.
 
