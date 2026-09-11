@@ -1,19 +1,31 @@
-import { VISIT_DELETE_DENIED_MESSAGE } from "./visit-preservation";
+import {
+  VISIT_DELETE_DENIED_MESSAGE,
+  VISIT_DELETE_DENIED_NOT_OWNER_MESSAGE,
+} from "./visit-preservation";
 
 export type VisitOwnership = {
   userId: string;
   source: string;
 };
 
-/** Office visit records are immutable compliance data. */
-export function canUserDeleteVisit(_visit: VisitOwnership, _userId: string): boolean {
-  return false;
+export function canUserDeleteVisit(visit: VisitOwnership, userId: string): boolean {
+  return visit.userId === userId && visit.source === "manual";
 }
 
 export function canUserReportVisit(visit: { userId: string }, userId: string): boolean {
   return visit.userId === userId;
 }
 
-export function deleteVisitDeniedReason(_visit: VisitOwnership, _userId: string): string {
-  return VISIT_DELETE_DENIED_MESSAGE;
+/** Returns an error message when deletion is denied, or null when allowed. */
+export function deleteVisitDeniedReason(
+  visit: VisitOwnership,
+  userId: string,
+): string | null {
+  if (visit.userId !== userId) {
+    return VISIT_DELETE_DENIED_NOT_OWNER_MESSAGE;
+  }
+  if (visit.source !== "manual") {
+    return VISIT_DELETE_DENIED_MESSAGE;
+  }
+  return null;
 }

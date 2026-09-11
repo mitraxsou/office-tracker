@@ -708,7 +708,7 @@ export function AdminUserReport({
         <div>
           <h3 className="text-lg font-medium">Visit data</h3>
           <p className="mt-1 text-sm text-muted">
-            Compliance visit records are permanent. Admins can add or correct entries, not delete them.
+            Add, correct, or delete visit entries for this user in Visit data below.
           </p>
         </div>
         <ComplianceExportButton

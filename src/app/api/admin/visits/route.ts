@@ -4,7 +4,6 @@ import { prisma } from "@/lib/db";
 import { createManualVisit } from "@/lib/heartbeat-service";
 import { logAuditEvent } from "@/lib/audit-log";
 import { validateVisitTimestamps } from "@/lib/visit-validation";
-import { VISIT_DELETE_DENIED_MESSAGE } from "@/lib/visit-preservation";
 
 export async function GET(request: Request) {
   const admin = await requireAdmin();
@@ -169,6 +168,36 @@ export async function PATCH(request: Request) {
   return NextResponse.json({ visit });
 }
 
-export async function DELETE() {
-  return NextResponse.json({ error: VISIT_DELETE_DENIED_MESSAGE }, { status: 403 });
+export async function DELETE(request: Request) {
+  const admin = await requireAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "id required" }, { status: 400 });
+  }
+
+  const existing = await prisma.visit.findUnique({ where: { id } });
+  if (!existing) {
+    return NextResponse.json({ error: "Visit not found" }, { status: 404 });
+  }
+
+  await prisma.visit.delete({ where: { id } });
+
+  await logAuditEvent({
+    actorId: admin.id,
+    action: "visit_delete",
+    targetUserId: existing.userId,
+    details: {
+      visitId: id,
+      startAt: existing.startAt.toISOString(),
+      endAt: existing.endAt?.toISOString() ?? null,
+      source: existing.source,
+    },
+  });
+
+  return NextResponse.json({ ok: true });
 }

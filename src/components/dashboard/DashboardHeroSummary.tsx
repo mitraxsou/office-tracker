@@ -85,9 +85,9 @@ export function DashboardHeroSummary({
         />
       </div>
 
-      {openVisitStartAt && inOfficeNow && (
+      {openVisitStartAt && (
         <p className="mt-3 text-xs text-muted">
-          Session since{" "}
+          Open visit since{" "}
           <strong className="text-accent">{formatTime(openVisitStartAt, timezone)}</strong>
           {openVisitSsid ? ` on ${openVisitSsid}` : ""}
         </p>
@@ -98,7 +98,7 @@ export function DashboardHeroSummary({
           Last pulse:{" "}
           <span className={toneClass(lastHeartbeatTone)}>{lastHeartbeatLabel}</span>
         </p>
-        <QuickOfficeToggle inOfficeNow={inOfficeNow} variant="inline" />
+        <QuickOfficeToggle hasOpenVisit={openVisitStartAt !== null} variant="inline" />
       </div>
 
       <p className="mt-2 text-[11px] text-muted">

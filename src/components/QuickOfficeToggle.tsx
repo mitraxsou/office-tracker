@@ -4,10 +4,10 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 export function QuickOfficeToggle({
-  inOfficeNow,
+  hasOpenVisit,
   variant = "card",
 }: {
-  inOfficeNow: boolean;
+  hasOpenVisit: boolean;
   variant?: "card" | "inline";
 }) {
   const router = useRouter();
@@ -17,7 +17,7 @@ export function QuickOfficeToggle({
   async function handleClick() {
     setLoading(true);
     setError(null);
-    const endpoint = inOfficeNow ? "/api/visits/check-out" : "/api/visits/check-in";
+    const endpoint = hasOpenVisit ? "/api/visits/check-out" : "/api/visits/check-in";
     const res = await fetch(endpoint, { method: "POST" });
     setLoading(false);
     if (!res.ok) {
@@ -42,10 +42,10 @@ export function QuickOfficeToggle({
           disabled={loading}
           title="Wi-Fi detection not working? Check in or out manually."
           className={`px-3 py-1.5 text-xs font-medium disabled:opacity-50 sm:text-sm ${
-            inOfficeNow ? "btn-secondary" : "btn-primary"
+            hasOpenVisit ? "btn-secondary" : "btn-primary"
           }`}
         >
-          {loading ? "Saving..." : inOfficeNow ? "Check out" : "Check in"}
+          {loading ? "Saving..." : hasOpenVisit ? "Check out" : "Check in"}
         </button>
       </div>
     );
@@ -64,14 +64,10 @@ export function QuickOfficeToggle({
         onClick={handleClick}
         disabled={loading}
         className={`mt-3 px-4 py-2 text-sm font-medium disabled:opacity-50 ${
-          inOfficeNow ? "btn-secondary" : "btn-primary"
+          hasOpenVisit ? "btn-secondary" : "btn-primary"
         }`}
       >
-        {loading
-          ? "Saving..."
-          : inOfficeNow
-            ? "Check out"
-            : "Check in"}
+        {loading ? "Saving..." : hasOpenVisit ? "Check out" : "Check in"}
       </button>
     </div>
   );

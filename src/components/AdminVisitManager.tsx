@@ -167,6 +167,38 @@ export function AdminVisitManager({ userId, officeSsids, timezone, onChanged }: 
     onChanged?.();
   }
 
+  async function handleDelete(visit: Visit) {
+    const startLabel = formatTime(new Date(visit.startAt), timezone);
+    const endLabel = visit.endAt
+      ? formatTime(new Date(visit.endAt), timezone)
+      : "open";
+    if (
+      !confirm(
+        `Delete this visit (${startLabel} to ${endLabel}, ${visit.source})? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    setMessage(null);
+    setBusy(true);
+    const res = await fetch(`/api/admin/visits?id=${encodeURIComponent(visit.id)}`, {
+      method: "DELETE",
+    });
+    setBusy(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? "Failed to delete visit");
+      return;
+    }
+    if (editingId === visit.id) {
+      setEditingId(null);
+    }
+    setMessage("Visit deleted.");
+    load();
+    onChanged?.();
+  }
+
   async function saveEdit(id: string) {
     setError(null);
     setBusy(true);
@@ -204,9 +236,8 @@ export function AdminVisitManager({ userId, officeSsids, timezone, onChanged }: 
     <section className="card p-6">
       <h2 className="mb-1 text-lg font-medium">Visit data</h2>
       <p className="mb-5 text-sm text-muted">
-        Add a visit when the agent missed one, or correct times on an existing entry. Visit records
-        are kept for compliance and cannot be deleted. Times use the calendar pickers and are saved
-        in {timezone}.
+        Add a visit when the agent missed one, correct times on an existing entry, or delete
+        incorrect records. Times use the calendar pickers and are saved in {timezone}.
       </p>
 
       <form onSubmit={handleAdd} className="mb-6 space-y-4">
@@ -409,9 +440,17 @@ export function AdminVisitManager({ userId, officeSsids, timezone, onChanged }: 
                               <button
                                 type="button"
                                 onClick={() => startEdit(visit)}
-                                className="text-xs text-accent hover:underline"
+                                className="mr-2 text-xs text-accent hover:underline"
                               >
                                 Edit
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void handleDelete(visit)}
+                                className="text-xs text-red-400 hover:underline disabled:opacity-40"
+                              >
+                                Delete
                               </button>
                             </td>
                           </>

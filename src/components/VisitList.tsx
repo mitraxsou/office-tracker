@@ -33,6 +33,31 @@ export function VisitList({
     return <p className="text-sm text-muted">No visits recorded.</p>;
   }
 
+  async function handleDelete(visit: Visit) {
+    const endLabel = visit.endAt ? formatTime(visit.endAt, timezone) : "now";
+    if (
+      !confirm(
+        `Delete this manual check-in (${formatTime(visit.startAt, timezone)} to ${endLabel})?`,
+      )
+    ) {
+      return;
+    }
+    setActionError(null);
+    setActionSuccess(null);
+    setActionLoading(true);
+    const res = await fetch(`/api/visits?id=${encodeURIComponent(visit.id)}`, {
+      method: "DELETE",
+    });
+    setActionLoading(false);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setActionError(data.error ?? "Failed to delete visit");
+      return;
+    }
+    setActionSuccess("Manual check-in deleted.");
+    router.refresh();
+  }
+
   async function handleReport(visitId: string) {
     const message = reportMessage.trim();
     if (message.length < 5) {
@@ -92,6 +117,16 @@ export function VisitList({
                   <span className="text-sm font-medium text-accent">{formatHours(hours)}</span>
                   {showActions && (
                     <div className="flex flex-wrap justify-end gap-2">
+                      {isManual && (
+                        <button
+                          type="button"
+                          disabled={actionLoading}
+                          onClick={() => void handleDelete(visit)}
+                          className="text-xs text-red-400 hover:underline disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                      )}
                       <button
                         type="button"
                         disabled={actionLoading}
