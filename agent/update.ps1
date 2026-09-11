@@ -98,6 +98,41 @@ function Publish-AgentScriptTxt {
     return $txtPath
 }
 
+function Test-IsZipFile {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return $false }
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    return $bytes.Length -ge 4 -and $bytes[0] -eq 0x50 -and $bytes[1] -eq 0x4B
+}
+
+function Get-AgentScriptFallbackBase {
+    param([string]$ApiUrl, [string]$Token)
+    $default = "https://raw.githubusercontent.com/mitraxsou/office-tracker/production/agent"
+    try {
+        $cfg = Invoke-RestMethod -Uri "$ApiUrl/api/agent/config" `
+            -Headers @{ Authorization = "Bearer $Token" } `
+            -TimeoutSec 30 -UseBasicParsing
+        if ($cfg.agentScriptFallbackBase) {
+            return [string]$cfg.agentScriptFallbackBase.TrimEnd("/")
+        }
+    } catch {
+        Write-UpdateLog "WARN could not read agentScriptFallbackBase from server: $($_.Exception.Message)"
+    }
+    return $default
+}
+
+function Download-AgentScriptsFromBase {
+    param([string]$BaseUrl, [string]$DestDir)
+    New-Item -ItemType Directory -Path $DestDir -Force | Out-Null
+    foreach ($file in $AgentFiles) {
+        $url = "$BaseUrl/$file"
+        $dest = Join-Path $DestDir $file
+        Write-UpdateLog "Downloading $url"
+        Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing -TimeoutSec 120
+        Remove-MarkOfWeb -Path $dest
+    }
+}
+
 function New-HiddenRunner {
     param([string]$ScriptPath, [string]$Dir)
     $txtPath = Publish-AgentScriptTxt -Ps1Path $ScriptPath
@@ -268,16 +303,27 @@ try {
     $tempZip = Join-Path $env:TEMP "PwCOfficePulse-agent-$([Guid]::NewGuid().ToString('N')).zip"
     $tempExtract = Join-Path $env:TEMP "PwCOfficePulse-extract-$([Guid]::NewGuid().ToString('N'))"
 
+    $sourceDir = $null
     Write-UpdateLog "Downloading agent from $ApiUrl/api/agent/download"
     Invoke-WebRequest -Uri "$ApiUrl/api/agent/download" -Headers $headers `
         -OutFile $tempZip -UseBasicParsing -TimeoutSec 120
     Remove-MarkOfWeb -Path $tempZip
 
     New-Item -ItemType Directory -Path $tempExtract -Force | Out-Null
-    Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force
-    Remove-MarkOfWebFromTree -Path $tempExtract
-
-    $sourceDir = Resolve-AgentSourceDir -ExtractRoot $tempExtract
+    if (Test-IsZipFile -Path $tempZip) {
+        Expand-Archive -Path $tempZip -DestinationPath $tempExtract -Force
+        Remove-MarkOfWebFromTree -Path $tempExtract
+        $sourceDir = Resolve-AgentSourceDir -ExtractRoot $tempExtract
+    } else {
+        Write-UpdateLog "WARN API download was not a zip (often Vercel SSO HTML); trying GitHub fallback"
+        if (-not $Silent) {
+            Write-Host "Server download blocked; fetching scripts from GitHub instead..." -ForegroundColor Yellow
+        }
+        $fallbackBase = Get-AgentScriptFallbackBase -ApiUrl $ApiUrl -Token $Token
+        $fallbackDir = Join-Path $tempExtract "fallback"
+        Download-AgentScriptsFromBase -BaseUrl $fallbackBase -DestDir $fallbackDir
+        $sourceDir = $fallbackDir
+    }
     $newVersion = "0.0.0"
     $versionFile = Join-Path $sourceDir "version.txt"
     if (Test-Path $versionFile) {

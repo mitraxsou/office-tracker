@@ -182,10 +182,14 @@ export function InstallTokenCommands({
             )}
 
             <div className="mt-3 rounded border border-[var(--border)] p-3">
-              <p className="text-sm font-medium">Install (first time)</p>
+              <p className="text-sm font-medium">
+                {t.status === "bound" ? "Refresh scripts from zip folder" : "Install (first time)"}
+              </p>
               <p className="mt-1 text-xs text-muted">
                 Download and extract the agent zip, open PowerShell in that folder, then paste this
                 command. The folder must contain <code>install.ps1</code>.
+                {t.status === "bound" &&
+                  " Safe to re-run on an existing install (copies scripts from this folder)."}
               </p>
               <pre className="mt-2 overflow-x-auto rounded border bg-[var(--background-elevated)] p-2 text-xs whitespace-pre-wrap">
                 {t.installCommand}
@@ -195,16 +199,21 @@ export function InstallTokenCommands({
                 onClick={() => handleCopy(t.installCommand, t.id)}
                 className="btn-primary mt-2 px-3 py-1 text-xs"
               >
-                {copiedId === t.id ? "Copied!" : "Copy install command"}
+                {copiedId === t.id
+                  ? "Copied!"
+                  : t.status === "bound"
+                    ? "Copy refresh command"
+                    : "Copy install command"}
               </button>
             </div>
 
             <div className="mt-3 rounded border border-[var(--border)] p-3">
-              <p className="text-sm font-medium">Update scripts (already installed)</p>
+              <p className="text-sm font-medium">Update scripts from server (optional)</p>
               <p className="mt-1 text-xs text-muted">
-                Downloads the latest agent scripts from this server. Run from the extract folder with{" "}
-                <code>update.ps1</code>. To only change the server URL, use{" "}
-                <strong>Switch server URL</strong> above instead.
+                Runs <code>update.ps1</code> from the extract folder. Downloads scripts from this
+                server (falls back to GitHub if the server blocks zip download). To change only the
+                server URL, use <strong>Switch server URL</strong> above. To refresh scripts without
+                a download, use <strong>Refresh scripts from zip folder</strong> instead.
               </p>
               <pre className="mt-2 overflow-x-auto rounded border bg-[var(--background-elevated)] p-2 text-xs whitespace-pre-wrap">
                 {t.updateCommand}

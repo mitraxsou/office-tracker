@@ -3,6 +3,7 @@ import { getUserByAgentToken } from "@/lib/auth";
 import { getAppConfig, getUserHoursTarget } from "@/lib/app-config";
 import { getAgentVersion } from "@/lib/agent-version";
 import { getDeviceForceAgentUpdate } from "@/lib/agent-update";
+import { agentScriptFallbackBase } from "@/lib/constants";
 import { API_VERSION, extractBearerToken, sanitizeSerialNumber } from "@/lib/security";
 
 export async function GET(request: Request) {
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
     heartbeatIntervalMinutes: globalConfig.heartbeatIntervalMinutes,
     apiVersion: API_VERSION,
     agentScriptVersion: getAgentVersion(),
+    agentScriptFallbackBase: agentScriptFallbackBase(),
     forceAgentUpdate,
   });
 }
