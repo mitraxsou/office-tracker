@@ -1,5 +1,4 @@
-import { QuickOfficeToggle } from "@/components/QuickOfficeToggle";
-import { formatLastHeartbeat, formatTime } from "@/lib/visits";
+import { formatTime } from "@/lib/visits";
 
 type StatusTone = "success" | "warning" | "neutral" | "muted";
 
@@ -93,13 +92,10 @@ export function DashboardHeroSummary({
         </p>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-3">
-        <p className="text-xs text-muted">
-          Last pulse:{" "}
-          <span className={toneClass(lastHeartbeatTone)}>{lastHeartbeatLabel}</span>
-        </p>
-        <QuickOfficeToggle hasOpenVisit={openVisitStartAt !== null} variant="inline" />
-      </div>
+      <p className="mt-3 border-t border-[var(--border)] pt-3 text-xs text-muted">
+        Last pulse:{" "}
+        <span className={toneClass(lastHeartbeatTone)}>{lastHeartbeatLabel}</span>
+      </p>
 
       <p className="mt-2 text-[11px] text-muted">
         {dayKey} · First check-in to last check-out counts toward today&apos;s target.

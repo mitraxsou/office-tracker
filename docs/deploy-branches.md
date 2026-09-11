@@ -57,6 +57,53 @@ $env:POWER_AUTOMATE_WEBHOOK_SECRET = "paste-secret-here"
 .\scripts\sync-enterprise-env.ps1 -Profile prod
 ```
 
+### Deployment Protection bypass (agent updates on PwC laptops)
+
+Enterprise SSO protection blocks unauthenticated requests to agent script URLs (`/api/agent/files/*`). The Windows agent (`update.ps1`) and server config (`GET /api/agent/config`) use a shared bypass secret so automation can reach those endpoints.
+
+**Automated setup (recommended):**
+
+```powershell
+$env:VERCEL_TOKEN = "your-token"   # session only, scoped to pwc-us-adv-cdtr
+.\scripts\setup-automation-bypass.ps1 -SyncEnv
+```
+
+This script:
+
+1. Creates a **Protection Bypass for Automation** secret on both `office-tracker-dev-9824` and `office-tracker-prod` (Vercel API).
+2. Marks it as `VERCEL_AUTOMATION_BYPASS_SECRET` (`isEnvVar=true`).
+3. Saves the value to gitignored `.env.vercel.enterprise.bypass.local`.
+4. With `-SyncEnv`, runs `sync-enterprise-env.ps1` for dev and prod.
+
+**Manual dashboard steps** (if API access is blocked):
+
+1. Open each Enterprise project in [Vercel dashboard](https://vercel.com/pwc-us-adv-cdtr).
+2. **Settings → Deployment Protection → Protection Bypass for Automation → Create**.
+3. Label it e.g. `Office Pulse agent`. Use the same 32-character secret on dev and prod.
+4. Enable **Set as VERCEL_AUTOMATION_BYPASS_SECRET** (or equivalent toggle).
+5. Add `VERCEL_AUTOMATION_BYPASS_SECRET` to **Settings → Environment Variables** for production, preview, and development (or run `sync-enterprise-env.ps1` after saving locally).
+6. **Redeploy** both projects.
+
+**How the app uses it:**
+
+| Location | Role |
+|---|---|
+| `src/lib/agent-download.ts` | Reads `VERCEL_AUTOMATION_BYPASS_SECRET` at runtime |
+| `GET /api/agent/config` | Returns `vercelProtectionBypass` to `update.ps1` |
+| `agent/update.ps1` | Sends header `x-vercel-protection-bypass` on file downloads |
+
+**Test after redeploy** (SSO bypass only; agent files still need Bearer token):
+
+```powershell
+curl.exe --ssl-no-revoke -H "x-vercel-protection-bypass: YOUR_SECRET" `
+  -H "Authorization: Bearer YOUR_AGENT_TOKEN" `
+  https://office-tracker-prod.vercel.app/api/agent/files/version.txt
+```
+
+Expect HTTP 200 with version text, not a 302 to `vercel.com/sso-api`.
+
+Check status without changes: `.\scripts\setup-automation-bypass.ps1 -CheckOnly`
+
 `sync-enterprise-env.ps1` **never rotates** `AUTH_SECRET` when it is already set on Vercel and not in your local env files. After first Enterprise deploy, save the session secret locally:
 
 ```powershell

@@ -37,7 +37,7 @@ if (-not $env:VERCEL_TOKEN) {
 $profiles = @{
     dev = @{
         ProjectName        = "office-tracker-dev-9824"
-        EnvFiles           = @(".env.vercel.dev.local", ".env.vercel.enterprise.dev.local")
+        EnvFiles           = @(".env.vercel.dev.local", ".env.vercel.enterprise.dev.local", ".env.vercel.enterprise.bypass.local")
         ExtraEnvFile       = ".env"
         AppUrl             = "https://office-tracker-dev-9824.vercel.app"
         ProductionBranch   = "dev"
@@ -45,7 +45,7 @@ $profiles = @{
     }
     prod = @{
         ProjectName        = "office-tracker-prod"
-        EnvFiles           = @(".env.vercel.local", ".env.vercel.prod.local", ".env.vercel.enterprise.prod.local")
+        EnvFiles           = @(".env.vercel.local", ".env.vercel.prod.local", ".env.vercel.enterprise.prod.local", ".env.vercel.enterprise.bypass.local")
         ExtraEnvFile       = ""
         AppUrl             = "https://office-tracker-prod.vercel.app"
         ProductionBranch   = "production"

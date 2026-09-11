@@ -192,6 +192,17 @@ Team: `pwc-us-adv-cdtr` (`team_aibOHBi06MpPxWdFWRGDp9iK`).
 
 **Do not** commit database URLs or `AUTH_SECRET` to git. Admin Settings in the app already edits runtime pilot config (SSIDs, hours target, etc.) in Postgres; connection strings belong in Vercel env only.
 
+### Deployment Protection bypass (agent script downloads)
+
+Enterprise SSO blocks `/api/agent/files/*` unless clients send `x-vercel-protection-bypass`. One-time setup:
+
+```powershell
+$env:VERCEL_TOKEN = "your-token"
+.\scripts\setup-automation-bypass.ps1 -SyncEnv
+```
+
+Saves to `.env.vercel.enterprise.bypass.local` (gitignored). See `docs/deploy-branches.md` for manual dashboard steps and curl test.
+
 ### Re-sync after Hobby env changes
 
 Re-run `.\scripts\sync-enterprise-env.ps1` whenever you rotate `AUTH_SECRET` or Neon credentials on Hobby.
