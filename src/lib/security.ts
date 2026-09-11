@@ -4,6 +4,7 @@ export const MAX_SSID_LENGTH = 64;
 export const MAX_VPN_GATEWAY_LENGTH = 128;
 export const MAX_TIMEZONE_LENGTH = 64;
 export const MAX_SERIAL_LENGTH = 64;
+export const MAX_AGENT_API_URL_LENGTH = 200;
 export const HEARTBEAT_RATE_LIMIT_MS = 30_000;
 
 const rateLimitMap = new Map<string, number>();
@@ -56,6 +57,32 @@ export function extractBearerToken(request: Request): string | null {
     if (token.length >= 16 && token.length <= 128) return token;
   }
   return null;
+}
+
+/** Origin the client used to reach this deployment (from Vercel/proxy headers). */
+export function resolveRequestAppOrigin(request: Request): string | null {
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const host = (forwardedHost ?? request.headers.get("host"))?.split(",")[0]?.trim();
+  if (!host) return null;
+  const protoHeader = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const proto =
+    protoHeader ||
+    (host.includes("localhost") || host.startsWith("127.0.0.1") ? "http" : "https");
+  return `${proto}://${host}`.replace(/\/$/, "");
+}
+
+export function sanitizeAgentApiUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim().replace(/\/$/, "");
+  if (!trimmed || trimmed.length > MAX_AGENT_API_URL_LENGTH) return null;
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    if (url.username || url.password) return null;
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return null;
+  }
 }
 
 export function extractTokenFromBody(body: { token?: unknown }): string | null {

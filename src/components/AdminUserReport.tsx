@@ -99,8 +99,10 @@ type UserReport = {
     agentScriptVersion: string | null;
     agentVersionReportedAt: string | null;
     agentVersionStale: boolean;
+    agentApiUrl: string | null;
     forceAgentUpdate: boolean;
   }>;
+  serverAppUrl: string | null;
   lifecycleEvents?: Array<{
     id: string;
     deviceId: string | null;
@@ -505,6 +507,12 @@ export function AdminUserReport({
             <dt className="text-muted">Registered laptops</dt>
             <dd>{data.devices.length}</dd>
           </div>
+          {data.serverAppUrl && (
+            <div className="sm:col-span-2">
+              <dt className="text-muted">Expected app URL (this deployment)</dt>
+              <dd className="font-mono text-xs break-all">{data.serverAppUrl}</dd>
+            </div>
+          )}
           <div className="sm:col-span-2">
             <dt className="text-muted">Installed agent versions</dt>
             <dd>
@@ -535,6 +543,28 @@ export function AdminUserReport({
                               timeZone: data.user.timezone,
                             })
                           : "never"}
+                        {device.agentApiUrl && (
+                          <>
+                            {" "}
+                            · agent URL{" "}
+                            <span
+                              className={
+                                data.serverAppUrl &&
+                                device.agentApiUrl.replace(/\/$/, "") !==
+                                  data.serverAppUrl.replace(/\/$/, "")
+                                  ? "text-amber-400"
+                                  : "text-green-400"
+                              }
+                            >
+                              {device.agentApiUrl}
+                            </span>
+                            {data.serverAppUrl &&
+                              device.agentApiUrl.replace(/\/$/, "") !==
+                                data.serverAppUrl.replace(/\/$/, "") && (
+                                <span className="text-amber-400"> (wrong server)</span>
+                              )}
+                          </>
+                        )}
                         {device.agentVersionStale && (
                           <>
                             {" "}

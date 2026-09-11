@@ -13,6 +13,8 @@ import {
   checkRateLimit,
   extractTokenFromBody,
   parseTimestamp,
+  resolveRequestAppOrigin,
+  sanitizeAgentApiUrl,
   sanitizeScriptVersion,
   sanitizeSsid,
   sanitizeSerialNumber,
@@ -60,10 +62,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: bindResult.error }, { status: bindResult.status });
   }
 
+  const agentApiUrl =
+    sanitizeAgentApiUrl(body.apiUrl) ?? resolveRequestAppOrigin(request);
+
   const deviceResult = await registerOrUpdateDevice(
     auth.userId,
     serialNumber,
     auth.agentTokenId,
+    agentApiUrl,
   );
   if (!deviceResult.ok) {
     return NextResponse.json({ error: deviceResult.error }, { status: deviceResult.status });

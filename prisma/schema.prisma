@@ -192,6 +192,7 @@ model AgentDevice {
   uninstalledAt DateTime?
   agentScriptVersion String?
   agentVersionReportedAt DateTime?
+  agentApiUrl        String?
   forceAgentUpdate Boolean @default(false)
   createdAt    DateTime    @default(now())
   removalRequests DeviceRemovalRequest[]

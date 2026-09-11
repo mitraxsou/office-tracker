@@ -492,6 +492,7 @@ $payload = @{
     source         = "wifi"
     vpnGateway     = $vpnGateway
     scriptVersion  = $scriptVersion
+    apiUrl         = $apiUrl
 } | ConvertTo-Json -Compress
 
 if ($DryRun) {

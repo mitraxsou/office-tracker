@@ -75,6 +75,7 @@ export async function registerOrUpdateDevice(
   userId: string,
   serialNumber: string,
   agentTokenId?: string,
+  agentApiUrl?: string | null,
 ) {
   const config = await getAppConfig();
 
@@ -83,14 +84,15 @@ export async function registerOrUpdateDevice(
   });
 
   if (existing) {
-    await prisma.agentDevice.update({
+    const device = await prisma.agentDevice.update({
       where: { id: existing.id },
       data: {
         lastSeenAt: new Date(),
         ...(agentTokenId && !existing.agentTokenId ? { agentTokenId } : {}),
+        ...(agentApiUrl ? { agentApiUrl } : {}),
       },
     });
-    return { ok: true as const, device: existing, registered: false };
+    return { ok: true as const, device, registered: false };
   }
 
   const count = await prisma.agentDevice.count({ where: { userId } });
@@ -108,6 +110,7 @@ export async function registerOrUpdateDevice(
       serialNumber,
       agentTokenId: agentTokenId ?? null,
       lastSeenAt: new Date(),
+      agentApiUrl: agentApiUrl ?? null,
     },
   });
 

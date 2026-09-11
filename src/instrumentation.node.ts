@@ -337,6 +337,9 @@ export async function registerNode() {
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "AgentDevice" ADD COLUMN IF NOT EXISTS "forceAgentUpdate" BOOLEAN NOT NULL DEFAULT false;'
     );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AgentDevice" ADD COLUMN IF NOT EXISTS "agentApiUrl" TEXT;'
+    );
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "AgentLifecycleEvent" (
         "id" TEXT NOT NULL,

@@ -138,10 +138,12 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
         d.agentScriptVersion,
         serverAgentVersion,
       ),
+      agentApiUrl: d.agentApiUrl,
       forceAgentUpdate: d.forceAgentUpdate,
     })),
     lifecycleEvents: await getLifecycleEventsForUser(user.id),
     tokens: summarizeAgentTokens(user.agentTokens),
+    serverAppUrl: process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? null,
   };
 }
 
