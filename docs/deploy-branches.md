@@ -1,22 +1,51 @@
 # Dev / production deployment workflow
 
-Office Pulse uses **two Vercel projects** and **two Git branches** so development never shares the production database.
+Office Pulse uses **Enterprise CDTR** for active deploys. Git branches `dev` and `production` map to separate Vercel projects so development never shares the production database.
 
-## Hobby (`soumitra-pwc`)
+## Enterprise CDTR (`pwc-us-adv-cdtr`) - active
+
+| Environment | Git branch | Vercel project | URL | Database |
+|---|---|---|---|---|
+| **Development** | `dev` | `office-tracker-dev-9824` | https://office-tracker-dev-9824.vercel.app | Same Neon as Hobby dev |
+| **Production** | `production` | `office-tracker-prod` | https://office-tracker-prod.vercel.app | Same Neon as Hobby prod (`neon-canary-blanket`) |
+
+### Git commit author (Enterprise deploy gate)
+
+Enterprise blocks git-triggered deploys when the **commit author** is not a recognized team member. Commits from this repo should use the PwC-linked Vercel identity:
+
+```powershell
+git config --local user.name "soumitrammandal-4446"
+git config --local user.email "soumitra.m.mandal@pwc.com"
+```
+
+Also link the same email in [Vercel Account Settings](https://vercel.com/account) and connect your GitHub login there. If git deploys stay `Blocked`, use CLI deploy (see below) or ask a team admin to approve the committer.
+
+### CLI deploy when git deploy is blocked
+
+```powershell
+$env:VERCEL_ORG_ID = "team_aibOHBi06MpPxWdFWRGDp9iK"
+$env:VERCEL_PROJECT_ID = "prj_lhha3DVceqlTtU2A4HGdNaM32Sk6"   # dev
+npx vercel deploy --prod --yes
+$env:VERCEL_PROJECT_ID = "prj_N8idhB3WNItVngojCQAmOT5bsnSI"   # prod
+npx vercel deploy --prod --yes
+```
+
+## Hobby (`soumitra-pwc`) - paused
+
+Hobby projects are **paused** during the Enterprise pilot. Do not deploy here.
 
 | Environment | Git branch | Vercel project | URL | Database |
 |---|---|---|---|---|
 | **Development** | `dev` (GitHub default) | `office-tracker-dev` | https://office-tracker-dev.vercel.app | Vercel Storage Neon `office-tracker-dev-db` |
 | **Production** | `production` | `office-tracker` | https://office-tracker-theta.vercel.app | Vercel Storage Neon `neon-canary-blanket` |
 
-## Enterprise CDTR (`pwc-us-adv-cdtr`)
+Pause or disconnect Hobby so pushes to `dev` / `production` do not deploy there:
 
-Same Git branches and **same Neon databases** as Hobby (env vars synced via API; no Storage UI needed).
+1. Open [Vercel dashboard](https://vercel.com) under team **soumitra-pwc**.
+2. For **office-tracker** and **office-tracker-dev**: Settings → General → **Pause Project** (or disconnect Git in Settings → Git).
+3. Or run `.\scripts\pause-hobby-projects.ps1` with a token scoped to `soumitra-pwc`.
 
-| Environment | Git branch | Vercel project | URL | Database |
-|---|---|---|---|---|
-| **Development** | `dev` | `office-tracker-dev-9824` | https://office-tracker-dev-9824.vercel.app | Same Neon as Hobby dev |
-| **Production** | `production` | `office-tracker-prod` | https://office-tracker-prod.vercel.app | Same Neon as Hobby prod (`neon-canary-blanket`) |
+Env vars for Enterprise (same Neon as Hobby; no Storage UI):
 
 ```powershell
 $env:VERCEL_TOKEN = "your-token"   # session only
@@ -45,11 +74,11 @@ If branch tracking is ever reset, set **Production Branch** in each project's Gi
 ## Day-to-day workflow
 
 1. **Feature work** - branch from `dev`, open PR into `dev`.
-2. **Dev deploy** - merge to `dev` auto-deploys **office-tracker-dev** (production deployment of that project).
+2. **Dev deploy** - merge to `dev` auto-deploys **office-tracker-dev-9824** on Enterprise.
 3. **Release** - open PR from `dev` into `production`. Merge only after review.
-4. **Prod deploy** - merge to `production` auto-deploys **office-tracker** (theta URL).
+4. **Prod deploy** - merge to `production` auto-deploys **office-tracker-prod** on Enterprise.
 
-Do not merge to `production` without explicit approval.
+Do not merge to `production` without explicit approval. Hobby projects should stay paused.
 
 ## Vercel project settings
 
