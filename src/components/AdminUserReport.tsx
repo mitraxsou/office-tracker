@@ -65,6 +65,8 @@ type UserReport = {
     recordedAt: string;
     inOffice: boolean;
     ssid: string | null;
+    vpnGateway: string | null;
+    source: string;
   }>;
   pulse: {
     pulsesLast24h: number;
@@ -72,7 +74,20 @@ type UserReport = {
     minutesSinceLastPulse: number | null;
     agentHealthy: boolean;
     lastHeartbeat: string | null;
-    recentPulses: Array<{ recordedAt: string; inOffice: boolean; ssid: string | null }>;
+    recentPulses: Array<{
+      recordedAt: string;
+      inOffice: boolean;
+      ssid: string | null;
+      vpnGateway: string | null;
+      source: string;
+    }>;
+    lastSignal: {
+      recordedAt: string;
+      inOffice: boolean;
+      ssid: string | null;
+      vpnGateway: string | null;
+      source: string;
+    } | null;
   };
   serverAgentVersion: string;
   devices: Array<{
@@ -93,6 +108,7 @@ type UserReport = {
     eventType: string;
     source: string;
     createdAt: string;
+    metadata: Record<string, unknown> | null;
   }>;
   tokens: Array<{
     id: string;
@@ -474,6 +490,17 @@ export function AdminUserReport({
             <dt className="text-muted">In office now</dt>
             <dd>{data.today.inOfficeNow ? "Yes" : "No"}</dd>
           </div>
+          {data.pulse.lastSignal && (
+            <div className="sm:col-span-2">
+              <dt className="text-muted">Last agent signal (stored fields)</dt>
+              <dd className="font-mono text-xs">
+                SSID: {data.pulse.lastSignal.ssid ?? "none"} · VPN gateway:{" "}
+                {data.pulse.lastSignal.vpnGateway ?? "none"} · In office:{" "}
+                {data.pulse.lastSignal.inOffice ? "yes" : "no"} · Source:{" "}
+                {data.pulse.lastSignal.source}
+              </dd>
+            </div>
+          )}
           <div>
             <dt className="text-muted">Registered laptops</dt>
             <dd>{data.devices.length}</dd>
@@ -541,6 +568,7 @@ export function AdminUserReport({
               <li key={i}>
                 {new Date(p.recordedAt).toLocaleString("en-IN")} ·{" "}
                 {p.inOffice ? "in office" : "out"} · {p.ssid ?? "no SSID"}
+                {p.vpnGateway ? ` · VPN ${p.vpnGateway}` : ""}
               </li>
             ))}
           </ul>
@@ -558,7 +586,8 @@ export function AdminUserReport({
                 <tr className="border-b border-[var(--border)] text-left text-muted">
                   <th className="py-1 pr-2">Time</th>
                   <th className="py-1 pr-2">In office</th>
-                  <th className="py-1">SSID</th>
+                  <th className="py-1 pr-2">SSID</th>
+                  <th className="py-1">VPN gateway</th>
                 </tr>
               </thead>
               <tbody>
@@ -566,7 +595,8 @@ export function AdminUserReport({
                   <tr key={h.id} className="border-b border-[var(--border)]">
                     <td className="py-1 pr-2">{new Date(h.recordedAt).toLocaleString("en-IN")}</td>
                     <td className="py-1 pr-2">{h.inOffice ? "Yes" : "No"}</td>
-                    <td className="py-1 font-mono">{h.ssid ?? "-"}</td>
+                    <td className="py-1 pr-2 font-mono">{h.ssid ?? "-"}</td>
+                    <td className="py-1 font-mono">{h.vpnGateway ?? "-"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -585,7 +615,8 @@ export function AdminUserReport({
                   <th className="py-1 pr-2">Time</th>
                   <th className="py-1 pr-2">Event</th>
                   <th className="py-1 pr-2">Serial</th>
-                  <th className="py-1">Source</th>
+                  <th className="py-1 pr-2">Source</th>
+                  <th className="py-1">Details</th>
                 </tr>
               </thead>
               <tbody>
@@ -596,7 +627,14 @@ export function AdminUserReport({
                     </td>
                     <td className="py-1 pr-2">{event.eventType}</td>
                     <td className="py-1 pr-2 font-mono">{event.serialNumber}</td>
-                    <td className="py-1">{event.source}</td>
+                    <td className="py-1 pr-2">{event.source}</td>
+                    <td className="py-1 font-mono text-[10px]">
+                      {event.metadata
+                        ? Object.entries(event.metadata)
+                            .map(([k, v]) => `${k}=${String(v)}`)
+                            .join(" ")
+                        : "-"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

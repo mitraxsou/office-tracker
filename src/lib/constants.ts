@@ -34,17 +34,6 @@ export function timezoneOptionsForUser(currentTimezone: string) {
 /** PwC office Wi-Fi SSIDs — all denote in-office for auto-detection */
 export const DEFAULT_OFFICE_SSIDS = ["OfficeConnect", "ExternalConnect", "pwcglb.com"];
 
-/** Raw GitHub agent scripts when /api/agent/download is blocked (e.g. Enterprise SSO). */
-export const DEFAULT_AGENT_SCRIPT_FALLBACK_BASE =
-  "https://raw.githubusercontent.com/mitraxsou/office-tracker/production/agent";
-
-export function agentScriptFallbackBase(): string {
-  return (
-    process.env.AGENT_SCRIPT_FALLBACK_BASE?.replace(/\/$/, "") ||
-    DEFAULT_AGENT_SCRIPT_FALLBACK_BASE
-  );
-}
-
 export function parseDefaultSsidsFromEnv(): string[] {
   const raw = process.env.DEFAULT_OFFICE_SSIDS;
   if (!raw) return DEFAULT_OFFICE_SSIDS;

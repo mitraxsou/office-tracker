@@ -121,6 +121,8 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
       recordedAt: h.recordedAt.toISOString(),
       inOffice: heartbeatInOffice(h, config.officeSsids),
       ssid: h.ssid,
+      vpnGateway: h.vpnGateway,
+      source: h.source,
     })),
     pulse,
     serverAgentVersion,

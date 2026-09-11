@@ -14,7 +14,7 @@ $UpdateCheckIntervalMinutes = 60
 
 # Version of this script. Keep in sync with agent/version.txt. Used when version.txt is
 # missing so the server always receives a real version instead of nothing.
-$AgentScriptVersion = "1.2.10"
+$AgentScriptVersion = "1.2.11"
 
 function Write-Log([string]$Message) {
     $logDir = Join-Path $env:LOCALAPPDATA "OfficeTracker\logs"

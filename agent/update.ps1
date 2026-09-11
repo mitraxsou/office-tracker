@@ -105,30 +105,54 @@ function Test-IsZipFile {
     return $bytes.Length -ge 4 -and $bytes[0] -eq 0x50 -and $bytes[1] -eq 0x4B
 }
 
-function Get-AgentScriptFallbackBase {
+function New-AgentDownloadHeaders {
+    param([string]$Token, [string]$BypassSecret)
+    $headers = @{ Authorization = "Bearer $Token" }
+    if ($BypassSecret) {
+        $headers["x-vercel-protection-bypass"] = $BypassSecret
+    }
+    return $headers
+}
+
+function Get-AgentDownloadConfig {
     param([string]$ApiUrl, [string]$Token)
-    $default = "https://raw.githubusercontent.com/mitraxsou/office-tracker/production/agent"
+    $result = @{
+        FilesBase = "$($ApiUrl.TrimEnd('/'))/api/agent/files"
+        BypassSecret = $null
+    }
     try {
         $cfg = Invoke-RestMethod -Uri "$ApiUrl/api/agent/config" `
             -Headers @{ Authorization = "Bearer $Token" } `
             -TimeoutSec 30 -UseBasicParsing
-        if ($cfg.agentScriptFallbackBase) {
-            return [string]$cfg.agentScriptFallbackBase.TrimEnd("/")
+        if ($cfg.agentScriptFilesBase) {
+            $result.FilesBase = [string]$cfg.agentScriptFilesBase.TrimEnd("/")
+        } elseif ($cfg.agentScriptFallbackBase) {
+            $legacy = [string]$cfg.agentScriptFallbackBase.TrimEnd("/")
+            $result.FilesBase = if ($legacy -match "/api/agent/files") { $legacy } else { "$legacy" }
+        }
+        if ($cfg.vercelProtectionBypass) {
+            $result.BypassSecret = [string]$cfg.vercelProtectionBypass
         }
     } catch {
-        Write-UpdateLog "WARN could not read agentScriptFallbackBase from server: $($_.Exception.Message)"
+        Write-UpdateLog "WARN could not read agent download config from server: $($_.Exception.Message)"
     }
-    return $default
+    return $result
 }
 
-function Download-AgentScriptsFromBase {
-    param([string]$BaseUrl, [string]$DestDir)
+function Download-AgentScriptsFromApp {
+    param(
+        [string]$FilesBase,
+        [string]$Token,
+        [string]$BypassSecret,
+        [string]$DestDir
+    )
     New-Item -ItemType Directory -Path $DestDir -Force | Out-Null
+    $headers = New-AgentDownloadHeaders -Token $Token -BypassSecret $BypassSecret
     foreach ($file in $AgentFiles) {
-        $url = "$BaseUrl/$file"
+        $url = "$FilesBase/$file"
         $dest = Join-Path $DestDir $file
         Write-UpdateLog "Downloading $url"
-        Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing -TimeoutSec 120
+        Invoke-WebRequest -Uri $url -Headers $headers -OutFile $dest -UseBasicParsing -TimeoutSec 120
         Remove-MarkOfWeb -Path $dest
     }
 }
@@ -299,7 +323,8 @@ if (Test-Path $lockPath) {
 Set-Content -Path $lockPath -Value (Get-Date -Format "o") -Encoding UTF8
 
 try {
-    $headers = @{ Authorization = "Bearer $Token" }
+    $downloadCfg = Get-AgentDownloadConfig -ApiUrl $ApiUrl -Token $Token
+    $headers = New-AgentDownloadHeaders -Token $Token -BypassSecret $downloadCfg.BypassSecret
     $tempZip = Join-Path $env:TEMP "PwCOfficePulse-agent-$([Guid]::NewGuid().ToString('N')).zip"
     $tempExtract = Join-Path $env:TEMP "PwCOfficePulse-extract-$([Guid]::NewGuid().ToString('N'))"
 
@@ -315,13 +340,13 @@ try {
         Remove-MarkOfWebFromTree -Path $tempExtract
         $sourceDir = Resolve-AgentSourceDir -ExtractRoot $tempExtract
     } else {
-        Write-UpdateLog "WARN API download was not a zip (often Vercel SSO HTML); trying GitHub fallback"
+        Write-UpdateLog "WARN zip download was not a zip (often Vercel SSO HTML); fetching per-file from app"
         if (-not $Silent) {
-            Write-Host "Server download blocked; fetching scripts from GitHub instead..." -ForegroundColor Yellow
+            Write-Host "Zip blocked; downloading agent files from the app instead..." -ForegroundColor Yellow
         }
-        $fallbackBase = Get-AgentScriptFallbackBase -ApiUrl $ApiUrl -Token $Token
-        $fallbackDir = Join-Path $tempExtract "fallback"
-        Download-AgentScriptsFromBase -BaseUrl $fallbackBase -DestDir $fallbackDir
+        $fallbackDir = Join-Path $tempExtract "files"
+        Download-AgentScriptsFromApp -FilesBase $downloadCfg.FilesBase -Token $Token `
+            -BypassSecret $downloadCfg.BypassSecret -DestDir $fallbackDir
         $sourceDir = $fallbackDir
     }
     $newVersion = "0.0.0"

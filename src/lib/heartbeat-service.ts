@@ -376,7 +376,7 @@ export async function getPulseStats(userId: string, graceHours: number) {
       where: { userId },
       orderBy: { recordedAt: "desc" },
       take: 12,
-      select: { recordedAt: true, inOffice: true, ssid: true },
+      select: { recordedAt: true, inOffice: true, ssid: true, vpnGateway: true, source: true },
     }),
     prisma.heartbeat.findFirst({
       where: { userId },
@@ -413,7 +413,18 @@ export async function getPulseStats(userId: string, graceHours: number) {
       recordedAt: p.recordedAt.toISOString(),
       inOffice: heartbeatInOffice(p, officeSsids),
       ssid: p.ssid,
+      vpnGateway: p.vpnGateway,
+      source: p.source,
     })),
+    lastSignal: lastHeartbeat
+      ? {
+          recordedAt: lastHeartbeat.recordedAt.toISOString(),
+          inOffice: heartbeatInOffice(lastHeartbeat, officeSsids),
+          ssid: lastHeartbeat.ssid,
+          vpnGateway: lastHeartbeat.vpnGateway,
+          source: lastHeartbeat.source,
+        }
+      : null,
   };
 }
 

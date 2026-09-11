@@ -3,7 +3,10 @@ import { getUserByAgentToken } from "@/lib/auth";
 import { getAppConfig, getUserHoursTarget } from "@/lib/app-config";
 import { getAgentVersion } from "@/lib/agent-version";
 import { getDeviceForceAgentUpdate } from "@/lib/agent-update";
-import { agentScriptFallbackBase } from "@/lib/constants";
+import {
+  agentScriptFilesBaseUrl,
+  vercelProtectionBypassSecret,
+} from "@/lib/agent-download";
 import { API_VERSION, extractBearerToken, sanitizeSerialNumber } from "@/lib/security";
 
 export async function GET(request: Request) {
@@ -27,6 +30,8 @@ export async function GET(request: Request) {
     ? await getDeviceForceAgentUpdate(user.id, serialNumber)
     : false;
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "";
+
   return NextResponse.json({
     ssids: globalConfig.officeSsids,
     hoursTarget,
@@ -34,7 +39,8 @@ export async function GET(request: Request) {
     heartbeatIntervalMinutes: globalConfig.heartbeatIntervalMinutes,
     apiVersion: API_VERSION,
     agentScriptVersion: getAgentVersion(),
-    agentScriptFallbackBase: agentScriptFallbackBase(),
+    agentScriptFilesBase: appUrl ? agentScriptFilesBaseUrl(appUrl) : null,
+    vercelProtectionBypass: vercelProtectionBypassSecret(),
     forceAgentUpdate,
   });
 }
