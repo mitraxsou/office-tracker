@@ -67,6 +67,14 @@ export function buildUpdateCommandFromLocalConfig(appUrl: string) {
   return `Unblock-File -LiteralPath "${AGENT_RELATIVE_UPDATE_SCRIPT}"; $cfg = Get-Content "${AGENT_LOCAL_CONFIG_PS}" -Raw | ConvertFrom-Json; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${AGENT_RELATIVE_UPDATE_SCRIPT}" -ApiUrl "${appUrl}" -Token $cfg.token`;
 }
 
+/**
+ * Point an already-installed agent at a new server URL (e.g. Enterprise prod).
+ * Keeps the existing token; does not download scripts. Run in any PowerShell window.
+ */
+export function buildRetargetApiUrlCommand(appUrl: string) {
+  return `$p = Join-Path $env:LOCALAPPDATA "${AGENT_INSTALL_FOLDER}\\config.json"; if (-not (Test-Path -LiteralPath $p)) { throw "Agent not installed. Use Install (first time) instead." }; $cfg = Get-Content -LiteralPath $p -Raw | ConvertFrom-Json; $cfg.apiUrl = "${appUrl}"; $cfg | ConvertTo-Json | Set-Content -LiteralPath $p -Encoding UTF8; Write-Host "Server URL updated to ${appUrl}. Heartbeats will use it within ~2 min."`;
+}
+
 /** Full-path install command (legacy / local dev with explicit script dir) */
 export function buildInstallCommandWithPath(appUrl: string, token: string, installScriptDir: string) {
   const scriptPath = `${installScriptDir}\\install.ps1`.replace(/\\\\/g, "\\");

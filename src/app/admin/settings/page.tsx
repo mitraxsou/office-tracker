@@ -47,6 +47,7 @@ export default async function AdminSettingsPage() {
           maxDevicesPerUser={config.maxDevicesPerUser}
           pendingTokenTtlDays={config.pendingTokenTtlDays}
           heartbeatRetentionDays={config.heartbeatRetentionDays}
+          heartbeatIntervalMinutes={config.heartbeatIntervalMinutes}
           agentStaleMinutes={config.agentStaleMinutes}
           agentStaleGraceHours={config.agentStaleGraceHours}
           fiscalYearStartMonth={config.fiscalYearStartMonth}

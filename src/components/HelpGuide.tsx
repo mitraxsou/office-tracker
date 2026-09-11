@@ -136,7 +136,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
         </p>
         <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
           <li>Web dashboard: today&apos;s hours, visit history, and progress toward the daily target</li>
-          <li>Windows agent: runs in the background every 2 minutes (no admin rights required)</li>
+          <li>Windows agent: wakes every 2 minutes and sends on the admin-set interval (5 minutes by default)</li>
           <li>One install token per laptop; admins issue tokens and approve laptop removals</li>
         </ul>
       </section>
@@ -476,7 +476,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             <p className="font-medium">After sleep or laptop wake</p>
             <p className="mt-1 text-muted">
               Heartbeats pause while the laptop sleeps. After wake or unlock, the agent should recover within about
-              2 minutes (unlock and power-resume triggers run the heartbeat sooner). Wi-Fi may take a few seconds to
+              5 minutes by default (unlock and power-resume checks may run sooner). Wi-Fi may take a few seconds to
               reconnect; the agent retries SSID detection automatically. Refresh the Today dashboard if agent status
               still looks stale after a minute.
             </p>
@@ -536,7 +536,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             the laptop without a manual check-out.
           </li>
           <li>
-            The agent sends a heartbeat about every 2 minutes. A gap longer than about 8 minutes ends the
+            The agent sends a heartbeat about every 5 minutes by default. A gap longer than about 15 minutes ends the
             current visit.
           </li>
         </ul>

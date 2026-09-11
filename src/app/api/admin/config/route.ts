@@ -41,6 +41,7 @@ export async function PATCH(request: Request) {
     allowOtpSelfRegistration?: boolean;
     pendingTokenTtlDays?: number;
     heartbeatRetentionDays?: number;
+    heartbeatIntervalMinutes?: number;
     agentStaleMinutes?: number;
     agentStaleGraceHours?: number;
     complianceExemptionRequiresApproval?: boolean;
@@ -121,6 +122,20 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "heartbeatRetentionDays must be 1–30" }, { status: 400 });
     }
     update.heartbeatRetentionDays = body.heartbeatRetentionDays;
+  }
+
+  if (body.heartbeatIntervalMinutes !== undefined) {
+    if (
+      !Number.isInteger(body.heartbeatIntervalMinutes) ||
+      body.heartbeatIntervalMinutes < 2 ||
+      body.heartbeatIntervalMinutes > 60
+    ) {
+      return NextResponse.json(
+        { error: "heartbeatIntervalMinutes must be 2-60" },
+        { status: 400 },
+      );
+    }
+    update.heartbeatIntervalMinutes = body.heartbeatIntervalMinutes;
   }
 
   if (body.agentStaleMinutes !== undefined) {

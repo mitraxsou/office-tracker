@@ -14,7 +14,7 @@ $UpdateCheckIntervalMinutes = 60
 
 # Version of this script. Keep in sync with agent/version.txt. Used when version.txt is
 # missing so the server always receives a real version instead of nothing.
-$AgentScriptVersion = "1.2.8"
+$AgentScriptVersion = "1.2.9"
 
 function Write-Log([string]$Message) {
     $logDir = Join-Path $env:LOCALAPPDATA "OfficeTracker\logs"
@@ -59,6 +59,10 @@ function Get-LastRunPath {
     Join-Path $env:LOCALAPPDATA "OfficeTracker\last-run.txt"
 }
 
+function Get-LastSuccessfulHeartbeatPath {
+    Join-Path $env:LOCALAPPDATA "OfficeTracker\last-successful-heartbeat.txt"
+}
+
 function Get-LastRunTime {
     $path = Get-LastRunPath
     if (-not (Test-Path $path)) { return $null }
@@ -71,6 +75,32 @@ function Get-LastRunTime {
 
 function Set-LastRunTime {
     Set-Content -Path (Get-LastRunPath) -Value (Get-Date -Format "o") -Encoding UTF8
+}
+
+function Get-HeartbeatIntervalMinutes($ServerConfig) {
+    $interval = 5
+    if ($ServerConfig -and $null -ne $ServerConfig.heartbeatIntervalMinutes) {
+        $parsed = 0
+        if ([int]::TryParse([string]$ServerConfig.heartbeatIntervalMinutes, [ref]$parsed)) {
+            $interval = $parsed
+        }
+    }
+    return [Math]::Max(2, [Math]::Min(60, $interval))
+}
+
+function Test-HeartbeatDue([int]$IntervalMinutes) {
+    $path = Get-LastSuccessfulHeartbeatPath
+    if (-not (Test-Path $path)) { return $true }
+    try {
+        $lastSuccess = [DateTime]::Parse((Get-Content $path -Raw).Trim())
+        return ((Get-Date) - $lastSuccess).TotalMinutes -ge $IntervalMinutes
+    } catch {
+        return $true
+    }
+}
+
+function Set-LastSuccessfulHeartbeatTime {
+    Set-Content -Path (Get-LastSuccessfulHeartbeatPath) -Value (Get-Date -Format "o") -Encoding UTF8
 }
 
 function Test-ResumeFromSleep {
@@ -400,6 +430,19 @@ $localConfig = Get-Content $configPath -Raw | ConvertFrom-Json
 $apiUrl = $localConfig.apiUrl.TrimEnd("/")
 $token = $localConfig.token
 
+$cachedServerConfig = $null
+$cachePath = Get-CachePath
+if (Test-Path $cachePath) {
+    try {
+        $cachedServerConfig = Get-Content $cachePath -Raw | ConvertFrom-Json
+    } catch {}
+}
+$cachedHeartbeatInterval = Get-HeartbeatIntervalMinutes $cachedServerConfig
+if (-not $DryRun -and -not (Test-HeartbeatDue $cachedHeartbeatInterval)) {
+    Write-Log "SKIP heartbeat interval ${cachedHeartbeatInterval}m has not elapsed"
+    exit 0
+}
+
 $serialNumber = Get-LaptopSerial
 if (-not $serialNumber -and $localConfig.serialNumber) {
     $serialNumber = $localConfig.serialNumber
@@ -411,7 +454,7 @@ Wait-NetworkReady -ApiUrl $apiUrl -MaxWaitSec $networkWaitSec | Out-Null
 $hourlyUpdateCheck = Test-ShouldRunHourlyUpdateCheck
 
 try {
-    $serverConfig = Get-ServerConfig -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber -Force:$hourlyUpdateCheck
+    $serverConfig = Get-ServerConfig -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber -Force
 } catch {
     Write-Log "ERROR: Cannot fetch server config"
     if ($DryRun) { Write-Host "ERROR: Cannot fetch server config: $($_.Exception.Message)"; exit 1 }
@@ -427,6 +470,12 @@ if (Test-NeedsAgentUpdate $serverConfig) {
 }
 
 Set-RunCounter ((Get-RunCounter) + 1)
+
+$heartbeatInterval = Get-HeartbeatIntervalMinutes $serverConfig
+if (-not $DryRun -and -not (Test-HeartbeatDue $heartbeatInterval)) {
+    Write-Log "SKIP server heartbeat interval ${heartbeatInterval}m has not elapsed"
+    exit 0
+}
 
 $ssidResult = Get-CurrentWifiSsidWithRetry
 $ssid = $ssidResult.Ssid
@@ -464,6 +513,7 @@ if ($DryRun) {
     Write-Host "  Hours target: $($serverConfig.hoursTarget)"
     Write-Host "  Timezone:    $($serverConfig.timezone)"
     Write-Host "  API version: $($serverConfig.apiVersion)"
+    Write-Host "  Heartbeat interval: ${heartbeatInterval}m"
     Write-Host "  Agent version (server): $($serverConfig.agentScriptVersion)"
     Write-Host "  Agent version (local):  $(Get-LocalAgentVersion)"
     Write-Host ""
@@ -477,6 +527,7 @@ for ($attempt = 1; $attempt -le $maxPostAttempts; $attempt++) {
     try {
         $response = Invoke-RestMethod -Uri "$apiUrl/api/heartbeat" -Method POST `
             -ContentType "application/json" -Body $payload -TimeoutSec 30
+        Set-LastSuccessfulHeartbeatTime
         Write-Log "OK ssid=$ssid method=$ssidMethod serial=$serialNumber inOffice=$($response.inOffice)"
         exit 0
     } catch {

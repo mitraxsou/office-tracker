@@ -126,7 +126,7 @@ export function AdminPilotControls({
         <h2 className="mb-1 text-lg font-medium">Agent updates</h2>
         <p className="mb-4 text-sm text-muted">
           Queue an agent upgrade for every bound laptop. Each device picks it up on the next heartbeat
-          (about every 2 minutes).
+          (up to about 6 minutes by default).
         </p>
         <button
           type="button"

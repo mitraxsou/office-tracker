@@ -110,12 +110,12 @@ describe("mergeHeartbeatsIntoVisits", () => {
     expect(visits[0].endAt).toEqual(heartbeats[2].recordedAt);
   });
 
-  it("splits visits when gap exceeds 8 minutes", () => {
+  it("splits visits when gap exceeds 15 minutes", () => {
     const base = new Date("2026-08-27T09:00:00+05:30");
     const heartbeats = [
       { recordedAt: new Date(base.getTime()), inOffice: true },
       { recordedAt: new Date(base.getTime() + ms(2)), inOffice: true },
-      { recordedAt: new Date(base.getTime() + ms(12)), inOffice: true },
+      { recordedAt: new Date(base.getTime() + ms(18)), inOffice: true },
     ];
     const visits = mergeHeartbeatsIntoVisits(heartbeats, VISIT_GAP_MS);
     expect(visits).toHaveLength(2);

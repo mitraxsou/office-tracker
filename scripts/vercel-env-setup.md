@@ -1,5 +1,22 @@
 # Vercel env cleanup (no CLI login)
 
+## Pause non-production projects
+
+The Vercel CLI can fail behind PwC SSL inspection. The pause script uses `curl.exe` and keeps
+`office-tracker` active:
+
+```powershell
+$env:VERCEL_TOKEN = "your-token-from-vercel-account-tokens"
+# Add this only when the projects belong to a team:
+# $env:VERCEL_TEAM_ID = "team_xxxxxxxxx"
+
+.\scripts\pause-vercel-projects.ps1 -WhatIf
+.\scripts\pause-vercel-projects.ps1
+```
+
+The script first verifies that exactly one accessible project is named `office-tracker`. It then
+pauses every other active project. `VERCEL_TOKEN` is kept in the PowerShell session only.
+
 On PwC laptops, `npx vercel login` often fails with:
 
 ```text
@@ -140,6 +157,45 @@ After cleanup and Storage reconnect:
 1. [vercel.com/account/tokens](https://vercel.com/account/tokens)
 2. Delete `office-tracker-env-cleanup`.
 
+## PwC Enterprise (`pwc-us-adv-cdtr`) without Storage / env UI
+
+On the CDTR Enterprise team, **v0 Builder** roles often cannot open **Storage** or **Environment Variables** in the dashboard, but the **REST API still accepts env var writes** (201/200). Use that to point an Enterprise project at the **same Hobby Neon database** you already use on `office-tracker-dev`.
+
+### Projects (dev and prod separate)
+
+| Profile | Project | URL | Git branch | Database |
+|---------|---------|-----|------------|----------|
+| `dev` | `office-tracker-dev-9824` | https://office-tracker-dev-9824.vercel.app | `dev` | Same Neon as Hobby `office-tracker-dev` |
+| `prod` | `office-tracker-prod` | https://office-tracker-prod.vercel.app | `production` | Same Neon as Hobby `office-tracker` (`neon-canary-blanket`) |
+
+Team: `pwc-us-adv-cdtr` (`team_aibOHBi06MpPxWdFWRGDp9iK`).
+
+### One-time sync (no secrets in git)
+
+1. Local env files (gitignored):
+   - **Dev:** `.env.vercel.dev.local` from Hobby `office-tracker-dev` (`npx vercel env pull`)
+   - **Prod:** `.env.vercel.local` (Neon from Hobby `office-tracker` Storage) + `.env.vercel.prod.local` (app vars)
+
+2. Sync both Enterprise projects:
+
+   ```powershell
+   $env:VERCEL_TOKEN = "your-token"   # session only
+   .\scripts\sync-enterprise-env.ps1 -Profile dev
+   .\scripts\sync-enterprise-env.ps1 -Profile prod
+   ```
+
+3. In Vercel dashboard → each project → **Git → Production Branch**:
+   - `office-tracker-dev-9824` → `dev`
+   - `office-tracker-prod` → `production`
+
+4. Workflow: merge to `dev` → dev URL updates; when ready, PR `dev` → `production` → prod URL updates.
+
+**Do not** commit database URLs or `AUTH_SECRET` to git. Admin Settings in the app already edits runtime pilot config (SSIDs, hours target, etc.) in Postgres; connection strings belong in Vercel env only.
+
+### Re-sync after Hobby env changes
+
+Re-run `.\scripts\sync-enterprise-env.ps1` whenever you rotate `AUTH_SECRET` or Neon credentials on Hobby.
+
 ## Troubleshooting
 
 | Error | Fix |
@@ -149,3 +205,5 @@ After cleanup and Storage reconnect:
 | `404 Project not found` | Wrong `VERCEL_PROJECT_ID` or missing `VERCEL_TEAM_ID` for team projects |
 | `curl.exe failed` | Corporate proxy blocking `api.vercel.com` — try from personal network or ask IT |
 | Vars deleted but app still broken | Reconnect Storage (step 4) and redeploy |
+| Enterprise build: `POSTGRES_PRISMA_URL` not found | Run `sync-enterprise-env.ps1`, then redeploy |
+| Enterprise URL redirects to Vercel SSO | Expected for protected Enterprise deployments — open in browser while signed into PwC Vercel |

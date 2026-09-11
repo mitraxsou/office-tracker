@@ -15,6 +15,7 @@ export function AdminSettingsForm({
   maxDevicesPerUser,
   pendingTokenTtlDays,
   heartbeatRetentionDays,
+  heartbeatIntervalMinutes,
   agentStaleMinutes,
   agentStaleGraceHours,
   fiscalYearStartMonth,
@@ -26,6 +27,7 @@ export function AdminSettingsForm({
   maxDevicesPerUser: number;
   pendingTokenTtlDays: number;
   heartbeatRetentionDays: number;
+  heartbeatIntervalMinutes: number;
   agentStaleMinutes: number;
   agentStaleGraceHours: number;
   fiscalYearStartMonth: number;
@@ -38,6 +40,7 @@ export function AdminSettingsForm({
   const [maxDevices, setMaxDevices] = useState(maxDevicesPerUser);
   const [tokenTtl, setTokenTtl] = useState(pendingTokenTtlDays);
   const [heartbeatRetention, setHeartbeatRetention] = useState(heartbeatRetentionDays);
+  const [heartbeatInterval, setHeartbeatInterval] = useState(heartbeatIntervalMinutes);
   const [staleMinutes, setStaleMinutes] = useState(agentStaleMinutes);
   const [graceHours, setGraceHours] = useState(agentStaleGraceHours);
   const [fyStartMonth, setFyStartMonth] = useState(fiscalYearStartMonth);
@@ -72,6 +75,7 @@ export function AdminSettingsForm({
         maxDevicesPerUser: maxDevices,
         pendingTokenTtlDays: tokenTtl,
         heartbeatRetentionDays: heartbeatRetention,
+        heartbeatIntervalMinutes: heartbeatInterval,
         agentStaleMinutes: staleMinutes,
         agentStaleGraceHours: graceHours,
         fiscalYearStartMonth: fyStartMonth,
@@ -205,7 +209,7 @@ export function AdminSettingsForm({
           Pending install tokens auto-revoke if never bound. Raw heartbeats are purged after the
           retention window (visits are kept).
         </p>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <label className="block text-sm">
             <span className="text-muted">Pending token TTL (days)</span>
             <input
@@ -225,6 +229,17 @@ export function AdminSettingsForm({
               max={30}
               value={heartbeatRetention}
               onChange={(e) => setHeartbeatRetention(Number(e.target.value))}
+              className="mt-1 w-full rounded-lg border px-3 py-2"
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="text-muted">Heartbeat interval (minutes)</span>
+            <input
+              type="number"
+              min={2}
+              max={60}
+              value={heartbeatInterval}
+              onChange={(e) => setHeartbeatInterval(Number(e.target.value))}
               className="mt-1 w-full rounded-lg border px-3 py-2"
             />
           </label>
@@ -252,8 +267,9 @@ export function AdminSettingsForm({
           </label>
         </div>
         <p className="mt-2 text-xs text-muted">
-          Visit gap ends office visits when heartbeats stop. Health grace (default 24h) flags stale
-          agents when no pulse for that long and the user is not out of office.
+          Installed agents wake every 2 minutes but send only when this heartbeat interval has
+          elapsed. Keep visit gap at about 3 times the heartbeat interval. Health grace (default
+          24h) flags stale agents when no pulse for that long and the user is not out of office.
         </p>
       </section>
 

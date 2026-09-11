@@ -11,6 +11,7 @@
 | `AUTH_SECRET` | Session JWT (32+ chars) |
 | `NEXT_PUBLIC_APP_URL` | Public URL for install commands and agent |
 | `DEFAULT_OFFICE_SSIDS` | Seed value (`OfficeConnect`, `ExternalConnect`, `pwcglb.com`); admin manages via AppConfig in prod; startup merges missing defaults |
+| `DEFAULT_HEARTBEAT_INTERVAL_MINUTES` | Seed value for a new AppConfig (default 5, range 2-60); admin manages the stored value |
 | `ADMIN_EMAIL` | Promote user to admin on seed |
 | `BREAKGLASS_EMAIL` | Recovery admin email (with password) |
 | `BREAKGLASS_PASSWORD` | Recovery admin password |

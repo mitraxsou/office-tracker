@@ -20,8 +20,11 @@ Config: GET /api/agent/config (Bearer token) — SSIDs & hours target server-sid
 ```
 
 - **Local dev:** Postgres via `.env.local`, `npm run dev` → http://localhost:3000
-- **Dev deploy:** branch `dev` → Vercel project `office-tracker-dev` → https://office-tracker-dev.vercel.app (separate Neon via Vercel Storage)
-- **Production:** branch `production` → Vercel project `office-tracker` → https://office-tracker-theta.vercel.app (Neon `neon-canary-blanket`)
+- **Dev (Hobby):** `dev` → `office-tracker-dev` → https://office-tracker-dev.vercel.app
+- **Prod (Hobby):** `production` → `office-tracker` → https://office-tracker-theta.vercel.app
+- **Dev (Enterprise CDTR):** `dev` → `office-tracker-dev-9824` → https://office-tracker-dev-9824.vercel.app (same Neon as Hobby dev)
+- **Prod (Enterprise CDTR):** `production` → `office-tracker-prod` → https://office-tracker-prod.vercel.app (same Neon as Hobby prod)
+- **Enterprise env sync:** `.\scripts\sync-enterprise-env.ps1 -Profile dev|prod` — see `scripts/vercel-env-setup.md` and `docs/deploy-branches.md`
 - **Workflow:** PR to `dev`, then PR `dev` → `production`. GitHub default branch is `dev`. See `docs/deploy-branches.md`
 - **Do not** reuse `lsc-impact-analyser-dashboard` Vercel project or point dev at prod Postgres
 
@@ -33,7 +36,7 @@ Config: GET /api/agent/config (Bearer token) — SSIDs & hours target server-sid
 | Manual visit / quick check-in | Public IP, gateway name |
 | Admin-corrected visits | Unknown SSID |
 
-- Heartbeat every **2 min**; gap **>8 min** ends visit
+- Heartbeat every **5 min by default** (admin configurable 2-60); gap **>15 min** ends visit
 - Timezone default: **Asia/Kolkata**
 - `vpnGateway` in heartbeat is **diagnostic only**
 
@@ -49,7 +52,7 @@ Config: GET /api/agent/config (Bearer token) — SSIDs & hours target server-sid
 | `uninstall.ps1` | Remove task, Startup shortcut, local files |
 | `update.ps1` | Refresh scripts; task name **PwCOfficePulse** |
 
-**Scheduled task:** `PwCOfficePulse` runs `wscript.exe //B //Nologo run-heartbeat.vbs` every 2 min + Startup shortcut at logon.
+**Scheduled task:** `PwCOfficePulse` wakes every 2 min and sends only after the server-configured interval + Startup shortcut at logon.
 
 **SSID detection order** (PwC laptops often block Location by admin):
 1. `netsh wlan show interfaces` (actual WLAN SSID; prefer connected interface)

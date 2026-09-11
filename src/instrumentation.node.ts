@@ -46,7 +46,16 @@ export async function registerNode() {
       'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "heartbeatRetentionDays" INTEGER NOT NULL DEFAULT 7;'
     );
     await prisma.$executeRawUnsafe(
-      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "agentStaleMinutes" INTEGER NOT NULL DEFAULT 8;'
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "heartbeatIntervalMinutes" INTEGER NOT NULL DEFAULT 5;'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "agentStaleMinutes" INTEGER NOT NULL DEFAULT 15;'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AppConfig" ALTER COLUMN "agentStaleMinutes" SET DEFAULT 15;'
+    );
+    await prisma.$executeRawUnsafe(
+      'UPDATE "AppConfig" SET "agentStaleMinutes" = 15 WHERE "agentStaleMinutes" = 8;'
     );
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "agentStaleGraceHours" INTEGER NOT NULL DEFAULT 24;'

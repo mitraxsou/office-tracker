@@ -89,12 +89,13 @@ export function AgentSetupPanel({
             </p>
           </li>
           <li>
-            <span className="font-medium">Pick your laptop, then choose Install or Update</span>
+            <span className="font-medium">Pick your laptop, then run one command</span>
             <p className="mt-1 text-muted">
-              Each laptop card below has two separate sections. Use{" "}
-              <strong>Install (first time)</strong> if the agent has never run on this laptop. Use{" "}
-              <strong>Update (already installed)</strong> to refresh an agent that is already there.
-              You only need one of them.
+              Each laptop card below includes <strong>Switch server URL</strong> if the agent is
+              already installed (paste in any PowerShell window; no zip folder needed). Use{" "}
+              <strong>Install (first time)</strong> for a new laptop. Use{" "}
+              <strong>Update scripts</strong> only when you need the latest scripts downloaded from
+              this server.
             </p>
             <div className="mt-3">
               <InstallTokenCommands

@@ -48,7 +48,7 @@ export function DashboardAlerts({
         <p className="text-sm font-medium text-amber-400">Wi-Fi SSID not detected</p>
         <p className="mt-0.5 text-xs text-muted">
           Use <strong>Check in</strong> below or add a manual visit if detection stays missing
-          after the next heartbeat (~2 min).
+          after the next heartbeat (up to ~6 min by default).
         </p>
       </CompactAlert>,
     );

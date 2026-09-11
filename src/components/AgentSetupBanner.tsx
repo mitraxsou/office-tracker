@@ -8,7 +8,7 @@ export function AgentSetupBanner({ ssidMissing }: { ssidMissing?: boolean }) {
         <p className="mt-1 text-sm text-muted">
           Location services may be disabled on this laptop. The agent also tries{" "}
           <code>Get-NetConnectionProfile</code>, which does not need Location. If SSID is still
-          missing after the next heartbeat (~2 min), use <strong>Check in</strong> below or add a
+          missing after the next heartbeat (up to ~6 min by default), use <strong>Check in</strong> below or add a
           manual visit.
         </p>
         <p className="mt-2 text-xs text-muted">

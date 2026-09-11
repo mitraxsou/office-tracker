@@ -32,7 +32,7 @@ const STATUS_LABELS = {
   waiting: {
     title: "Waiting for heartbeat",
     detail:
-      "Install may have finished. The agent checks in every 2 minutes. Use Refresh status below.",
+      "Install may have finished. The agent checks in about every 5 minutes by default. Use Refresh status below.",
     color: "text-blue-300",
   },
   connected: {

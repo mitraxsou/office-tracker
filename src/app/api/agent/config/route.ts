@@ -30,6 +30,7 @@ export async function GET(request: Request) {
     ssids: globalConfig.officeSsids,
     hoursTarget,
     timezone: user.timezone,
+    heartbeatIntervalMinutes: globalConfig.heartbeatIntervalMinutes,
     apiVersion: API_VERSION,
     agentScriptVersion: getAgentVersion(),
     forceAgentUpdate,

@@ -1,8 +1,8 @@
 export const DEFAULT_TIMEZONE = "Asia/Kolkata";
 export const DEFAULT_HOURS_TARGET = 5;
 export const DEFAULT_MONTHLY_DAYS_TARGET = 8;
-export const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
-export const VISIT_GAP_MS = 8 * 60 * 1000;
+export const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
+export const VISIT_GAP_MS = 15 * 60 * 1000;
 
 /** Curated IANA zones for the pilot (dropdown). Any valid IANA id still accepted via API. */
 export const USER_TIMEZONE_OPTIONS: Array<{ value: string; label: string }> = [

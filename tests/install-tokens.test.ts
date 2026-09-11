@@ -8,6 +8,7 @@ import { decryptPendingToken, encryptPendingToken } from "../src/lib/token-crypt
 import {
   buildInstallCommand,
   buildInstallCommandFromLocalConfig,
+  buildRetargetApiUrlCommand,
   buildUpdateCommand,
   buildUpdateCommandFromLocalConfig,
 } from "../src/lib/agent-branding";
@@ -214,5 +215,13 @@ describe("copy-paste agent commands", () => {
     expect(command).toContain('-ApiUrl "https://office.example"');
     expect(command).toContain("-Token $cfg.token");
     expect(command).toContain(".\\update.ps1");
+  });
+
+  it("builds retarget command that updates config.json apiUrl only", () => {
+    const command = buildRetargetApiUrlCommand("https://office-tracker-prod.vercel.app");
+    expect(command).toContain("OfficeTracker\\config.json");
+    expect(command).toContain('apiUrl = "https://office-tracker-prod.vercel.app"');
+    expect(command).not.toContain("update.ps1");
+    expect(command).not.toContain("install.ps1");
   });
 });

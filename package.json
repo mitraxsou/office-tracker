@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/ensure-postgres-env.mjs -- next dev",
-    "build": "node scripts/ensure-postgres-env.mjs --generate-only -- prisma generate && node scripts/setup-db-on-deploy.mjs && next build",
+    "build": "node scripts/ensure-postgres-env.mjs --generate-only -- prisma generate && node scripts/setup-db-on-deploy.mjs && node scripts/ensure-postgres-env.mjs -- next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",

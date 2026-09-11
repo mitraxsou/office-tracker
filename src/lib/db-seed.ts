@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { DEFAULT_HOURS_TARGET, DEFAULT_MONTHLY_DAYS_TARGET, parseDefaultSsidsFromEnv } from "./constants";
 import { ensureBreakglassAdmin } from "./breakglass";
+import { resolveDefaultHeartbeatIntervalMinutes } from "./app-config";
 
 export async function seedDefaults() {
   await prisma.appConfig.upsert({
@@ -13,6 +14,7 @@ export async function seedDefaults() {
       maxDevicesPerUser: 10,
       allowRegistration: false,
       allowOtpSelfRegistration: true,
+      heartbeatIntervalMinutes: resolveDefaultHeartbeatIntervalMinutes(),
     },
     // Seed runs on every deploy when RUN_DB_SETUP_ON_DEPLOY=true. Leave an existing row
     // alone so it cannot overwrite SSIDs and targets an admin set in /admin/settings.

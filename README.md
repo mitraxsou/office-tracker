@@ -32,7 +32,7 @@ Release workflow: PR to `dev` (auto-deploy dev) → PR `dev` → `production` (a
 | **Sign-in** | OTP via Microsoft Teams (Power Automate); password fallback for admin-issued accounts |
 | **Terms** | First sign-in (or next sign-in for existing users) requires accepting Terms and Privacy |
 | **Dashboard** | Today hours, monthly progress, year compliance calendar, manual check-in/out |
-| **Agent** | Windows background agent (2 min heartbeats); user-level install, no admin rights |
+| **Agent** | Windows background agent (5 min heartbeats by default); user-level install, no admin rights |
 | **Notifications** | Per-alert channel: in-app, Teams, or both; out-of-office and schedule prefs |
 | **Admin** | User/token management, org calendar, visit corrections, compliance exemptions, audit log |
 | **Integrations** | Power Automate webhook for OTP and Teams alerts ([docs/power-automate.md](docs/power-automate.md)) |
@@ -133,6 +133,7 @@ If Vercel shows vars like `DATABASE_URL_POSTGRES_URL`, `DATABASE_URL_DATABASE_UR
 | `BREAKGLASS_PASSWORD` | Your secure password |
 | `ALLOW_REGISTRATION` | `false` blocks legacy `/register` only. OTP self-registration uses the admin toggle (default on). |
 | `DEFAULT_OFFICE_SSIDS` | `OfficeConnect,ExternalConnect,pwcglb.com` |
+| `DEFAULT_HEARTBEAT_INTERVAL_MINUTES` | Optional seed default for new databases (`5`, range 2-60). Admin edits the stored value later. |
 | `POWER_AUTOMATE_WEBHOOK_URL` | Power Automate HTTP trigger URL. See [docs/power-automate.md](docs/power-automate.md) |
 | `POWER_AUTOMATE_WEBHOOK_SECRET` | `X-Office-Pulse-Token` header secret (required; survives AUTH_SECRET rotation) |
 

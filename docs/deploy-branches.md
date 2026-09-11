@@ -2,10 +2,29 @@
 
 Office Pulse uses **two Vercel projects** and **two Git branches** so development never shares the production database.
 
+## Hobby (`soumitra-pwc`)
+
 | Environment | Git branch | Vercel project | URL | Database |
 |---|---|---|---|---|
 | **Development** | `dev` (GitHub default) | `office-tracker-dev` | https://office-tracker-dev.vercel.app | Vercel Storage Neon `office-tracker-dev-db` |
 | **Production** | `production` | `office-tracker` | https://office-tracker-theta.vercel.app | Vercel Storage Neon `neon-canary-blanket` |
+
+## Enterprise CDTR (`pwc-us-adv-cdtr`)
+
+Same Git branches and **same Neon databases** as Hobby (env vars synced via API; no Storage UI needed).
+
+| Environment | Git branch | Vercel project | URL | Database |
+|---|---|---|---|---|
+| **Development** | `dev` | `office-tracker-dev-9824` | https://office-tracker-dev-9824.vercel.app | Same Neon as Hobby dev |
+| **Production** | `production` | `office-tracker-prod` | https://office-tracker-prod.vercel.app | Same Neon as Hobby prod (`neon-canary-blanket`) |
+
+```powershell
+$env:VERCEL_TOKEN = "your-token"   # session only
+.\scripts\sync-enterprise-env.ps1 -Profile dev
+.\scripts\sync-enterprise-env.ps1 -Profile prod
+```
+
+Set **Production Branch** in each Enterprise project's Git settings: `dev` for `office-tracker-dev-9824`, `production` for `office-tracker-prod` (dashboard only; API cannot change this on Enterprise).
 
 The legacy `main` branch is frozen at the same commit as `dev` / `production` when the split was created. Do not deploy from `main`.
 

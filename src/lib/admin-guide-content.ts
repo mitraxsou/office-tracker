@@ -20,7 +20,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       {
         type: "paragraph",
         text:
-          "My Office Pulse tracks whether pilot users spend at least the configured daily hours in the office (default 5 hours) and meet a monthly office-days target (default 8 days). A Windows agent on each PwC laptop sends heartbeats every 2 minutes. The web app stores visits, compliance, and admin settings in Postgres (Neon on Vercel).",
+          "My Office Pulse tracks whether pilot users spend at least the configured daily hours in the office (default 5 hours) and meet a monthly office-days target (default 8 days). A Windows agent on each PwC laptop sends heartbeats on the admin-set interval (default 5 minutes). The web app stores visits, compliance, and admin settings in Postgres (Neon on Vercel).",
       },
       {
         type: "diagram",
@@ -46,7 +46,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         items: [
           "Counts as in-office: Wi-Fi SSID matches the global allowlist (OfficeConnect, ExternalConnect, pwcglb.com, or admin-configured names), manual check-in, or admin-corrected visits.",
           "Does NOT count: VPN (GlobalProtect), home networks, unknown SSIDs.",
-          "Heartbeat gap greater than the visit gap (default 8 minutes) ends the current visit.",
+          "Heartbeat gap greater than the visit gap (default 15 minutes) ends the current visit.",
           "Default timezone: Asia/Kolkata. Users can request a timezone change; admins approve on the Corrections page.",
         ],
       },
@@ -490,7 +490,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
           "Monthly office days target (default 8).",
           "Office Wi-Fi SSIDs: one per line. Case-insensitive; strips band suffixes and (Unauthenticated). Prefix match supported.",
           "Max laptops per user.",
-          "Pending token TTL, heartbeat retention, visit gap (minutes), agent health grace (hours).",
+          "Pending token TTL, heartbeat retention, heartbeat interval, visit gap (minutes), agent health grace (hours).",
         ],
       },
       {
@@ -571,7 +571,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         items: [
           {
             problem: "SSID change not reflecting for a user",
-            fix: "Save global config. Recent heartbeats are backfilled. User may need a new heartbeat cycle (2 min). Manual check-in uses current SSID list immediately.",
+            fix: "Save global config. Recent heartbeats are backfilled. User may need a new heartbeat cycle (up to 6 min by default). Manual check-in uses current SSID list immediately.",
           },
           {
             problem: "Cron shows Overdue",
@@ -729,7 +729,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       {
         type: "paragraph",
         text:
-          "The Windows agent (My Office Pulse) runs every 2 minutes via scheduled task PwCOfficePulse. No IT admin rights required for default install to %LOCALAPPDATA%\\OfficeTracker\\.",
+          "The Windows agent (My Office Pulse) wakes every 2 minutes via scheduled task PwCOfficePulse and sends on the admin-set interval (5 minutes by default). No IT admin rights required for default install to %LOCALAPPDATA%\\OfficeTracker\\.",
       },
       {
         type: "subheading",

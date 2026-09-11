@@ -29,6 +29,10 @@ describe("agent version", () => {
     expect(heartbeat).toContain(`$AgentScriptVersion = "${getAgentVersion()}"`);
     expect(heartbeat).toContain("scriptVersion  = $scriptVersion");
     expect(heartbeat).toContain('$uri = "${uri}?serialNumber=$encoded"');
+    expect(heartbeat).toContain("Get-HeartbeatIntervalMinutes");
+    expect(heartbeat).toContain("Test-HeartbeatDue");
+    expect(heartbeat).toContain("Set-LastSuccessfulHeartbeatTime");
+    expect(heartbeat).toContain("[Math]::Max(2, [Math]::Min(60, $interval))");
   });
 
   it("treats missing or different versions as needing update", () => {

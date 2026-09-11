@@ -133,7 +133,7 @@ export function MonthlyReportSection({
           value={agentLabel}
           tooltip={
             agentHealthDetail ??
-            `Laptop agent pulses about every 2 minutes. Healthy means a pulse arrived within the last few minutes. ${pulse.pulsesLast24h} pulses in the last 24h.`
+            `Laptop agent pulses about every 5 minutes by default. Healthy means a pulse arrived within the configured grace window. ${pulse.pulsesLast24h} pulses in the last 24h.`
           }
           tone={agentTone}
         >

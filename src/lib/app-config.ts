@@ -17,9 +17,16 @@ import {
 
 export const DEFAULT_PENDING_TOKEN_TTL_DAYS = 7;
 export const DEFAULT_HEARTBEAT_RETENTION_DAYS = 7;
-export const DEFAULT_AGENT_STALE_MINUTES = 8;
+export const DEFAULT_HEARTBEAT_INTERVAL_MINUTES = 5;
+export const DEFAULT_AGENT_STALE_MINUTES = 15;
 export const DEFAULT_AGENT_STALE_GRACE_HOURS = 24;
 export const DEFAULT_PILOT_START_MONTH_KEY = "2026-09";
+
+export function resolveDefaultHeartbeatIntervalMinutes(): number {
+  const parsed = Number(process.env.DEFAULT_HEARTBEAT_INTERVAL_MINUTES);
+  if (Number.isInteger(parsed) && parsed >= 2 && parsed <= 60) return parsed;
+  return DEFAULT_HEARTBEAT_INTERVAL_MINUTES;
+}
 
 export function resolvePilotStartMonthKey(stored?: string | null): string {
   const fromEnv = process.env.PILOT_START_MONTH?.trim();
@@ -78,6 +85,7 @@ export type AppConfigData = {
   allowOtpSelfRegistration: boolean;
   pendingTokenTtlDays: number;
   heartbeatRetentionDays: number;
+  heartbeatIntervalMinutes: number;
   agentStaleMinutes: number;
   agentStaleGraceHours: number;
   complianceExemptionRequiresApproval: boolean;
@@ -117,6 +125,7 @@ export async function ensureAppConfig(): Promise<AppConfigData> {
           allowOtpSelfRegistration: true,
           pendingTokenTtlDays: DEFAULT_PENDING_TOKEN_TTL_DAYS,
           heartbeatRetentionDays: DEFAULT_HEARTBEAT_RETENTION_DAYS,
+          heartbeatIntervalMinutes: resolveDefaultHeartbeatIntervalMinutes(),
           agentStaleMinutes: DEFAULT_AGENT_STALE_MINUTES,
           agentStaleGraceHours: DEFAULT_AGENT_STALE_GRACE_HOURS,
           complianceExemptionRequiresApproval: true,
@@ -154,6 +163,9 @@ export async function updateAppConfig(data: Partial<AppConfigData>) {
   }
   if (data.pendingTokenTtlDays !== undefined) update.pendingTokenTtlDays = data.pendingTokenTtlDays;
   if (data.heartbeatRetentionDays !== undefined) update.heartbeatRetentionDays = data.heartbeatRetentionDays;
+  if (data.heartbeatIntervalMinutes !== undefined) {
+    update.heartbeatIntervalMinutes = data.heartbeatIntervalMinutes;
+  }
   if (data.agentStaleMinutes !== undefined) update.agentStaleMinutes = data.agentStaleMinutes;
   if (data.agentStaleGraceHours !== undefined) update.agentStaleGraceHours = data.agentStaleGraceHours;
   if (data.complianceExemptionRequiresApproval !== undefined) {
@@ -200,6 +212,7 @@ function parseConfig(config: {
   allowOtpSelfRegistration?: boolean;
   pendingTokenTtlDays?: number;
   heartbeatRetentionDays?: number;
+  heartbeatIntervalMinutes?: number;
   agentStaleMinutes?: number;
   agentStaleGraceHours?: number;
   complianceExemptionRequiresApproval?: boolean;
@@ -227,6 +240,8 @@ function parseConfig(config: {
     allowOtpSelfRegistration: config.allowOtpSelfRegistration ?? true,
     pendingTokenTtlDays: config.pendingTokenTtlDays ?? DEFAULT_PENDING_TOKEN_TTL_DAYS,
     heartbeatRetentionDays: config.heartbeatRetentionDays ?? DEFAULT_HEARTBEAT_RETENTION_DAYS,
+    heartbeatIntervalMinutes:
+      config.heartbeatIntervalMinutes ?? resolveDefaultHeartbeatIntervalMinutes(),
     agentStaleMinutes: config.agentStaleMinutes ?? DEFAULT_AGENT_STALE_MINUTES,
     agentStaleGraceHours: config.agentStaleGraceHours ?? DEFAULT_AGENT_STALE_GRACE_HOURS,
     complianceExemptionRequiresApproval: config.complianceExemptionRequiresApproval ?? true,

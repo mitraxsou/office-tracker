@@ -22,6 +22,29 @@ export function InstallTokenCommands({
   const [copyError, setCopyError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+
+  async function handleRefreshInstallCommands() {
+    if (
+      !confirm(
+        "This creates a new laptop token with full copy-paste commands. Your old token stops working until you run the new command. Continue?",
+      )
+    ) {
+      return;
+    }
+
+    setRefreshing(true);
+    setRefreshError(null);
+    const res = await fetch("/api/settings/refresh-install-commands", { method: "POST" });
+    setRefreshing(false);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setRefreshError(body.error ?? "Could not refresh install commands");
+      return;
+    }
+    router.refresh();
+  }
 
   async function handleGenerateInstallCommand() {
     if (
@@ -118,12 +141,44 @@ export function InstallTokenCommands({
               </div>
             )}
             {t.usesLocalConfig && (
-              <p className="mt-2 text-xs text-muted">
-                Showing commands from your laptop{" "}
-                <code>{AGENT_INSTALL_DIR}\config.json</code> until your agent sends its next
-                heartbeat (~2 min). Refresh this page afterward to copy commands with your full
-                token from the server.
-              </p>
+              <div className="mt-2 space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-muted">
+                <p>
+                  Full token commands are not stored for this laptop yet. Use{" "}
+                  <strong>Switch server URL</strong> below to move to the new app URL (recommended).
+                  Or click <strong>Show full commands with token</strong> to issue a new token.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void handleRefreshInstallCommands()}
+                  disabled={refreshing}
+                  className="btn-primary px-3 py-1 text-xs"
+                >
+                  {refreshing ? "Generating..." : "Show full commands with token"}
+                </button>
+                {refreshError && <p className="text-red-400">{refreshError}</p>}
+              </div>
+            )}
+
+            {t.retargetCommand && t.status === "bound" && (
+              <div className="mt-3 rounded border border-[var(--pwc-orange)]/40 bg-[var(--pwc-orange)]/5 p-3">
+                <p className="text-sm font-medium text-[var(--pwc-orange)]">
+                  Switch server URL (already installed)
+                </p>
+                <p className="mt-1 text-xs text-muted">
+                  Paste in any PowerShell window. Updates <code>{AGENT_INSTALL_DIR}\config.json</code>{" "}
+                  to this site. Your token stays the same. No zip download required.
+                </p>
+                <pre className="mt-2 overflow-x-auto rounded border bg-[var(--background-elevated)] p-2 text-xs whitespace-pre-wrap">
+                  {t.retargetCommand}
+                </pre>
+                <button
+                  type="button"
+                  onClick={() => handleCopy(t.retargetCommand!, `${t.id}-retarget`)}
+                  className="btn-primary mt-2 px-3 py-1 text-xs"
+                >
+                  {copiedId === `${t.id}-retarget` ? "Copied!" : "Copy switch-server command"}
+                </button>
+              </div>
             )}
 
             <div className="mt-3 rounded border border-[var(--border)] p-3">
@@ -145,10 +200,11 @@ export function InstallTokenCommands({
             </div>
 
             <div className="mt-3 rounded border border-[var(--border)] p-3">
-              <p className="text-sm font-medium">Update (already installed)</p>
+              <p className="text-sm font-medium">Update scripts (already installed)</p>
               <p className="mt-1 text-xs text-muted">
-                Use this to refresh an agent that is already on this laptop. Run it from the same
-                extract folder, which must contain <code>update.ps1</code>.
+                Downloads the latest agent scripts from this server. Run from the extract folder with{" "}
+                <code>update.ps1</code>. To only change the server URL, use{" "}
+                <strong>Switch server URL</strong> above instead.
               </p>
               <pre className="mt-2 overflow-x-auto rounded border bg-[var(--background-elevated)] p-2 text-xs whitespace-pre-wrap">
                 {t.updateCommand}
