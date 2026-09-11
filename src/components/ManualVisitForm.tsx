@@ -43,6 +43,7 @@ export function ManualVisitForm({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
@@ -52,6 +53,7 @@ export function ManualVisitForm({
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(null);
 
     const res = await fetch("/api/visits", {
       method: "POST",
@@ -71,6 +73,7 @@ export function ManualVisitForm({
     setStartAt("");
     setEndAt("");
     setIncludeCheckout(false);
+    setSuccess("Submitted for admin approval. You will see the visit after it is approved.");
     router.refresh();
   }
 
@@ -82,12 +85,17 @@ export function ManualVisitForm({
         {!embedded && <h2 className="text-lg font-medium">Manual visit</h2>}
         <p className={`text-sm text-muted ${embedded ? "" : "mt-1"}`}>
           Log a past office session when the agent missed it, or for guest Wi-Fi and Ethernet.
-          Pick date and time from the calendar and clock controls.
+          Submissions go to admin for approval before they count toward compliance.
         </p>
       </div>
 
       {error && (
         <p className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>
+      )}
+      {success && (
+        <p className="mb-4 rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-400">
+          {success}
+        </p>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -142,7 +150,7 @@ export function ManualVisitForm({
             disabled={loading}
             className="btn-primary px-4 py-2 disabled:opacity-50"
           >
-            {loading ? "Saving..." : "Add manual visit"}
+            {loading ? "Submitting..." : "Submit for approval"}
           </button>
           <p className="text-xs text-muted">Timezone: {timezone}</p>
         </div>

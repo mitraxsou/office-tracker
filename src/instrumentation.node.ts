@@ -299,6 +299,33 @@ export async function registerNode() {
       'CREATE INDEX IF NOT EXISTS "TimezoneChangeRequest_userId_idx" ON "TimezoneChangeRequest"("userId");'
     );
     await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "ManualVisitRequest" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "startAt" TIMESTAMP(3) NOT NULL,
+        "endAt" TIMESTAMP(3),
+        "ssid" TEXT NOT NULL DEFAULT 'manual',
+        "message" TEXT,
+        "status" TEXT NOT NULL DEFAULT 'open',
+        "adminNote" TEXT,
+        "reviewedAt" TIMESTAMP(3),
+        "reviewedById" TEXT,
+        "visitId" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "ManualVisitRequest_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "ManualVisitRequest_status_createdAt_idx" ON "ManualVisitRequest"("status", "createdAt");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "ManualVisitRequest_userId_idx" ON "ManualVisitRequest"("userId");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "ManualVisitRequest_userId_startAt_idx" ON "ManualVisitRequest"("userId", "startAt");'
+    );
+    await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "ProfileChangeRequest" (
         "id" TEXT NOT NULL,
         "userId" TEXT NOT NULL,

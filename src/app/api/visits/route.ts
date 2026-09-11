@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, getSessionUserId } from "@/lib/auth";
-import { createManualVisit } from "@/lib/heartbeat-service";
-import { handleOfficePresenceDetected } from "@/lib/ooo-presence";
+import { createManualVisitRequest } from "@/lib/manual-visit-requests";
 import { prisma } from "@/lib/db";
-import { validateVisitTimestamps } from "@/lib/visit-validation";
 
 export async function GET() {
   const userId = await getSessionUserId();
@@ -11,13 +9,29 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const visits = await prisma.visit.findMany({
-    where: { userId },
-    orderBy: { startAt: "desc" },
-    take: 50,
-  });
+  const [visits, openRequests] = await Promise.all([
+    prisma.visit.findMany({
+      where: { userId },
+      orderBy: { startAt: "desc" },
+      take: 50,
+    }),
+    prisma.manualVisitRequest.findMany({
+      where: { userId, status: "open" },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
 
-  return NextResponse.json({ visits });
+  return NextResponse.json({
+    visits,
+    pendingRequests: openRequests.map((r) => ({
+      id: r.id,
+      status: r.status,
+      startAt: r.startAt.toISOString(),
+      endAt: r.endAt?.toISOString() ?? null,
+      ssid: r.ssid,
+      createdAt: r.createdAt.toISOString(),
+    })),
+  });
 }
 
 export async function POST(request: Request) {
@@ -26,14 +40,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { startAt?: string; endAt?: string; ssid?: string | null };
+  let body: { startAt?: string; endAt?: string; ssid?: string | null; message?: string | null };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { startAt, endAt, ssid } = body;
+  const { startAt, endAt, ssid, message } = body;
   if (!startAt) {
     return NextResponse.json({ error: "startAt is required" }, { status: 400 });
   }
@@ -46,35 +60,24 @@ export async function POST(request: Request) {
   let end: Date | null = null;
   if (endAt) {
     end = new Date(endAt);
-    if (Number.isNaN(end.getTime()) || end <= start) {
+    if (Number.isNaN(end.getTime())) {
       return NextResponse.json({ error: "Invalid endAt" }, { status: 400 });
     }
   }
 
-  const timestampError = validateVisitTimestamps(start, end);
-  if (timestampError) {
-    return NextResponse.json({ error: timestampError }, { status: 400 });
+  const result = await createManualVisitRequest({
+    userId: user.id,
+    startAt: start,
+    endAt: end,
+    ssid,
+    message,
+  });
+
+  if ("error" in result) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
   }
 
-  const resolvedSsid = typeof ssid === "string" && ssid.trim() ? ssid.trim() : "manual";
-
-  try {
-    const visit = await createManualVisit({
-      userId: user.id,
-      startAt: start,
-      endAt: end,
-      ssid: resolvedSsid,
-    });
-
-    if (!end) {
-      await handleOfficePresenceDetected(user.id, user.timezone, start);
-    }
-
-    return NextResponse.json({ visit }, { status: 201 });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to create visit";
-    return NextResponse.json({ error: message }, { status: 400 });
-  }
+  return NextResponse.json({ request: result.request }, { status: 201 });
 }
 
 export async function DELETE(request: Request) {

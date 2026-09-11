@@ -6,6 +6,7 @@ describe("admin inbox count", () => {
     expect(
       totalAdminInboxCount({
         visit_correction: 4,
+        manual_visit: 1,
         timezone_change: 2,
         profile_change: 1,
         compliance_exemption: 3,
@@ -13,6 +14,6 @@ describe("admin inbox count", () => {
         admin_contact: 1,
         prior_compliance: 2,
       }),
-    ).toBe(15);
+    ).toBe(16);
   });
 });

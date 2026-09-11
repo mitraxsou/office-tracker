@@ -64,7 +64,10 @@ export type AuditAction =
   | "prior_compliance_request"
   | "prior_compliance_cancel"
   | "prior_compliance_approve"
-  | "prior_compliance_reject";
+  | "prior_compliance_reject"
+  | "manual_visit_request"
+  | "manual_visit_approve"
+  | "manual_visit_reject";
 
 export async function logAuditEvent(params: {
   actorId: string;

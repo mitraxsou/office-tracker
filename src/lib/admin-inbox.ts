@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 
 export const ADMIN_INBOX_KINDS = [
   "visit_correction",
+  "manual_visit",
   "timezone_change",
   "profile_change",
   "compliance_exemption",
@@ -37,11 +38,21 @@ export async function getAdminInbox(): Promise<{
 }> {
   const { prisma } = await import("./db");
   const userSelect = { id: true, email: true, name: true } satisfies Prisma.UserSelect;
-  const [corrections, timezones, profiles, exemptions, removals, adminContacts, priorCompliance] =
+  const [corrections, manualVisits, timezones, profiles, exemptions, removals, adminContacts, priorCompliance] =
     await Promise.all([
     prisma.visitCorrectionRequest.findMany({
       where: { status: "open" },
       select: { id: true, createdAt: true, message: true, user: { select: userSelect } },
+    }),
+    prisma.manualVisitRequest.findMany({
+      where: { status: "open" },
+      select: {
+        id: true,
+        createdAt: true,
+        startAt: true,
+        endAt: true,
+        user: { select: userSelect },
+      },
     }),
     prisma.timezoneChangeRequest.findMany({
       where: { status: "open" },
@@ -125,6 +136,16 @@ export async function getAdminInbox(): Promise<{
     ...corrections.map((row) =>
       item("visit_correction", "Visit correction", row.message, row),
     ),
+    ...manualVisits.map((row) =>
+      item(
+        "manual_visit",
+        "Manual visit",
+        row.endAt
+          ? `${row.startAt.toISOString()} to ${row.endAt.toISOString()}`
+          : `${row.startAt.toISOString()} (open)`,
+        row,
+      ),
+    ),
     ...timezones.map((row) =>
       item("timezone_change", "Timezone change", row.requestedTimezone, row),
     ),
@@ -162,6 +183,7 @@ export async function getAdminInbox(): Promise<{
 
   const counts: AdminInboxCounts = {
     visit_correction: corrections.length,
+    manual_visit: manualVisits.length,
     timezone_change: timezones.length,
     profile_change: profiles.length,
     compliance_exemption: exemptions.length,

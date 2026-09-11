@@ -370,7 +370,19 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       {
         type: "paragraph",
         text:
-          "The Corrections page (/admin/visit-reports) hosts all approval queues. Sections are anchored: admin_contact, timezone_change, profile_change, compliance_exemption, device_removal, visit_correction.",
+          "The Corrections page (/admin/visit-reports) hosts all approval queues. Sections are anchored: admin_contact, manual_visit, timezone_change, profile_change, compliance_exemption, device_removal, visit_correction.",
+      },
+      {
+        type: "subheading",
+        text: "Manual visit requests",
+      },
+      {
+        type: "list",
+        items: [
+          "Users submit manual check-ins and past visits from the dashboard. Nothing counts until approved.",
+          "Approve to create the visit record. Reject with an optional note if the request is invalid.",
+          "Admins can still add visits instantly from the user report without a request.",
+        ],
       },
       {
         type: "subheading",
