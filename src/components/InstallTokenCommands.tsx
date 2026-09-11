@@ -24,6 +24,10 @@ export function InstallTokenCommands({
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [storingId, setStoringId] = useState<string | null>(null);
+  const [storeError, setStoreError] = useState<Record<string, string>>({});
+  const [pasteToken, setPasteToken] = useState<Record<string, string>>({});
+  const [showToken, setShowToken] = useState<Record<string, boolean>>({});
 
   async function handleRefreshInstallCommands() {
     if (
@@ -65,6 +69,38 @@ export function InstallTokenCommands({
       return;
     }
     router.refresh();
+  }
+
+  async function handleStoreToken(tokenId: string) {
+    const value = pasteToken[tokenId]?.trim();
+    if (!value) {
+      setStoreError((prev) => ({ ...prev, [tokenId]: "Paste your token first." }));
+      return;
+    }
+
+    setStoringId(tokenId);
+    setStoreError((prev) => ({ ...prev, [tokenId]: "" }));
+    const res = await fetch(`/api/settings/tokens/${tokenId}/store`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: value }),
+    });
+    setStoringId(null);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setStoreError((prev) => ({
+        ...prev,
+        [tokenId]: body.error ?? "Could not save token",
+      }));
+      return;
+    }
+    setPasteToken((prev) => ({ ...prev, [tokenId]: "" }));
+    router.refresh();
+  }
+
+  function maskToken(token: string) {
+    if (token.length <= 12) return "••••••••";
+    return `${token.slice(0, 8)}••••••••${token.slice(-4)}`;
   }
 
   async function handleCopy(text: string, tokenId: string) {
@@ -125,39 +161,92 @@ export function InstallTokenCommands({
               )}
             </div>
             {!compact && (
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                <p className="text-xs text-muted">
-                  Issued {new Date(t.createdAt).toLocaleString("en-IN")}
-                </p>
-                {t.plainToken && (
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(t.plainToken!, `${t.id}-token`)}
-                    className="btn-secondary px-3 py-1 text-xs"
-                  >
-                    {copiedId === `${t.id}-token` ? "Copied!" : "Copy token"}
-                  </button>
-                )}
-              </div>
+              <p className="mt-2 text-xs text-muted">
+                Issued {new Date(t.createdAt).toLocaleString("en-IN")}
+              </p>
             )}
-            {t.usesLocalConfig && (
-              <div className="mt-2 space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-muted">
-                <p>
-                  Full token commands are not stored for this laptop yet. Use{" "}
-                  <strong>Switch server URL</strong> below to move to the new app URL (recommended).
-                  Or click <strong>Show full commands with token</strong> to issue a new token.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => void handleRefreshInstallCommands()}
-                  disabled={refreshing}
-                  className="btn-primary px-3 py-1 text-xs"
-                >
-                  {refreshing ? "Generating..." : "Show full commands with token"}
-                </button>
-                {refreshError && <p className="text-red-400">{refreshError}</p>}
-              </div>
-            )}
+
+            <div className="mt-3 rounded border border-[var(--border)] bg-[var(--background-elevated)] p-3">
+              <p className="text-sm font-medium">Laptop token</p>
+              {t.plainToken ? (
+                <>
+                  <p className="mt-1 text-xs text-muted">
+                    Use this token in install commands or share with IT for troubleshooting. Prefix:{" "}
+                    <code>{t.prefix}</code>
+                  </p>
+                  <pre className="mt-2 overflow-x-auto rounded border bg-[var(--background)] p-2 text-xs break-all whitespace-pre-wrap">
+                    {showToken[t.id] ? t.plainToken : maskToken(t.plainToken)}
+                  </pre>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowToken((prev) => ({ ...prev, [t.id]: !prev[t.id] }))
+                      }
+                      className="btn-secondary px-3 py-1 text-xs"
+                    >
+                      {showToken[t.id] ? "Hide token" : "Show full token"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(t.plainToken!, `${t.id}-token`)}
+                      className="btn-primary px-3 py-1 text-xs"
+                    >
+                      {copiedId === `${t.id}-token` ? "Copied!" : "Copy token"}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="mt-2 space-y-2 text-xs text-muted">
+                  <p>
+                    Full token is not stored on the server yet for this laptop (prefix{" "}
+                    <code>{t.prefix}</code>). Paste it from your laptop config file once, or wait
+                    for the next agent heartbeat and refresh this page.
+                  </p>
+                  <p className="font-mono text-[11px] text-foreground/80">
+                    (Get-Content &quot;$env:LOCALAPPDATA\OfficeTracker\config.json&quot; -Raw |
+                    ConvertFrom-Json).token
+                  </p>
+                  <input
+                    type="password"
+                    value={pasteToken[t.id] ?? ""}
+                    onChange={(e) =>
+                      setPasteToken((prev) => ({ ...prev, [t.id]: e.target.value }))
+                    }
+                    placeholder="Paste token from config.json"
+                    className="w-full rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-xs font-mono"
+                    autoComplete="off"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleStoreToken(t.id)}
+                      disabled={storingId === t.id}
+                      className="btn-primary px-3 py-1 text-xs"
+                    >
+                      {storingId === t.id ? "Saving..." : "Save token for this laptop"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => router.refresh()}
+                      className="btn-secondary px-3 py-1 text-xs"
+                    >
+                      Refresh page
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleRefreshInstallCommands()}
+                      disabled={refreshing}
+                      className="btn-secondary px-3 py-1 text-xs"
+                    >
+                      {refreshing ? "Working..." : "Issue new token instead"}
+                    </button>
+                  </div>
+                  {storeError[t.id] && <p className="text-red-400">{storeError[t.id]}</p>}
+                  {refreshError && <p className="text-red-400">{refreshError}</p>}
+                </div>
+              )}
+            </div>
 
             {t.retargetCommand && t.status === "bound" && (
               <div className="mt-3 rounded border border-[var(--pwc-orange)]/40 bg-[var(--pwc-orange)]/5 p-3">
@@ -211,7 +300,7 @@ export function InstallTokenCommands({
               <p className="text-sm font-medium">Update scripts from server (optional)</p>
               <p className="mt-1 text-xs text-muted">
                 Runs <code>update.ps1</code> from the extract folder. Downloads scripts from this
-                server (falls back to GitHub if the server blocks zip download). To change only the
+                server (falls back to per-file app download if zip is blocked). To change only the
                 server URL, use <strong>Switch server URL</strong> above. To refresh scripts without
                 a download, use <strong>Refresh scripts from zip folder</strong> instead.
               </p>
