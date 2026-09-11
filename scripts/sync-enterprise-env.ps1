@@ -22,7 +22,9 @@ param(
     [string]$ExtraEnvFile = ".env",
     [string]$AppUrl,
     [string]$ProductionBranch,
-    [string]$RunDbSetupOnDeploy
+    [string]$RunDbSetupOnDeploy,
+    [string]$WebhookSecret,
+    [string]$AuthSecret
 )
 
 Set-StrictMode -Version Latest
@@ -35,7 +37,7 @@ if (-not $env:VERCEL_TOKEN) {
 $profiles = @{
     dev = @{
         ProjectName        = "office-tracker-dev-9824"
-        EnvFiles           = @(".env.vercel.dev.local")
+        EnvFiles           = @(".env.vercel.dev.local", ".env.vercel.enterprise.dev.local")
         ExtraEnvFile       = ".env"
         AppUrl             = "https://office-tracker-dev-9824.vercel.app"
         ProductionBranch   = "dev"
@@ -43,7 +45,7 @@ $profiles = @{
     }
     prod = @{
         ProjectName        = "office-tracker-prod"
-        EnvFiles           = @(".env.vercel.local", ".env.vercel.prod.local")
+        EnvFiles           = @(".env.vercel.local", ".env.vercel.prod.local", ".env.vercel.enterprise.prod.local")
         ExtraEnvFile       = ""
         AppUrl             = "https://office-tracker-prod.vercel.app"
         ProductionBranch   = "production"
@@ -123,11 +125,16 @@ foreach ($file in $EnvFiles) {
     $vars = Merge-EnvMaps -Base $vars -Overlay (Read-DotEnvFile $path)
 }
 
+$existing = Invoke-VercelJson -Method GET -Url "https://api.vercel.com/v9/projects/$([Uri]::EscapeDataString($ProjectName))/env?teamId=$([Uri]::EscapeDataString($TeamId))"
+$existingByKey = @{}
+if ($existing.envs) {
+    foreach ($row in $existing.envs) { $existingByKey[$row.key] = $row }
+}
+
 $syncKeys = @(
     "POSTGRES_PRISMA_URL",
     "POSTGRES_URL_NON_POOLING",
     "POSTGRES_URL",
-    "AUTH_SECRET",
     "DEFAULT_OFFICE_SSIDS",
     "ADMIN_EMAIL",
     "BREAKGLASS_EMAIL",
@@ -147,15 +154,39 @@ foreach ($key in $syncKeys) {
     }
 }
 
+if ($WebhookSecret) {
+    $toSet["POWER_AUTOMATE_WEBHOOK_SECRET"] = $WebhookSecret
+} elseif ($env:POWER_AUTOMATE_WEBHOOK_SECRET) {
+    $toSet["POWER_AUTOMATE_WEBHOOK_SECRET"] = $env:POWER_AUTOMATE_WEBHOOK_SECRET
+}
+
+if ($AuthSecret) {
+    $toSet["AUTH_SECRET"] = $AuthSecret
+} elseif ($env:AUTH_SECRET) {
+    $toSet["AUTH_SECRET"] = $env:AUTH_SECRET
+} elseif ($vars.ContainsKey("AUTH_SECRET") -and $vars["AUTH_SECRET"]) {
+    $toSet["AUTH_SECRET"] = $vars["AUTH_SECRET"]
+}
+
+if (-not $toSet["POWER_AUTOMATE_WEBHOOK_SECRET"]) {
+    Write-Warning "POWER_AUTOMATE_WEBHOOK_SECRET missing. OTP login and Teams alerts will fail until set."
+    Write-Warning "Copy from Hobby Vercel (office-tracker) or Power Automate Condition, then rerun with -WebhookSecret or `$env:POWER_AUTOMATE_WEBHOOK_SECRET."
+}
+
 if (-not $toSet["POSTGRES_PRISMA_URL"]) {
     throw "POSTGRES_PRISMA_URL missing. For dev: npx vercel env pull .env.vercel.dev.local (Hobby office-tracker-dev). For prod: copy Neon vars into .env.vercel.local from Hobby office-tracker Storage."
 }
 
 if (-not $toSet["AUTH_SECRET"]) {
-    $bytes = New-Object byte[] 32
-    [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
-    $toSet["AUTH_SECRET"] = [Convert]::ToBase64String($bytes)
-    Write-Warning "AUTH_SECRET was missing locally; generated a new one for Enterprise $Profile (users must sign in again on this URL)."
+    if ($existingByKey.ContainsKey("AUTH_SECRET")) {
+        Write-Host "  Preserving AUTH_SECRET on $ProjectName (not in local env files; will not rotate)." -ForegroundColor Yellow
+    } else {
+        $bytes = New-Object byte[] 32
+        [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+        $toSet["AUTH_SECRET"] = [Convert]::ToBase64String($bytes)
+        Write-Warning "AUTH_SECRET missing locally and on Vercel; generated a new one for Enterprise $Profile (users must sign in once)."
+        Write-Warning "Save it: npx vercel env pull .env.vercel.$Profile.local --environment=production (Enterprise project)."
+    }
 }
 
 $toSet["NEXT_PUBLIC_APP_URL"] = $AppUrl
@@ -164,12 +195,6 @@ $toSet["SCHEMA_AUTO_MIGRATE"] = "false"
 
 Write-Host "Profile: $Profile" -ForegroundColor Cyan
 Write-Host "Syncing $($toSet.Count) env vars to $ProjectName on team $TeamId" -ForegroundColor Cyan
-
-$existing = Invoke-VercelJson -Method GET -Url "https://api.vercel.com/v9/projects/$([Uri]::EscapeDataString($ProjectName))/env?teamId=$([Uri]::EscapeDataString($TeamId))"
-$existingByKey = @{}
-if ($existing.envs) {
-    foreach ($row in $existing.envs) { $existingByKey[$row.key] = $row }
-}
 
 foreach ($entry in $toSet.GetEnumerator()) {
     $key = $entry.Key

@@ -49,9 +49,20 @@ Env vars for Enterprise (same Neon as Hobby; no Storage UI):
 
 ```powershell
 $env:VERCEL_TOKEN = "your-token"   # session only
+# OTP login requires POWER_AUTOMATE_WEBHOOK_SECRET (copy from Hobby office-tracker or Power Automate):
+$env:POWER_AUTOMATE_WEBHOOK_SECRET = "paste-secret-here"
 .\scripts\sync-enterprise-env.ps1 -Profile dev
 .\scripts\sync-enterprise-env.ps1 -Profile prod
 ```
+
+`sync-enterprise-env.ps1` **never rotates** `AUTH_SECRET` when it is already set on Vercel and not in your local env files. After first Enterprise deploy, save the session secret locally:
+
+```powershell
+.\scripts\pull-enterprise-auth-secret.ps1 -Profile prod
+.\scripts\pull-enterprise-auth-secret.ps1 -Profile dev
+```
+
+Then redeploy both Enterprise projects (CLI deploy or Vercel dashboard). Redeploy alone does not log users out if `AUTH_SECRET` stays unchanged.
 
 Set **Production Branch** in each Enterprise project's Git settings: `dev` for `office-tracker-dev-9824`, `production` for `office-tracker-prod` (dashboard only; API cannot change this on Enterprise).
 
