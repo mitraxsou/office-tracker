@@ -2,6 +2,8 @@
 
 Office Pulse uses **Enterprise CDTR** for active deploys. Git branches `dev` and `production` map to separate Vercel projects so development never shares the production database.
 
+Cursor agents: see `.cursor/skills/office-tracker/SKILL.md` section **After feature work** for the push, merge, and CLI deploy checklist.
+
 ## Enterprise CDTR (`pwc-us-adv-cdtr`) - active
 
 | Environment | Git branch | Vercel project | URL | Database |

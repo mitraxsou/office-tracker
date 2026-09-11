@@ -125,33 +125,74 @@ Before calling work done:
 5. User vs admin permissions unchanged unless requested
 6. Copy/install commands use `NEXT_PUBLIC_APP_URL`
 
-## Git commits / deploy
+## Git commits
 
-Vercel blocks commits not authored by **mitraxsou**. Always commit with:
+Enterprise git deploys require commits authored by the PwC-linked Vercel identity. Use per-commit flags (do **not** permanently update `git config`):
 
 ```bash
-git -c user.name="mitraxsou" -c user.email="16998608+mitraxsou@users.noreply.github.com" commit -m "your message"
+git -c user.name="soumitrammandal-4446" -c user.email="soumitra.m.mandal@pwc.com" commit -m "your message"
 ```
 
-- Never use `SoumitraPWC` or other authors for production pushes
-- Do **not** permanently update `git config user.name` / `user.email` in this repo
+- Do **not** auto-commit unless the user explicitly asks
+- Never use `SoumitraPWC`, `soumitra-dan`, or other authors for pushes that should deploy
+- Hobby deploys used `mitraxsou`; Enterprise uses the PwC email above (see `docs/deploy-branches.md`)
 
-## Deploy checklist (Vercel)
+## After feature work (Enterprise deploy checklist)
 
-**Two projects** (see `docs/deploy-branches.md`):
+When the user says **deploy**, **commit and deploy**, or approves release after feature work, run the full pipeline below. Do **not** deploy to paused Hobby projects (`soumitra-pwc` / `office-tracker-dev` / `office-tracker`).
 
-| Project | Branch | URL |
+### 1. Git (if commits are ready)
+
+```powershell
+git push origin dev
+git checkout production
+git pull origin production
+git merge dev
+git push origin production
+git checkout dev
+```
+
+### 2. CLI deploy (git-triggered deploys are often BLOCKED on Enterprise)
+
+Requires `VERCEL_TOKEN` in the PowerShell session (https://vercel.com/account/tokens, scoped to `pwc-us-adv-cdtr`).
+
+```powershell
+$env:NODE_TLS_REJECT_UNAUTHORIZED = "0"
+$env:VERCEL_ORG_ID = "team_aibOHBi06MpPxWdFWRGDp9iK"
+$env:VERCEL_TOKEN = "your-token"   # session only, never commit
+
+# Dev (branch dev)
+$env:VERCEL_PROJECT_ID = "prj_lhha3DVceqlTtU2A4HGdNaM32Sk6"
+npx vercel deploy --prod --yes --token $env:VERCEL_TOKEN
+
+# Prod (branch production)
+$env:VERCEL_PROJECT_ID = "prj_N8idhB3WNItVngojCQAmOT5bsnSI"
+npx vercel deploy --prod --yes --token $env:VERCEL_TOKEN
+```
+
+### 3. Verify
+
+Confirm both deployments are **READY** and aliased:
+
+| Environment | Project | URL |
 |---|---|---|
-| `office-tracker-dev` | `dev` | https://office-tracker-dev.vercel.app |
-| `office-tracker` | `production` | https://office-tracker-theta.vercel.app |
+| Dev | `office-tracker-dev-9824` | https://office-tracker-dev-9824.vercel.app |
+| Prod | `office-tracker-prod` | https://office-tracker-prod.vercel.app |
 
-1. Push/merge to the correct branch (not `main`)
-2. **Storage → Postgres** per project via `npx vercel integration add neon` (no env prefix). Prod DB vars must be **Production-only** on `office-tracker`
-3. Manual env per project: `AUTH_SECRET` (separate secrets), `NEXT_PUBLIC_APP_URL`, `BREAKGLASS_*`, `ALLOW_REGISTRATION=false`, `DEFAULT_OFFICE_SSIDS`, `RUN_DB_SETUP_ON_DEPLOY=true` on dev
-4. `prisma` provider **postgresql**; schema uses `POSTGRES_PRISMA_URL` + `POSTGRES_URL_NON_POOLING`
-5. Release: PR `dev` → `production` only after review
-6. Agent install commands on laptops use **production** `NEXT_PUBLIC_APP_URL` only
-7. Production branches verified: `production` on `office-tracker`, `dev` on `office-tracker-dev` — see `docs/deploy-branches.md`
+Use the Vercel API or inspector URL from CLI output. Check `/login` returns 200 or SSO redirect.
+
+### 4. Env sync (when vars changed)
+
+- `.\scripts\sync-enterprise-env.ps1 -Profile dev|prod` copies env vars to Enterprise
+- Script **never rotates** `AUTH_SECRET` when already set on Vercel (see `scripts/pull-enterprise-auth-secret.ps1`)
+- Full branch and project mapping: `docs/deploy-branches.md`
+
+### Rules
+
+- Do **not** deploy Hobby `soumitra-pwc` projects (paused during Enterprise pilot)
+- Do **not** merge to `production` without user approval unless they asked to deploy prod
+- Agent install commands on laptops use **Enterprise prod** `NEXT_PUBLIC_APP_URL` only
+- `prisma` provider **postgresql**; schema uses `POSTGRES_PRISMA_URL` + `POSTGRES_URL_NON_POOLING`
 
 ## Common pitfalls
 
