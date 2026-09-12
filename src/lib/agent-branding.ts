@@ -46,9 +46,13 @@ function escapePsSingleQuoted(value: string) {
   return value.replace(/'/g, "''");
 }
 
+function trimTrailingSlash(url: string) {
+  return url.replace(/\/+$/, "");
+}
+
 /** Download setup.ps1 from server and run via IEX. Works without zip on PwC laptops. */
 function buildServerBootstrapCommand(appUrl: string, tokenSetup: string) {
-  const base = escapePsSingleQuoted(appUrl.trimEnd("/"));
+  const base = escapePsSingleQuoted(trimTrailingSlash(appUrl));
   return (
     `powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $ErrorActionPreference='Stop'; ` +
     `[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; ` +
@@ -67,7 +71,7 @@ function buildServerBootstrapCommand(appUrl: string, tokenSetup: string) {
 
 /** Run a local script via IEX bypass (zip extract folder). */
 function buildLocalIexCommand(scriptPath: string, appUrl: string, tokenExpr: string) {
-  const base = escapePsSingleQuoted(appUrl.trimEnd("/"));
+  const base = escapePsSingleQuoted(trimTrailingSlash(appUrl));
   return (
     `powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $ErrorActionPreference='Stop'; ` +
     `. .\\lib\\agent-download.ps1; ` +
