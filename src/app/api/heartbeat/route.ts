@@ -21,6 +21,7 @@ import {
   sanitizeVpnGateway,
 } from "@/lib/security";
 import { recordDeviceScriptVersion } from "@/lib/agent-update";
+import { prisma } from "@/lib/db";
 import { maybeDispatchHeartbeatAlerts } from "@/lib/heartbeat-alerts";
 
 export async function POST(request: Request) {
@@ -105,9 +106,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid timestamp" }, { status: 400 });
   }
 
+  const globalConfig = await getAppConfig();
+
+  if (globalConfig.agentMode === "events") {
+    const openVisitRow = await prisma.visit.findFirst({
+      where: { userId: user.id, endAt: null },
+      orderBy: { startAt: "desc" },
+    });
+
+    return NextResponse.json({
+      ok: true,
+      inOffice: Boolean(openVisitRow),
+      mode: "events",
+      message: "Use /api/agent/sync",
+      deviceRegistered: deviceResult.registered,
+      tokenBound: bindResult.newlyBound,
+    });
+  }
+
   const ssid = sanitizeSsid(body.ssid);
   const vpnGateway = sanitizeVpnGateway(body.vpnGateway);
-  const globalConfig = await getAppConfig();
   const allowlist = globalConfig.officeSsids;
 
   const result = await processHeartbeat({
