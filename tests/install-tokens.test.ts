@@ -190,6 +190,7 @@ describe("copy-paste agent commands", () => {
     expect(command).toContain("/api/agent/files/setup.ps1");
     expect(command).toContain("/api/agent/files/agent-download.ps1");
     expect(command).toContain("Publish-AgentScriptTxt");
+    expect(command).toContain("$PSScriptRoot=$d");
     expect(command).toContain("Invoke-Expression");
     expect(command).toContain("$Token=''tok''");
     expect(command).toContain("$ApiUrl=''https://office.example''");
@@ -203,6 +204,7 @@ describe("copy-paste agent commands", () => {
     const command = buildInstallCommand("https://office.example", "tok");
     expect(command).toContain("agent-download.ps1");
     expect(command).toContain("Publish-AgentScriptTxt");
+    expect(command).toContain("$PSScriptRoot=(Split-Path");
     expect(command).toContain("Invoke-Expression");
     expect(command).toContain("$Token='tok'");
     expect(command).not.toContain("-File");

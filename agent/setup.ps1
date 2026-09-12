@@ -43,11 +43,15 @@ function Get-ForceUpdateMarkerPath {
 }
 
 function Import-AgentDownloadModule {
-    $candidates = @(
-        (Join-Path $PSScriptRoot "lib\agent-download.ps1"),
-        (Join-Path $PSScriptRoot "agent-download.ps1"),
-        (Join-Path (Get-InstallDir) "lib\agent-download.ps1")
-    )
+    if (Get-Command Publish-AgentScriptTxt -ErrorAction SilentlyContinue) {
+        return
+    }
+    $candidates = @()
+    if ($PSScriptRoot) {
+        $candidates += Join-Path $PSScriptRoot "lib\agent-download.ps1"
+        $candidates += Join-Path $PSScriptRoot "agent-download.ps1"
+    }
+    $candidates += Join-Path (Get-InstallDir) "lib\agent-download.ps1"
     foreach ($path in $candidates) {
         if (Test-Path -LiteralPath $path) {
             . $path

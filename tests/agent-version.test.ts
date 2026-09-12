@@ -89,6 +89,7 @@ describe("agent version", () => {
 
     expect(setup).toContain("Remove-MarkOfWeb -Path $destination");
     expect(setup).toContain("Publish-AgentScriptTxt");
+    expect(setup).toContain("Get-Command Publish-AgentScriptTxt");
     expect(setup).toContain("Invoke-Expression");
 
     expect(updater).toContain("Invoke-AgentScriptBypass");

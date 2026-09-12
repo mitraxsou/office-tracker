@@ -65,6 +65,7 @@ function buildServerBootstrapCommand(appUrl: string, tokenSetup: string) {
     `Invoke-WebRequest -Uri ($ApiUrl+''/api/agent/files/agent-download.ps1'') -Headers $h -OutFile (Join-Path $lib ''agent-download.ps1'') -UseBasicParsing; ` +
     `. (Join-Path $lib ''agent-download.ps1''); ` +
     `Invoke-WebRequest -Uri ($ApiUrl+''/api/agent/files/setup.ps1'') -Headers $h -OutFile (Join-Path $d ''setup.ps1'') -UseBasicParsing; ` +
+    `$PSScriptRoot=$d; ` +
     `$t=Publish-AgentScriptTxt -Ps1Path (Join-Path $d ''setup.ps1''); ` +
     `$s=Get-Content -Raw $t; Invoke-Expression $s }'`
   );
@@ -77,6 +78,7 @@ function buildLocalIexCommand(scriptPath: string, appUrl: string, tokenExpr: str
     `powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $ErrorActionPreference='Stop'; ` +
     `. .\\lib\\agent-download.ps1; ` +
     `$ApiUrl='${base}'; $Token=${tokenExpr}; ` +
+    `$PSScriptRoot=(Split-Path (Resolve-Path '${scriptPath}') -Parent); ` +
     `$t=Publish-AgentScriptTxt -Ps1Path (Resolve-Path '${scriptPath}'); ` +
     `$s=Get-Content -Raw $t; Invoke-Expression $s }"`
   );
