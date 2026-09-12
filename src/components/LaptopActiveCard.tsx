@@ -3,7 +3,7 @@ type LaptopActiveCardProps = {
 };
 
 const TOOLTIP =
-  "Time from your first agent pulse today to your last (or now if the agent is still running). Counts whenever the My Office Pulse agent is pulsing on your laptop, not only on office Wi-Fi. Requires you to be logged in with the agent task active.";
+  "Time from your first agent activity today to your last (or now if the agent is still running). Counts whenever the My Office Pulse agent is active on your laptop, not only on office Wi-Fi. Requires you to be logged in with the agent task active.";
 
 export function LaptopActiveCard({ laptopActiveHours }: LaptopActiveCardProps) {
   return (
@@ -17,7 +17,7 @@ export function LaptopActiveCard({ laptopActiveHours }: LaptopActiveCardProps) {
         <span className="text-base font-normal text-muted">h</span>
       </p>
       <p className="mt-1 text-xs text-muted">
-        First to last agent pulse today (any network).
+        First to last agent activity today (any network).
       </p>
     </div>
   );

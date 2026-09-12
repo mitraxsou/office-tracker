@@ -234,7 +234,7 @@ export function UserSettingsForm({
       <section className="card p-6">
         <h2 className="mb-2 text-lg font-medium">Registered laptops</h2>
         <p className="mb-4 text-sm text-muted">
-          Registered on first heartbeat. To remove a laptop, submit a request. An admin must
+          Registered on first agent sync. To remove a laptop, submit a request. An admin must
           approve it (prevents accidental removal).
         </p>
         {devices.length === 0 ? (
@@ -260,7 +260,7 @@ export function UserSettingsForm({
                 </div>
                 {d.lastSeenAt && (
                   <p className="mt-1 text-xs text-muted">
-                    Last heartbeat {new Date(d.lastSeenAt).toLocaleString("en-IN")}
+                    Last seen {new Date(d.lastSeenAt).toLocaleString("en-IN")}
                   </p>
                 )}
                 {!d.pendingRemoval && (

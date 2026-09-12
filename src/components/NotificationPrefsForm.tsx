@@ -56,7 +56,7 @@ const ADVANCED_ALERT_ROWS: Array<{
   {
     enabledKey: "alertIfAgentStale",
     channelKey: "channelAgentStale",
-    label: "Remind me if the agent stops sending heartbeats",
+    label: "Remind me if the agent stops syncing",
     help: "On a usual office day, after start time plus grace, My Office Pulse reminds you if a registered laptop has gone quiet past the stale threshold. Default delivery is in the app only.",
   },
   {
@@ -298,7 +298,7 @@ export function NotificationPrefsForm({ adminUserId }: { adminUserId?: string } 
 
         <p className="text-sm text-muted">
           Reminder alerts can fire on a usual office day after start plus grace when the agent has
-          no Wi-Fi name or is not responding, unless the person is out of office. A recent pulse
+          no Wi-Fi name or is not responding, unless the person is out of office. Recent agent activity
           from a home or other non-office Wi-Fi is treated as working from home and does not trigger
           a reminder. Usual end time is stored with the schedule; current reminders use start time
           and grace, not end time.

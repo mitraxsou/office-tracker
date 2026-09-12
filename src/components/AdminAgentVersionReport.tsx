@@ -134,7 +134,7 @@ export function AdminAgentVersionReport() {
             </table>
           </div>
           <p className="mt-2 text-xs text-muted">
-            Unknown version means the laptop is sending pulses with an older script that does not
+            Unknown version means the laptop is syncing with an older script that does not
             report its version. Auto-repair is attempted. If it has no updater, re-run installation
             once.
           </p>

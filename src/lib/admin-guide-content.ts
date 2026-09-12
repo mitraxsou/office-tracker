@@ -20,13 +20,13 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       {
         type: "paragraph",
         text:
-          "My Office Pulse tracks whether pilot users spend at least the configured daily hours in the office (default 5 hours) and meet a monthly office-days target (default 8 days). A Windows agent on each PwC laptop sends heartbeats on the admin-set interval (default 5 minutes). The web app stores visits, compliance, and admin settings in Postgres (Neon on Vercel).",
+          "My Office Pulse tracks whether pilot users spend at least the configured daily hours in the office (default 5 hours) and meet a monthly office-days target (default 8 days). A Windows agent on each PwC laptop syncs with the server on the admin-set interval (default 5 minutes), sending Wi-Fi events, activity ticks, and visit updates. The web app stores visits, compliance, and admin settings in Postgres (Neon on Vercel).",
       },
       {
         type: "diagram",
         lines: [
           "  Windows agent (My Office Pulse)",
-          "       |  POST /api/heartbeat (token + serial + SSID)",
+          "       |  POST /api/agent/sync (events) or /api/heartbeat (legacy)",
           "       v",
           "  Vercel / Next.js app  <---- session cookie ----  Web dashboard",
           "       |",
@@ -46,7 +46,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         items: [
           "Counts as in-office: Wi-Fi SSID matches the global allowlist (OfficeConnect, ExternalConnect, pwcglb.com, or admin-configured names), manual check-in, or admin-corrected visits.",
           "Does NOT count: VPN (GlobalProtect), home networks, unknown SSIDs.",
-          "Heartbeat gap greater than the visit gap (default 15 minutes) ends the current visit.",
+          "Agent sync gap greater than the visit gap (default 15 minutes) ends the current visit.",
           "Default timezone: Asia/Kolkata. Users can request a timezone change; admins approve on the Corrections page.",
         ],
       },
@@ -118,7 +118,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         items: [
           "Export compliance data from Reports if your pilot needs a snapshot.",
           "Review agent version report on Users & tokens. Push agent update to all devices after a release if needed.",
-          "Confirm heartbeat retention and maintenance purges match your data policy.",
+          "Confirm legacy heartbeat retention and maintenance purges match your data policy.",
         ],
       },
       {
@@ -131,7 +131,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         items: [
           "Create user on Users & tokens (or confirm OTP self-registration is enabled).",
           "Issue one install token per laptop. Share the install command from Settings or copy from the user card.",
-          "Confirm first heartbeat within 24 hours. If not, follow agent troubleshooting below.",
+          "Confirm first agent sync within 24 hours. If not, follow agent troubleshooting below.",
           "Set notification preferences and out-of-office if the user travels often.",
         ],
       },
@@ -168,7 +168,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       {
         type: "list",
         items: [
-          "Stale agent: no heartbeat for longer than agent health grace (default 24 hours) and user is not on OOO. Excluded from daily compliance % on that day.",
+          "Stale agent: no agent sync or activity for longer than agent health grace (default 24 hours) and user is not on OOO. Excluded from daily compliance % on that day.",
           "Out of office: user or admin marked OOO for that day. Excluded from compliance denominator.",
           "No visit: user had no office presence that day. Counted as not met, not excluded.",
           "Weekends: shown on calendar but typically not counted toward monthly office-days unless configured otherwise in reporting logic.",
@@ -280,11 +280,11 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         type: "troubleshooting",
         items: [
           {
-            problem: "User cannot install agent (401 heartbeat)",
+            problem: "User cannot install agent (401 on sync)",
             fix: "Token regenerated without re-install, wrong laptop serial, or expired pending token. Issue a new token and have user re-run install command from extracted zip folder in PowerShell.",
           },
           {
-            problem: "Token shows bound but no heartbeats",
+            problem: "Token shows bound but no agent activity",
             fix: "Scheduled task PwCOfficePulse may be missing. User should run install.ps1 again or check Task Scheduler. Verify NEXT_PUBLIC_APP_URL in production matches Vercel URL.",
           },
           {
@@ -336,7 +336,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         items: [
           "Triage inbox daily. Sort is newest first.",
           "Click Review to jump to the request type on Corrections.",
-          "For visit corrections, verify against user history and heartbeats before approving.",
+          "For visit corrections, verify against user history and agent activity before approving.",
           "For profile changes, confirm identity out of band if email is changing.",
           "Empty inbox is normal when the pilot is quiet.",
         ],
@@ -460,7 +460,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
           "Investigate who changed office SSIDs or hours target.",
           "Confirm impersonation sessions for support tickets.",
           "Trace token regeneration or password resets.",
-          "Review heartbeat purge or maintenance purges.",
+          "Review legacy heartbeat purge or maintenance purges.",
         ],
       },
       {
@@ -502,7 +502,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
           "Monthly office days target (default 8).",
           "Office Wi-Fi SSIDs: one per line. Case-insensitive; strips band suffixes and (Unauthenticated). Prefix match supported.",
           "Max laptops per user.",
-          "Pending token TTL, heartbeat retention, heartbeat interval, visit gap (minutes), agent health grace (hours).",
+          "Pending token TTL, agent check-in interval, visit gap (minutes), agent health grace (hours). Legacy heartbeat retention is in Advanced.",
         ],
       },
       {
@@ -524,7 +524,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         type: "list",
         items: [
           "Agent alerts: daily Power Automate dispatch for eligible Teams alerts (Vercel Hobby: once per day max).",
-          "Purge heartbeats: deletes raw heartbeats older than retention; visits kept.",
+          "Purge heartbeats: deletes raw legacy heartbeats older than retention; visits and activity ticks kept.",
           "Office schedule sync: weekly inference of office schedules from visit history.",
           "Run now: manual trigger for testing. Health: Working, Never run, Overdue, Failed.",
         ],
@@ -583,7 +583,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         items: [
           {
             problem: "SSID change not reflecting for a user",
-            fix: "Save global config. Recent heartbeats are backfilled. User may need a new heartbeat cycle (up to 6 min by default). Manual check-in uses current SSID list immediately.",
+            fix: "Save global config. Recent agent activity is backfilled. User may need a new sync cycle (up to 6 min by default). Manual check-in uses current SSID list immediately.",
           },
           {
             problem: "Cron shows Overdue",
@@ -637,10 +637,10 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         type: "list",
         items: [
           "OTP login: plain-text email with one-time code (separate from webhook; uses email delivery configured for auth).",
-          "hours_started: user reached start threshold for the day (also from heartbeat).",
+          "hours_started: user reached start threshold for the day (also from agent sync).",
           "hours_met: user met daily target.",
           "not_in_office: reminder when expected in office but no presence.",
-          "agent_stale: no heartbeat within grace period.",
+          "agent_stale: no agent sync or activity within grace period.",
           "custom: admin-sent message from user profile.",
         ],
       },
@@ -662,7 +662,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         items: [
           {
             problem: "Teams messages never arrive",
-            fix: "Check webhook URL env, secret match, and user channel prefs. Agent-alerts cron runs once daily on Hobby; some alerts also fire on heartbeat.",
+            fix: "Check webhook URL env, secret match, and user channel prefs. Agent-alerts cron runs once daily on Hobby; some alerts also fire on agent sync.",
           },
           {
             problem: "OTP emails not received",
@@ -741,7 +741,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       {
         type: "paragraph",
         text:
-          "The Windows agent (My Office Pulse) wakes every 2 minutes via scheduled task PwCOfficePulse and sends on the admin-set interval (5 minutes by default). No IT admin rights required for default install to %LOCALAPPDATA%\\OfficeTracker\\.",
+          "The Windows agent (My Office Pulse) wakes every 2 minutes via scheduled task PwCOfficePulse and syncs on the admin-set check-in interval (5 minutes by default). Users install via setup command from Settings (no zip required). No IT admin rights required for default install to %LOCALAPPDATA%\\OfficeTracker\\.",
       },
       {
         type: "subheading",
@@ -772,8 +772,8 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
             fix: "Laptop asleep, task disabled, or token invalid. Re-run install.ps1 from zip in PowerShell. Check Task Scheduler for PwCOfficePulse.",
           },
           {
-            problem: "Heartbeats stop after sleep",
-            fix: "Normal until wake. Visit gap may have closed the visit; new heartbeat starts a new visit. User can check in manually after long sleep.",
+            problem: "Agent sync stops after sleep",
+            fix: "Normal until wake. Visit gap may have closed the visit; new sync starts a new visit. User can check in manually after long sleep.",
           },
           {
             problem: "PowerShell window flashes",
@@ -785,7 +785,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
           },
           {
             problem: "Agent version outdated",
-            fix: "User runs update command from Settings, or admin pushes update to all devices. Device picks up on next heartbeat.",
+            fix: "User runs setup command from Settings, or admin pushes update to all devices. Device picks up on next agent sync.",
           },
         ],
       },
@@ -801,7 +801,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
           "Extract fully (nested PwCOfficePulse folder is common on OneDrive Downloads).",
           "Open PowerShell in extract folder (not cmd.exe).",
           "Paste install command from Settings. Wait for success message.",
-          "Confirm first heartbeat in admin user card within 5 minutes.",
+          "Confirm first agent sync in admin user card within 5 minutes.",
         ],
       },
     ],

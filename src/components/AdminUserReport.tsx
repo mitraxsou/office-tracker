@@ -296,7 +296,7 @@ export function AdminUserReport({
     }
     setResetConfirm("");
     setResetMessage(
-      `Cleared ${body.visitsDeleted ?? 0} visits and ${body.heartbeatsDeleted ?? 0} pulses for ${describeResetRange(resetRange)}.`,
+      `Cleared ${body.visitsDeleted ?? 0} visits and ${body.heartbeatsDeleted ?? 0} activity records for ${describeResetRange(resetRange)}.`,
     );
     load(monthKey);
   }
@@ -334,7 +334,7 @@ export function AdminUserReport({
     ? "Healthy"
     : data.pulse.lastHeartbeat
       ? "Stale"
-      : "No pulses";
+      : "No activity";
   const installedVersionSummary = summarizeDeviceAgentVersions(data.devices);
 
   return (
@@ -389,7 +389,7 @@ export function AdminUserReport({
         selectedDate={selectedDate}
         onSelectDate={setSelectedDate}
         agentHealthLabel={agentHealthLabel}
-        agentHealthDetail={`Expected agent ${data.serverAgentVersion}. Installed: ${installedVersionSummary}. ${data.pulse.pulsesLast24h} pulses in the last 24h (expected ~${data.pulse.expectedPulsesPerDay}).`}
+        agentHealthDetail={`Expected agent ${data.serverAgentVersion}. Installed: ${installedVersionSummary}. ${data.pulse.pulsesLast24h} activity ticks in the last 24h (expected ~${data.pulse.expectedPulsesPerDay}).`}
       />
 
       <section className="card p-4">
@@ -441,7 +441,7 @@ export function AdminUserReport({
 
       <section className="card p-6">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-medium">Agent pulse</h3>
+          <h3 className="text-sm font-medium">Agent activity</h3>
           <div className="flex flex-wrap items-center gap-3">
             {data.user.agentDeregisteredAt ? (
               <span className="text-xs text-muted">
@@ -467,7 +467,7 @@ export function AdminUserReport({
         </div>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-muted">Last heartbeat</dt>
+            <dt className="text-muted">Last seen</dt>
             <dd>
               {data.pulse.lastHeartbeat
                 ? new Date(data.pulse.lastHeartbeat).toLocaleString("en-IN")
@@ -475,7 +475,7 @@ export function AdminUserReport({
             </dd>
           </div>
           <div>
-            <dt className="text-muted">Time since last pulse</dt>
+            <dt className="text-muted">Time since last activity</dt>
             <dd>
               {formatPulseAge({
                 minutes: data.pulse.minutesSinceLastPulse,
@@ -606,9 +606,9 @@ export function AdminUserReport({
       </section>
 
       <section className="card p-6">
-        <h3 className="mb-3 text-sm font-medium">Recent heartbeats (retention window)</h3>
+        <h3 className="mb-3 text-sm font-medium">Recent activity (retention window)</h3>
         {data.heartbeats.length === 0 ? (
-          <p className="text-sm text-muted">No heartbeats in range.</p>
+          <p className="text-sm text-muted">No activity in range.</p>
         ) : (
           <div className="max-h-48 overflow-y-auto">
             <table className="w-full text-xs">
@@ -730,7 +730,7 @@ export function AdminUserReport({
       <section className="card border-red-500/30 p-6">
         <h3 className="mb-2 text-lg font-medium text-red-400">Clear tracking data</h3>
         <p className="mb-4 text-sm text-muted">
-          Clear agent heartbeats (pulses) for a day, month, year, or custom range. Office visit
+          Clear agent activity records for a day, month, year, or custom range. Office visit
           records are kept for compliance and are not removed here. Deleting the user account
           removes everything permanently.
         </p>
@@ -822,7 +822,7 @@ export function AdminUserReport({
                 checked={resetScope === "tracking"}
                 onChange={() => setResetScope("tracking")}
               />
-              Tracking only (visits + pulses)
+              Tracking only (visits + activity)
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -837,7 +837,7 @@ export function AdminUserReport({
 
         <p className="mb-3 text-sm text-muted">
           Will clear: <span className="text-foreground">{describeResetRange(resetRange)}</span>
-          {resetPeriod !== "all" && " (visits and pulses only, tokens and devices are kept)"}
+          {resetPeriod !== "all" && " (visits and activity only, tokens and devices are kept)"}
         </p>
 
         <input

@@ -207,8 +207,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
                                                               │
                                                               v
   ┌──────────────────┐     ┌──────────────────┐     ┌─────────────────────┐
-  │ Dashboard shows  │ <-- │ Agent sends      │ <-- │ Download zip, run   │
-  │ office hours     │     │ heartbeats       │     │ install in PowerShell│
+  │ Dashboard shows  │ <-- │ Agent syncs      │ <-- │ Copy setup cmd,    │
+  │ office hours     │     │ with server      │     │ run in PowerShell  │
   └──────────────────┘     └──────────────────┘     └─────────────────────┘`}
         </pre>
         <p className="text-sm text-muted">
@@ -413,7 +413,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
               Choose your usual office days (Wednesday and Friday by default) and a delivery channel
               per alert: in the app only, Microsoft Teams only, or both. {APP_NAME} can tell you when
               office hours start, when you meet your daily target, or when the agent needs attention.
-              A recent pulse on home or other non-office Wi-Fi is treated as working from home and does
+              Recent agent activity on home or other non-office Wi-Fi is treated as working from home and does
               not trigger a not-in-office reminder. An admin can also send you a one-off in-app or Teams
               message.
             </dd>
@@ -431,14 +431,14 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             <dd className="mt-1 text-muted">
               At the top of Settings, each laptop card has an <strong>Install (first time)</strong>{" "}
               section and a separate <strong>Update (already installed)</strong> section. Use one or
-              the other, not both. Each token binds to one laptop serial on first heartbeat, and both
+              the other, not both. Each token binds to one laptop serial on first sync, and both
               commands must be run from the extracted folder that contains the scripts.
             </dd>
           </div>
           <div>
             <dt className="font-medium">Registered laptops and removal requests</dt>
             <dd className="mt-1 text-muted">
-              Each laptop registers on first heartbeat. To remove an old or replaced laptop, click{" "}
+              Each laptop registers on first agent sync. To remove an old or replaced laptop, click{" "}
               <strong>Request removal</strong> in Settings. An admin must approve before the device is
               removed (this prevents accidental de-registration).
             </dd>
@@ -468,21 +468,21 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
               Open Settings and go to Install or reinstall. Download and extract the latest agent
               zip, open PowerShell in that folder, copy the <strong>update command</strong>, and
               paste it. Check Task Scheduler for task <code>{AGENT_TASK_NAME}</code>. If it still
-              does not pulse, review <code>%LOCALAPPDATA%\OfficeTracker\logs\heartbeat.log</code> or
+              does not sync, review <code>%LOCALAPPDATA%\OfficeTracker\logs\heartbeat.log</code> or
               contact your pilot admin.
             </p>
           </div>
           <div>
             <p className="font-medium">After sleep or laptop wake</p>
             <p className="mt-1 text-muted">
-              Heartbeats pause while the laptop sleeps. After wake or unlock, the agent should recover within about
+              Agent sync pauses while the laptop sleeps. After wake or unlock, the agent should recover within about
               5 minutes by default (unlock and power-resume checks may run sooner). Wi-Fi may take a few seconds to
               reconnect; the agent retries SSID detection automatically. Refresh the Today dashboard if agent status
               still looks stale after a minute.
             </p>
           </div>
           <div>
-            <p className="font-medium">Low pulses but agent shows connected</p>
+            <p className="font-medium">Low activity but agent shows connected</p>
             <p className="mt-1 text-muted">
               The scheduled task may not be running reliably. Download the latest zip, open
               PowerShell in the extract folder, paste the update command, then confirm the{" "}
@@ -494,7 +494,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             <p className="mt-1 text-muted">
               The agent reports your laptop&apos;s Wi-Fi network name (SSID). During captive portal sign-in,
               Windows may briefly show a domain name such as <code>pwcglb.com</code> instead of{" "}
-              <code>ExternalConnect</code>. The agent prefers the actual WLAN name from netsh. If pulses show
+              <code>ExternalConnect</code>. The agent prefers the actual WLAN name from netsh. If activity shows
               the wrong network or &quot;Identifying...&quot;, wait a minute for Wi-Fi to settle, or use{" "}
               <strong>Check in</strong> on the Today page.
             </p>
@@ -536,7 +536,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             the laptop without a manual check-out.
           </li>
           <li>
-            The agent sends a heartbeat about every 5 minutes by default. A gap longer than about 15 minutes ends the
+            The agent syncs with the server about every 5 minutes by default. A gap longer than about 15 minutes ends the
             current visit.
           </li>
         </ul>

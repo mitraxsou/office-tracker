@@ -50,6 +50,7 @@ export default async function AdminSettingsPage() {
           heartbeatIntervalMinutes={config.heartbeatIntervalMinutes}
           agentStaleMinutes={config.agentStaleMinutes}
           agentStaleGraceHours={config.agentStaleGraceHours}
+          agentMode={config.agentMode}
           fiscalYearStartMonth={config.fiscalYearStartMonth}
           fiscalYearEndMonth={config.fiscalYearEndMonth}
         />

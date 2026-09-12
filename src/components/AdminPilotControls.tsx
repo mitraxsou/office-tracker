@@ -125,7 +125,7 @@ export function AdminPilotControls({
       <section className="card p-6">
         <h2 className="mb-1 text-lg font-medium">Agent updates</h2>
         <p className="mb-4 text-sm text-muted">
-          Queue an agent upgrade for every bound laptop. Each device picks it up on the next heartbeat
+          Queue an agent upgrade for every bound laptop. Each device picks it up on the next agent sync
           (up to about 6 minutes by default).
         </p>
         <button

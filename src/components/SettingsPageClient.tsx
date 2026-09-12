@@ -89,18 +89,18 @@ export function SettingsPageClient({
         </p>
       ) : (
         <>
-      <AgentStatusPanel
-        installTokens={installTokens}
-        legacyBoundCount={legacyBoundCount}
-        appUrl={appUrl}
-        adminAccess={adminAccess}
-      />
-
       <AgentSetupPanel
         appUrl={appUrl}
         installTokens={installTokens}
         legacyBoundCount={legacyBoundCount}
         localDevAgentPath={localDevAgentPath}
+      />
+
+      <AgentStatusPanel
+        installTokens={installTokens}
+        legacyBoundCount={legacyBoundCount}
+        appUrl={appUrl}
+        adminAccess={adminAccess}
       />
 
       <OfficeScheduleSuggestionCard />

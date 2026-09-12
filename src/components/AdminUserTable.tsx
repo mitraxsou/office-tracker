@@ -73,7 +73,7 @@ export function AdminUserTable() {
     <div className="overflow-x-auto">
       <p className="mb-3 text-xs text-muted">
         Server agent version: <code>{serverVersion}</code>. Push update queues install on next
-        heartbeat (within ~6 min by default).
+        agent sync (within ~6 min by default).
       </p>
       <table className="w-full text-sm">
         <thead>

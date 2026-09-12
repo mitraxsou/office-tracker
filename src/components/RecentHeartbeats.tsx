@@ -20,17 +20,17 @@ export function RecentHeartbeats({
   if (pulses.length === 0) {
     return (
       <section className={wrapperClass}>
-        {!embedded && <h2 className="mb-2 text-lg font-medium">Recent agent pulses</h2>}
-        <p className="text-sm text-muted">No heartbeats recorded yet.</p>
+        {!embedded && <h2 className="mb-2 text-lg font-medium">Recent agent activity</h2>}
+        <p className="text-sm text-muted">No agent activity recorded yet.</p>
       </section>
     );
   }
 
   return (
     <section className={wrapperClass}>
-      {!embedded && <h2 className="mb-1 text-lg font-medium">Recent agent pulses</h2>}
+      {!embedded && <h2 className="mb-1 text-lg font-medium">Recent agent activity</h2>}
       <p className={`text-sm text-muted ${embedded ? "mb-2" : "mb-4"}`}>
-        Raw Wi-Fi heartbeats from your laptop agent (up to {retentionDays} day
+        Wi-Fi and activity events from your laptop agent (up to {retentionDays} day
         {retentionDays === 1 ? "" : "s"} kept on the server). This is separate from
         &quot;Office session since&quot;, which tracks your current visit window.
       </p>

@@ -159,7 +159,7 @@ export function VisitCalendar({
       {!compact && (
         <p className="text-xs text-muted">
           Green = daily target met ({hoursTarget}h). Orange tint = visits but below target. Daily
-          total is first check-in to last check-out (gaps count). Last in-office heartbeat counts as
+          total is first check-in to last check-out (gaps count). Last in-office activity counts as
           checkout unless you checked out manually. Click a day for visit details.
         </p>
       )}

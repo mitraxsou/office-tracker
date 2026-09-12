@@ -48,6 +48,7 @@ export async function PATCH(request: Request) {
     pilotStartMonthKey?: string;
     fiscalYearStartMonth?: number;
     fiscalYearEndMonth?: number;
+    agentMode?: string;
   };
 
   try {
@@ -164,6 +165,13 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Invalid pilotStartMonthKey (expected YYYY-MM)" }, { status: 400 });
     }
     update.pilotStartMonthKey = body.pilotStartMonthKey;
+  }
+
+  if (body.agentMode !== undefined) {
+    if (body.agentMode !== "events" && body.agentMode !== "heartbeat") {
+      return NextResponse.json({ error: "agentMode must be events or heartbeat" }, { status: 400 });
+    }
+    update.agentMode = body.agentMode;
   }
 
   if (body.fiscalYearStartMonth !== undefined || body.fiscalYearEndMonth !== undefined) {

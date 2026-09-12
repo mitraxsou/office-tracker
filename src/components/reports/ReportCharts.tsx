@@ -58,7 +58,7 @@ function HoursTooltip({
         <p className="text-muted">Compliance: {point.compliancePct}%</p>
       )}
       <p className="mt-1 text-xs text-muted">
-        First check-in to last check-out. Last heartbeat counts unless manual checkout.
+        First check-in to last check-out. Last agent activity counts unless manual checkout.
       </p>
       <p className="mt-1 text-xs text-muted">Click bar to filter table</p>
     </div>
@@ -209,7 +209,7 @@ export function AgentPulseSparkline({
     <div
       className={`flex h-10 items-end gap-px ${className}`}
       role="img"
-      aria-label="Agent pulse activity over the last 24 hours"
+      aria-label="Agent activity over the last 24 hours"
     >
       {buckets.map((count, index) => (
         <div
@@ -219,7 +219,7 @@ export function AgentPulseSparkline({
             height: `${Math.max(8, (count / max) * 100)}%`,
             opacity: count > 0 ? 0.55 + (count / max) * 0.45 : 0.12,
           }}
-          title={`${count} pulse${count === 1 ? "" : "s"}`}
+          title={`${count} activity tick${count === 1 ? "" : "s"}`}
         />
       ))}
     </div>

@@ -175,6 +175,7 @@ export async function updateAppConfig(data: Partial<AppConfigData>) {
   if (data.pilotStartMonthKey !== undefined) update.pilotStartMonthKey = data.pilotStartMonthKey;
   if (data.fiscalYearStartMonth !== undefined) update.fiscalYearStartMonth = data.fiscalYearStartMonth;
   if (data.fiscalYearEndMonth !== undefined) update.fiscalYearEndMonth = data.fiscalYearEndMonth;
+  if (data.agentMode !== undefined) update.agentMode = data.agentMode;
 
   const config = await prisma.appConfig.update({
     where: { id: CONFIG_ID },

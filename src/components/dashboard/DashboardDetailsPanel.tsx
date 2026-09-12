@@ -46,7 +46,7 @@ export function DashboardDetailsPanel({
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<TabId>("visits");
 
-  const tabs = showPulses ? [...TABS, { id: "pulses" as TabId, label: "Agent pulses" }] : TABS;
+  const tabs = showPulses ? [...TABS, { id: "pulses" as TabId, label: "Agent activity" }] : TABS;
 
   const summary =
     visitCount === 0

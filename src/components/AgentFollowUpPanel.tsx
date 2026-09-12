@@ -135,7 +135,7 @@ export function AgentFollowUpPanel({
               Agent follow-up
             </h2>
             <p className="mt-1 text-sm text-muted">
-              Installed agents with no uninstall request, but no recent heartbeats. Check in with
+              Installed agents with no uninstall request, but no recent activity. Check in with
               these users proactively.
             </p>
           </div>
@@ -227,13 +227,13 @@ export function AgentFollowUpPanel({
                         </div>
                         <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-muted">
                           <div>
-                            <dt>Last pulse</dt>
+                            <dt>Last activity</dt>
                             <dd className="text-[var(--foreground)]">
                               {formatWhen(device.lastHeartbeatAt)}
                             </dd>
                           </div>
                           <div>
-                            <dt>Since pulse</dt>
+                            <dt>Since activity</dt>
                             <dd className="text-[var(--foreground)]">
                               {formatPulseAge({
                                 minutes: device.minutesSinceLastPulse,
@@ -251,7 +251,7 @@ export function AgentFollowUpPanel({
                           <div className="col-span-2">
                             <dt>History</dt>
                             <dd className="text-[var(--foreground)]">
-                              Had heartbeats before (not never installed)
+                              Had agent activity before (not never installed)
                             </dd>
                           </div>
                         </dl>
@@ -281,7 +281,7 @@ export function AgentFollowUpPanel({
 
         {data?.updatedAt && (
           <footer className="border-t border-[var(--border)] px-5 py-3 text-xs text-muted">
-            Stale threshold: {data.staleThresholdHours}h without pulse. Last updated{" "}
+            Stale threshold: {data.staleThresholdHours}h without activity. Last updated{" "}
             {new Date(data.updatedAt).toLocaleTimeString("en-IN")}. Auto-refreshes every 60s.
           </footer>
         )}

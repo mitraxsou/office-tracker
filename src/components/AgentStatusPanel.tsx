@@ -30,25 +30,25 @@ const STATUS_LABELS = {
     color: "text-amber-300",
   },
   waiting: {
-    title: "Waiting for heartbeat",
+    title: "Waiting for first sync",
     detail:
-      "Install may have finished. The agent checks in about every 5 minutes by default. Use Refresh status below.",
+      "Install may have finished. The agent syncs about every 5 minutes by default. Use Refresh status below.",
     color: "text-blue-300",
   },
   connected: {
     title: "Agent connected",
-    detail: "Your laptop is registered and sending pulses regularly.",
+    detail: "Your laptop is registered and syncing regularly.",
     color: "text-green-300",
   },
 };
 
-const PULSE_LABELS = {
-  healthy: { text: "Sending pulses regularly", color: "text-green-400" },
+const SYNC_LABELS = {
+  healthy: { text: "Syncing regularly", color: "text-green-400" },
   stale: {
     text: "Not responding - update below or contact admin",
     color: "text-red-300",
   },
-  none: { text: "No pulses received yet", color: "text-muted" },
+  none: { text: "No activity received yet", color: "text-muted" },
 };
 
 type AgentStatusPanelProps = {
@@ -90,7 +90,7 @@ export function AgentStatusPanel({
   if (!status) return null;
 
   const meta = STATUS_LABELS[status.installStatus];
-  const pulseMeta = PULSE_LABELS[status.pulseStatus];
+  const syncMeta = SYNC_LABELS[status.pulseStatus];
   const showReinstall =
     status.pulseStatus === "stale" ||
     status.installStatus === "not_installed" ||
@@ -101,7 +101,7 @@ export function AgentStatusPanel({
       <h2 className="mb-1 text-lg font-medium">Agent status</h2>
       <p className={`text-sm font-medium ${meta.color}`}>{meta.title}</p>
       <p className="mt-1 text-sm text-muted">{meta.detail}</p>
-      <p className={`mt-2 text-sm font-medium ${pulseMeta.color}`}>{pulseMeta.text}</p>
+      <p className={`mt-2 text-sm font-medium ${syncMeta.color}`}>{syncMeta.text}</p>
 
       {showReinstall && (
         <div className="mt-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-3 text-sm text-muted">
@@ -110,8 +110,8 @@ export function AgentStatusPanel({
           </p>
           <p className="mt-1">
             {status.pulseStatus === "stale"
-              ? "Download the latest zip, open PowerShell in the extract folder, then use the Update (already installed) section below."
-              : "Use the Install (first time) section below to register this laptop."}
+              ? "Copy the setup command below and run it in PowerShell to refresh the agent."
+              : "Use the setup command below to register this laptop."}
           </p>
           <div className="mt-3">
             <InstallTokenCommands
@@ -139,8 +139,8 @@ export function AgentStatusPanel({
       {adminAccess && status.pulsesLast24h < 30 && status.deviceCount > 0 && status.pulseStatus === "healthy" && (
         <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-sm text-muted">
           <p>
-            Only {status.pulsesLast24h} pulses in the last 24 hours (expected ~720). The laptop may
-            have been asleep or the task may not be running reliably.{" "}
+            Only {status.pulsesLast24h} activity ticks in the last 24 hours (expected ~720). The
+            laptop may have been asleep or the task may not be running reliably.{" "}
             <a href="#install" className="text-accent hover:underline">
               Reinstall from here
             </a>
@@ -152,7 +152,7 @@ export function AgentStatusPanel({
       <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
         {adminAccess && (
           <div>
-            <dt className="text-muted">Pulses last 24h</dt>
+            <dt className="text-muted">Activity ticks last 24h</dt>
             <dd>
               {status.pulsesLast24h} / ~{status.expectedPulsesPerDay} expected
             </dd>
@@ -160,7 +160,7 @@ export function AgentStatusPanel({
         )}
         {adminAccess && (
           <div>
-            <dt className="text-muted">Last heartbeat</dt>
+            <dt className="text-muted">Last seen</dt>
             <dd>
               {status.lastHeartbeat
                 ? new Date(status.lastHeartbeat).toLocaleString("en-IN")
@@ -170,7 +170,7 @@ export function AgentStatusPanel({
         )}
         {adminAccess && (
           <div>
-            <dt className="text-muted">Time since last pulse</dt>
+            <dt className="text-muted">Time since last activity</dt>
             <dd>
               {formatPulseAge({
                 minutes: status.minutesSinceLastPulse,
@@ -192,7 +192,7 @@ export function AgentStatusPanel({
 
       {adminAccess && status.recentPulses.length > 0 && (
         <div className="mt-3">
-          <p className="mb-1 text-xs font-medium text-muted">Recent pulses</p>
+          <p className="mb-1 text-xs font-medium text-muted">Recent activity</p>
           <ul className="space-y-1 text-xs text-muted">
             {status.recentPulses.map((p, i) => (
               <li key={i}>

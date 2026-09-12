@@ -75,7 +75,7 @@ export function AgentGraceSection({ adminUserId }: { adminUserId?: string } = {}
         {adminUserId ? "Agent health grace (admin)" : "Agent health grace"}
       </h2>
       <p className="mb-4 text-sm text-muted">
-        How long without a heartbeat before the agent is flagged as stale. Default is{" "}
+        How long without agent sync or activity before the agent is flagged as stale. Default is{" "}
         {state.globalGraceHours} hours (1 day). Increase for shift workers or travel when laptop
         sleep is expected.
       </p>

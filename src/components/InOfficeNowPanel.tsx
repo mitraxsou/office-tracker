@@ -111,7 +111,7 @@ export function InOfficeNowPanel({
               In office now
             </h2>
             <p className="mt-1 text-sm text-muted">
-              Live list of users with an active office visit and recent heartbeat.
+              Live list of users with an active office visit and recent agent activity.
             </p>
           </div>
           <button
@@ -181,7 +181,7 @@ export function InOfficeNowPanel({
                       </dd>
                     </div>
                     <div>
-                      <dt className="text-muted">Last pulse</dt>
+                      <dt className="text-muted">Last activity</dt>
                       <dd>{formatWhen(user.lastHeartbeatAt)}</dd>
                     </div>
                     <div>

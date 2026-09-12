@@ -133,13 +133,13 @@ export function MonthlyReportSection({
           value={agentLabel}
           tooltip={
             agentHealthDetail ??
-            `Laptop agent pulses about every 5 minutes by default. Healthy means a pulse arrived within the configured grace window. ${pulse.pulsesLast24h} pulses in the last 24h.`
+            `Laptop agent syncs about every 5 minutes by default. Healthy means activity arrived within the configured grace window. ${pulse.pulsesLast24h} activity ticks in the last 24h.`
           }
           tone={agentTone}
         >
           <AgentPulseSparkline buckets={pulseTimeline} className="mt-2 h-8" />
           <p className="mt-1 text-[10px] text-muted">
-            {pulse.pulsesLast24h} pulses · last 24h
+            {pulse.pulsesLast24h} activity ticks · last 24h
             {pulse.minutesSinceLastPulse != null &&
               ` · ${formatPulseAge({
                 minutes: pulse.minutesSinceLastPulse,

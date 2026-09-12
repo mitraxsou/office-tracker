@@ -555,7 +555,7 @@ export function AdminUsersDashboard() {
                 Today: {u.today.totalHours.toFixed(1)}h / {u.hoursTarget}h · Agent:{" "}
                 {u.today.agentHealthy ? "Healthy" : "Stale"}
                 {u.today.lastHeartbeat &&
-                  ` · Last heartbeat ${new Date(u.today.lastHeartbeat).toLocaleString("en-IN")}`}
+                  ` · Last activity ${new Date(u.today.lastHeartbeat).toLocaleString("en-IN")}`}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">

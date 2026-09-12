@@ -296,7 +296,7 @@ export function InstallTokenCommands({
                   <p>
                     Full token is not stored on the server yet for this laptop (prefix{" "}
                     <code>{t.prefix}</code>). Paste it from your laptop config file once, or wait
-                    for the next agent heartbeat and refresh this page.
+                    for the next agent sync and refresh this page.
                   </p>
                   <p className="font-mono text-[11px] text-foreground/80">
                     (Get-Content &quot;$env:LOCALAPPDATA\OfficeTracker\config.json&quot; -Raw |

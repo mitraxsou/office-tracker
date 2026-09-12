@@ -18,6 +18,7 @@ export function AdminSettingsForm({
   heartbeatIntervalMinutes,
   agentStaleMinutes,
   agentStaleGraceHours,
+  agentMode,
   fiscalYearStartMonth,
   fiscalYearEndMonth,
 }: {
@@ -30,6 +31,7 @@ export function AdminSettingsForm({
   heartbeatIntervalMinutes: number;
   agentStaleMinutes: number;
   agentStaleGraceHours: number;
+  agentMode: string;
   fiscalYearStartMonth: number;
   fiscalYearEndMonth: number;
 }) {
@@ -43,6 +45,7 @@ export function AdminSettingsForm({
   const [heartbeatInterval, setHeartbeatInterval] = useState(heartbeatIntervalMinutes);
   const [staleMinutes, setStaleMinutes] = useState(agentStaleMinutes);
   const [graceHours, setGraceHours] = useState(agentStaleGraceHours);
+  const [mode, setMode] = useState(agentMode === "heartbeat" ? "heartbeat" : "events");
   const [fyStartMonth, setFyStartMonth] = useState(fiscalYearStartMonth);
   const [fyEndMonth, setFyEndMonth] = useState(fiscalYearEndMonth);
   const [loading, setLoading] = useState(false);
@@ -78,6 +81,7 @@ export function AdminSettingsForm({
         heartbeatIntervalMinutes: heartbeatInterval,
         agentStaleMinutes: staleMinutes,
         agentStaleGraceHours: graceHours,
+        agentMode: mode,
         fiscalYearStartMonth: fyStartMonth,
         fiscalYearEndMonth: fyEndMonth,
       }),
@@ -181,7 +185,7 @@ export function AdminSettingsForm({
         <p className="mb-3 text-xs text-muted">
           Recommended defaults: <code>OfficeConnect</code>, <code>ExternalConnect</code>,{" "}
           <code>pwcglb.com</code>. Set <code>DEFAULT_OFFICE_SSIDS</code> in Vercel env to seed new
-          installs; admin edits here apply immediately and backfill recent heartbeats.
+          installs; admin edits here apply immediately and backfill recent agent activity.
         </p>
         <textarea
           value={ssidText}
@@ -204,12 +208,13 @@ export function AdminSettingsForm({
       </section>
 
       <section className="card p-6">
-        <h2 className="mb-2 text-lg font-medium">Agent & token settings</h2>
+        <h2 className="mb-2 text-lg font-medium">Agent sync settings</h2>
         <p className="mb-4 text-sm text-muted">
-          Pending install tokens auto-revoke if never bound. Raw heartbeats are purged after the
-          retention window (visits are kept).
+          Agents wake every 2 minutes and sync with the server on the check-in interval. Each sync
+          sends Wi-Fi events, activity ticks, and visit updates. Pending install tokens auto-revoke
+          if never bound.
         </p>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <label className="block text-sm">
             <span className="text-muted">Pending token TTL (days)</span>
             <input
@@ -222,18 +227,7 @@ export function AdminSettingsForm({
             />
           </label>
           <label className="block text-sm">
-            <span className="text-muted">Heartbeat retention (days)</span>
-            <input
-              type="number"
-              min={1}
-              max={30}
-              value={heartbeatRetention}
-              onChange={(e) => setHeartbeatRetention(Number(e.target.value))}
-              className="mt-1 w-full rounded-lg border px-3 py-2"
-            />
-          </label>
-          <label className="block text-sm">
-            <span className="text-muted">Heartbeat interval (minutes)</span>
+            <span className="text-muted">Agent check-in interval (minutes)</span>
             <input
               type="number"
               min={2}
@@ -267,10 +261,45 @@ export function AdminSettingsForm({
           </label>
         </div>
         <p className="mt-2 text-xs text-muted">
-          Installed agents wake every 2 minutes but send only when this heartbeat interval has
-          elapsed. Keep visit gap at about 3 times the heartbeat interval. Health grace (default
-          24h) flags stale agents when no pulse for that long and the user is not out of office.
+          Keep visit gap at about 3 times the check-in interval. Health grace (default 24h) flags
+          stale agents when no sync or activity for that long and the user is not out of office.
         </p>
+
+        <details className="mt-4 rounded-lg border border-[var(--border)] p-4 text-sm">
+          <summary className="cursor-pointer font-medium text-muted">Advanced agent options</summary>
+          <div className="mt-4 space-y-4">
+            <label className="block text-sm">
+              <span className="text-muted">Agent mode</span>
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value)}
+                className="mt-1 w-full max-w-xs rounded-lg border px-3 py-2"
+              >
+                <option value="events">Events (recommended)</option>
+                <option value="heartbeat">Legacy heartbeat only</option>
+              </select>
+              <span className="mt-1 block text-xs text-muted">
+                Events mode uses POST /api/agent/sync. Legacy heartbeat is a fallback for older
+                agents only.
+              </span>
+            </label>
+            <label className="block text-sm">
+              <span className="text-muted">Legacy heartbeat retention (days)</span>
+              <input
+                type="number"
+                min={1}
+                max={30}
+                value={heartbeatRetention}
+                onChange={(e) => setHeartbeatRetention(Number(e.target.value))}
+                className="mt-1 w-full max-w-xs rounded-lg border px-3 py-2"
+              />
+              <span className="mt-1 block text-xs text-muted">
+                How long raw legacy heartbeats are kept on the server. Activity ticks and visits are
+                not affected. Purge runs via maintenance cron.
+              </span>
+            </label>
+          </div>
+        </details>
       </section>
 
       {error && <p className="text-sm text-red-400">{error}</p>}

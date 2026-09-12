@@ -444,7 +444,7 @@ export function AdminDashboard({
                     {!selectedDate && (
                       <>
                         <th className="py-2 pr-4">Agent</th>
-                        <th className="py-2 pr-4">Last pulse</th>
+                        <th className="py-2 pr-4">Last activity</th>
                         <th className="py-2">Report</th>
                       </>
                     )}

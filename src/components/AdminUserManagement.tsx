@@ -70,7 +70,7 @@ export function AdminUserManagement({ onUserCreated }: Props) {
       <h2 className="mb-2 text-lg font-medium">Add pilot user</h2>
       <p className="mb-4 text-sm text-muted">
         Create the account with a temporary password. Share the login details and install
-        command with the user. Each install token binds to one laptop on first heartbeat.
+        command with the user. Each install token binds to one laptop on first agent sync.
       </p>
 
       <form onSubmit={handleCreate} className="grid gap-3 sm:grid-cols-2">

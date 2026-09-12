@@ -20,7 +20,7 @@ type DashboardHeroSummaryProps = {
 };
 
 const LAPTOP_TOOLTIP =
-  "Time from your first agent pulse today to your last (or now if the agent is still running). Counts whenever the My Office Pulse agent is pulsing on your laptop, not only on office Wi-Fi.";
+  "Time from your first agent activity today to your last (or now if the agent is still running). Counts whenever the My Office Pulse agent is active on your laptop, not only on office Wi-Fi.";
 
 export function DashboardHeroSummary({
   totalHours,
@@ -93,7 +93,7 @@ export function DashboardHeroSummary({
       )}
 
       <p className="mt-3 border-t border-[var(--border)] pt-3 text-xs text-muted">
-        Last pulse:{" "}
+        Last activity:{" "}
         <span className={toneClass(lastHeartbeatTone)}>{lastHeartbeatLabel}</span>
       </p>
 
