@@ -32,9 +32,9 @@ $env:VERCEL_PROJECT_ID = "prj_N8idhB3WNItVngojCQAmOT5bsnSI"   # prod
 npx vercel deploy --prod --yes
 ```
 
-## Hobby (`soumitra-pwc`) - paused
+## Hobby (`soumitra-pwc`) - active
 
-Hobby projects are **paused** during the Enterprise pilot. Do not deploy here.
+Hobby is the **active** deploy target again (Enterprise sunset). Git push to `dev` / `production` auto-deploys here. After any push, run the **Vercel deploy failure loop** in `.cursor/skills/office-tracker/SKILL.md` until both projects are **READY**.
 
 | Environment | Git branch | Vercel project | URL | Database |
 |---|---|---|---|---|

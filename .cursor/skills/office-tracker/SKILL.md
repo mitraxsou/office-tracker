@@ -2,9 +2,9 @@
 name: office-tracker
 description: >-
   PwC Office Pulse pilot app (5-hour office tracking on PwC laptops). Covers
-  Next.js/Vercel app, Windows agent, admin RBAC, Wi-Fi detection, security, and
-  deploy. Use when developing, fixing, or extending Office Tracker / Office Pulse
-  in this repo.
+  Next.js/Vercel app, Windows agent, admin RBAC, Wi-Fi detection, security,
+  deploy, and Vercel deploy failure verification. Use when developing, fixing,
+  or extending Office Tracker / Office Pulse in this repo.
 ---
 
 # PwC Office Pulse (Office Tracker)
@@ -194,6 +194,64 @@ Use the Vercel API or inspector URL from CLI output. Check `/login` returns 200 
 - Do **not** merge to `production` without user approval unless they asked to deploy prod
 - Agent install commands on laptops use **Enterprise prod** `NEXT_PUBLIC_APP_URL` only
 - `prisma` provider **postgresql**; schema uses `POSTGRES_PRISMA_URL` + `POSTGRES_URL_NON_POOLING`
+
+## Vercel deploy failure loop
+
+Run this after any push/deploy, when the user reports a build failed, or before calling deploy **done**. Do not stop at the first failure; iterate until both environments are **READY** or you are blocked (missing user token or permission).
+
+### 1. Check deployment status and logs
+
+| Method | Command / location |
+|---|---|
+| GitHub (if `gh` linked) | `gh api repos/mitraxsou/office-tracker/deployments --jq '.[0] \| {state, environment, created_at}'` or check the repo Deployments tab |
+| Vercel CLI (Hobby) | `npx vercel ls --token $env:VERCEL_TOKEN` |
+| Vercel dashboard | Team **soumitra-pwc**, projects **office-tracker** (prod) and **office-tracker-dev** (dev) |
+| Failed build logs | `npx vercel inspect <deployment-url> --logs --token $env:VERCEL_TOKEN` or Vercel API |
+
+### 2. Active targets (Hobby; Enterprise sunset)
+
+| Environment | Branch | Project | URL |
+|---|---|---|---|
+| Dev | `dev` | `office-tracker-dev` | https://office-tracker-dev.vercel.app |
+| Prod | `production` | `office-tracker` | https://office-tracker-theta.vercel.app |
+
+Git push to `dev` / `production` triggers Hobby auto-deploy. Commits must use **mitraxsou** author (see [reference.md](reference.md)).
+
+### 3. Common failures in this repo
+
+- **TypeScript / lint errors** during `next build` (fix locally, then `npm test` and `npm run build`)
+- **Prerender DB access denied** on `/privacy` (local only without Neon; Vercel has Postgres)
+- **Cron more than once per day** on Hobby (`vercel.json`; daily or weekly only)
+- **Missing env vars** on Vercel (check Settings → Environment Variables per project)
+
+### 4. Fix loop
+
+1. Read the failed deployment log and identify the error.
+2. Fix code in the repo.
+3. `npm test` then `npm run build` locally when possible.
+4. Commit with mitraxsou author.
+5. Push `dev`, then merge and push `production` (or push both as the user requested).
+6. Recheck deployment status until **READY** on both dev and prod URLs (`/login` returns 200 or SSO redirect).
+
+### 5. CLI redeploy when git deploy is stuck
+
+Hobby team and project IDs (from `docs/deploy-branches.md`):
+
+```powershell
+$env:NODE_TLS_REJECT_UNAUTHORIZED = "0"
+$env:VERCEL_ORG_ID = "team_3LPxagkp9owYBE8nVXkQAg7H"
+$env:VERCEL_TOKEN = "your-token"   # session only, never commit
+
+# Dev (branch dev)
+$env:VERCEL_PROJECT_ID = "prj_8e1WU41N2AV7BIaKDydrmeQ6oL2x"
+npx vercel deploy --prod --yes --token $env:VERCEL_TOKEN
+
+# Prod (branch production)
+$env:VERCEL_PROJECT_ID = "prj_Ay5vp88pkSDFYURvoX9zCip4k72c"
+npx vercel deploy --prod --yes --token $env:VERCEL_TOKEN
+```
+
+Prefer git push when auto-deploy works; use CLI only when git-triggered deploys stall or stay in Error state.
 
 ## Common pitfalls
 
