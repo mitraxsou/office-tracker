@@ -37,7 +37,9 @@ export async function POST() {
   }
 
   return NextResponse.json({
-    command: first.installCommand,
+    command: first.setupCommand,
+    setupCommand: first.setupCommand,
+    installCommand: first.installCommand,
     updateCommand: first.updateCommand,
     token: first.plainToken,
     appUrl,

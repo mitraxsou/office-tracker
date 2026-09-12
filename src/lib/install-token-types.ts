@@ -3,6 +3,7 @@ export type InstallTokenForUser = {
   label: string | null;
   prefix: string;
   plainToken: string | null;
+  setupCommand: string;
   installCommand: string;
   updateCommand: string;
   createdAt: string;

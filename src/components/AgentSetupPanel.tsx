@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import {
-  AGENT_EXTRACT_FOLDER,
   AGENT_INSTALL_DIR,
   AGENT_PRODUCT_NAME,
   AGENT_TASK_NAME,
@@ -44,58 +43,20 @@ export function AgentSetupPanel({
     <div id="install" className="scroll-mt-6 space-y-6">
       <section className="card border-[var(--pwc-orange)] p-6">
         <h2 className="mb-2 text-lg font-medium text-[var(--pwc-orange)]">
-          Install or reinstall {AGENT_PRODUCT_NAME}
+          Install or update {AGENT_PRODUCT_NAME}
         </h2>
         <p className="mb-4 text-sm text-muted">
-          Use this section to set up the agent or fix a stale install. No admin required. Use{" "}
-          <strong>PowerShell</strong> (not Command Prompt). Steps 1 to 3 are the same for both
-          paths. After that, follow either <strong>Install (first time)</strong> or{" "}
-          <strong>Update (already installed)</strong>, not both.
+          Use <strong>PowerShell</strong> (not Command Prompt). Copy the setup command for your
+          laptop below, paste it in any PowerShell window, and press Enter. The agent downloads
+          from this server. No admin rights and no zip download required.
         </p>
 
         <ol className="mb-6 list-decimal space-y-3 pl-5 text-sm">
           <li>
-            <span className="font-medium">Download the agent zip</span>
+            <span className="font-medium">Copy the setup command</span>
             <p className="mt-1 text-muted">
-              Save <code>{AGENT_ZIP_STEM}.zip</code> to Downloads. On PwC laptops that is often{" "}
-              <code>OneDrive - PwC\Downloads</code>, not <code>%USERPROFILE%\Downloads</code>.
-            </p>
-            <a href="/api/agent/download" className="btn-primary mt-2 inline-block px-4 py-2 text-sm">
-              Download agent (.zip)
-            </a>
-          </li>
-          <li>
-            <span className="font-medium">Extract the zip</span>
-            <p className="mt-1 text-muted">
-              Right-click the zip, choose <strong>Extract All</strong>, and extract to Downloads.
-              The zip is named <code>{AGENT_ZIP_STEM}.zip</code>, so Extract All may create a nested
-              folder such as <code>{`${AGENT_ZIP_STEM}\\${AGENT_EXTRACT_FOLDER}`}</code>. Open the inner
-              folder until you see <code>install.ps1</code> and <code>update.ps1</code>.
-            </p>
-          </li>
-          <li>
-            <span className="font-medium">Open PowerShell in that folder</span>
-            <p className="mt-1 text-muted">
-              In the extracted folder, Shift + right-click empty space and choose{" "}
-              <strong>Open PowerShell window here</strong> (or Terminal). Run <code>dir</code>; it
-              must list <code>install.ps1</code>. The copy-paste commands use{" "}
-              <code>.\install.ps1</code> and <code>.\update.ps1</code>, so they only work from this
-              folder.
-            </p>
-            <p className="mt-1 text-xs text-muted">
-              If this window is not already in that folder, <code>cd</code> into it first. Example
-              nested path:{" "}
-              <code>{`cd "$env:USERPROFILE\\OneDrive - PwC\\Downloads\\${AGENT_ZIP_STEM}\\${AGENT_EXTRACT_FOLDER}"`}</code>
-            </p>
-          </li>
-          <li>
-            <span className="font-medium">Pick your laptop, then run one command</span>
-            <p className="mt-1 text-muted">
-              Each laptop card below includes <strong>Switch server URL</strong> if the agent is
-              already installed (paste in any PowerShell window; no zip folder needed). Use{" "}
-              <strong>Install (first time)</strong> for a new laptop. Use{" "}
-              <strong>Update scripts</strong> only when you need the latest scripts downloaded from
-              this server.
+              Pick your laptop card below and click <strong>Copy setup command</strong>. Works for
+              first-time install and for updating an existing install.
             </p>
             <div className="mt-3">
               <InstallTokenCommands
@@ -107,10 +68,17 @@ export function AgentSetupPanel({
           <li>
             <span className="font-medium">Paste and run in PowerShell</span>
             <p className="mt-1 text-muted">
-              Paste the one command you copied into the PowerShell window you opened in this folder
-              (right-click or Ctrl+V) and press Enter. It must run from the folder that contains the
-              scripts. Install writes to <code>{AGENT_INSTALL_DIR}</code> and registers task{" "}
+              Open PowerShell, paste the command (right-click or Ctrl+V), and press Enter. Install
+              writes to <code>{AGENT_INSTALL_DIR}</code> and registers task{" "}
               <code>{AGENT_TASK_NAME}</code>.
+            </p>
+          </li>
+          <li>
+            <span className="font-medium">Switch server URL only (optional)</span>
+            <p className="mt-1 text-muted">
+              If the agent is already installed and you only need to point it at this site, use{" "}
+              <strong>Switch server URL</strong> on the laptop card instead. Your token stays the
+              same.
             </p>
           </li>
           <li>
@@ -122,7 +90,25 @@ export function AgentSetupPanel({
             </p>
           </li>
         </ol>
-        <p className="text-xs text-muted">API URL: {appUrl}</p>
+
+        <details className="rounded-lg border border-[var(--border)] p-4 text-sm">
+          <summary className="cursor-pointer font-medium text-muted">
+            Advanced: install from zip ({AGENT_ZIP_STEM}.zip)
+          </summary>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-xs text-muted">
+            <li>
+              Download <code>{AGENT_ZIP_STEM}.zip</code> from the laptop card Advanced section or{" "}
+              <a href="/api/agent/download" className="text-accent hover:underline">
+                here
+              </a>
+              .
+            </li>
+            <li>Extract to Downloads and open PowerShell in the folder that contains install.ps1.</li>
+            <li>Use the zip-based install or update commands in the Advanced section of your laptop card.</li>
+          </ol>
+        </details>
+
+        <p className="mt-4 text-xs text-muted">API URL: {appUrl}</p>
       </section>
 
       <section className="card p-6">
@@ -146,8 +132,8 @@ export function AgentSetupPanel({
       <section className="card p-6">
         <h2 className="mb-2 text-lg font-medium">Uninstall {AGENT_PRODUCT_NAME}</h2>
         <p className="mb-4 text-sm text-muted">
-          For a clean reinstall, run uninstall first from the extracted agent folder in PowerShell.
-          No admin required.
+          For a clean reinstall, run uninstall from the agent install folder in PowerShell, or use
+          the zip folder if you still have it extracted. No admin required.
         </p>
         <pre className="overflow-x-auto rounded-lg border bg-[var(--background)] p-4 text-xs whitespace-pre-wrap">
           {uninstallCommand}

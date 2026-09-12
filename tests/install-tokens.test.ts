@@ -9,6 +9,8 @@ import {
   buildInstallCommand,
   buildInstallCommandFromLocalConfig,
   buildRetargetApiUrlCommand,
+  buildSetupCommand,
+  buildSetupCommandFromLocalConfig,
   buildUpdateCommand,
   buildUpdateCommandFromLocalConfig,
 } from "../src/lib/agent-branding";
@@ -182,10 +184,19 @@ describe("post-backfill install commands", () => {
 });
 
 describe("copy-paste agent commands", () => {
+  const expectedSetup =
+    'Unblock-File -LiteralPath ".\\setup.ps1"; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ".\\setup.ps1" -ApiUrl "https://office.example" -Token "tok"';
   const expectedInstall =
     'Unblock-File -LiteralPath ".\\install.ps1"; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ".\\install.ps1" -ApiUrl "https://office.example" -Token "tok"';
   const expectedUpdate =
     'Unblock-File -LiteralPath ".\\update.ps1"; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ".\\update.ps1" -ApiUrl "https://office.example" -Token "tok"';
+
+  it("uses relative setup.ps1 with ApiUrl and Token", () => {
+    const command = buildSetupCommand("https://office.example", "tok");
+    expect(command).toBe(expectedSetup);
+    expect(command).not.toContain("USERPROFILE");
+    expect(command).not.toContain("Downloads");
+  });
 
   it("uses relative install.ps1 with ApiUrl and Token", () => {
     const command = buildInstallCommand("https://office.example", "tok");
@@ -215,6 +226,14 @@ describe("copy-paste agent commands", () => {
     expect(command).toContain('-ApiUrl "https://office.example"');
     expect(command).toContain("-Token $cfg.token");
     expect(command).toContain(".\\update.ps1");
+  });
+
+  it("builds setup command from local config.json for legacy bound tokens", () => {
+    const command = buildSetupCommandFromLocalConfig("https://office.example");
+    expect(command).toContain("config.json");
+    expect(command).toContain('-ApiUrl "https://office.example"');
+    expect(command).toContain("-Token $cfg.token");
+    expect(command).toContain(".\\setup.ps1");
   });
 
   it("builds retarget command that updates config.json apiUrl only", () => {

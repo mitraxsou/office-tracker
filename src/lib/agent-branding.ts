@@ -61,6 +61,11 @@ export function buildSetupCommand(appUrl: string, token: string) {
   return buildRelativeScriptCommand(AGENT_RELATIVE_SETUP_SCRIPT, appUrl, token);
 }
 
+/** Setup command for laptops that already have the agent token in local config.json. */
+export function buildSetupCommandFromLocalConfig(appUrl: string) {
+  return `Unblock-File -LiteralPath "${AGENT_RELATIVE_SETUP_SCRIPT}"; $cfg = Get-Content "${AGENT_LOCAL_CONFIG_PS}" -Raw | ConvertFrom-Json; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${AGENT_RELATIVE_SETUP_SCRIPT}" -ApiUrl "${appUrl}" -Token $cfg.token`;
+}
+
 const AGENT_LOCAL_CONFIG_PS = `$env:LOCALAPPDATA\\${AGENT_INSTALL_FOLDER}\\config.json`;
 
 /** Install command for laptops that already have the agent token in local config.json. */
