@@ -8,6 +8,8 @@ export const AGENT_DOWNLOAD_FILES = [
   "office-heartbeat.ps1",
   "uninstall.ps1",
   "update.ps1",
+  "setup.ps1",
+  "agent-download.ps1",
   "version.txt",
 ] as const;
 
@@ -18,7 +20,13 @@ const CONTENT_TYPES: Record<AgentDownloadFileName, string> = {
   "office-heartbeat.ps1": "text/plain; charset=utf-8",
   "uninstall.ps1": "text/plain; charset=utf-8",
   "update.ps1": "text/plain; charset=utf-8",
+  "setup.ps1": "text/plain; charset=utf-8",
+  "agent-download.ps1": "text/plain; charset=utf-8",
   "version.txt": "text/plain; charset=utf-8",
+};
+
+const FILE_PATHS: Partial<Record<AgentDownloadFileName, string>> = {
+  "agent-download.ps1": "lib/agent-download.ps1",
 };
 
 export function isAgentDownloadFileName(name: string): name is AgentDownloadFileName {
@@ -38,7 +46,8 @@ export async function authorizeAgentDownload(request: Request): Promise<boolean>
 
 export async function readAgentFile(name: AgentDownloadFileName): Promise<Buffer> {
   const agentDir = path.join(process.cwd(), "agent");
-  return readFile(path.join(agentDir, name));
+  const relativePath = FILE_PATHS[name] ?? name;
+  return readFile(path.join(agentDir, relativePath));
 }
 
 export function agentFileContentType(name: AgentDownloadFileName): string {

@@ -368,7 +368,34 @@ export async function getPulseStats(userId: string, graceHours: number) {
   const now = new Date();
   const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  const [pulsesLast24h, recentPulses, lastHeartbeat, heartbeats24h] = await Promise.all([
+  const [
+    activityCount24h,
+    recentActivity,
+    lastActivity,
+    activity24h,
+    pulsesLast24h,
+    recentPulses,
+    lastHeartbeat,
+    heartbeats24h,
+  ] = await Promise.all([
+    prisma.activityTick.count({
+      where: { userId, at: { gte: since24h } },
+    }),
+    prisma.activityTick.findMany({
+      where: { userId },
+      orderBy: { at: "desc" },
+      take: 12,
+      select: { at: true, inOffice: true, ssid: true },
+    }),
+    prisma.activityTick.findFirst({
+      where: { userId },
+      orderBy: { at: "desc" },
+    }),
+    prisma.activityTick.findMany({
+      where: { userId, at: { gte: since24h } },
+      select: { at: true },
+      orderBy: { at: "asc" },
+    }),
     prisma.heartbeat.count({
       where: { userId, recordedAt: { gte: since24h } },
     }),
@@ -389,40 +416,58 @@ export async function getPulseStats(userId: string, graceHours: number) {
     }),
   ]);
 
-  const minutesSinceLastPulse = lastHeartbeat
-    ? Math.round((now.getTime() - lastHeartbeat.recordedAt.getTime()) / 60000)
+  const useActivity = activityCount24h > 0 || (lastActivity && !lastHeartbeat);
+  const lastSignalAt = useActivity ? lastActivity?.at : lastHeartbeat?.recordedAt;
+
+  const minutesSinceLastPulse = lastSignalAt
+    ? Math.round((now.getTime() - lastSignalAt.getTime()) / 60000)
     : null;
 
   const agentHealthy =
-    lastHeartbeat !== null &&
-    now.getTime() - lastHeartbeat.recordedAt.getTime() <= graceHours * 60 * 60 * 1000;
+    lastSignalAt !== null &&
+    lastSignalAt !== undefined &&
+    now.getTime() - lastSignalAt.getTime() <= graceHours * 60 * 60 * 1000;
 
   const { officeSsids } = await getAppConfig();
 
+  const effectivePulseCount = useActivity ? activityCount24h : pulsesLast24h;
+  const timelineSource = useActivity
+    ? activity24h.map((t) => t.at)
+    : heartbeats24h.map((h) => h.recordedAt);
+
+  const recentMapped = useActivity
+    ? recentActivity.map((p) => ({
+        recordedAt: p.at.toISOString(),
+        inOffice: p.inOffice,
+        ssid: p.ssid,
+        vpnGateway: null,
+        source: "activity_tick",
+      }))
+    : recentPulses.map((p) => ({
+        recordedAt: p.recordedAt.toISOString(),
+        inOffice: heartbeatInOffice(p, officeSsids),
+        ssid: p.ssid,
+        vpnGateway: p.vpnGateway,
+        source: p.source,
+      }));
+
+  const lastRow = recentMapped[0] ?? null;
+
   return {
-    pulsesLast24h,
+    pulsesLast24h: effectivePulseCount,
     expectedPulsesPerDay: 720,
     minutesSinceLastPulse,
     agentHealthy,
-    lastHeartbeat: lastHeartbeat?.recordedAt.toISOString() ?? null,
-    pulseTimeline24h: buildPulseTimeline24h(
-      heartbeats24h.map((h) => h.recordedAt),
-      now,
-    ),
-    recentPulses: recentPulses.map((p) => ({
-      recordedAt: p.recordedAt.toISOString(),
-      inOffice: heartbeatInOffice(p, officeSsids),
-      ssid: p.ssid,
-      vpnGateway: p.vpnGateway,
-      source: p.source,
-    })),
-    lastSignal: lastHeartbeat
+    lastHeartbeat: lastSignalAt?.toISOString() ?? null,
+    pulseTimeline24h: buildPulseTimeline24h(timelineSource, now),
+    recentPulses: recentMapped,
+    lastSignal: lastRow
       ? {
-          recordedAt: lastHeartbeat.recordedAt.toISOString(),
-          inOffice: heartbeatInOffice(lastHeartbeat, officeSsids),
-          ssid: lastHeartbeat.ssid,
-          vpnGateway: lastHeartbeat.vpnGateway,
-          source: lastHeartbeat.source,
+          recordedAt: lastRow.recordedAt,
+          inOffice: lastRow.inOffice,
+          ssid: lastRow.ssid,
+          vpnGateway: lastRow.vpnGateway,
+          source: lastRow.source,
         }
       : null,
   };

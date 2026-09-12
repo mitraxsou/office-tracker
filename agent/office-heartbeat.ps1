@@ -1,7 +1,6 @@
-# Office Tracker heartbeat agent
-# Reads Wi-Fi SSID locally, fetches ALL config from server, POSTs heartbeat.
-# Server decides inOffice. Nothing hardcoded on the laptop.
-# GlobalProtect/VPN is diagnostic only and never counts toward hours.
+# Office Tracker heartbeat agent (event mode v1.3)
+# Tracks Wi-Fi changes locally, queues events, syncs via POST /api/agent/sync.
+# Falls back to POST /api/heartbeat when sync is not deployed yet.
 
 param(
     [switch]$DryRun
@@ -11,10 +10,7 @@ $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ConfigFetchIntervalRuns = 5
 $UpdateCheckIntervalMinutes = 60
-
-# Version of this script. Keep in sync with agent/version.txt. Used when version.txt is
-# missing so the server always receives a real version instead of nothing.
-$AgentScriptVersion = "1.2.11"
+$AgentScriptVersion = "1.3.0"
 
 function Write-Log([string]$Message) {
     $logDir = Join-Path $env:LOCALAPPDATA "OfficeTracker\logs"
@@ -24,9 +20,25 @@ function Write-Log([string]$Message) {
     Add-Content -Path $logFile -Value $line -ErrorAction SilentlyContinue
 }
 
-function Get-VersionPath {
-    Join-Path $env:LOCALAPPDATA "OfficeTracker\version.txt"
+function Get-InstallDir {
+    Join-Path $env:LOCALAPPDATA "OfficeTracker"
 }
+
+function Get-StateDir {
+    $dir = Join-Path (Get-InstallDir) "state"
+    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    return $dir
+}
+
+function Get-PresencePath { Join-Path (Get-StateDir) "presence.json" }
+function Get-EventQueuePath { Join-Path (Get-StateDir) "event-queue.json" }
+function Get-SyncStatePath { Join-Path (Get-StateDir) "sync-state.json" }
+function Get-ConfigPath { Join-Path (Get-InstallDir) "config.json" }
+function Get-CachePath { Join-Path (Get-InstallDir) "server-config.json" }
+function Get-RunCounterPath { Join-Path (Get-InstallDir) "run-counter.txt" }
+function Get-LastRunPath { Join-Path (Get-InstallDir) "last-run.txt" }
+function Get-LastUpdateCheckPath { Join-Path (Get-InstallDir) "last-update-check.txt" }
+function Get-VersionPath { Join-Path (Get-InstallDir) "version.txt" }
 
 function Get-LocalAgentVersion {
     $path = Get-VersionPath
@@ -34,73 +46,22 @@ function Get-LocalAgentVersion {
         $fromFile = Get-Content $path -Raw -ErrorAction SilentlyContinue
         if ($fromFile) {
             $trimmed = $fromFile.Trim()
-            # Server rejects anything that is not numeric dotted form, so check before sending.
             if ($trimmed -match '^\d+(\.\d+){0,3}$') { return $trimmed }
         }
     }
     return $AgentScriptVersion
 }
 
-Write-Log "START v$(Get-LocalAgentVersion)"
-
-function Get-ConfigPath {
-    Join-Path $env:LOCALAPPDATA "OfficeTracker\config.json"
-}
-
-function Get-CachePath {
-    Join-Path $env:LOCALAPPDATA "OfficeTracker\server-config.json"
-}
-
-function Get-RunCounterPath {
-    Join-Path $env:LOCALAPPDATA "OfficeTracker\run-counter.txt"
-}
-
-function Get-LastRunPath {
-    Join-Path $env:LOCALAPPDATA "OfficeTracker\last-run.txt"
-}
-
-function Get-LastSuccessfulHeartbeatPath {
-    Join-Path $env:LOCALAPPDATA "OfficeTracker\last-successful-heartbeat.txt"
-}
+Write-Log "START v$(Get-LocalAgentVersion) event-mode"
 
 function Get-LastRunTime {
     $path = Get-LastRunPath
     if (-not (Test-Path $path)) { return $null }
-    try {
-        return [DateTime]::Parse((Get-Content $path -Raw).Trim())
-    } catch {
-        return $null
-    }
+    try { return [DateTime]::Parse((Get-Content $path -Raw).Trim()) } catch { return $null }
 }
 
 function Set-LastRunTime {
     Set-Content -Path (Get-LastRunPath) -Value (Get-Date -Format "o") -Encoding UTF8
-}
-
-function Get-HeartbeatIntervalMinutes($ServerConfig) {
-    $interval = 5
-    if ($ServerConfig -and $null -ne $ServerConfig.heartbeatIntervalMinutes) {
-        $parsed = 0
-        if ([int]::TryParse([string]$ServerConfig.heartbeatIntervalMinutes, [ref]$parsed)) {
-            $interval = $parsed
-        }
-    }
-    return [Math]::Max(2, [Math]::Min(60, $interval))
-}
-
-function Test-HeartbeatDue([int]$IntervalMinutes) {
-    $path = Get-LastSuccessfulHeartbeatPath
-    if (-not (Test-Path $path)) { return $true }
-    try {
-        $lastSuccess = [DateTime]::Parse((Get-Content $path -Raw).Trim())
-        return ((Get-Date) - $lastSuccess).TotalMinutes -ge $IntervalMinutes
-    } catch {
-        return $true
-    }
-}
-
-function Set-LastSuccessfulHeartbeatTime {
-    Set-Content -Path (Get-LastSuccessfulHeartbeatPath) -Value (Get-Date -Format "o") -Encoding UTF8
 }
 
 function Test-ResumeFromSleep {
@@ -127,85 +88,16 @@ function Compare-AgentVersion {
     return 0
 }
 
-function Test-NeedsAgentUpdate($ServerConfig) {
-    if ($ServerConfig.forceAgentUpdate) { return $true }
-    if (-not $ServerConfig.agentScriptVersion) { return $false }
-    $local = Get-LocalAgentVersion
-    return (Compare-AgentVersion $ServerConfig.agentScriptVersion $local) -ne 0
+function Get-RunCounter {
+    $path = Get-RunCounterPath
+    if (-not (Test-Path $path)) { return 0 }
+    $val = Get-Content $path -Raw -ErrorAction SilentlyContinue
+    if ($val -match '^\d+$') { return [int]$val }
+    return 0
 }
 
-function Invoke-AgentSelfUpdate([string]$ApiUrl, [string]$Token, [bool]$Force) {
-    $updateScript = Join-Path $env:LOCALAPPDATA "OfficeTracker\update.ps1"
-    if (-not (Test-Path $updateScript)) {
-        Write-Log "WARN update.ps1 missing; cannot auto-update"
-        return
-    }
-    try {
-        Write-Log "Auto-update: installed agent differs from server version"
-        Invoke-AgentUpdateScript -UpdateScript $updateScript -ApiUrl $ApiUrl -Token $Token -Force:$Force
-    } catch {
-        Write-Log "WARN auto-update failed: $($_.Exception.Message)"
-    }
-}
-
-function Get-LastUpdateCheckPath {
-    Join-Path $env:LOCALAPPDATA "OfficeTracker\last-update-check.txt"
-}
-
-function Test-ShouldRunHourlyUpdateCheck {
-    $path = Get-LastUpdateCheckPath
-    if (-not (Test-Path $path)) { return $true }
-    try {
-        $last = [DateTime]::Parse((Get-Content $path -Raw).Trim())
-        return ((Get-Date) - $last).TotalMinutes -ge $UpdateCheckIntervalMinutes
-    } catch {
-        return $true
-    }
-}
-
-function Set-LastUpdateCheckTime {
-    Set-Content -Path (Get-LastUpdateCheckPath) -Value (Get-Date -Format "o") -Encoding UTF8
-}
-
-function Invoke-AgentUpdateScript {
-    param(
-        [string]$UpdateScript,
-        [string]$ApiUrl,
-        [string]$Token,
-        [switch]$Force
-    )
-    # ExecutionPolicy Bypass does not suppress Attachment Manager prompts. Remove MOTW
-    # from the installed updater, then launch that exact copy through a hidden VBS host.
-    Unblock-File -LiteralPath $UpdateScript -ErrorAction SilentlyContinue
-    if ($Force) {
-        Set-Content -Path (Join-Path (Split-Path $UpdateScript) "force-update.txt") `
-            -Value (Get-Date -Format "o") -Encoding UTF8
-    }
-
-    $runnerPath = Join-Path (Split-Path $UpdateScript) "run-update.vbs"
-    $vbsContent = @"
-CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$UpdateScript"" -Silent", 0, True
-"@
-    Set-Content -Path $runnerPath -Value $vbsContent -Encoding ASCII
-    Unblock-File -LiteralPath $runnerPath -ErrorAction SilentlyContinue
-
-    $wscript = (Get-Command wscript.exe).Source
-    Start-Process -FilePath $wscript -ArgumentList @("//B", "//Nologo", "`"$runnerPath`"") `
-        -WindowStyle Hidden -Wait
-}
-
-function Invoke-HourlyUpdateCheck([string]$ApiUrl, [string]$Token) {
-    $updateScript = Join-Path $env:LOCALAPPDATA "OfficeTracker\update.ps1"
-    if (-not (Test-Path $updateScript)) {
-        Write-Log "WARN update.ps1 missing; cannot run hourly update check"
-        return
-    }
-    try {
-        Write-Log "Hourly update check"
-        Invoke-AgentUpdateScript -UpdateScript $updateScript -ApiUrl $ApiUrl -Token $Token
-    } catch {
-        Write-Log "WARN hourly update check failed: $($_.Exception.Message)"
-    }
+function Set-RunCounter([int]$Value) {
+    Set-Content -Path (Get-RunCounterPath) -Value $Value -Encoding UTF8
 }
 
 function Get-LaptopSerial {
@@ -283,14 +175,12 @@ function Get-WifiSsidFromNetsh {
 }
 
 function Get-CurrentWifiSsid {
-    # Method 1: netsh wlan (actual WLAN SSID; prefer over connection profile name)
     $netshSsid = Get-WifiSsidFromNetsh
     if ($netshSsid) {
         $normalized = Normalize-WifiSsid $netshSsid
         if ($normalized) { return @{ Ssid = $normalized; Method = "netsh" } }
     }
 
-    # Method 2: Get-NetConnectionProfile (fallback; may show captive portal domain, not WLAN SSID)
     try {
         $profile = Get-NetConnectionProfile -ErrorAction Stop |
             Where-Object { $_.InterfaceAlias -like '*Wi-Fi*' -or $_.InterfaceAlias -like '*Wireless*' } |
@@ -301,7 +191,6 @@ function Get-CurrentWifiSsid {
         }
     } catch {}
 
-    # Method 3: WMI MSNdis (fallback, often blocked)
     try {
         $wmi = Get-CimInstance -Namespace root/wmi -ClassName MSNdis_80211_ServiceSetIdentifier -ErrorAction Stop |
             Select-Object -First 1
@@ -337,8 +226,7 @@ function Get-CurrentWifiSsidWithRetry {
 function Get-VpnGatewayDiagnostic {
     try {
         $gp = Get-Process -Name "PanGPA","GlobalProtect" -ErrorAction SilentlyContinue
-        if (-not $gp) { return $null }
-        return "GlobalProtect-Connected"
+        if ($gp) { return "GlobalProtect-Connected" }
     } catch {}
     return $null
 }
@@ -361,16 +249,255 @@ function Wait-NetworkReady {
     return $false
 }
 
-function Get-RunCounter {
-    $path = Get-RunCounterPath
-    if (-not (Test-Path $path)) { return 0 }
-    $val = Get-Content $path -Raw -ErrorAction SilentlyContinue
-    if ($val -match '^\d+$') { return [int]$val }
-    return 0
+function Get-HeartbeatIntervalMinutes($ServerConfig) {
+    $interval = 5
+    if ($ServerConfig -and $null -ne $ServerConfig.heartbeatIntervalMinutes) {
+        $parsed = 0
+        if ([int]::TryParse([string]$ServerConfig.heartbeatIntervalMinutes, [ref]$parsed)) {
+            $interval = $parsed
+        }
+    }
+    return [Math]::Max(2, [Math]::Min(60, $interval))
 }
 
-function Set-RunCounter([int]$Value) {
-    Set-Content -Path (Get-RunCounterPath) -Value $Value -Encoding UTF8
+function Get-AgentTimezone($ServerConfig) {
+    if ($ServerConfig -and $ServerConfig.timezone) {
+        return [string]$ServerConfig.timezone
+    }
+    return "Asia/Kolkata"
+}
+
+function Get-DayKey([string]$TimezoneId) {
+    try {
+        $tz = [TimeZoneInfo]::FindSystemTimeZoneById($TimezoneId)
+        $local = [TimeZoneInfo]::ConvertTimeFromUtc((Get-Date).ToUniversalTime(), $tz)
+        return $local.ToString("yyyy-MM-dd")
+    } catch {
+        return (Get-Date).ToString("yyyy-MM-dd")
+    }
+}
+
+function Get-NowIso {
+    return (Get-Date).ToUniversalTime().ToString("o")
+}
+
+function New-EventId {
+    return [Guid]::NewGuid().ToString("N")
+}
+
+function Read-JsonFile([string]$Path, $Default) {
+    if (-not (Test-Path $Path)) { return $Default }
+    try {
+        return Get-Content $Path -Raw | ConvertFrom-Json
+    } catch {
+        return $Default
+    }
+}
+
+function Write-JsonFile([string]$Path, $Object) {
+    $Object | ConvertTo-Json -Depth 8 -Compress | Set-Content -Path $Path -Encoding UTF8
+}
+
+function Get-PresenceState {
+    $default = @{ ssid = $null; updatedAt = $null }
+    $data = Read-JsonFile (Get-PresencePath) $default
+    return @{
+        ssid = if ($data.ssid) { [string]$data.ssid } else { $null }
+        updatedAt = if ($data.updatedAt) { [string]$data.updatedAt } else { $null }
+    }
+}
+
+function Set-PresenceState([string]$Ssid) {
+    Write-JsonFile (Get-PresencePath) @{
+        ssid = $Ssid
+        updatedAt = Get-NowIso
+    }
+}
+
+function Get-EventQueue {
+    $data = Read-JsonFile (Get-EventQueuePath) @{ events = @() }
+    $events = @()
+    if ($data.events) {
+        foreach ($evt in $data.events) { $events += $evt }
+    }
+    return $events
+}
+
+function Set-EventQueue([array]$Events) {
+    Write-JsonFile (Get-EventQueuePath) @{ events = $Events }
+}
+
+function Add-QueuedEvent {
+    param(
+        [string]$Type,
+        [hashtable]$Fields = @{}
+    )
+    $evt = @{
+        id = New-EventId
+        type = $Type
+        at = Get-NowIso
+    }
+    foreach ($key in $Fields.Keys) {
+        if ($null -ne $Fields[$key]) { $evt[$key] = $Fields[$key] }
+    }
+    $queue = @(Get-EventQueue)
+    $queue += $evt
+    Set-EventQueue $queue
+    return $evt
+}
+
+function Get-SyncState {
+    $default = @{
+        lastActivityTickAt = $null
+        lastDailySummaryDayKey = $null
+        lastSyncAt = $null
+        dayKey = $null
+        dayOfficeMs = 0
+        dayVisitCount = 0
+        openVisit = $null
+        pendingSsid = $null
+        pendingPreviousSsid = $null
+    }
+    return Read-JsonFile (Get-SyncStatePath) $default
+}
+
+function Set-SyncState($State) {
+    Write-JsonFile (Get-SyncStatePath) $State
+}
+
+function Test-IsOfficeSsid {
+    param(
+        [string]$Ssid,
+        $ServerConfig
+    )
+    if (-not $Ssid) { return $false }
+    if (-not $ServerConfig -or -not $ServerConfig.ssids) { return $false }
+    foreach ($allowed in $ServerConfig.ssids) {
+        if ([string]$allowed -eq $Ssid) { return $true }
+    }
+    return $false
+}
+
+function Get-OpenVisitFromState($SyncState) {
+    if ($SyncState.openVisit) {
+        return @{
+            localVisitId = [string]$SyncState.openVisit.localVisitId
+            startAt = [string]$SyncState.openVisit.startAt
+            ssid = [string]$SyncState.openVisit.ssid
+        }
+    }
+    return $null
+}
+
+function Start-LocalVisit {
+    param(
+        $SyncState,
+        [string]$Ssid
+    )
+    $visitId = New-EventId
+    $startAt = Get-NowIso
+    $SyncState.openVisit = @{
+        localVisitId = $visitId
+        startAt = $startAt
+        ssid = $Ssid
+    }
+    if ($null -eq $SyncState.dayVisitCount) { $SyncState.dayVisitCount = 0 }
+    $SyncState.dayVisitCount = [int]$SyncState.dayVisitCount + 1
+    Add-QueuedEvent -Type "visit_start" -Fields @{
+        localVisitId = $visitId
+        ssid = $Ssid
+    }
+    return $SyncState
+}
+
+function End-LocalVisit {
+    param($SyncState)
+    $open = Get-OpenVisitFromState $SyncState
+    if (-not $open) { return $SyncState }
+    $start = [DateTime]::Parse($open.startAt)
+    $end = [DateTime]::UtcNow
+    $durationMs = [Math]::Max(0, [int](($end - $start).TotalMilliseconds))
+    if ($null -eq $SyncState.dayOfficeMs) { $SyncState.dayOfficeMs = 0 }
+    $SyncState.dayOfficeMs = [int]$SyncState.dayOfficeMs + $durationMs
+    Add-QueuedEvent -Type "visit_end" -Fields @{
+        localVisitId = $open.localVisitId
+        officeMs = $durationMs
+    }
+    $SyncState.openVisit = $null
+    return $SyncState
+}
+
+function Add-WifiChangeEvents {
+    param(
+        [string]$PreviousSsid,
+        [string]$CurrentSsid
+    )
+    $prevSet = [bool]$PreviousSsid
+    $currSet = [bool]$CurrentSsid
+    if (-not $prevSet -and $currSet) {
+        Add-QueuedEvent -Type "wifi_connected" -Fields @{ ssid = $CurrentSsid }
+    } elseif ($prevSet -and -not $currSet) {
+        Add-QueuedEvent -Type "wifi_disconnected" -Fields @{ previousSsid = $PreviousSsid }
+    } elseif ($prevSet -and $currSet -and $PreviousSsid -ne $CurrentSsid) {
+        Add-QueuedEvent -Type "ssid_changed" -Fields @{
+            ssid = $CurrentSsid
+            previousSsid = $PreviousSsid
+        }
+    }
+}
+
+function Update-VisitBoundaries {
+    param(
+        $SyncState,
+        [string]$PreviousSsid,
+        [string]$CurrentSsid,
+        $ServerConfig
+    )
+    $wasOffice = Test-IsOfficeSsid -Ssid $PreviousSsid -ServerConfig $ServerConfig
+    $isOffice = Test-IsOfficeSsid -Ssid $CurrentSsid -ServerConfig $ServerConfig
+    if ($wasOffice -and -not $isOffice) {
+        $SyncState = End-LocalVisit -SyncState $SyncState
+    }
+    if (-not $wasOffice -and $isOffice) {
+        $SyncState = Start-LocalVisit -SyncState $SyncState -Ssid $CurrentSsid
+    }
+    return $SyncState
+}
+
+function Test-ActivityTickDue {
+    param(
+        $SyncState,
+        [int]$IntervalMinutes
+    )
+    if (-not $SyncState.lastActivityTickAt) { return $true }
+    try {
+        $last = [DateTime]::Parse([string]$SyncState.lastActivityTickAt)
+        return ((Get-Date) - $last).TotalMinutes -ge $IntervalMinutes
+    } catch {
+        return $true
+    }
+}
+
+function Maybe-EnqueueDailySummary {
+    param(
+        $SyncState,
+        [string]$DayKey
+    )
+    $previousDayKey = if ($SyncState.dayKey) { [string]$SyncState.dayKey } else { $null }
+    if ($previousDayKey -and $previousDayKey -ne $DayKey) {
+        if ($SyncState.lastDailySummaryDayKey -ne $previousDayKey) {
+            Add-QueuedEvent -Type "daily_summary" -Fields @{
+                dayKey = $previousDayKey
+                officeMs = [int](if ($null -ne $SyncState.dayOfficeMs) { $SyncState.dayOfficeMs } else { 0 })
+                visitCount = [int](if ($null -ne $SyncState.dayVisitCount) { $SyncState.dayVisitCount } else { 0 })
+            }
+            $SyncState.lastDailySummaryDayKey = $previousDayKey
+        }
+        $SyncState.dayOfficeMs = 0
+        $SyncState.dayVisitCount = 0
+    }
+    $SyncState.dayKey = $DayKey
+    return $SyncState
 }
 
 function Fetch-ServerConfig([string]$ApiUrl, [string]$Token, [string]$SerialNumber) {
@@ -382,8 +509,7 @@ function Fetch-ServerConfig([string]$ApiUrl, [string]$Token, [string]$SerialNumb
     }
     $response = Invoke-RestMethod -Uri $uri -Method GET `
         -Headers $headers -TimeoutSec 30
-    $cachePath = Get-CachePath
-    $response | ConvertTo-Json -Compress | Set-Content -Path $cachePath -Encoding UTF8
+    $response | ConvertTo-Json -Compress | Set-Content -Path (Get-CachePath) -Encoding UTF8
     return $response
 }
 
@@ -411,6 +537,268 @@ function Get-ServerConfig([string]$ApiUrl, [string]$Token, [string]$SerialNumber
     return Fetch-ServerConfig -ApiUrl $ApiUrl -Token $Token -SerialNumber $SerialNumber
 }
 
+function Apply-SyncConfig {
+    param(
+        $Response,
+        [string]$ApiUrl
+    )
+    if (-not $Response) { return $null }
+    $config = $null
+    if ($Response.config) { $config = $Response.config }
+    if ($config) {
+        $config | ConvertTo-Json -Compress | Set-Content -Path (Get-CachePath) -Encoding UTF8
+    }
+    return $config
+}
+
+function Test-NeedsAgentUpdateFromResponse {
+    param($Response)
+    if (-not $Response) { return $false }
+    if ($Response.forceAgentUpdate) { return $true }
+    $serverVersion = $null
+    if ($Response.agentScriptVersion) { $serverVersion = [string]$Response.agentScriptVersion }
+    elseif ($Response.config -and $Response.config.agentScriptVersion) {
+        $serverVersion = [string]$Response.config.agentScriptVersion
+    }
+    if (-not $serverVersion) { return $false }
+    return (Compare-AgentVersion $serverVersion (Get-LocalAgentVersion)) -ne 0
+}
+
+function Get-SetupScriptPath {
+    $paths = @(
+        (Join-Path (Get-InstallDir) "setup.ps1"),
+        (Join-Path (Get-InstallDir) "update.ps1")
+    )
+    foreach ($path in $paths) {
+        if (Test-Path -LiteralPath $path) { return $path }
+    }
+    return $null
+}
+
+function Invoke-AgentSetupScript {
+    param(
+        [string]$SetupScript,
+        [string]$ApiUrl,
+        [string]$Token,
+        [switch]$Force
+    )
+    Unblock-File -LiteralPath $SetupScript -ErrorAction SilentlyContinue
+    if ($Force) {
+        Set-Content -Path (Join-Path (Get-InstallDir) "force-update.txt") `
+            -Value (Get-Date -Format "o") -Encoding UTF8
+    }
+
+    $runnerPath = Join-Path (Get-InstallDir) "run-update.vbs"
+    $vbsContent = @"
+CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$SetupScript"" -Silent", 0, True
+"@
+    Set-Content -Path $runnerPath -Value $vbsContent -Encoding ASCII
+    Unblock-File -LiteralPath $runnerPath -ErrorAction SilentlyContinue
+
+    $wscript = (Get-Command wscript.exe).Source
+    Start-Process -FilePath $wscript -ArgumentList @("//B", "//Nologo", "`"$runnerPath`"") `
+        -WindowStyle Hidden -Wait
+}
+
+function Invoke-AgentSelfUpdate([string]$ApiUrl, [string]$Token, [bool]$Force) {
+    $setupScript = Get-SetupScriptPath
+    if (-not $setupScript) {
+        Write-Log "WARN setup.ps1 missing; cannot auto-update"
+        return
+    }
+    try {
+        Write-Log "Auto-update: server requested newer agent"
+        Invoke-AgentSetupScript -SetupScript $setupScript -ApiUrl $ApiUrl -Token $Token -Force:$Force
+    } catch {
+        Write-Log "WARN auto-update failed: $($_.Exception.Message)"
+    }
+}
+
+function Test-ShouldRunHourlyUpdateCheck {
+    $path = Get-LastUpdateCheckPath
+    if (-not (Test-Path $path)) { return $true }
+    try {
+        $last = [DateTime]::Parse((Get-Content $path -Raw).Trim())
+        return ((Get-Date) - $last).TotalMinutes -ge $UpdateCheckIntervalMinutes
+    } catch {
+        return $true
+    }
+}
+
+function Set-LastUpdateCheckTime {
+    Set-Content -Path (Get-LastUpdateCheckPath) -Value (Get-Date -Format "o") -Encoding UTF8
+}
+
+function Invoke-HourlyUpdateCheck([string]$ApiUrl, [string]$Token) {
+    $setupScript = Get-SetupScriptPath
+    if (-not $setupScript) {
+        Write-Log "WARN setup.ps1 missing; cannot run hourly update check"
+        return
+    }
+    try {
+        Write-Log "Hourly update check"
+        Invoke-AgentSetupScript -SetupScript $setupScript -ApiUrl $ApiUrl -Token $Token
+    } catch {
+        Write-Log "WARN hourly update check failed: $($_.Exception.Message)"
+    }
+}
+
+function Remove-AckedEvents {
+    param(
+        [array]$Queue,
+        $AckedIds
+    )
+    if (-not $AckedIds) { return $Queue }
+    $acked = @{}
+    foreach ($id in $AckedIds) { $acked[[string]$id] = $true }
+    return @($Queue | Where-Object { -not $acked[[string]$_.id] })
+}
+
+function Invoke-AgentSync {
+    param(
+        [string]$ApiUrl,
+        [string]$Token,
+        [string]$SerialNumber,
+        [string]$ScriptVersion,
+        [array]$Events,
+        $OpenVisit
+    )
+
+    $body = @{
+        token = $Token
+        serialNumber = $SerialNumber
+        scriptVersion = $ScriptVersion
+        apiUrl = $ApiUrl
+        events = $Events
+    }
+    if ($OpenVisit) { $body.openVisit = $OpenVisit }
+
+    $json = $body | ConvertTo-Json -Depth 8 -Compress
+    $uri = "$ApiUrl/api/agent/sync"
+
+    try {
+        $response = Invoke-RestMethod -Uri $uri -Method POST `
+            -ContentType "application/json" -Body $json -TimeoutSec 45
+        return @{ ok = $true; response = $response; statusCode = 200 }
+    } catch {
+        $statusCode = $null
+        if ($_.Exception.Response) {
+            try { $statusCode = [int]$_.Exception.Response.StatusCode } catch {}
+        }
+        if ($statusCode -eq 404) {
+            return @{ ok = $false; notFound = $true; statusCode = 404; error = $_.Exception.Message }
+        }
+        throw
+    }
+}
+
+function Invoke-LegacyHeartbeat {
+    param(
+        [string]$ApiUrl,
+        [string]$Token,
+        [string]$SerialNumber,
+        [string]$Ssid,
+        [string]$ScriptVersion,
+        [string]$VpnGateway
+    )
+    $payload = @{
+        token = $Token
+        serialNumber = $SerialNumber
+        ssid = $Ssid
+        at = Get-NowIso
+        source = "wifi"
+        vpnGateway = $VpnGateway
+        scriptVersion = $ScriptVersion
+        apiUrl = $ApiUrl
+    } | ConvertTo-Json -Compress
+
+    $maxPostAttempts = 3
+    $postError = $null
+    for ($attempt = 1; $attempt -le $maxPostAttempts; $attempt++) {
+        try {
+            $response = Invoke-RestMethod -Uri "$ApiUrl/api/heartbeat" -Method POST `
+                -ContentType "application/json" -Body $payload -TimeoutSec 30
+            Write-Log "OK legacy heartbeat ssid=$Ssid inOffice=$($response.inOffice)"
+            return @{ ok = $true; response = $response }
+        } catch {
+            $postError = $_.Exception.Message
+            if ($attempt -lt $maxPostAttempts) {
+                Write-Log "WARN legacy POST attempt $attempt failed: $postError; retrying"
+                Start-Sleep -Seconds ([Math]::Min(15, 3 * $attempt))
+            }
+        }
+    }
+    Write-Log "ERROR legacy POST failed after $maxPostAttempts attempts: $postError"
+    return @{ ok = $false; error = $postError }
+}
+
+function Invoke-FlushSync {
+    param(
+        [string]$ApiUrl,
+        [string]$Token,
+        [string]$SerialNumber,
+        [string]$ScriptVersion,
+        $SyncState,
+        [bool]$AllowHealthPing,
+        [string]$FallbackSsid,
+        [string]$VpnGateway
+    )
+
+    $queue = @(Get-EventQueue)
+    $eventsToSend = @()
+    foreach ($evt in $queue) { $eventsToSend += $evt }
+
+    if ($eventsToSend.Count -eq 0 -and $AllowHealthPing) {
+        $eventsToSend += @{
+            id = New-EventId
+            type = "health_ping"
+            at = Get-NowIso
+        }
+    }
+
+    if ($eventsToSend.Count -eq 0) {
+        return @{ synced = $false; syncState = $SyncState }
+    }
+
+    $openVisit = Get-OpenVisitFromState $SyncState
+    $syncResult = Invoke-AgentSync -ApiUrl $ApiUrl -Token $Token -SerialNumber $SerialNumber `
+        -ScriptVersion $ScriptVersion -Events $eventsToSend -OpenVisit $openVisit
+
+    if ($syncResult.notFound) {
+        Write-Log "WARN sync 404; falling back to legacy heartbeat"
+        $legacy = Invoke-LegacyHeartbeat -ApiUrl $ApiUrl -Token $Token -SerialNumber $SerialNumber `
+            -Ssid $FallbackSsid -ScriptVersion $ScriptVersion -VpnGateway $VpnGateway
+        if ($legacy.ok) {
+            $remaining = Remove-AckedEvents -Queue (Get-EventQueue) -AckedIds ($eventsToSend | ForEach-Object { $_.id })
+            Set-EventQueue $remaining
+            $SyncState.lastSyncAt = Get-NowIso
+            return @{ synced = $true; syncState = $SyncState; legacy = $true }
+        }
+        return @{ synced = $false; syncState = $SyncState; error = $legacy.error }
+    }
+
+    if (-not $syncResult.ok) {
+        return @{ synced = $false; syncState = $SyncState; error = $syncResult.error }
+    }
+
+    $response = $syncResult.response
+    $remaining = Remove-AckedEvents -Queue $queue -AckedIds $response.ackedEventIds
+    Set-EventQueue $remaining
+    $SyncState.lastSyncAt = Get-NowIso
+
+    $serverConfig = Apply-SyncConfig -Response $response -ApiUrl $ApiUrl
+    if (Test-NeedsAgentUpdateFromResponse -Response $response) {
+        $force = [bool]$response.forceAgentUpdate
+        if ($response.config -and $response.config.forceAgentUpdate) { $force = $true }
+        Invoke-AgentSelfUpdate -ApiUrl $ApiUrl -Token $Token -Force $force
+        Set-LastUpdateCheckTime
+    }
+
+    $eventTypes = ($eventsToSend | ForEach-Object { $_.type }) -join ","
+    Write-Log "OK sync events=$eventTypes acked=$($response.ackedEventIds.Count) remaining=$($remaining.Count)"
+    return @{ synced = $true; syncState = $SyncState; response = $response; serverConfig = $serverConfig }
+}
+
 $configPath = Get-ConfigPath
 if (-not (Test-Path $configPath)) {
     Write-Log "ERROR: Config not found. Run install.ps1 first."
@@ -430,19 +818,6 @@ $localConfig = Get-Content $configPath -Raw | ConvertFrom-Json
 $apiUrl = $localConfig.apiUrl.TrimEnd("/")
 $token = $localConfig.token
 
-$cachedServerConfig = $null
-$cachePath = Get-CachePath
-if (Test-Path $cachePath) {
-    try {
-        $cachedServerConfig = Get-Content $cachePath -Raw | ConvertFrom-Json
-    } catch {}
-}
-$cachedHeartbeatInterval = Get-HeartbeatIntervalMinutes $cachedServerConfig
-if (-not $DryRun -and -not (Test-HeartbeatDue $cachedHeartbeatInterval)) {
-    Write-Log "SKIP heartbeat interval ${cachedHeartbeatInterval}m has not elapsed"
-    exit 0
-}
-
 $serialNumber = Get-LaptopSerial
 if (-not $serialNumber -and $localConfig.serialNumber) {
     $serialNumber = $localConfig.serialNumber
@@ -451,17 +826,22 @@ if (-not $serialNumber -and $localConfig.serialNumber) {
 $networkWaitSec = if ($isResumeRun) { 90 } else { 60 }
 Wait-NetworkReady -ApiUrl $apiUrl -MaxWaitSec $networkWaitSec | Out-Null
 
-$hourlyUpdateCheck = Test-ShouldRunHourlyUpdateCheck
+$cachedServerConfig = $null
+$cachePath = Get-CachePath
+if (Test-Path $cachePath) {
+    try { $cachedServerConfig = Get-Content $cachePath -Raw | ConvertFrom-Json } catch {}
+}
 
 try {
-    $serverConfig = Get-ServerConfig -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber -Force
+    $serverConfig = Get-ServerConfig -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber
 } catch {
     Write-Log "ERROR: Cannot fetch server config"
     if ($DryRun) { Write-Host "ERROR: Cannot fetch server config: $($_.Exception.Message)"; exit 1 }
     exit 1
 }
 
-if (Test-NeedsAgentUpdate $serverConfig) {
+$hourlyUpdateCheck = Test-ShouldRunHourlyUpdateCheck
+if (Test-NeedsAgentUpdateFromResponse -Response @{ agentScriptVersion = $serverConfig.agentScriptVersion; forceAgentUpdate = $serverConfig.forceAgentUpdate }) {
     Invoke-AgentSelfUpdate -ApiUrl $apiUrl -Token $token -Force ([bool]$serverConfig.forceAgentUpdate)
     Set-LastUpdateCheckTime
 } elseif ($hourlyUpdateCheck) {
@@ -472,72 +852,82 @@ if (Test-NeedsAgentUpdate $serverConfig) {
 Set-RunCounter ((Get-RunCounter) + 1)
 
 $heartbeatInterval = Get-HeartbeatIntervalMinutes $serverConfig
-if (-not $DryRun -and -not (Test-HeartbeatDue $heartbeatInterval)) {
-    Write-Log "SKIP server heartbeat interval ${heartbeatInterval}m has not elapsed"
-    exit 0
-}
+$timezone = Get-AgentTimezone $serverConfig
+$dayKey = Get-DayKey $timezone
+$scriptVersion = Get-LocalAgentVersion
 
 $ssidResult = Get-CurrentWifiSsidWithRetry
 $ssid = $ssidResult.Ssid
 $ssidMethod = $ssidResult.Method
 $vpnGateway = Get-VpnGatewayDiagnostic
-$recordedAt = (Get-Date).ToUniversalTime().ToString("o")
-$scriptVersion = Get-LocalAgentVersion
 
-$payload = @{
-    token          = $token
-    serialNumber   = $serialNumber
-    ssid           = $ssid
-    at             = $recordedAt
-    source         = "wifi"
-    vpnGateway     = $vpnGateway
-    scriptVersion  = $scriptVersion
-    apiUrl         = $apiUrl
-} | ConvertTo-Json -Compress
+$presence = Get-PresenceState
+$previousSsid = $presence.ssid
+$syncState = Get-SyncState
+$syncState = Maybe-EnqueueDailySummary -SyncState $syncState -DayKey $dayKey
+
+$ssidChanged = ($previousSsid -ne $ssid)
+$pendingEvents = @()
+
+if ($ssidChanged) {
+    $alreadyQueued = $syncState.pendingSsid -and [string]$syncState.pendingSsid -eq $ssid
+    if (-not $alreadyQueued) {
+        $fromSsid = if ($syncState.pendingPreviousSsid) { [string]$syncState.pendingPreviousSsid } else { $previousSsid }
+        Add-WifiChangeEvents -PreviousSsid $fromSsid -CurrentSsid $ssid
+        $syncState = Update-VisitBoundaries -SyncState $syncState -PreviousSsid $fromSsid `
+            -CurrentSsid $ssid -ServerConfig $serverConfig
+        $syncState.pendingSsid = $ssid
+        $syncState.pendingPreviousSsid = $fromSsid
+    }
+    $pendingEvents = @(Get-EventQueue)
+}
+
+$activityDue = Test-ActivityTickDue -SyncState $syncState -IntervalMinutes $heartbeatInterval
+if ($activityDue) {
+    Add-QueuedEvent -Type "activity_tick" -Fields @{ ssid = $ssid }
+    $syncState.lastActivityTickAt = Get-NowIso
+    $pendingEvents = @(Get-EventQueue)
+}
 
 if ($DryRun) {
-    Write-Host "=== Heartbeat dry run ==="
-    Write-Host "Local config:  $configPath (apiUrl + token only)"
+    Write-Host "=== Heartbeat dry run (event mode) ==="
+    Write-Host "Local config:  $configPath"
     Write-Host "API URL:       $apiUrl"
     Write-Host "Laptop serial: $(if ($serialNumber) { $serialNumber } else { '(unable to read)' })"
     Write-Host "SSID detected: $(if ($ssid) { $ssid } else { '(none)' }) via $ssidMethod"
-    if (-not $ssid -and $ssidMethod -eq "none") {
-        Write-Host ""
-        Write-Host "WLAN SSID unavailable (Identifying... or Wi-Fi still connecting)."
-        Write-Host "Agent prefers netsh WLAN SSID, then Get-NetConnectionProfile."
-        Write-Host "Use dashboard Check in if SSID is still missing."
-    }
+    Write-Host "Previous SSID: $(if ($previousSsid) { $previousSsid } else { '(none)' })"
+    Write-Host "SSID changed:  $ssidChanged"
     Write-Host "VPN (diag):    $(if ($vpnGateway) { $vpnGateway } else { '(not connected)' })"
     Write-Host ""
-    Write-Host "Server config (from $apiUrl/api/agent/config):"
+    Write-Host "Server config:"
     Write-Host "  SSIDs:       $($serverConfig.ssids -join ', ')"
     Write-Host "  Hours target: $($serverConfig.hoursTarget)"
-    Write-Host "  Timezone:    $($serverConfig.timezone)"
-    Write-Host "  API version: $($serverConfig.apiVersion)"
+    Write-Host "  Timezone:    $timezone"
     Write-Host "  Heartbeat interval: ${heartbeatInterval}m"
     Write-Host "  Agent version (server): $($serverConfig.agentScriptVersion)"
-    Write-Host "  Agent version (local):  $(Get-LocalAgentVersion)"
+    Write-Host "  Agent version (local):  $scriptVersion"
     Write-Host ""
-    Write-Host "Would POST heartbeat (server decides inOffice): $payload"
+    Write-Host "Queued events: $(Get-EventQueue | ConvertTo-Json -Compress)"
+    Write-Host "Open visit:    $(if ($syncState.openVisit) { ($syncState.openVisit | ConvertTo-Json -Compress) } else { '(none)' })"
     exit 0
 }
 
-$maxPostAttempts = 3
-$postError = $null
-for ($attempt = 1; $attempt -le $maxPostAttempts; $attempt++) {
-    try {
-        $response = Invoke-RestMethod -Uri "$apiUrl/api/heartbeat" -Method POST `
-            -ContentType "application/json" -Body $payload -TimeoutSec 30
-        Set-LastSuccessfulHeartbeatTime
-        Write-Log "OK ssid=$ssid method=$ssidMethod serial=$serialNumber inOffice=$($response.inOffice)"
-        exit 0
-    } catch {
-        $postError = $_.Exception.Message
-        if ($attempt -lt $maxPostAttempts) {
-            Write-Log "WARN POST attempt $attempt failed: $postError; retrying"
-            Start-Sleep -Seconds ([Math]::Min(15, 3 * $attempt))
-        }
+$shouldSync = $ssidChanged -or $activityDue -or (@(Get-EventQueue).Count -gt 0)
+if ($shouldSync) {
+    $flush = Invoke-FlushSync -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber `
+        -ScriptVersion $scriptVersion -SyncState $syncState -AllowHealthPing:(-not $ssidChanged) `
+        -FallbackSsid $ssid -VpnGateway $vpnGateway
+    $syncState = $flush.syncState
+    if (-not $flush.synced) {
+        if ($flush.error) { Write-Log "ERROR sync failed: $($flush.error)"; exit 1 }
+    } elseif ($ssidChanged) {
+        Set-PresenceState -Ssid $ssid
+        $syncState.pendingSsid = $null
+        $syncState.pendingPreviousSsid = $null
     }
+} else {
+    Write-Log "SKIP no events to sync"
 }
-Write-Log "ERROR POST failed after $maxPostAttempts attempts: $postError"
-exit 1
+
+Set-SyncState $syncState
+exit 0

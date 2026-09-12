@@ -77,6 +77,10 @@ model User {
   reviewedManualVisitRequests ManualVisitRequest[] @relation("ManualVisitRequestReviewer")
   agentLifecycleEvents AgentLifecycleEvent[]
   alertDispatches      AlertDispatch[]
+  dailySummaries       DailySummary[]
+  presenceTransitions  PresenceTransition[]
+  activityTicks        ActivityTick[]
+  agentEvents          AgentEvent[]
 }
 
 model AlertDispatch {
@@ -406,6 +410,7 @@ model AppConfig {
   heartbeatIntervalMinutes Int   @default(5)
   agentStaleMinutes     Int      @default(15)
   agentStaleGraceHours  Int      @default(24)
+  agentMode             String   @default("events")
   complianceExemptionRequiresApproval Boolean @default(true)
   pilotStartMonthKey    String   @default("2026-09")
   fiscalYearStartMonth  Int      @default(4)
@@ -429,6 +434,70 @@ model CronJobRun {
   @@index([status, startedAt])
 }
 
+model DailySummary {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dayKey         String
+  officeMs       Int
+  laptopActiveMs Int      @default(0)
+  visitCount     Int      @default(0)
+  firstCheckInAt DateTime?
+  lastCheckOutAt DateTime?
+  source         String   @default("agent")
+  verified       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, dayKey])
+  @@index([dayKey])
+}
+
+model PresenceTransition {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId     String?
+  type         String
+  at           DateTime
+  dayKey       String
+  ssid         String?
+  previousSsid String?
+  inOffice     Boolean
+  createdAt    DateTime @default(now())
+
+  @@index([userId, at])
+  @@index([userId, dayKey])
+}
+
+model ActivityTick {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId  String?
+  at        DateTime
+  ssid      String?
+  inOffice  Boolean
+  createdAt DateTime @default(now())
+
+  @@index([userId, at])
+}
+
+model AgentEvent {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId      String?
+  clientEventId String
+  type          String
+  payload       Json
+  status        String   @default("accepted")
+  createdAt     DateTime @default(now())
+
+  @@unique([userId, clientEventId])
+  @@index([userId, createdAt])
+}
+
 model Heartbeat {
   id         String   @id @default(cuid())
   userId     String
@@ -444,18 +513,21 @@ model Heartbeat {
 }
 
 model Visit {
-  id        String    @id @default(cuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  startAt   DateTime
-  endAt     DateTime?
-  source    String    @default("wifi")
-  ssid      String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startAt       DateTime
+  endAt         DateTime?
+  source        String    @default("wifi")
+  ssid          String?
+  localVisitId  String?
+  deviceId      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   correctionRequests VisitCorrectionRequest[]
 
   @@index([userId, startAt])
+  @@index([userId, localVisitId])
 }
 
 model VisitCorrectionRequest {

@@ -88,6 +88,7 @@ export type AppConfigData = {
   heartbeatIntervalMinutes: number;
   agentStaleMinutes: number;
   agentStaleGraceHours: number;
+  agentMode: string;
   complianceExemptionRequiresApproval: boolean;
   pilotStartMonthKey: string;
   fiscalYearStartMonth: number;
@@ -215,6 +216,7 @@ function parseConfig(config: {
   heartbeatIntervalMinutes?: number;
   agentStaleMinutes?: number;
   agentStaleGraceHours?: number;
+  agentMode?: string;
   complianceExemptionRequiresApproval?: boolean;
   pilotStartMonthKey?: string;
   fiscalYearStartMonth?: number;
@@ -244,6 +246,7 @@ function parseConfig(config: {
       config.heartbeatIntervalMinutes ?? resolveDefaultHeartbeatIntervalMinutes(),
     agentStaleMinutes: config.agentStaleMinutes ?? DEFAULT_AGENT_STALE_MINUTES,
     agentStaleGraceHours: config.agentStaleGraceHours ?? DEFAULT_AGENT_STALE_GRACE_HOURS,
+    agentMode: config.agentMode ?? "events",
     complianceExemptionRequiresApproval: config.complianceExemptionRequiresApproval ?? true,
     pilotStartMonthKey: resolvePilotStartMonthKey(config.pilotStartMonthKey),
     fiscalYearStartMonth: fiscalYear.startMonth,

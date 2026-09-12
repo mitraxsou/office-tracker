@@ -42,5 +42,6 @@ export async function GET(request: Request) {
     agentScriptFilesBase: appUrl ? agentScriptFilesBaseUrl(appUrl) : null,
     vercelProtectionBypass: vercelProtectionBypassSecret(),
     forceAgentUpdate,
+    agentMode: globalConfig.agentMode,
   });
 }

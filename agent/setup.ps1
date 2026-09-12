@@ -1,0 +1,473 @@
+# My Office Pulse unified setup. Fresh install OR update without zip.
+#
+# If config.json is missing: download scripts from /api/agent/files/* and register tasks.
+# If config exists: version check and refresh scripts from the server.
+#
+# Usage:
+#   .\setup.ps1 -ApiUrl "https://your-app.vercel.app" -Token "your-agent-token"
+#   .\setup.ps1 -Silent
+#   .\setup.ps1 -Force
+
+param(
+    [string]$ApiUrl,
+    [string]$Token,
+    [switch]$Silent,
+    [switch]$Verbose,
+    [switch]$Force,
+    [switch]$RequireAdmin
+)
+
+$ErrorActionPreference = "Stop"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+$TaskName = "PwCOfficePulse"
+$UpdateTaskName = "PwCOfficePulseUpdate"
+$TaskDescription = "My Office Pulse - office hours tracker"
+$UpdateTaskDescription = "My Office Pulse - hourly agent update check"
+$LegacyTaskNames = @("OfficeTrackerHeartbeat", "PwCOfficePulse")
+
+function Get-InstallDir {
+    Join-Path $env:LOCALAPPDATA "OfficeTracker"
+}
+
+function Get-ConfigPath {
+    Join-Path (Get-InstallDir) "config.json"
+}
+
+function Get-LockPath {
+    Join-Path (Get-InstallDir) ".setup.lock"
+}
+
+function Get-ForceUpdateMarkerPath {
+    Join-Path (Get-InstallDir) "force-update.txt"
+}
+
+function Import-AgentDownloadModule {
+    $candidates = @(
+        (Join-Path $PSScriptRoot "lib\agent-download.ps1"),
+        (Join-Path $PSScriptRoot "agent-download.ps1"),
+        (Join-Path (Get-InstallDir) "lib\agent-download.ps1")
+    )
+    foreach ($path in $candidates) {
+        if (Test-Path -LiteralPath $path) {
+            . $path
+            return
+        }
+    }
+    throw "agent-download.ps1 module not found"
+}
+
+function Write-SetupLog([string]$Message) {
+    $logDir = Join-Path (Get-InstallDir) "logs"
+    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
+    $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message"
+    Add-Content -Path (Join-Path $logDir "setup.log") -Value $line -ErrorAction SilentlyContinue
+    if ($Verbose -and -not $Silent) { Write-Host $Message }
+}
+
+function Test-IsAdmin {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Test-ExistingInstall {
+    $installDir = Get-InstallDir
+    $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    return (Test-Path $installDir) -and ($null -ne $task)
+}
+
+function Get-LaptopSerial {
+    try {
+        $serial = (Get-CimInstance Win32_Bios -ErrorAction Stop).SerialNumber
+        if ($serial) { return $serial.Trim() }
+    } catch {}
+    try {
+        $serial = (Get-WmiObject Win32_Bios -ErrorAction Stop).SerialNumber
+        if ($serial) { return $serial.Trim() }
+    } catch {}
+    return $null
+}
+
+function Invoke-BlockedAgentScript {
+    param(
+        [string]$ScriptPath,
+        [hashtable]$BoundVars = @{}
+    )
+    $txtPath = Publish-AgentScriptTxt -Ps1Path $ScriptPath
+    $assignments = ($BoundVars.GetEnumerator() | ForEach-Object {
+        $val = [string]$_.Value
+        $val = $val -replace "'", "''"
+        "`$$($_.Key) = '$val'"
+    }) -join "; "
+    $prefix = if ($assignments) { "$assignments; " } else { "" }
+    $command = "${prefix}`$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s"
+    powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden `
+        -Command "& { $command }" | Out-Null
+}
+
+function New-HiddenRunner {
+    param(
+        [string]$ScriptPath,
+        [string]$Dir
+    )
+    $txtPath = Publish-AgentScriptTxt -Ps1Path $ScriptPath
+    $vbsPath = Join-Path $Dir "run-heartbeat.vbs"
+    $vbsContent = @"
+CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""& { `$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s }""", 0, False
+"@
+    Set-Content -Path $vbsPath -Value $vbsContent -Encoding ASCII
+    return $vbsPath
+}
+
+function New-HeartbeatTaskTriggers {
+    $repeatTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
+        -RepetitionInterval (New-TimeSpan -Minutes 2) `
+        -RepetitionDuration (New-TimeSpan -Days 3650)
+    $logonTrigger = New-ScheduledTaskTrigger -AtLogOn
+
+    $unlockTrigger = $null
+    $resumeTrigger = $null
+    try {
+        $unlockTrigger = New-CimInstance -Namespace "Root\Microsoft\Windows\TaskScheduler" `
+            -ClassName "MSFT_TaskSessionStateChangeTrigger" -ClientOnly
+        $unlockTrigger.Enabled = $true
+        $unlockTrigger.StateChange = 7
+        $unlockTrigger.Delay = "PT30S"
+    } catch {}
+
+    try {
+        $resumeTrigger = New-CimInstance -Namespace "Root\Microsoft\Windows\TaskScheduler" `
+            -ClassName "MSFT_TaskEventTrigger" -ClientOnly
+        $resumeTrigger.Enabled = $true
+        $resumeTrigger.Subscription = @"
+<QueryList>
+  <Query Id="0" Path="System">
+    <Select Path="System">*[System[Provider[@Name='Microsoft-Windows-Kernel-Power'] and EventID=107]]</Select>
+  </Query>
+</QueryList>
+"@
+        $resumeTrigger.ValueQueries = ""
+        $resumeTrigger.Delay = "PT45S"
+    } catch {}
+
+    $triggers = @($repeatTrigger, $logonTrigger)
+    if ($unlockTrigger) { $triggers += $unlockTrigger }
+    if ($resumeTrigger) { $triggers += $resumeTrigger }
+    return $triggers
+}
+
+function Register-HiddenTask {
+    param(
+        [string]$VbsPath,
+        [string]$InstallDir
+    )
+    foreach ($legacy in $LegacyTaskNames) {
+        Unregister-ScheduledTask -TaskName $legacy -Confirm:$false -ErrorAction SilentlyContinue
+    }
+
+    $wscript = (Get-Command wscript.exe).Source
+    $actionArgs = "//B //Nologo `"$VbsPath`""
+
+    $action = New-ScheduledTaskAction -Execute $wscript -Argument $actionArgs
+    $triggers = New-HeartbeatTaskTriggers
+    $repeatTrigger = $triggers[0]
+    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
+        -LogonType Interactive -RunLevel Limited
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+        -StartWhenAvailable -MultipleInstances Queue
+
+    try {
+        Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $triggers `
+            -Principal $principal -Settings $settings -Description $TaskDescription -Force | Out-Null
+    } catch {
+        Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $repeatTrigger `
+            -Principal $principal -Settings $settings -Description $TaskDescription -Force | Out-Null
+    }
+
+    $startupDir = [Environment]::GetFolderPath("Startup")
+    foreach ($legacy in @("OfficeTrackerHeartbeat.lnk", "PwC Office Pulse.lnk", "My Office Pulse.lnk")) {
+        $legacyPath = Join-Path $startupDir $legacy
+        if (Test-Path $legacyPath) { Remove-Item $legacyPath -Force }
+    }
+
+    $shortcutPath = Join-Path $startupDir "My Office Pulse.lnk"
+    $wsh = New-Object -ComObject WScript.Shell
+    $shortcut = $wsh.CreateShortcut($shortcutPath)
+    $shortcut.TargetPath = $wscript
+    $shortcut.Arguments = $actionArgs
+    $shortcut.WorkingDirectory = $InstallDir
+    $shortcut.WindowStyle = 7
+    $shortcut.Description = $TaskDescription
+    $shortcut.Save()
+}
+
+function New-UpdateHiddenRunner {
+    param(
+        [string]$ScriptPath,
+        [string]$Dir
+    )
+    Remove-MarkOfWeb -Path $ScriptPath
+    $vbsPath = Join-Path $Dir "run-update.vbs"
+    $vbsContent = @"
+CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$ScriptPath"" -Silent", 0, True
+"@
+    Set-Content -Path $vbsPath -Value $vbsContent -Encoding ASCII
+    Remove-MarkOfWeb -Path $vbsPath
+    return $vbsPath
+}
+
+function Register-HourlyUpdateTask {
+    param([string]$InstallDir)
+
+    $setupScript = Join-Path $InstallDir "setup.ps1"
+    if (-not (Test-Path $setupScript)) { return }
+
+    $vbsPath = New-UpdateHiddenRunner -ScriptPath $setupScript -Dir $InstallDir
+    $wscript = (Get-Command wscript.exe).Source
+    $actionArgs = "//B //Nologo `"$vbsPath`""
+    $action = New-ScheduledTaskAction -Execute $wscript -Argument $actionArgs
+    $hourlyTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
+        -RepetitionInterval (New-TimeSpan -Hours 1) `
+        -RepetitionDuration (New-TimeSpan -Days 3650)
+    $logonTrigger = New-ScheduledTaskTrigger -AtLogOn
+    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
+        -LogonType Interactive -RunLevel Limited
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+        -StartWhenAvailable -MultipleInstances IgnoreNew
+
+    try {
+        Register-ScheduledTask -TaskName $UpdateTaskName -Action $action `
+            -Trigger @($hourlyTrigger, $logonTrigger) -Principal $principal -Settings $settings `
+            -Description $UpdateTaskDescription -Force | Out-Null
+    } catch {
+        Register-ScheduledTask -TaskName $UpdateTaskName -Action $action `
+            -Trigger $hourlyTrigger -Principal $principal -Settings $settings `
+            -Description $UpdateTaskDescription -Force | Out-Null
+    }
+}
+
+function Install-AgentScripts {
+    param(
+        [string]$SourceDir,
+        [string]$TargetDir
+    )
+    foreach ($file in $script:AgentDownloadFiles) {
+        if ($file -eq "agent-download.ps1") {
+            $src = Join-Path $SourceDir "lib\agent-download.ps1"
+            if (-not (Test-Path $src)) {
+                $src = Join-Path $SourceDir "agent-download.ps1"
+            }
+            if (Test-Path $src) {
+                $libDir = Join-Path $TargetDir "lib"
+                New-Item -ItemType Directory -Path $libDir -Force | Out-Null
+                $destination = Join-Path $libDir "agent-download.ps1"
+                Remove-MarkOfWeb -Path $src
+                Copy-Item $src $destination -Force
+                Remove-MarkOfWeb -Path $destination
+            }
+            continue
+        }
+        $src = Join-Path $SourceDir $file
+        if (Test-Path $src) {
+            Remove-MarkOfWeb -Path $src
+            $destination = Join-Path $TargetDir $file
+            Copy-Item $src $destination -Force
+            Remove-MarkOfWeb -Path $destination
+        }
+    }
+}
+
+function Publish-InstalledAgentScripts {
+    param([string]$InstallDir)
+    foreach ($name in @("office-heartbeat.ps1", "setup.ps1", "update.ps1")) {
+        $path = Join-Path $InstallDir $name
+        if (Test-Path $path) {
+            Publish-AgentScriptTxt -Ps1Path $path | Out-Null
+        }
+    }
+}
+
+function Write-AgentConfig {
+    param(
+        [string]$InstallDir,
+        [string]$ApiUrlValue,
+        [string]$TokenValue
+    )
+    $serial = Get-LaptopSerial
+    $config = @{
+        apiUrl = $ApiUrlValue.TrimEnd("/")
+        token  = $TokenValue
+    }
+    if ($serial) { $config.serialNumber = $serial }
+    ($config | ConvertTo-Json) | Set-Content -Path (Join-Path $InstallDir "config.json") -Encoding UTF8
+}
+
+function Install-AdminLevel {
+    param(
+        [string]$ApiUrlValue,
+        [string]$TokenValue
+    )
+    if (-not (Test-IsAdmin)) {
+        Write-Host "Re-launching with admin (UAC prompt)..." -ForegroundColor Yellow
+        $args = @(
+            "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $PSCommandPath,
+            "-ApiUrl", $ApiUrlValue, "-Token", $TokenValue, "-RequireAdmin"
+        )
+        Start-Process powershell.exe -Verb RunAs -ArgumentList $args
+        exit 0
+    }
+
+    $installDir = "C:\Program Files\OfficeTracker"
+    if (-not (Test-Path $installDir)) {
+        New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+    }
+
+    $localConfigDir = Get-InstallDir
+    if (-not (Test-Path $localConfigDir)) { New-Item -ItemType Directory -Path $localConfigDir -Force | Out-Null }
+
+    Install-AgentScripts -SourceDir $PSScriptRoot -TargetDir $installDir
+    Install-AgentScripts -SourceDir $PSScriptRoot -TargetDir $localConfigDir
+    Write-AgentConfig -InstallDir $localConfigDir -ApiUrlValue $ApiUrlValue -TokenValue $TokenValue
+
+    $heartbeatScript = Join-Path $installDir "office-heartbeat.ps1"
+    $vbsPath = New-HiddenRunner -ScriptPath $heartbeatScript -Dir $localConfigDir
+    Register-HiddenTask -VbsPath $vbsPath -InstallDir $localConfigDir
+    Register-HourlyUpdateTask -InstallDir $localConfigDir
+
+    Write-Host ""
+    Write-Host "My Office Pulse installed (admin / Program Files)" -ForegroundColor Green
+    Write-Host "Scripts:  $installDir"
+    Write-Host "Config:   $(Join-Path $localConfigDir 'config.json')"
+}
+
+function Complete-Install {
+    param(
+        [string]$InstallDir,
+        [bool]$IsReinstall,
+        [bool]$ScriptsUpdated
+    )
+    $heartbeatScript = Join-Path $InstallDir "office-heartbeat.ps1"
+    Publish-InstalledAgentScripts -InstallDir $InstallDir
+    $vbsPath = New-HiddenRunner -ScriptPath $heartbeatScript -Dir $InstallDir
+    Register-HiddenTask -VbsPath $vbsPath -InstallDir $InstallDir
+    Register-HourlyUpdateTask -InstallDir $InstallDir
+
+    if ($ScriptsUpdated) {
+        try {
+            Invoke-BlockedAgentScript -ScriptPath $heartbeatScript
+        } catch {
+            Write-SetupLog "WARN first heartbeat after setup failed: $($_.Exception.Message)"
+        }
+    }
+
+    if ($Silent) { return }
+
+    if ($IsReinstall) {
+        Write-Host "My Office Pulse refreshed (existing install updated)." -ForegroundColor Green
+        return
+    }
+
+    Write-Host ""
+    Write-Host "My Office Pulse installed (user-level)" -ForegroundColor Green
+    Write-Host "Install dir:     $InstallDir"
+    Write-Host "Scheduled task:  $TaskName (hidden, every 2 min)"
+    Write-Host "Startup shortcut: My Office Pulse.lnk"
+    Write-Host "Config:          $(Join-Path $InstallDir 'config.json')"
+    Write-Host ""
+    Write-Host "The agent auto-updates silently when new versions are published."
+    Write-Host "Re-running this setup command is safe anytime."
+}
+
+Import-AgentDownloadModule
+
+$installDir = Get-InstallDir
+if (-not (Test-Path $installDir)) {
+    New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+}
+
+$forceMarkerPath = Get-ForceUpdateMarkerPath
+if (Test-Path -LiteralPath $forceMarkerPath) {
+    $Force = $true
+    Remove-Item -LiteralPath $forceMarkerPath -Force -ErrorAction SilentlyContinue
+}
+
+$configPath = Get-ConfigPath
+$isFreshInstall = -not (Test-Path $configPath)
+
+if ($isFreshInstall) {
+    if (-not $ApiUrl -or -not $Token) {
+        Write-SetupLog "ERROR fresh install requires ApiUrl and Token"
+        if (-not $Silent) {
+            Write-Host "ERROR: ApiUrl and Token are required for a fresh install." -ForegroundColor Red
+        }
+        exit 1
+    }
+} else {
+    $localConfig = Get-Content $configPath -Raw | ConvertFrom-Json
+    if (-not $ApiUrl) { $ApiUrl = [string]$localConfig.apiUrl.TrimEnd("/") }
+    if (-not $Token) { $Token = [string]$localConfig.token }
+}
+
+if ($RequireAdmin) {
+    Install-AdminLevel -ApiUrlValue $ApiUrl -TokenValue $Token
+    exit 0
+}
+
+$lockPath = Get-LockPath
+if (Test-Path $lockPath) {
+    $lockAge = (Get-Date) - (Get-Item $lockPath).LastWriteTime
+    if ($lockAge.TotalMinutes -lt 10) {
+        Write-SetupLog "SKIP setup already in progress"
+        exit 0
+    }
+    Remove-Item $lockPath -Force -ErrorAction SilentlyContinue
+}
+
+Set-Content -Path $lockPath -Value (Get-Date -Format "o") -Encoding UTF8
+
+$tempDir = $null
+try {
+    $downloadCfg = Get-AgentDownloadConfig -ApiUrl $ApiUrl -Token $Token
+    $tempDir = Join-Path $env:TEMP "PwCOfficePulse-setup-$([Guid]::NewGuid().ToString('N'))"
+    Download-AgentScriptsFromApp -FilesBase $downloadCfg.FilesBase -Token $Token `
+        -BypassSecret $downloadCfg.BypassSecret -DestDir $tempDir `
+        -Log { param($m) Write-SetupLog $m }
+
+    $newVersion = "0.0.0"
+    $versionFile = Join-Path $tempDir "version.txt"
+    if (Test-Path $versionFile) {
+        $newVersion = (Get-Content $versionFile -Raw).Trim()
+    }
+
+    $localVersion = Get-LocalAgentVersion
+    $isReinstall = Test-ExistingInstall
+    $shouldInstallScripts = $isFreshInstall -or $Force -or (Compare-AgentVersion $newVersion $localVersion) -ne 0
+
+    if ($shouldInstallScripts) {
+        $reason = if ($isFreshInstall) { "fresh install" } elseif ($Force) { "force" } else { "version $localVersion -> $newVersion" }
+        Write-SetupLog "Installing scripts ($reason)"
+        Install-AgentScripts -SourceDir $tempDir -TargetDir $installDir
+    } else {
+        Write-SetupLog "SKIP already at v$localVersion (server v$newVersion)"
+    }
+
+    if ($isFreshInstall) {
+        Write-AgentConfig -InstallDir $installDir -ApiUrlValue $ApiUrl -TokenValue $Token
+    }
+
+    Complete-Install -InstallDir $installDir -IsReinstall $isReinstall -ScriptsUpdated $shouldInstallScripts
+
+    if ($shouldInstallScripts -and -not $Silent -and -not $isFreshInstall) {
+        Write-Host "My Office Pulse updated to v$newVersion." -ForegroundColor Green
+    }
+} catch {
+    Write-SetupLog "ERROR $($_.Exception.Message)"
+    if (-not $Silent) { Write-Host "Setup failed: $($_.Exception.Message)" -ForegroundColor Red }
+    exit 1
+} finally {
+    Remove-Item $lockPath -Force -ErrorAction SilentlyContinue
+    if ($tempDir -and (Test-Path $tempDir)) {
+        Remove-Item $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}

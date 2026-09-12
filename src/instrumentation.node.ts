@@ -566,6 +566,96 @@ export async function registerNode() {
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "UserNotificationPrefs" ALTER COLUMN "alertIfAgentStale" SET DEFAULT false;'
     );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "agentMode" TEXT NOT NULL DEFAULT \'events\';'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "Visit" ADD COLUMN IF NOT EXISTS "localVisitId" TEXT;'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "Visit" ADD COLUMN IF NOT EXISTS "deviceId" TEXT;'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "Visit_userId_localVisitId_idx" ON "Visit"("userId", "localVisitId");'
+    );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "DailySummary" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "dayKey" TEXT NOT NULL,
+        "officeMs" INTEGER NOT NULL,
+        "laptopActiveMs" INTEGER NOT NULL DEFAULT 0,
+        "visitCount" INTEGER NOT NULL DEFAULT 0,
+        "firstCheckInAt" TIMESTAMP(3),
+        "lastCheckOutAt" TIMESTAMP(3),
+        "source" TEXT NOT NULL DEFAULT 'agent',
+        "verified" BOOLEAN NOT NULL DEFAULT true,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "DailySummary_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "DailySummary_userId_dayKey_key" ON "DailySummary"("userId", "dayKey");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "DailySummary_dayKey_idx" ON "DailySummary"("dayKey");'
+    );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "PresenceTransition" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "deviceId" TEXT,
+        "type" TEXT NOT NULL,
+        "at" TIMESTAMP(3) NOT NULL,
+        "dayKey" TEXT NOT NULL,
+        "ssid" TEXT,
+        "previousSsid" TEXT,
+        "inOffice" BOOLEAN NOT NULL,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "PresenceTransition_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "PresenceTransition_userId_at_idx" ON "PresenceTransition"("userId", "at");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "PresenceTransition_userId_dayKey_idx" ON "PresenceTransition"("userId", "dayKey");'
+    );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "ActivityTick" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "deviceId" TEXT,
+        "at" TIMESTAMP(3) NOT NULL,
+        "ssid" TEXT,
+        "inOffice" BOOLEAN NOT NULL,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "ActivityTick_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "ActivityTick_userId_at_idx" ON "ActivityTick"("userId", "at");'
+    );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "AgentEvent" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "deviceId" TEXT,
+        "clientEventId" TEXT NOT NULL,
+        "type" TEXT NOT NULL,
+        "payload" JSONB NOT NULL,
+        "status" TEXT NOT NULL DEFAULT 'accepted',
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "AgentEvent_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE UNIQUE INDEX IF NOT EXISTS "AgentEvent_userId_clientEventId_key" ON "AgentEvent"("userId", "clientEventId");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "AgentEvent_userId_createdAt_idx" ON "AgentEvent"("userId", "createdAt");'
+    );
     }
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "AlertDispatch" (

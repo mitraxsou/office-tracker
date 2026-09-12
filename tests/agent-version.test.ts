@@ -27,11 +27,12 @@ describe("agent version", () => {
       "utf8",
     );
     expect(heartbeat).toContain(`$AgentScriptVersion = "${getAgentVersion()}"`);
-    expect(heartbeat).toContain("scriptVersion  = $scriptVersion");
+    expect(heartbeat).toContain("scriptVersion = $ScriptVersion");
     expect(heartbeat).toContain('$uri = "${uri}?serialNumber=$encoded"');
     expect(heartbeat).toContain("Get-HeartbeatIntervalMinutes");
-    expect(heartbeat).toContain("Test-HeartbeatDue");
-    expect(heartbeat).toContain("Set-LastSuccessfulHeartbeatTime");
+    expect(heartbeat).toContain("/api/agent/sync");
+    expect(heartbeat).toContain("Invoke-LegacyHeartbeat");
+    expect(heartbeat).toContain("event-queue.json");
     expect(heartbeat).toContain("[Math]::Max(2, [Math]::Min(60, $interval))");
   });
 
@@ -72,21 +73,20 @@ describe("agent version", () => {
       path.join(process.cwd(), "agent", "office-heartbeat.ps1"),
       "utf8",
     );
+    const setup = readFileSync(path.join(process.cwd(), "agent", "setup.ps1"), "utf8");
     const updater = readFileSync(path.join(process.cwd(), "agent", "update.ps1"), "utf8");
     const installer = readFileSync(path.join(process.cwd(), "agent", "install.ps1"), "utf8");
 
-    expect(heartbeat).toContain("Unblock-File -LiteralPath $UpdateScript");
-    expect(heartbeat).toContain('Join-Path (Split-Path $UpdateScript) "run-update.vbs"');
+    expect(heartbeat).toContain("Unblock-File -LiteralPath $SetupScript");
+    expect(heartbeat).toContain('Join-Path (Get-InstallDir) "run-update.vbs"');
     expect(heartbeat).toContain("-NoProfile -NonInteractive -ExecutionPolicy Bypass");
-    expect(heartbeat).toContain('-File ""$UpdateScript"" -Silent');
+    expect(heartbeat).toContain('-File ""$SetupScript"" -Silent');
 
-    expect(updater).toContain("Remove-MarkOfWeb -Path $tempZip");
-    expect(updater).toContain("Remove-MarkOfWebFromTree -Path $tempExtract");
-    expect(updater).toContain("Remove-MarkOfWeb -Path $destination");
-    expect(updater).toContain('-File ""$ScriptPath"" -Silent');
+    expect(setup).toContain("Remove-MarkOfWeb -Path $destination");
+    expect(setup).toContain("Publish-AgentScriptTxt");
+    expect(setup).toContain('-File ""$ScriptPath"" -Silent');
 
-    expect(installer).toContain("Remove-MarkOfWeb -Path $src");
-    expect(installer).toContain("Remove-MarkOfWeb -Path $destination");
-    expect(installer).toContain('-File ""$ScriptPath"" -Silent');
+    expect(updater).toContain("setup.ps1");
+    expect(installer).toContain("setup.ps1");
   });
 });

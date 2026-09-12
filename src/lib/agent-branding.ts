@@ -40,6 +40,7 @@ export const AGENT_EXTRACT_PATH_PS = `$env:USERPROFILE\\Downloads\\${AGENT_EXTRA
 /** Relative scripts; copy commands assume PowerShell cwd is the extract folder. */
 export const AGENT_RELATIVE_INSTALL_SCRIPT = ".\\install.ps1";
 export const AGENT_RELATIVE_UPDATE_SCRIPT = ".\\update.ps1";
+export const AGENT_RELATIVE_SETUP_SCRIPT = ".\\setup.ps1";
 
 function buildRelativeScriptCommand(scriptPath: string, appUrl: string, token: string) {
   return `Unblock-File -LiteralPath "${scriptPath}"; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${scriptPath}" -ApiUrl "${appUrl}" -Token "${token}"`;
@@ -53,6 +54,11 @@ export function buildInstallCommand(appUrl: string, token: string) {
 /** Update command to paste from the same extract folder (update.ps1 -ApiUrl -Token). */
 export function buildUpdateCommand(appUrl: string, token: string) {
   return buildRelativeScriptCommand(AGENT_RELATIVE_UPDATE_SCRIPT, appUrl, token);
+}
+
+/** Unified setup command (install or update, no zip). Preferred for new agent v1.3. */
+export function buildSetupCommand(appUrl: string, token: string) {
+  return buildRelativeScriptCommand(AGENT_RELATIVE_SETUP_SCRIPT, appUrl, token);
 }
 
 const AGENT_LOCAL_CONFIG_PS = `$env:LOCALAPPDATA\\${AGENT_INSTALL_FOLDER}\\config.json`;
