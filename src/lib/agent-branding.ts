@@ -53,19 +53,20 @@ function trimTrailingSlash(url: string) {
 /** Download setup.ps1 from server and run via IEX. Works without zip on PwC laptops. */
 function buildServerBootstrapCommand(appUrl: string, tokenSetup: string) {
   const base = escapePsSingleQuoted(trimTrailingSlash(appUrl));
+  // Outer -Command uses single quotes so pasted command never needs \" inside strings.
   return (
-    `powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $ErrorActionPreference='Stop'; ` +
+    `powershell -NoProfile -ExecutionPolicy Bypass -Command '& { $ErrorActionPreference=''Stop''; ` +
     `[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; ` +
-    `$ApiUrl='${base}'; ${tokenSetup}; ` +
-    `$d=Join-Path $env:TEMP ('OfficePulse-'+[guid]::NewGuid().ToString('N')); ` +
+    `$ApiUrl=''${base}''; ${tokenSetup}; ` +
+    `$d=Join-Path $env:TEMP (''OfficePulse-''+[guid]::NewGuid().ToString(''N'')); ` +
     `New-Item -ItemType Directory -Path $d -Force | Out-Null; ` +
-    `$h=@{Authorization=\\"Bearer $Token\\"}; ` +
-    `$lib=Join-Path $d 'lib'; New-Item -ItemType Directory -Path $lib -Force | Out-Null; ` +
-    `Invoke-WebRequest -Uri \\"$ApiUrl/api/agent/files/agent-download.ps1\\" -Headers $h -OutFile (Join-Path $lib 'agent-download.ps1') -UseBasicParsing; ` +
-    `. (Join-Path $lib 'agent-download.ps1'); ` +
-    `Invoke-WebRequest -Uri \\"$ApiUrl/api/agent/files/setup.ps1\\" -Headers $h -OutFile (Join-Path $d 'setup.ps1') -UseBasicParsing; ` +
-    `$t=Publish-AgentScriptTxt -Ps1Path (Join-Path $d 'setup.ps1'); ` +
-    `$s=Get-Content -Raw $t; Invoke-Expression $s }"`
+    `$h=@{Authorization=(''Bearer ''+$Token)}; ` +
+    `$lib=Join-Path $d ''lib''; New-Item -ItemType Directory -Path $lib -Force | Out-Null; ` +
+    `Invoke-WebRequest -Uri ($ApiUrl+''/api/agent/files/agent-download.ps1'') -Headers $h -OutFile (Join-Path $lib ''agent-download.ps1'') -UseBasicParsing; ` +
+    `. (Join-Path $lib ''agent-download.ps1''); ` +
+    `Invoke-WebRequest -Uri ($ApiUrl+''/api/agent/files/setup.ps1'') -Headers $h -OutFile (Join-Path $d ''setup.ps1'') -UseBasicParsing; ` +
+    `$t=Publish-AgentScriptTxt -Ps1Path (Join-Path $d ''setup.ps1''); ` +
+    `$s=Get-Content -Raw $t; Invoke-Expression $s }'`
   );
 }
 
@@ -93,12 +94,13 @@ export function buildUpdateCommand(appUrl: string, token: string) {
 
 /** Unified setup command (install or update, no zip). Preferred for new agent v1.3. */
 export function buildSetupCommand(appUrl: string, token: string) {
-  return buildServerBootstrapCommand(appUrl, `$Token='${escapePsSingleQuoted(token)}'`);
+  return buildServerBootstrapCommand(appUrl, `$Token=''${escapePsSingleQuoted(token)}''`);
 }
 
 /** Setup command for laptops that already have the agent token in local config.json. */
 export function buildSetupCommandFromLocalConfig(appUrl: string) {
-  const tokenSetup = `$cfg = Get-Content "${AGENT_LOCAL_CONFIG_PS}" -Raw | ConvertFrom-Json; $Token = [string]$cfg.token`;
+  const tokenSetup =
+    `$cfg = Get-Content (Join-Path $env:LOCALAPPDATA ''${AGENT_INSTALL_FOLDER}\\config.json'') -Raw | ConvertFrom-Json; $Token = [string]$cfg.token`;
   return buildServerBootstrapCommand(appUrl, tokenSetup);
 }
 

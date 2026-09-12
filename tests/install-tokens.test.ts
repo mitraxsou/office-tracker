@@ -178,7 +178,7 @@ describe("post-backfill install commands", () => {
     const revealed = decryptPendingToken(enc);
     expect(revealed).toBe(plain);
     const command = buildInstallCommand("https://office.example", revealed!);
-    expect(command).toContain(`$Token='${plain}'`);
+    expect(command).toContain(`$Token='${plain}'`); // zip-folder IEX command (double-quoted -Command)
     expect(command).not.toContain("config.json");
   });
 });
@@ -191,8 +191,10 @@ describe("copy-paste agent commands", () => {
     expect(command).toContain("/api/agent/files/agent-download.ps1");
     expect(command).toContain("Publish-AgentScriptTxt");
     expect(command).toContain("Invoke-Expression");
-    expect(command).toContain("$Token='tok'");
-    expect(command).toContain("$ApiUrl='https://office.example'");
+    expect(command).toContain("$Token=''tok''");
+    expect(command).toContain("$ApiUrl=''https://office.example''");
+    expect(command).toContain("Authorization=(''Bearer ''+$Token)");
+    expect(command).not.toContain('\\"');
     expect(command).not.toContain("-File");
     expect(command).not.toContain("Downloads");
   });
