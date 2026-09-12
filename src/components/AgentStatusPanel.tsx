@@ -18,6 +18,7 @@ type AgentStatus = {
   boundTokens: number;
   pulsesLast24h: number;
   expectedPulsesPerDay: number;
+  showLowActivityWarning: boolean;
   minutesSinceLastPulse: number | null;
   recentPulses: Array<{ recordedAt: string; inOffice: boolean; ssid: string | null }>;
   devices: Array<{ id: string; serialNumber: string; lastSeenAt: string | null }>;
@@ -136,11 +137,12 @@ export function AgentStatusPanel({
         </div>
       )}
 
-      {adminAccess && status.pulsesLast24h < 30 && status.deviceCount > 0 && status.pulseStatus === "healthy" && (
+      {adminAccess && status.showLowActivityWarning && (
         <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-sm text-muted">
           <p>
-            Only {status.pulsesLast24h} activity ticks in the last 24 hours (expected ~720). The
-            laptop may have been asleep or the task may not be running reliably.{" "}
+            Only {status.pulsesLast24h} activity ticks in the last 24 hours (expected ~
+            {status.expectedPulsesPerDay}). The laptop may have been asleep or the task may not be
+            running reliably.{" "}
             <a href="#install" className="text-accent hover:underline">
               Reinstall from here
             </a>

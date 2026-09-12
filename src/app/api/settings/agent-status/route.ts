@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { deviceRegistrationReferenceAt, isLowActivityCount } from "@/lib/activity-signal";
 import { getTodaySummary, getPulseStats } from "@/lib/heartbeat-service";
 import { getAppConfig, getUserHoursTarget, getEffectiveAgentStaleGraceHours } from "@/lib/app-config";
 import { isUserOutOfOffice } from "@/lib/out-of-office";
@@ -39,6 +40,16 @@ export async function GET() {
     pulseStatus = isOutToday || pulse.agentHealthy ? "healthy" : "stale";
   }
 
+  const deviceReferenceAt = deviceRegistrationReferenceAt(user.agentDevices);
+  const showLowActivityWarning =
+    pulse.agentHealthy &&
+    user.agentDevices.length > 0 &&
+    isLowActivityCount(
+      pulse.pulsesLast24h,
+      pulse.expectedPulsesPerDay,
+      deviceReferenceAt,
+    );
+
   return NextResponse.json({
     installStatus,
     agentHealthy: isOutToday || pulse.agentHealthy,
@@ -51,6 +62,7 @@ export async function GET() {
     boundTokens,
     pulsesLast24h: pulse.pulsesLast24h,
     expectedPulsesPerDay: pulse.expectedPulsesPerDay,
+    showLowActivityWarning,
     minutesSinceLastPulse: pulse.minutesSinceLastPulse,
     recentPulses: pulse.recentPulses,
     devices: user.agentDevices.map((d) => ({

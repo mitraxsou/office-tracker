@@ -18,6 +18,7 @@ import { DashboardRefreshButton } from "@/components/DashboardRefreshButton";
 import { DashboardHeroSummary } from "@/components/dashboard/DashboardHeroSummary";
 import { DashboardAlerts } from "@/components/dashboard/DashboardAlerts";
 import { DashboardDetailsPanel } from "@/components/dashboard/DashboardDetailsPanel";
+import { deviceRegistrationReferenceAt, isLowActivityCount } from "@/lib/activity-signal";
 import { formatLastHeartbeat } from "@/lib/visits";
 
 export default async function DashboardPage() {
@@ -64,12 +65,17 @@ export default async function DashboardPage() {
   const lastHeartbeat = summary.lastHeartbeat;
   const agentNeverConnected = !lastHeartbeat && user.agentDevices.length === 0;
   const agentStale = !isOutToday && !!summary.lastHeartbeat && !summary.agentHealthy;
+  const deviceReferenceAt = deviceRegistrationReferenceAt(user.agentDevices);
   const agentLowPulses =
     !isOutToday &&
     user.agentDevices.length > 0 &&
     !!pulse.lastHeartbeat &&
     pulse.agentHealthy &&
-    pulse.pulsesLast24h < 30;
+    isLowActivityCount(
+      pulse.pulsesLast24h,
+      pulse.expectedPulsesPerDay,
+      deviceReferenceAt,
+    );
   const ssidMissing =
     !!summary.lastHeartbeat && !summary.lastHeartbeat.ssid && summary.lastHeartbeat.inOffice === false;
   const openVisit = summary.visits.find((v) => v.endAt === null);
