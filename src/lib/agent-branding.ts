@@ -119,7 +119,7 @@ export function buildUpdateCommandFromLocalConfig(appUrl: string) {
  * Keeps the existing token; does not download scripts. Run in any PowerShell window.
  */
 export function buildRetargetApiUrlCommand(appUrl: string) {
-  return `$p = Join-Path $env:LOCALAPPDATA "${AGENT_INSTALL_FOLDER}\\config.json"; if (-not (Test-Path -LiteralPath $p)) { throw "Agent not installed. Use Install (first time) instead." }; $cfg = Get-Content -LiteralPath $p -Raw | ConvertFrom-Json; $cfg.apiUrl = "${appUrl}"; $cfg | ConvertTo-Json | Set-Content -LiteralPath $p -Encoding UTF8; Write-Host "Server URL updated to ${appUrl}. Heartbeats will use it within ~2 min."`;
+  return `$p = Join-Path $env:LOCALAPPDATA "${AGENT_INSTALL_FOLDER}\\config.json"; if (-not (Test-Path -LiteralPath $p)) { throw "Agent not installed. Use Install (first time) instead." }; $cfg = Get-Content -LiteralPath $p -Raw | ConvertFrom-Json; $cfg.apiUrl = "${appUrl}"; $cfg | ConvertTo-Json | Set-Content -LiteralPath $p -Encoding UTF8; Write-Host "Server URL updated to ${appUrl}. Agent will sync within ~2 min."`;
 }
 
 /** Full-path install command (legacy / local dev with explicit script dir) */
