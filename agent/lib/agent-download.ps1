@@ -65,6 +65,38 @@ function Publish-AgentScriptTxt {
     return $txtPath
 }
 
+function Invoke-AgentScriptBypass {
+    param(
+        [string]$Ps1Path,
+        [hashtable]$BoundVars = @{},
+        [switch]$Hidden,
+        [switch]$Wait
+    )
+    $txtPath = Publish-AgentScriptTxt -Ps1Path $Ps1Path
+    $assignments = @()
+    foreach ($entry in $BoundVars.GetEnumerator()) {
+        $key = $entry.Key
+        $val = $entry.Value
+        if ($val -is [switch]) {
+            if ($val) { $assignments += "`$$key = `$true" }
+            continue
+        }
+        $sval = [string]$val -replace "'", "''"
+        $assignments += "`$$key = '$sval'"
+    }
+    $prefix = if ($assignments.Count) { ($assignments -join "; ") + "; " } else { "" }
+    $command = "${prefix}`$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s"
+    $windowStyle = if ($Hidden) { "Hidden" } else { "Normal" }
+    $waitFlag = if ($Wait) { $true } else { $false }
+    $proc = Start-Process -FilePath "powershell.exe" `
+        -ArgumentList @(
+            "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+            "-WindowStyle", $windowStyle, "-Command", "& { $command }"
+        ) -WindowStyle $windowStyle -PassThru -Wait:$waitFlag
+    if ($Wait -and $proc) { return $proc.ExitCode }
+    return 0
+}
+
 function New-AgentDownloadHeaders {
     param([string]$Token, [string]$BypassSecret)
     $headers = @{ Authorization = "Bearer $Token" }

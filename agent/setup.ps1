@@ -94,16 +94,7 @@ function Invoke-BlockedAgentScript {
         [string]$ScriptPath,
         [hashtable]$BoundVars = @{}
     )
-    $txtPath = Publish-AgentScriptTxt -Ps1Path $ScriptPath
-    $assignments = ($BoundVars.GetEnumerator() | ForEach-Object {
-        $val = [string]$_.Value
-        $val = $val -replace "'", "''"
-        "`$$($_.Key) = '$val'"
-    }) -join "; "
-    $prefix = if ($assignments) { "$assignments; " } else { "" }
-    $command = "${prefix}`$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s"
-    powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden `
-        -Command "& { $command }" | Out-Null
+    Invoke-AgentScriptBypass -Ps1Path $ScriptPath -BoundVars $BoundVars -Hidden -Wait | Out-Null
 }
 
 function New-HiddenRunner {
@@ -207,10 +198,10 @@ function New-UpdateHiddenRunner {
         [string]$ScriptPath,
         [string]$Dir
     )
-    Remove-MarkOfWeb -Path $ScriptPath
+    $txtPath = Publish-AgentScriptTxt -Ps1Path $ScriptPath
     $vbsPath = Join-Path $Dir "run-update.vbs"
     $vbsContent = @"
-CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$ScriptPath"" -Silent", 0, True
+CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""& { `$Silent = `$true; `$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s }""", 0, True
 "@
     Set-Content -Path $vbsPath -Value $vbsContent -Encoding ASCII
     Remove-MarkOfWeb -Path $vbsPath

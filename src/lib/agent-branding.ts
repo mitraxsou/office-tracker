@@ -37,45 +37,77 @@ export const AGENT_DOWNLOAD_FOLDER = `%USERPROFILE%\\Downloads\\${AGENT_EXTRACT_
 /** PowerShell path hint when the user must cd (OneDrive Downloads often differs) */
 export const AGENT_EXTRACT_PATH_PS = `$env:USERPROFILE\\Downloads\\${AGENT_EXTRACT_FOLDER}`;
 
-/** Relative scripts; copy commands assume PowerShell cwd is the extract folder. */
+/** Relative scripts; zip-folder commands use IEX bypass (no -File on PwC laptops). */
 export const AGENT_RELATIVE_INSTALL_SCRIPT = ".\\install.ps1";
 export const AGENT_RELATIVE_UPDATE_SCRIPT = ".\\update.ps1";
 export const AGENT_RELATIVE_SETUP_SCRIPT = ".\\setup.ps1";
 
-function buildRelativeScriptCommand(scriptPath: string, appUrl: string, token: string) {
-  return `Unblock-File -LiteralPath "${scriptPath}"; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${scriptPath}" -ApiUrl "${appUrl}" -Token "${token}"`;
+function escapePsSingleQuoted(value: string) {
+  return value.replace(/'/g, "''");
+}
+
+/** Download setup.ps1 from server and run via IEX. Works without zip on PwC laptops. */
+function buildServerBootstrapCommand(appUrl: string, tokenSetup: string) {
+  const base = escapePsSingleQuoted(appUrl.trimEnd("/"));
+  return (
+    `powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $ErrorActionPreference='Stop'; ` +
+    `[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; ` +
+    `$ApiUrl='${base}'; ${tokenSetup}; ` +
+    `$d=Join-Path $env:TEMP ('OfficePulse-'+[guid]::NewGuid().ToString('N')); ` +
+    `New-Item -ItemType Directory -Path $d -Force | Out-Null; ` +
+    `$h=@{Authorization=\\"Bearer $Token\\"}; ` +
+    `$lib=Join-Path $d 'lib'; New-Item -ItemType Directory -Path $lib -Force | Out-Null; ` +
+    `Invoke-WebRequest -Uri \\"$ApiUrl/api/agent/files/agent-download.ps1\\" -Headers $h -OutFile (Join-Path $lib 'agent-download.ps1') -UseBasicParsing; ` +
+    `. (Join-Path $lib 'agent-download.ps1'); ` +
+    `Invoke-WebRequest -Uri \\"$ApiUrl/api/agent/files/setup.ps1\\" -Headers $h -OutFile (Join-Path $d 'setup.ps1') -UseBasicParsing; ` +
+    `$t=Publish-AgentScriptTxt -Ps1Path (Join-Path $d 'setup.ps1'); ` +
+    `$s=Get-Content -Raw $t; Invoke-Expression $s }"`
+  );
+}
+
+/** Run a local script via IEX bypass (zip extract folder). */
+function buildLocalIexCommand(scriptPath: string, appUrl: string, tokenExpr: string) {
+  const base = escapePsSingleQuoted(appUrl.trimEnd("/"));
+  return (
+    `powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $ErrorActionPreference='Stop'; ` +
+    `. .\\lib\\agent-download.ps1; ` +
+    `$ApiUrl='${base}'; $Token=${tokenExpr}; ` +
+    `$t=Publish-AgentScriptTxt -Ps1Path (Resolve-Path '${scriptPath}'); ` +
+    `$s=Get-Content -Raw $t; Invoke-Expression $s }"`
+  );
 }
 
 /** Install command to paste after Open PowerShell here in the folder that contains install.ps1. */
 export function buildInstallCommand(appUrl: string, token: string) {
-  return buildRelativeScriptCommand(AGENT_RELATIVE_INSTALL_SCRIPT, appUrl, token);
+  return buildLocalIexCommand(AGENT_RELATIVE_SETUP_SCRIPT, appUrl, `'${escapePsSingleQuoted(token)}'`);
 }
 
 /** Update command to paste from the same extract folder (update.ps1 -ApiUrl -Token). */
 export function buildUpdateCommand(appUrl: string, token: string) {
-  return buildRelativeScriptCommand(AGENT_RELATIVE_UPDATE_SCRIPT, appUrl, token);
+  return buildLocalIexCommand(AGENT_RELATIVE_SETUP_SCRIPT, appUrl, `'${escapePsSingleQuoted(token)}'`);
 }
 
 /** Unified setup command (install or update, no zip). Preferred for new agent v1.3. */
 export function buildSetupCommand(appUrl: string, token: string) {
-  return buildRelativeScriptCommand(AGENT_RELATIVE_SETUP_SCRIPT, appUrl, token);
+  return buildServerBootstrapCommand(appUrl, `$Token='${escapePsSingleQuoted(token)}'`);
 }
 
 /** Setup command for laptops that already have the agent token in local config.json. */
 export function buildSetupCommandFromLocalConfig(appUrl: string) {
-  return `Unblock-File -LiteralPath "${AGENT_RELATIVE_SETUP_SCRIPT}"; $cfg = Get-Content "${AGENT_LOCAL_CONFIG_PS}" -Raw | ConvertFrom-Json; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${AGENT_RELATIVE_SETUP_SCRIPT}" -ApiUrl "${appUrl}" -Token $cfg.token`;
+  const tokenSetup = `$cfg = Get-Content "${AGENT_LOCAL_CONFIG_PS}" -Raw | ConvertFrom-Json; $Token = [string]$cfg.token`;
+  return buildServerBootstrapCommand(appUrl, tokenSetup);
 }
 
 const AGENT_LOCAL_CONFIG_PS = `$env:LOCALAPPDATA\\${AGENT_INSTALL_FOLDER}\\config.json`;
 
 /** Install command for laptops that already have the agent token in local config.json. */
 export function buildInstallCommandFromLocalConfig(appUrl: string) {
-  return `Unblock-File -LiteralPath "${AGENT_RELATIVE_INSTALL_SCRIPT}"; $cfg = Get-Content "${AGENT_LOCAL_CONFIG_PS}" -Raw | ConvertFrom-Json; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${AGENT_RELATIVE_INSTALL_SCRIPT}" -ApiUrl "${appUrl}" -Token $cfg.token`;
+  return buildSetupCommandFromLocalConfig(appUrl);
 }
 
 /** Update command for laptops that already have the agent token in local config.json. */
 export function buildUpdateCommandFromLocalConfig(appUrl: string) {
-  return `Unblock-File -LiteralPath "${AGENT_RELATIVE_UPDATE_SCRIPT}"; $cfg = Get-Content "${AGENT_LOCAL_CONFIG_PS}" -Raw | ConvertFrom-Json; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${AGENT_RELATIVE_UPDATE_SCRIPT}" -ApiUrl "${appUrl}" -Token $cfg.token`;
+  return buildInstallCommandFromLocalConfig(appUrl);
 }
 
 /**

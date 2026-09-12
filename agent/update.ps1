@@ -1,4 +1,4 @@
-# My Office Pulse agent updater. Thin wrapper around setup.ps1.
+# My Office Pulse agent updater. Thin wrapper around setup.ps1 (IEX bypass for PwC laptops).
 #
 # Usage:
 #   .\update.ps1
@@ -16,6 +16,23 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+function Import-AgentDownloadModule {
+    $candidates = @(
+        (Join-Path $PSScriptRoot "lib\agent-download.ps1"),
+        (Join-Path $PSScriptRoot "agent-download.ps1"),
+        (Join-Path $env:LOCALAPPDATA "OfficeTracker\lib\agent-download.ps1")
+    )
+    foreach ($path in $candidates) {
+        if (Test-Path -LiteralPath $path) {
+            . $path
+            return
+        }
+    }
+    throw "agent-download.ps1 module not found"
+}
+
+Import-AgentDownloadModule
+
 $setupPath = Join-Path $PSScriptRoot "setup.ps1"
 if (-not (Test-Path -LiteralPath $setupPath)) {
     $setupPath = Join-Path $env:LOCALAPPDATA "OfficeTracker\setup.ps1"
@@ -25,4 +42,12 @@ if (-not (Test-Path -LiteralPath $setupPath)) {
     exit 1
 }
 
-& $setupPath -ApiUrl $ApiUrl -Token $Token -Silent:$Silent -Verbose:$Verbose -Force:$Force
+$bound = @{}
+if ($ApiUrl) { $bound.ApiUrl = $ApiUrl }
+if ($Token) { $bound.Token = $Token }
+if ($Silent) { $bound.Silent = $true }
+if ($Verbose) { $bound.Verbose = $true }
+if ($Force) { $bound.Force = $true }
+
+$exitCode = Invoke-AgentScriptBypass -Ps1Path $setupPath -BoundVars $bound -Wait -Hidden:($Silent)
+exit $exitCode

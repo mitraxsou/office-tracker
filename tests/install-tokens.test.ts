@@ -178,62 +178,62 @@ describe("post-backfill install commands", () => {
     const revealed = decryptPendingToken(enc);
     expect(revealed).toBe(plain);
     const command = buildInstallCommand("https://office.example", revealed!);
-    expect(command).toContain(`-Token "${plain}"`);
+    expect(command).toContain(`$Token='${plain}'`);
     expect(command).not.toContain("config.json");
   });
 });
 
 describe("copy-paste agent commands", () => {
-  const expectedSetup =
-    'Unblock-File -LiteralPath ".\\setup.ps1"; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ".\\setup.ps1" -ApiUrl "https://office.example" -Token "tok"';
-  const expectedInstall =
-    'Unblock-File -LiteralPath ".\\install.ps1"; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ".\\install.ps1" -ApiUrl "https://office.example" -Token "tok"';
-  const expectedUpdate =
-    'Unblock-File -LiteralPath ".\\update.ps1"; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ".\\update.ps1" -ApiUrl "https://office.example" -Token "tok"';
-
-  it("uses relative setup.ps1 with ApiUrl and Token", () => {
+  it("bootstrap setup command downloads from server without zip or -File", () => {
     const command = buildSetupCommand("https://office.example", "tok");
-    expect(command).toBe(expectedSetup);
-    expect(command).not.toContain("USERPROFILE");
+    expect(command).toContain("powershell -NoProfile -ExecutionPolicy Bypass -Command");
+    expect(command).toContain("/api/agent/files/setup.ps1");
+    expect(command).toContain("/api/agent/files/agent-download.ps1");
+    expect(command).toContain("Publish-AgentScriptTxt");
+    expect(command).toContain("Invoke-Expression");
+    expect(command).toContain("$Token='tok'");
+    expect(command).toContain("$ApiUrl='https://office.example'");
+    expect(command).not.toContain("-File");
     expect(command).not.toContain("Downloads");
   });
 
-  it("uses relative install.ps1 with ApiUrl and Token", () => {
+  it("zip-folder install uses IEX bypass on setup.ps1", () => {
     const command = buildInstallCommand("https://office.example", "tok");
-    expect(command).toBe(expectedInstall);
-    expect(command).not.toContain("USERPROFILE");
-    expect(command).not.toContain("Downloads");
+    expect(command).toContain("agent-download.ps1");
+    expect(command).toContain("Publish-AgentScriptTxt");
+    expect(command).toContain("Invoke-Expression");
+    expect(command).toContain("$Token='tok'");
+    expect(command).not.toContain("-File");
   });
 
-  it("uses relative update.ps1 with the same ApiUrl and Token flags", () => {
+  it("zip-folder update uses the same IEX bypass as install", () => {
     const command = buildUpdateCommand("https://office.example", "tok");
-    expect(command).toBe(expectedUpdate);
-    expect(command).toContain('-ApiUrl "https://office.example"');
-    expect(command).toContain('-Token "tok"');
+    expect(command).toContain("Publish-AgentScriptTxt");
+    expect(command).toContain("$Token='tok'");
+    expect(command).not.toContain("-File");
   });
 
   it("builds install command from local config.json for legacy bound tokens", () => {
     const command = buildInstallCommandFromLocalConfig("https://office.example");
     expect(command).toContain("config.json");
-    expect(command).toContain('-ApiUrl "https://office.example"');
-    expect(command).toContain("-Token $cfg.token");
-    expect(command).toContain(".\\install.ps1");
+    expect(command).toContain("$cfg.token");
+    expect(command).toContain("/api/agent/files/setup.ps1");
+    expect(command).not.toContain("-File");
   });
 
   it("builds update command from local config.json for legacy bound tokens", () => {
     const command = buildUpdateCommandFromLocalConfig("https://office.example");
     expect(command).toContain("config.json");
-    expect(command).toContain('-ApiUrl "https://office.example"');
-    expect(command).toContain("-Token $cfg.token");
-    expect(command).toContain(".\\update.ps1");
+    expect(command).toContain("$cfg.token");
+    expect(command).not.toContain("-File");
   });
 
   it("builds setup command from local config.json for legacy bound tokens", () => {
     const command = buildSetupCommandFromLocalConfig("https://office.example");
     expect(command).toContain("config.json");
-    expect(command).toContain('-ApiUrl "https://office.example"');
-    expect(command).toContain("-Token $cfg.token");
-    expect(command).toContain(".\\setup.ps1");
+    expect(command).toContain("$cfg.token");
+    expect(command).toContain("Invoke-Expression");
+    expect(command).not.toContain("-File");
   });
 
   it("builds retarget command that updates config.json apiUrl only", () => {

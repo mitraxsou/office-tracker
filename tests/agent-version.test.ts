@@ -56,19 +56,20 @@ describe("agent version", () => {
     ).toBe("not reported");
   });
 
-  it("builds a relative PowerShell install command", () => {
-    expect(buildInstallCommand("https://office.example", "token-123")).toBe(
-      'Unblock-File -LiteralPath ".\\install.ps1"; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ".\\install.ps1" -ApiUrl "https://office.example" -Token "token-123"',
-    );
+  it("builds an IEX-bypass install command for zip folder", () => {
+    const command = buildInstallCommand("https://office.example", "token-123");
+    expect(command).toContain("Invoke-Expression");
+    expect(command).toContain("Publish-AgentScriptTxt");
+    expect(command).not.toContain("-File");
   });
 
-  it("builds a relative PowerShell update command", () => {
-    expect(buildUpdateCommand("https://office.example", "token-123")).toBe(
-      'Unblock-File -LiteralPath ".\\update.ps1"; powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ".\\update.ps1" -ApiUrl "https://office.example" -Token "token-123"',
-    );
+  it("builds an IEX-bypass update command for zip folder", () => {
+    const command = buildUpdateCommand("https://office.example", "token-123");
+    expect(command).toContain("Invoke-Expression");
+    expect(command).not.toContain("-File");
   });
 
-  it("removes MOTW before hidden installed updater launches", () => {
+  it("uses IEX bypass for installed updater and zip wrappers", () => {
     const heartbeat = readFileSync(
       path.join(process.cwd(), "agent", "office-heartbeat.ps1"),
       "utf8",
@@ -76,17 +77,23 @@ describe("agent version", () => {
     const setup = readFileSync(path.join(process.cwd(), "agent", "setup.ps1"), "utf8");
     const updater = readFileSync(path.join(process.cwd(), "agent", "update.ps1"), "utf8");
     const installer = readFileSync(path.join(process.cwd(), "agent", "install.ps1"), "utf8");
+    const download = readFileSync(
+      path.join(process.cwd(), "agent", "lib", "agent-download.ps1"),
+      "utf8",
+    );
 
-    expect(heartbeat).toContain("Unblock-File -LiteralPath $SetupScript");
-    expect(heartbeat).toContain('Join-Path (Get-InstallDir) "run-update.vbs"');
-    expect(heartbeat).toContain("-NoProfile -NonInteractive -ExecutionPolicy Bypass");
-    expect(heartbeat).toContain('-File ""$SetupScript"" -Silent');
+    expect(download).toContain("function Invoke-AgentScriptBypass");
+    expect(heartbeat).toContain("Invoke-AgentScriptBypass");
+    expect(heartbeat).toContain("Invoke-Expression");
+    expect(heartbeat).not.toContain('-File ""$SetupScript""');
 
     expect(setup).toContain("Remove-MarkOfWeb -Path $destination");
     expect(setup).toContain("Publish-AgentScriptTxt");
-    expect(setup).toContain('-File ""$ScriptPath"" -Silent');
+    expect(setup).toContain("Invoke-Expression");
 
-    expect(updater).toContain("setup.ps1");
-    expect(installer).toContain("setup.ps1");
+    expect(updater).toContain("Invoke-AgentScriptBypass");
+    expect(installer).toContain("Invoke-AgentScriptBypass");
+    expect(updater).not.toContain("& $setupPath");
+    expect(installer).not.toContain("& $setupPath");
   });
 });

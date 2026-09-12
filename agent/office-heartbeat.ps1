@@ -575,6 +575,20 @@ function Get-SetupScriptPath {
     return $null
 }
 
+function Import-AgentDownloadModule {
+    $candidates = @(
+        (Join-Path (Get-InstallDir) "lib\agent-download.ps1"),
+        (Join-Path (Get-InstallDir) "agent-download.ps1")
+    )
+    foreach ($path in $candidates) {
+        if (Test-Path -LiteralPath $path) {
+            . $path
+            return $true
+        }
+    }
+    return $false
+}
+
 function Invoke-AgentSetupScript {
     param(
         [string]$SetupScript,
@@ -588,9 +602,21 @@ function Invoke-AgentSetupScript {
             -Value (Get-Date -Format "o") -Encoding UTF8
     }
 
+    if (Import-AgentDownloadModule) {
+        $bound = @{ ApiUrl = $ApiUrl; Token = $Token; Silent = $true }
+        if ($Force) { $bound.Force = $true }
+        Invoke-AgentScriptBypass -Ps1Path $SetupScript -BoundVars $bound -Hidden -Wait | Out-Null
+        return
+    }
+
+    $txtPath = [System.IO.Path]::ChangeExtension($SetupScript, ".txt")
+    if (-not (Test-Path -LiteralPath $txtPath)) {
+        Copy-Item $SetupScript $txtPath -Force
+        Unblock-File -LiteralPath $txtPath -ErrorAction SilentlyContinue
+    }
     $runnerPath = Join-Path (Get-InstallDir) "run-update.vbs"
     $vbsContent = @"
-CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File ""$SetupScript"" -Silent", 0, True
+CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""& { `$Silent = `$true; `$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s }""", 0, True
 "@
     Set-Content -Path $runnerPath -Value $vbsContent -Encoding ASCII
     Unblock-File -LiteralPath $runnerPath -ErrorAction SilentlyContinue
