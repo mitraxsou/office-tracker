@@ -96,6 +96,9 @@ describe("agent version", () => {
     expect(setup).toContain("Publish-AgentScriptTxt");
     expect(setup).toContain("Get-Command Publish-AgentScriptTxt");
     expect(setup).toContain("Invoke-Expression");
+    expect(setup).toContain("Remove-LegacyUpdateTask");
+    expect(setup).not.toContain("Register-HourlyUpdateTask");
+    expect(setup).not.toContain('Register-ScheduledTask -TaskName $UpdateTaskName');
 
     expect(updater).toContain("Invoke-AgentScriptBypass");
     expect(installer).toContain("Invoke-AgentScriptBypass");

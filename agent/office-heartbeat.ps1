@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ConfigFetchIntervalRuns = 5
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.3.4"
+$AgentScriptVersion = "1.3.5"
 
 function Write-Log([string]$Message) {
     $logDir = Join-Path $env:LOCALAPPDATA "OfficeTracker\logs"

@@ -21,10 +21,9 @@ $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $TaskName = "PwCOfficePulse"
-$UpdateTaskName = "PwCOfficePulseUpdate"
 $TaskDescription = "My Office Pulse - office hours tracker"
-$UpdateTaskDescription = "My Office Pulse - hourly agent update check"
 $LegacyTaskNames = @("OfficeTrackerHeartbeat", "PwCOfficePulse")
+$LegacyUpdateTaskName = "PwCOfficePulseUpdate"
 
 function Get-InstallDir {
     Join-Path $env:LOCALAPPDATA "OfficeTracker"
@@ -197,49 +196,10 @@ function Register-HiddenTask {
     $shortcut.Save()
 }
 
-function New-UpdateHiddenRunner {
-    param(
-        [string]$ScriptPath,
-        [string]$Dir
-    )
-    $txtPath = Publish-AgentScriptTxt -Ps1Path $ScriptPath
-    $vbsPath = Join-Path $Dir "run-update.vbs"
-    $vbsContent = @"
-CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -Command ""& { `$Silent = `$true; `$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s }""", 0, True
-"@
-    Set-Content -Path $vbsPath -Value $vbsContent -Encoding ASCII
-    Remove-MarkOfWeb -Path $vbsPath
-    return $vbsPath
-}
-
-function Register-HourlyUpdateTask {
-    param([string]$InstallDir)
-
-    $setupScript = Join-Path $InstallDir "setup.ps1"
-    if (-not (Test-Path $setupScript)) { return }
-
-    $vbsPath = New-UpdateHiddenRunner -ScriptPath $setupScript -Dir $InstallDir
-    $wscript = (Get-Command wscript.exe).Source
-    $actionArgs = "//B //Nologo `"$vbsPath`""
-    $action = New-ScheduledTaskAction -Execute $wscript -Argument $actionArgs
-    $hourlyTrigger = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
-        -RepetitionInterval (New-TimeSpan -Hours 1) `
-        -RepetitionDuration (New-TimeSpan -Days 3650)
-    $logonTrigger = New-ScheduledTaskTrigger -AtLogOn
-    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
-        -LogonType Interactive -RunLevel Limited
-    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
-        -StartWhenAvailable -MultipleInstances IgnoreNew
-
-    try {
-        Register-ScheduledTask -TaskName $UpdateTaskName -Action $action `
-            -Trigger @($hourlyTrigger, $logonTrigger) -Principal $principal -Settings $settings `
-            -Description $UpdateTaskDescription -Force | Out-Null
-    } catch {
-        Register-ScheduledTask -TaskName $UpdateTaskName -Action $action `
-            -Trigger $hourlyTrigger -Principal $principal -Settings $settings `
-            -Description $UpdateTaskDescription -Force | Out-Null
-    }
+function Remove-LegacyUpdateTask {
+    # Heartbeat runs hourly update checks inline; a separate scheduled task is redundant
+    # and often fails with Access denied on non-admin PwC laptops.
+    Unregister-ScheduledTask -TaskName $LegacyUpdateTaskName -Confirm:$false -ErrorAction SilentlyContinue
 }
 
 function Install-AgentScripts {
@@ -328,7 +288,7 @@ function Install-AdminLevel {
     $heartbeatScript = Join-Path $installDir "office-heartbeat.ps1"
     $vbsPath = New-HiddenRunner -ScriptPath $heartbeatScript -Dir $localConfigDir
     Register-HiddenTask -VbsPath $vbsPath -InstallDir $localConfigDir
-    Register-HourlyUpdateTask -InstallDir $localConfigDir
+    Remove-LegacyUpdateTask
 
     Write-Host ""
     Write-Host "My Office Pulse installed (admin / Program Files)" -ForegroundColor Green
@@ -346,7 +306,7 @@ function Complete-Install {
     Publish-InstalledAgentScripts -InstallDir $InstallDir
     $vbsPath = New-HiddenRunner -ScriptPath $heartbeatScript -Dir $InstallDir
     Register-HiddenTask -VbsPath $vbsPath -InstallDir $InstallDir
-    Register-HourlyUpdateTask -InstallDir $InstallDir
+    Remove-LegacyUpdateTask
 
     if ($ScriptsUpdated) {
         try {
