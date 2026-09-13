@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ConfigFetchIntervalRuns = 5
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.3.0"
+$AgentScriptVersion = "1.3.1"
 
 function Write-Log([string]$Message) {
     $logDir = Join-Path $env:LOCALAPPDATA "OfficeTracker\logs"
@@ -832,11 +832,12 @@ if (-not (Test-Path $configPath)) {
     exit 1
 }
 
+$resumeGapMin = $null
 $isResumeRun = Test-ResumeFromSleep
 if ($isResumeRun) {
     $last = Get-LastRunTime
-    $gapMin = [Math]::Round(((Get-Date) - $last).TotalMinutes, 1)
-    Write-Log "RESUME detected (gap ${gapMin}m since last run)"
+    $resumeGapMin = [Math]::Round(((Get-Date) - $last).TotalMinutes, 1)
+    Write-Log "RESUME detected (gap ${resumeGapMin}m since last run)"
 }
 Set-LastRunTime
 
@@ -890,7 +891,17 @@ $vpnGateway = Get-VpnGatewayDiagnostic
 $presence = Get-PresenceState
 $previousSsid = $presence.ssid
 $syncState = Get-SyncState
+$previousDayKey = if ($syncState.dayKey) { [string]$syncState.dayKey } else { $null }
 $syncState = Maybe-EnqueueDailySummary -SyncState $syncState -DayKey $dayKey
+$dayRolledOver = $previousDayKey -and $previousDayKey -ne $dayKey
+if ($dayRolledOver) {
+    $isOfficeNow = Test-IsOfficeSsid -Ssid $ssid -ServerConfig $serverConfig
+    $hasOpenVisit = [bool](Get-OpenVisitFromState $syncState)
+    if ($isOfficeNow -and -not $hasOpenVisit) {
+        $syncState = Start-LocalVisit -SyncState $syncState -Ssid $ssid
+        Write-Log "NEW_DAY visit_start on office Wi-Fi"
+    }
+}
 
 $ssidChanged = ($previousSsid -ne $ssid)
 $pendingEvents = @()
@@ -908,10 +919,17 @@ if ($ssidChanged) {
     $pendingEvents = @(Get-EventQueue)
 }
 
+$activityTickQueued = $false
 $activityDue = Test-ActivityTickDue -SyncState $syncState -IntervalMinutes $heartbeatInterval
-if ($activityDue) {
+if ($isResumeRun) {
+    Add-QueuedEvent -Type "session_resume" -Fields @{
+        gapMinutes = $resumeGapMin
+        ssid = $ssid
+    }
+}
+if ($isResumeRun -or $activityDue) {
     Add-QueuedEvent -Type "activity_tick" -Fields @{ ssid = $ssid }
-    $syncState.lastActivityTickAt = Get-NowIso
+    $activityTickQueued = $true
     $pendingEvents = @(Get-EventQueue)
 }
 
@@ -938,7 +956,7 @@ if ($DryRun) {
     exit 0
 }
 
-$shouldSync = $ssidChanged -or $activityDue -or (@(Get-EventQueue).Count -gt 0)
+$shouldSync = $isResumeRun -or $ssidChanged -or $activityDue -or (@(Get-EventQueue).Count -gt 0)
 if ($shouldSync) {
     $flush = Invoke-FlushSync -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber `
         -ScriptVersion $scriptVersion -SyncState $syncState -AllowHealthPing:(-not $ssidChanged) `
@@ -946,10 +964,15 @@ if ($shouldSync) {
     $syncState = $flush.syncState
     if (-not $flush.synced) {
         if ($flush.error) { Write-Log "ERROR sync failed: $($flush.error)"; exit 1 }
-    } elseif ($ssidChanged) {
-        Set-PresenceState -Ssid $ssid
-        $syncState.pendingSsid = $null
-        $syncState.pendingPreviousSsid = $null
+    } else {
+        if ($activityTickQueued) {
+            $syncState.lastActivityTickAt = Get-NowIso
+        }
+        if ($ssidChanged) {
+            Set-PresenceState -Ssid $ssid
+            $syncState.pendingSsid = $null
+            $syncState.pendingPreviousSsid = $null
+        }
     }
 } else {
     Write-Log "SKIP no events to sync"

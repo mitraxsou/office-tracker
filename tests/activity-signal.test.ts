@@ -3,7 +3,9 @@ import {
   deviceRegistrationReferenceAt,
   expectedTicksPerDay,
   isLowActivityCount,
+  latestDeviceLastSeenAt,
   lowActivityThreshold,
+  minutesSinceAt,
   resolveInOfficeNow,
   shouldUseActivityTicks,
 } from "../src/lib/activity-signal";
@@ -56,6 +58,26 @@ describe("resolveInOfficeNow", () => {
         lastPulseInOffice: false,
       }),
     ).toBe(false);
+  });
+});
+
+describe("sync freshness helpers", () => {
+  it("picks the latest device lastSeenAt", () => {
+    const older = new Date("2026-09-12T10:00:00Z");
+    const newer = new Date("2026-09-13T10:00:00Z");
+    expect(
+      latestDeviceLastSeenAt([
+        { createdAt: older, lastSeenAt: older, installedAt: older },
+        { createdAt: older, lastSeenAt: newer, installedAt: older },
+      ]),
+    ).toEqual(newer);
+  });
+
+  it("computes minutes since a timestamp", () => {
+    const now = new Date("2026-09-13T12:00:00Z");
+    const at = new Date("2026-09-13T11:30:00Z");
+    expect(minutesSinceAt(at, now)).toBe(30);
+    expect(minutesSinceAt(null, now)).toBeNull();
   });
 });
 

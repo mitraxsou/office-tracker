@@ -55,6 +55,33 @@ export function isLowActivityCount(
   return pulsesLast24h < threshold;
 }
 
+export function latestDeviceLastSeenAt(
+  devices: AgentDeviceReference[],
+): Date | null {
+  let latest: Date | null = null;
+  for (const device of devices) {
+    if (!device.lastSeenAt) continue;
+    if (!latest || device.lastSeenAt > latest) {
+      latest = device.lastSeenAt;
+    }
+  }
+  return latest;
+}
+
+export function minutesSinceAt(at: Date | null, now: Date = new Date()): number | null {
+  if (!at) return null;
+  return Math.round((now.getTime() - at.getTime()) / 60000);
+}
+
+export async function getLastOfficeActivityAt(userId: string): Promise<Date | null> {
+  const tick = await prisma.activityTick.findFirst({
+    where: { userId, inOffice: true },
+    orderBy: { at: "desc" },
+    select: { at: true },
+  });
+  return tick?.at ?? null;
+}
+
 export function deviceRegistrationReferenceAt(
   devices: AgentDeviceReference[],
 ): Date | null {

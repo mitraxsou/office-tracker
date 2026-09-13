@@ -13,8 +13,10 @@ type DashboardHeroSummaryProps = {
   inOfficeNow: boolean;
   agentStatusValue: string;
   agentStatusTone: StatusTone;
-  lastHeartbeatLabel: string;
-  lastHeartbeatTone: StatusTone;
+  lastSyncedLabel: string;
+  lastSyncedTone: StatusTone;
+  lastOfficeActivityLabel: string;
+  lastOfficeActivityTone: StatusTone;
   openVisitStartAt: Date | null;
   openVisitSsid: string | null;
 };
@@ -33,8 +35,10 @@ export function DashboardHeroSummary({
   inOfficeNow,
   agentStatusValue,
   agentStatusTone,
-  lastHeartbeatLabel,
-  lastHeartbeatTone,
+  lastSyncedLabel,
+  lastSyncedTone,
+  lastOfficeActivityLabel,
+  lastOfficeActivityTone,
   openVisitStartAt,
   openVisitSsid,
 }: DashboardHeroSummaryProps) {
@@ -92,10 +96,16 @@ export function DashboardHeroSummary({
         </p>
       )}
 
-      <p className="mt-3 border-t border-[var(--border)] pt-3 text-xs text-muted">
-        Last activity:{" "}
-        <span className={toneClass(lastHeartbeatTone)}>{lastHeartbeatLabel}</span>
-      </p>
+      <div className="mt-3 space-y-1 border-t border-[var(--border)] pt-3 text-xs text-muted">
+        <p>
+          Last synced:{" "}
+          <span className={toneClass(lastSyncedTone)}>{lastSyncedLabel}</span>
+        </p>
+        <p>
+          Last office activity:{" "}
+          <span className={toneClass(lastOfficeActivityTone)}>{lastOfficeActivityLabel}</span>
+        </p>
+      </div>
 
       <p className="mt-2 text-[11px] text-muted">
         {dayKey} · First check-in to last check-out counts toward today&apos;s target.

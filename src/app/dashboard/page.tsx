@@ -18,7 +18,14 @@ import { DashboardRefreshButton } from "@/components/DashboardRefreshButton";
 import { DashboardHeroSummary } from "@/components/dashboard/DashboardHeroSummary";
 import { DashboardAlerts } from "@/components/dashboard/DashboardAlerts";
 import { DashboardDetailsPanel } from "@/components/dashboard/DashboardDetailsPanel";
-import { deviceRegistrationReferenceAt, isLowActivityCount } from "@/lib/activity-signal";
+import {
+  deviceRegistrationReferenceAt,
+  getLastOfficeActivityAt,
+  isLowActivityCount,
+  latestDeviceLastSeenAt,
+  minutesSinceAt,
+} from "@/lib/activity-signal";
+import { computeDeviceAgentStatus } from "@/lib/device-status";
 import { formatLastHeartbeat } from "@/lib/visits";
 
 export default async function DashboardPage() {
@@ -61,21 +68,26 @@ export default async function DashboardPage() {
     pendingPriorComplianceMonthKeys,
   );
   const pulse = await getPulseStats(user.id, graceHours);
+  const lastOfficeActivityAt = await getLastOfficeActivityAt(user.id);
   const isOutToday = await isUserOutOfOffice(user.id, summary.dayKey);
   const lastHeartbeat = summary.lastHeartbeat;
-  const agentNeverConnected = !lastHeartbeat && user.agentDevices.length === 0;
-  const agentStale = !isOutToday && !!summary.lastHeartbeat && !summary.agentHealthy;
+  const lastSyncedAt = latestDeviceLastSeenAt(user.agentDevices);
+  const syncStatus = computeDeviceAgentStatus(lastSyncedAt, graceHours);
+  const lastSyncedHealthy = syncStatus === "healthy";
+  const agentNeverConnected = user.agentDevices.length === 0 || !lastSyncedAt;
+  const agentStale =
+    !isOutToday && user.agentDevices.length > 0 && !!lastSyncedAt && !lastSyncedHealthy;
   const deviceReferenceAt = deviceRegistrationReferenceAt(user.agentDevices);
   const agentLowPulses =
     !isOutToday &&
     user.agentDevices.length > 0 &&
-    !!pulse.lastHeartbeat &&
-    pulse.agentHealthy &&
+    lastSyncedHealthy &&
     isLowActivityCount(
       pulse.pulsesLast24h,
       pulse.expectedPulsesPerDay,
       deviceReferenceAt,
     );
+  const minutesSinceLastSync = minutesSinceAt(lastSyncedAt);
   const ssidMissing =
     !!summary.lastHeartbeat && !summary.lastHeartbeat.ssid && summary.lastHeartbeat.inOffice === false;
   const openVisit = summary.visits.find((v) => v.endAt === null);
@@ -87,22 +99,26 @@ export default async function DashboardPage() {
       : null;
   const agentStatusValue = agentNeverConnected
     ? "Not connected"
-    : summary.agentHealthy
+    : lastSyncedHealthy
       ? "Healthy"
       : "Stale / offline";
   const agentStatusTone: StatusTone = agentNeverConnected
     ? "neutral"
-    : summary.agentHealthy
+    : lastSyncedHealthy
       ? "success"
       : "warning";
-  const lastHeartbeatLabel = lastHeartbeat
-    ? formatLastHeartbeat(lastHeartbeat.recordedAt, summary.dayKey, user.timezone)
+  const lastSyncedLabel = lastSyncedAt
+    ? formatLastHeartbeat(lastSyncedAt, summary.dayKey, user.timezone)
     : "None";
-  const lastHeartbeatTone: StatusTone = !lastHeartbeat
+  const lastSyncedTone: StatusTone = !lastSyncedAt
     ? "muted"
-    : summary.agentHealthy
+    : lastSyncedHealthy
       ? "success"
       : "warning";
+  const lastOfficeActivityLabel = lastOfficeActivityAt
+    ? formatLastHeartbeat(lastOfficeActivityAt, summary.dayKey, user.timezone)
+    : "None";
+  const lastOfficeActivityTone: StatusTone = lastOfficeActivityAt ? "success" : "muted";
 
   return (
     <>
@@ -124,8 +140,8 @@ export default async function DashboardPage() {
           agentStale={agentStale}
           agentLowPulses={agentLowPulses}
           adminAccess={adminAccess}
-          minutesSinceLastPulse={pulse.minutesSinceLastPulse}
-          lastPulseAt={pulse.lastHeartbeat}
+          minutesSinceLastSync={minutesSinceLastSync}
+          lastSyncedAt={lastSyncedAt}
           timezone={user.timezone}
         />
 
@@ -140,8 +156,10 @@ export default async function DashboardPage() {
           inOfficeNow={summary.inOfficeNow}
           agentStatusValue={agentStatusValue}
           agentStatusTone={agentStatusTone}
-          lastHeartbeatLabel={lastHeartbeatLabel}
-          lastHeartbeatTone={lastHeartbeatTone}
+          lastSyncedLabel={lastSyncedLabel}
+          lastSyncedTone={lastSyncedTone}
+          lastOfficeActivityLabel={lastOfficeActivityLabel}
+          lastOfficeActivityTone={lastOfficeActivityTone}
           openVisitStartAt={openVisit?.startAt ?? null}
           openVisitSsid={openVisit?.ssid ?? null}
         />
@@ -181,9 +199,9 @@ export default async function DashboardPage() {
           </p>
         )}
 
-        {adminAccess && !agentNeverConnected && !summary.agentHealthy && !agentStale && (
+        {adminAccess && !agentNeverConnected && !lastSyncedHealthy && !agentStale && (
           <p className="text-xs text-muted">
-            Agent has not sent a heartbeat recently. Check Task Scheduler or re-run{" "}
+            Agent has not synced recently. Check Task Scheduler or re-run{" "}
             <Link href="/settings#install" className="text-accent hover:underline">
               install.ps1
             </Link>

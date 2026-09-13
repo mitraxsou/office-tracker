@@ -8,8 +8,8 @@ type DashboardAlertsProps = {
   agentStale: boolean;
   agentLowPulses: boolean;
   adminAccess: boolean;
-  minutesSinceLastPulse?: number | null;
-  lastPulseAt?: string | Date | null;
+  minutesSinceLastSync?: number | null;
+  lastSyncedAt?: string | Date | null;
   timezone: string;
 };
 
@@ -19,8 +19,8 @@ export function DashboardAlerts({
   agentStale,
   agentLowPulses,
   adminAccess,
-  minutesSinceLastPulse,
-  lastPulseAt,
+  minutesSinceLastSync,
+  lastSyncedAt,
   timezone,
 }: DashboardAlertsProps) {
   const alerts: ReactNode[] = [];
@@ -59,8 +59,8 @@ export function DashboardAlerts({
       <div key="stale" className="[&>div]:px-3 [&>div]:py-3 [&>div]:text-sm">
         <AgentHealthBanner
           variant="stale"
-          minutesSinceLastPulse={minutesSinceLastPulse}
-          lastPulseAt={lastPulseAt}
+          minutesSinceLastPulse={minutesSinceLastSync}
+          lastPulseAt={lastSyncedAt}
           timezone={timezone}
         />
       </div>,

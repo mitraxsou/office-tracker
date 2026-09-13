@@ -27,6 +27,7 @@ export type AgentSyncEvent = {
   dayKey?: string;
   visitCount?: number;
   laptopActiveMs?: number;
+  gapMinutes?: number;
 };
 
 export type AgentSyncOpenVisit = {
@@ -54,6 +55,14 @@ export async function processAgentSync(params: {
 
   let lastEventAt: Date | null = null;
   let lastInOffice = false;
+
+  const needsEodClose = params.events.some(
+    (event) => event.type === "session_resume" || event.type === "daily_summary",
+  );
+  if (needsEodClose) {
+    const todayKey = dayKeyInTimezone(new Date(), params.userTimezone);
+    await loadDaySpanContext(params.userId, todayKey, params.userTimezone);
+  }
 
   for (const event of params.events) {
     if (!event.id || !event.type) {
@@ -288,6 +297,27 @@ export async function processAgentSync(params: {
           ackedEventIds.push(event.id);
           break;
         }
+        case "session_resume": {
+          const ssid = event.ssid ? normalizeSsid(sanitizeSsid(event.ssid) ?? event.ssid) : null;
+          const inOffice = isOfficeSsid(ssid, allowlist);
+          await prisma.presenceTransition.create({
+            data: {
+              userId: params.userId,
+              deviceId: params.deviceId,
+              type: "session_resume",
+              at: eventAt,
+              dayKey,
+              ssid,
+              previousSsid: null,
+              inOffice,
+            },
+          });
+          lastEventAt = eventAt;
+          lastInOffice = inOffice;
+          await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
+          ackedEventIds.push(event.id);
+          break;
+        }
         default: {
           rejected.push({ id: event.id, reason: "unknown_event_type" });
           ackedEventIds.push(event.id);
@@ -401,6 +431,7 @@ export function parseAgentSyncEvents(raw: unknown): AgentSyncEvent[] {
       dayKey: typeof record.dayKey === "string" ? record.dayKey : undefined,
       visitCount: typeof record.visitCount === "number" ? record.visitCount : undefined,
       laptopActiveMs: typeof record.laptopActiveMs === "number" ? record.laptopActiveMs : undefined,
+      gapMinutes: typeof record.gapMinutes === "number" ? record.gapMinutes : undefined,
     });
   }
   return events;

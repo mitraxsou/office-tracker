@@ -31,11 +31,11 @@ export function AgentHealthBanner({
   if (variant === "low_pulses") {
     return (
       <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-4">
-        <p className="font-medium text-amber-400">Agent is connected but activity is low</p>
+        <p className="font-medium text-amber-400">Agent is syncing but office activity is low</p>
         <p className="mt-1 text-sm text-muted">
-          Few activity ticks in the last 24 hours. The laptop may have been asleep, or the scheduled
-          task may not be running. From Settings, copy the setup command and run it in PowerShell.
-          Then check Task Scheduler for <code>PwCOfficePulse</code>.
+          Your laptop is syncing with the server, but few in-office ticks were recorded in the last
+          24 hours. You may be working from home, or the laptop was asleep most of the day. Office
+          hours only count on office Wi-Fi.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link href="/settings#install" className="btn-primary px-4 py-2 text-sm">
@@ -51,17 +51,17 @@ export function AgentHealthBanner({
 
   return (
     <div className="rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-4">
-      <p className="font-medium text-red-300">Agent not responding</p>
+      <p className="font-medium text-red-300">Agent not syncing</p>
       <p className="mt-1 text-sm text-muted">
         {minutesSinceLastPulse != null
-          ? `No agent activity for ${formatPulseAge({
+          ? `No successful sync for ${formatPulseAge({
               minutes: minutesSinceLastPulse,
               lastPulseAt,
               timezone,
             })}. `
-          : "No recent agent activity detected. "}
-        Your office hours are not updating. Copy the setup command from Settings and run it in
-        PowerShell. If that does not fix it, contact your admin.
+          : "No recent agent sync detected. "}
+        The dashboard only updates when your laptop agent POSTs to the server. Copy the setup
+        command from Settings and run it in PowerShell. If that does not fix it, contact your admin.
       </p>
       <ul className="mt-2 list-inside list-disc text-sm text-muted">
         <li>Open Settings and copy the setup command</li>
