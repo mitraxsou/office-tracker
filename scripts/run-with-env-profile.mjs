@@ -9,12 +9,15 @@ import { spawnSync } from "child_process";
 const args = process.argv.slice(2);
 const dashDash = args.indexOf("--");
 if (dashDash < 1 || dashDash >= args.length - 1) {
-  console.error("Usage: node scripts/run-with-env-profile.mjs <dev|prod> -- <command> [args...]");
+  console.error("Usage: node scripts/run-with-env-profile.mjs <dev|prod|remote|docker> -- <command> [args...]");
   process.exit(1);
 }
 
 const profileRaw = args[0].trim().toLowerCase();
-const profile = profileRaw === "prod" || profileRaw === "production" ? "prod" : "dev";
+let profile = "dev";
+if (profileRaw === "prod" || profileRaw === "production") profile = "prod";
+else if (profileRaw === "remote") profile = "remote";
+else if (profileRaw === "docker") profile = "docker";
 const childArgv = args.slice(dashDash + 1);
 const [command, ...commandArgs] = childArgv;
 

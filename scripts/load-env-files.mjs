@@ -3,6 +3,8 @@
  *
  * dev (default):  .env, .env.local, .env.vercel.dev.local
  * prod:           .env, .env.local, .env.vercel.local, .env.vercel.prod.local
+ * remote:         .env, .env.local, .env.remote.local (no local Postgres required)
+ * docker:         .env, .env.local, .env.docker.local
  *
  * Later files override earlier ones. On Vercel (VERCEL=1), skips file loading.
  */
@@ -17,11 +19,15 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const PROFILE_FILES = {
   dev: [".env", ".env.local", ".env.vercel.dev.local"],
   prod: [".env", ".env.local", ".env.vercel.local", ".env.vercel.prod.local"],
+  remote: [".env", ".env.local", ".env.remote.local"],
+  docker: [".env", ".env.local", ".env.docker.local"],
 };
 
 export function getEnvProfile() {
   const raw = (process.env.OFFICETRACKER_ENV_PROFILE || "dev").trim().toLowerCase();
   if (raw === "prod" || raw === "production") return "prod";
+  if (raw === "remote") return "remote";
+  if (raw === "docker") return "docker";
   return "dev";
 }
 

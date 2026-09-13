@@ -51,6 +51,8 @@ PwC Office Pulse regression scenarios for the Windows agent (`agent/`) and porta
 
 ## Laptop regression (manual + harness)
 
+See `docs/local-demo-users.md` for demo users and the dev simulator at `/dev/simulator`.
+
 ```powershell
 # 1. Create or refresh dummy user (requires .env.local with Postgres)
 npm run prisma:env -- tsx scripts/regression/create-regression-user.ts

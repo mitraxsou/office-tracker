@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "node scripts/ensure-postgres-env.mjs -- next dev",
     "dev:prod": "node scripts/run-with-env-profile.mjs prod -- node scripts/ensure-postgres-env.mjs -- next dev",
+    "dev:remote": "node scripts/run-with-env-profile.mjs remote -- node scripts/ensure-postgres-env.mjs -- next dev",
+    "dev:docker": "node scripts/run-with-env-profile.mjs docker -- node scripts/ensure-postgres-env.mjs -- next dev",
     "env:pull:dev": "node scripts/pull-hobby-env.mjs dev",
     "env:pull:prod": "node scripts/pull-hobby-env.mjs prod",
     "build": "node scripts/ensure-postgres-env.mjs --generate-only -- prisma generate && node scripts/setup-db-on-deploy.mjs && node scripts/ensure-postgres-env.mjs -- next build",
@@ -13,6 +15,9 @@
     "test": "vitest run",
     "test:regression": "vitest run tests/agent-heartbeat-sync.test.ts tests/agent-storage.test.ts tests/agent-version.test.ts tests/agent-sync.test.ts tests/agent-ps51-compat.test.ts tests/heartbeat-eod.test.ts tests/activity-signal.test.ts tests/agent-api-hits.test.ts",
     "regression:create-prod": "node scripts/regression/create-regression-user-prod.mjs",
+    "seed:demo": "node scripts/ensure-postgres-env.mjs -- tsx scripts/regression/seed-demo-users.ts",
+    "seed:demo:dev": "node scripts/run-with-env-profile.mjs dev -- node scripts/regression/seed-demo-users-dev.mjs",
+    "seed:demo:prod": "node scripts/run-with-env-profile.mjs prod -- node scripts/regression/seed-demo-users-prod.mjs",
     "test:watch": "vitest",
     "db:generate": "node scripts/ensure-postgres-env.mjs --generate-only -- prisma generate",
     "db:push": "node scripts/ensure-postgres-env.mjs -- prisma db push",

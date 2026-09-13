@@ -22,11 +22,17 @@ const dashDash = args.indexOf("--");
 const childArgv = dashDash >= 0 ? args.slice(dashDash + 1) : [];
 
 const loadedFiles = loadEnvFiles();
+const remoteApiMode = process.env.OFFICETRACKER_REMOTE_API === "1";
 
 if (generateOnly) {
   // Generate does not connect to the DB. Always use placeholders so install/build
   // succeed on Vercel even when Storage vars are missing during install or partial.
   applyPrismaGenerateEnv();
+} else if (remoteApiMode) {
+  applyPrismaGenerateEnv();
+  if (process.env.DEBUG_POSTGRES_ENV === "1") {
+    console.log("Remote API mode: skipping Postgres env check (OFFICETRACKER_REMOTE_API=1)");
+  }
 } else {
   const prepared = preparePostgresEnvForPush();
 

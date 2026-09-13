@@ -8,6 +8,8 @@ Office Pulse loads env files from the repo root based on `OFFICETRACKER_ENV_PROF
 |---------|----------|-------------------------|
 | **dev** (default) | `npm run dev` | `.env`, `.env.local`, `.env.vercel.dev.local` |
 | **prod** | `npm run dev:prod` or `OFFICETRACKER_ENV_PROFILE=prod` | `.env`, `.env.local`, `.env.vercel.local`, `.env.vercel.prod.local` |
+| **remote** | `npm run dev:remote` | `.env`, `.env.local`, `.env.remote.local` |
+| **docker** | `npm run dev:docker` | `.env`, `.env.local`, `.env.docker.local` |
 
 `npm run dev` uses the **dev** Neon database (`office-tracker-dev-db`). It does **not** load `.env.vercel.local` (Hobby prod Postgres).
 
@@ -21,7 +23,9 @@ Office Pulse loads env files from the repo root based on `OFFICETRACKER_ENV_PROF
 | `.env.vercel.local` | Hobby **prod** Postgres / Storage vars only (manual or Storage tab) |
 | `.env.vercel.prod.local` | Hobby **prod** full env pull (`npm run env:pull:prod`) |
 
-See `.env.local.example` and `.env.vercel.local.example` for templates.
+See `.env.local.example`, `.env.vercel.local.example`, `.env.remote.example`, and `.env.docker.example` for templates.
+
+When PwC VPN blocks Neon, start with `docs/local-dev-connectivity.md` (remote API profile).
 
 ## Optional (Enterprise pilot)
 

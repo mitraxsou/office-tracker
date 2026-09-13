@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: office
+      POSTGRES_PASSWORD: office
+      POSTGRES_DB: office_tracker
+    volumes:
+      - office_tracker_pg:/var/lib/postgresql/data
+
+volumes:
+  office_tracker_pg:
