@@ -1,5 +1,5 @@
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 import { resolvePostgresEnv } from "./db-env";
 
@@ -24,7 +24,8 @@ export function shouldUsePgAdapter(): boolean {
 }
 
 function createPrismaClient(): PrismaClient {
-  const log = process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"];
+  const log: Prisma.LogLevel[] =
+    process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"];
 
   if (shouldUsePgAdapter()) {
     const connectionString = process.env.POSTGRES_PRISMA_URL;
