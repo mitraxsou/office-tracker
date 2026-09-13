@@ -6,9 +6,9 @@ import {
   isMaintenanceTable,
   isRetentionPeriod,
   MAINTENANCE_TABLE_LABELS,
-  purgeTableRows,
   retentionDaysFromPeriod,
 } from "@/lib/db-maintenance";
+import { purgeTableRows } from "@/lib/db-maintenance-server";
 
 export async function POST(request: Request) {
   const admin = await requireAdmin();

@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin";
 import {
-  countRowsForPurge,
   cutoffDateFromRetentionDays,
   isMaintenanceTable,
   isRetentionPeriod,
   MAINTENANCE_TABLE_LABELS,
   retentionDaysFromPeriod,
 } from "@/lib/db-maintenance";
+import { countRowsForPurge } from "@/lib/db-maintenance-server";
 
 export async function GET(request: Request) {
   const admin = await requireAdmin();
