@@ -51,6 +51,8 @@ const env = {
   ...process.env,
   VERCEL_ORG_ID: HOBBY_TEAM_ID,
   VERCEL_PROJECT_ID: projectId,
+  // PwC corporate TLS inspection breaks vercel env pull without this.
+  NODE_TLS_REJECT_UNAUTHORIZED: "0",
 };
 
 console.log(`Pulling ${projectName} (${profile}) into ${outputFile} ...`);
