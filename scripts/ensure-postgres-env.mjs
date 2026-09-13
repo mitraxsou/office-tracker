@@ -1,5 +1,5 @@
 /**
- * Loads env files, maps Vercel Storage Postgres vars for Prisma, and optionally
+ * Loads profile-based env files, maps Vercel Storage Postgres vars for Prisma, and optionally
  * runs a child command with the resolved env (so prisma db push / seed see them).
  */
 

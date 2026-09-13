@@ -152,10 +152,10 @@ export function formatMissingPostgresEnvError({ loadedFiles = [] } = {}) {
   } else if (isVercel()) {
     lines.push("  No POSTGRES_* / DATABASE_* / NEON_* keys in process.env during Vercel build.");
   } else if (loadedFiles.length === 0) {
-    lines.push("  No .env, .env.local, or .env.vercel.local found in project root.");
+    lines.push("  No env files found for the active profile in project root.");
   } else {
     lines.push(
-      `  Loaded: ${loadedFiles.join(", ")} — but no valid Postgres URL found in process.env.`,
+      `  Loaded: ${loadedFiles.join(", ")} - but no valid Postgres URL found in process.env.`,
     );
   }
 
@@ -170,13 +170,20 @@ export function formatMissingPostgresEnvError({ loadedFiles = [] } = {}) {
     lines.push("  3. Each Storage var must be enabled for Build (not Runtime-only)");
     lines.push("  4. Redeploy with RUN_DB_SETUP_ON_DEPLOY=true");
   } else {
-    lines.push("Local fix:");
-    lines.push("  1. Vercel → Storage → Postgres → .env.local tab");
-    lines.push("     Copy POSTGRES_PRISMA_URL and POSTGRES_URL_NON_POOLING");
-    lines.push("  2. Paste into .env.vercel.local (see .env.vercel.local.example)");
-    lines.push("  3. Run: .\\scripts\\setup-prod-db.ps1   or   npm run db:push");
+    const profile = (process.env.OFFICETRACKER_ENV_PROFILE || "dev").trim().toLowerCase();
+    const isProdProfile = profile === "prod" || profile === "production";
+    lines.push(`Local fix (OFFICETRACKER_ENV_PROFILE=${isProdProfile ? "prod" : "dev"}):`);
+    if (isProdProfile) {
+      lines.push("  1. npm run env:pull:prod   or copy POSTGRES_* into .env.vercel.local / .env.vercel.prod.local");
+      lines.push("  2. See .env.vercel.local.example and docs/local-env-files.md");
+      lines.push("  3. Run: OFFICETRACKER_ENV_PROFILE=prod npm run db:push");
+    } else {
+      lines.push("  1. npm run env:pull:dev   or copy POSTGRES_* into .env.vercel.dev.local");
+      lines.push("  2. See docs/local-env-files.md");
+      lines.push("  3. Run: npm run db:push");
+    }
     lines.push("");
-    lines.push("Or: npm run db:push / node scripts/prisma-with-env.mjs db push");
+    lines.push("Or: node scripts/prisma-with-env.mjs db push");
   }
 
   lines.push("");

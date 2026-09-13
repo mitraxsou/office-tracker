@@ -1,7 +1,7 @@
 /**
- * Run Prisma CLI with .env, .env.local, and .env.vercel.local loaded and
- * POSTGRES_* aliases resolved. Use instead of raw `npx prisma` when vars
- * live in .env.vercel.local or only DATABASE_URL / POSTGRES_URL is set.
+ * Run Prisma CLI with profile-based env files loaded and POSTGRES_* resolved.
+ * Default profile is dev (.env.vercel.dev.local). Use OFFICETRACKER_ENV_PROFILE=prod
+ * for prod files. See docs/local-env-files.md.
  *
  *   node scripts/prisma-with-env.mjs db push
  *   npm run prisma:env -- db push

@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/ensure-postgres-env.mjs -- next dev",
+    "dev:prod": "node scripts/run-with-env-profile.mjs prod -- node scripts/ensure-postgres-env.mjs -- next dev",
+    "env:pull:dev": "node scripts/pull-hobby-env.mjs dev",
+    "env:pull:prod": "node scripts/pull-hobby-env.mjs prod",
     "build": "node scripts/ensure-postgres-env.mjs --generate-only -- prisma generate && node scripts/setup-db-on-deploy.mjs && node scripts/ensure-postgres-env.mjs -- next build",
     "start": "next start",
     "lint": "eslint",
