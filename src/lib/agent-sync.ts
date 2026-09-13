@@ -13,6 +13,8 @@ import { validateVisitTimestamps } from "./visit-validation";
 import { maybeDispatchHeartbeatAlerts } from "./heartbeat-alerts";
 import { loadDaySpanContext, runVisitMaintenance } from "./heartbeat-service";
 import { parseAgentEventTimestamp, sanitizeSsid, sanitizeSerialNumber } from "./security";
+import { sanitizeSyncTrigger } from "./presence-timeline";
+import { randomUUID } from "crypto";
 
 const SUMMARY_MISMATCH_MS = 5 * 60 * 1000;
 
@@ -70,6 +72,7 @@ export async function processAgentSync(params: {
   events: AgentSyncEvent[];
   openVisit?: AgentSyncOpenVisit | null;
   appUrl: string;
+  syncTrigger?: string | null;
 }) {
   const config = await getAppConfig();
   const allowlist = config.officeSsids;
@@ -384,6 +387,18 @@ export async function processAgentSync(params: {
   const forceAgentUpdate = await getDeviceForceAgentUpdate(params.userId, params.serialNumber);
   const appUrl = params.appUrl.replace(/\/$/, "");
 
+  const syncTrigger = sanitizeSyncTrigger(params.syncTrigger);
+  if (syncTrigger) {
+    await recordSyncBatch({
+      userId: params.userId,
+      deviceId: params.deviceId,
+      syncTrigger,
+      eventCount: params.events.length,
+      ackedCount: ackedEventIds.length,
+      eventTypes: [...new Set(params.events.map((event) => event.type))],
+    });
+  }
+
   return {
     ok: true,
     ackedEventIds,
@@ -426,6 +441,31 @@ async function recordAgentEvent(
       status,
     },
     update: { status },
+  });
+}
+
+async function recordSyncBatch(params: {
+  userId: string;
+  deviceId: string;
+  syncTrigger: string;
+  eventCount: number;
+  ackedCount: number;
+  eventTypes: string[];
+}) {
+  await prisma.agentEvent.create({
+    data: {
+      userId: params.userId,
+      deviceId: params.deviceId,
+      clientEventId: `sync-${randomUUID()}`,
+      type: "sync_batch",
+      payload: {
+        syncTrigger: params.syncTrigger,
+        eventCount: params.eventCount,
+        ackedCount: params.ackedCount,
+        eventTypes: params.eventTypes,
+      },
+      status: "accepted",
+    },
   });
 }
 

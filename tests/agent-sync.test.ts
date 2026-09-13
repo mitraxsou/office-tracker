@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const agentEventFindUniqueMock = vi.hoisted(() => vi.fn());
 const agentEventUpsertMock = vi.hoisted(() => vi.fn());
+const agentEventCreateMock = vi.hoisted(() => vi.fn());
 const presenceTransitionCreateMock = vi.hoisted(() => vi.fn());
 const activityTickCreateMock = vi.hoisted(() => vi.fn());
 const visitFindFirstMock = vi.hoisted(() => vi.fn());
@@ -17,6 +18,7 @@ vi.mock("@/lib/db", () => ({
     agentEvent: {
       findUnique: agentEventFindUniqueMock,
       upsert: agentEventUpsertMock,
+      create: agentEventCreateMock,
     },
     presenceTransition: { create: presenceTransitionCreateMock },
     activityTick: { create: activityTickCreateMock },
@@ -129,6 +131,7 @@ describe("processAgentSync session_resume", () => {
     vi.clearAllMocks();
     agentEventFindUniqueMock.mockResolvedValue(null);
     agentEventUpsertMock.mockResolvedValue({});
+    agentEventCreateMock.mockResolvedValue({});
     presenceTransitionCreateMock.mockResolvedValue({});
     activityTickCreateMock.mockResolvedValue({});
     visitFindFirstMock.mockResolvedValue(null);
@@ -277,6 +280,36 @@ describe("processAgentSync session_resume", () => {
     expect(visitUpdateMock).not.toHaveBeenCalled();
     expect(result.rejected).toEqual([]);
     expect(result.serverState.inOfficeNow).toBe(false);
+  });
+
+  it("records sync_batch when syncTrigger is provided", async () => {
+    await processAgentSync({
+      userId: "user-1",
+      userTimezone: "Asia/Kolkata",
+      deviceId: "device-1",
+      serialNumber: "SERIAL-1",
+      events: [
+        {
+          id: "evt-tick",
+          type: "activity_tick",
+          at: "2026-09-13T08:00:00.000Z",
+          ssid: "HomeWiFi",
+        },
+      ],
+      appUrl: "https://office.example",
+      syncTrigger: "activity_tick",
+    });
+
+    expect(agentEventCreateMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        type: "sync_batch",
+        payload: expect.objectContaining({
+          syncTrigger: "activity_tick",
+          eventCount: 1,
+          eventTypes: ["activity_tick"],
+        }),
+      }),
+    });
   });
 
   it("rejects visit_start when SSID is not on the office allowlist", async () => {

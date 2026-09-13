@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ConfigFetchIntervalRuns = 5
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.3.7"
+$AgentScriptVersion = "1.3.8"
 
 function Get-InstallDir {
     if ($env:OFFICETRACKER_INSTALL_DIR) {
@@ -820,7 +820,8 @@ function Invoke-AgentSync {
         [string]$SerialNumber,
         [string]$ScriptVersion,
         [array]$Events,
-        $OpenVisit
+        $OpenVisit,
+        [string]$SyncTrigger
     )
 
     $body = @{
@@ -831,6 +832,7 @@ function Invoke-AgentSync {
         events = $Events
     }
     if ($OpenVisit) { $body.openVisit = $OpenVisit }
+    if ($SyncTrigger) { $body.syncTrigger = $SyncTrigger }
 
     $json = $body | ConvertTo-Json -Depth 8 -Compress
     $uri = "$ApiUrl/api/agent/sync"
@@ -891,6 +893,20 @@ function Invoke-LegacyHeartbeat {
     return @{ ok = $false; error = $postError }
 }
 
+function Get-SyncTrigger {
+    param(
+        [bool]$IsResumeRun,
+        [bool]$SsidChanged,
+        [bool]$ActivityDue,
+        [int]$QueuedEventCount
+    )
+    if ($IsResumeRun) { return "resume_wake" }
+    if ($SsidChanged) { return "ssid_change" }
+    if ($ActivityDue) { return "activity_tick" }
+    if ($QueuedEventCount -gt 0) { return "queued_events" }
+    return "health_ping"
+}
+
 function Invoke-FlushSync {
     param(
         [string]$ApiUrl,
@@ -900,7 +916,8 @@ function Invoke-FlushSync {
         $SyncState,
         [bool]$AllowHealthPing,
         [string]$FallbackSsid,
-        [string]$VpnGateway
+        [string]$VpnGateway,
+        [string]$SyncTrigger
     )
 
     $queue = @(Get-EventQueue)
@@ -921,7 +938,8 @@ function Invoke-FlushSync {
 
     $openVisit = Get-OpenVisitFromState $SyncState
     $syncResult = Invoke-AgentSync -ApiUrl $ApiUrl -Token $Token -SerialNumber $SerialNumber `
-        -ScriptVersion $ScriptVersion -Events $eventsToSend -OpenVisit $openVisit
+        -ScriptVersion $ScriptVersion -Events $eventsToSend -OpenVisit $openVisit `
+        -SyncTrigger $SyncTrigger
 
     if ($syncResult.notFound) {
         Write-Log "WARN sync 404; falling back to legacy heartbeat"
@@ -1125,9 +1143,11 @@ if ($DryRun) {
 
 $shouldSync = $isResumeRun -or $ssidChanged -or $activityDue -or (@(Get-EventQueue).Count -gt 0)
 if ($shouldSync) {
+    $syncTrigger = Get-SyncTrigger -IsResumeRun $isResumeRun -SsidChanged $ssidChanged `
+        -ActivityDue $activityDue -QueuedEventCount (@(Get-EventQueue).Count)
     $flush = Invoke-FlushSync -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber `
         -ScriptVersion $scriptVersion -SyncState $syncState -AllowHealthPing:(-not $ssidChanged) `
-        -FallbackSsid $ssid -VpnGateway $vpnGateway
+        -FallbackSsid $ssid -VpnGateway $vpnGateway -SyncTrigger $syncTrigger
     $syncState = $flush.syncState
     if (-not $flush.synced) {
         if ($flush.error) { Write-Log "ERROR sync failed: $($flush.error)"; exit 1 }

@@ -28,6 +28,7 @@ import {
   summarizeDeviceAgentVersions,
 } from "@/lib/agent-version-display";
 import { formatPulseAge } from "@/lib/pulse-age";
+import { AdminPresenceTimeline } from "./AdminPresenceTimeline";
 
 type UserReport = {
   user: {
@@ -121,6 +122,13 @@ type UserReport = {
     expiresAt: string | null;
   }>;
   range: { days: number; from: string; to: string; month: string; currentMonth: string };
+  apiHits?: {
+    totals: { day: number; month: number; year: number };
+    byDevice: Array<{
+      deviceId: string;
+      totals: { day: number; month: number; year: number };
+    }>;
+  };
   monthlyDaysTarget: number;
   monthlyProgress: {
     monthKey: string;
@@ -507,6 +515,15 @@ export function AdminUserReport({
             <dt className="text-muted">Registered laptops</dt>
             <dd>{data.devices.length}</dd>
           </div>
+          {data.apiHits && (
+            <div>
+              <dt className="text-muted">Agent API hits (all laptops)</dt>
+              <dd>
+                Today {data.apiHits.totals.day} · This month {data.apiHits.totals.month} · This
+                year {data.apiHits.totals.year}
+              </dd>
+            </div>
+          )}
           {data.serverAppUrl && (
             <div className="sm:col-span-2">
               <dt className="text-muted">Expected app URL (this deployment)</dt>
@@ -525,6 +542,9 @@ export function AdminUserReport({
                       device.agentScriptVersion,
                       device.agentVersionStale,
                     );
+                    const deviceHits = data.apiHits?.byDevice.find(
+                      (entry) => entry.deviceId === device.id,
+                    )?.totals;
                     return (
                       <li key={device.id}>
                         <code>{device.serialNumber}</code>: {version.version}
@@ -584,6 +604,13 @@ export function AdminUserReport({
                             </button>
                           </>
                         )}
+                        {deviceHits && (
+                          <>
+                            {" "}
+                            · API hits today {deviceHits.day}, month {deviceHits.month}, year{" "}
+                            {deviceHits.year}
+                          </>
+                        )}
                       </li>
                     );
                   })}
@@ -604,6 +631,8 @@ export function AdminUserReport({
           </ul>
         )}
       </section>
+
+      <AdminPresenceTimeline userId={userId} timezone={data.user.timezone} />
 
       <section className="card p-6">
         <h3 className="mb-3 text-sm font-medium">Recent activity (retention window)</h3>

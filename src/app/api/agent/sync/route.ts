@@ -21,6 +21,8 @@ import {
   sanitizeScriptVersion,
   sanitizeSerialNumber,
 } from "@/lib/security";
+import { sanitizeSyncTrigger } from "@/lib/presence-timeline";
+import { AGENT_API_ROUTES, recordAgentApiHit } from "@/lib/agent-api-hits";
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -106,6 +108,19 @@ export async function POST(request: Request) {
     resolveRequestAppOrigin(request) ??
     "";
 
+  const syncTrigger = sanitizeSyncTrigger(body.syncTrigger);
+
+  try {
+    await recordAgentApiHit({
+      userId: user.id,
+      deviceId: deviceResult.device.id,
+      route: AGENT_API_ROUTES.SYNC,
+      timezone: user.timezone,
+    });
+  } catch {
+    console.error("[agent-sync] Failed to record API hit");
+  }
+
   const result = await processAgentSync({
     userId: user.id,
     userTimezone: user.timezone,
@@ -114,6 +129,7 @@ export async function POST(request: Request) {
     events,
     openVisit,
     appUrl,
+    syncTrigger,
   });
 
   return NextResponse.json(result);

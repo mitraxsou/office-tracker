@@ -63,4 +63,11 @@ describe("office-heartbeat wake and sync behavior", () => {
   it("honors OFFICETRACKER_INSTALL_DIR for isolated regression installs", () => {
     expect(heartbeat).toContain("$env:OFFICETRACKER_INSTALL_DIR");
   });
+
+  it("sends syncTrigger on agent sync POST body", () => {
+    expect(heartbeat).toContain('if ($SyncTrigger) { $body.syncTrigger = $SyncTrigger }');
+    expect(heartbeat).toContain("function Get-SyncTrigger");
+    expect(heartbeat).toContain('return "resume_wake"');
+    expect(heartbeat).toContain('-SyncTrigger $syncTrigger');
+  });
 });

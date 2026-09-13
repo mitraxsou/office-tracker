@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { formatPulseAge } from "@/lib/pulse-age";
+import { AdminPresenceTimeline } from "./AdminPresenceTimeline";
 
 type FollowUpDevice = {
   deviceId: string;
@@ -258,6 +259,12 @@ export function AgentFollowUpPanel({
                       </li>
                     ))}
                   </ul>
+
+                  <AdminPresenceTimeline
+                    userId={user.userId}
+                    timezone={user.timezone}
+                    compact
+                  />
 
                   <div className="mt-3 flex flex-wrap gap-3">
                     <Link
