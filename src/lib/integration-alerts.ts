@@ -80,7 +80,7 @@ export async function acknowledgeIntegrationAlerts(
   }
 }
 
-async function hadInOfficeHeartbeatToday(
+async function hadInOfficePresenceToday(
   userId: string,
   dayStart: Date,
   dayEnd: Date,
@@ -90,7 +90,26 @@ async function hadInOfficeHeartbeatToday(
     where: { userId, recordedAt: { gte: dayStart, lte: dayEnd } },
     select: { ssid: true, inOffice: true },
   });
-  return beats.some((b) => heartbeatInOffice(b, allowlist));
+  if (beats.some((b) => heartbeatInOffice(b, allowlist))) return true;
+
+  const inOfficeTick = await prisma.activityTick.findFirst({
+    where: {
+      userId,
+      at: { gte: dayStart, lte: dayEnd },
+      inOffice: true,
+    },
+    select: { id: true },
+  });
+  if (inOfficeTick) return true;
+
+  const visitToday = await prisma.visit.findFirst({
+    where: {
+      userId,
+      startAt: { gte: dayStart, lte: dayEnd },
+    },
+    select: { id: true },
+  });
+  return visitToday !== null;
 }
 
 function buildAbsentMessage(
@@ -169,7 +188,7 @@ async function evaluateUserAlerts(
 
   const baseUrl = appBaseUrl();
   const outOfOfficeUrl = await buildOutOfOfficeLinkUrl(user.id, dayKey);
-  const inOfficeToday = await hadInOfficeHeartbeatToday(
+  const inOfficeToday = await hadInOfficePresenceToday(
     user.id,
     dayStart,
     dayEnd,

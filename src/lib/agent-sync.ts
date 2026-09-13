@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { isOfficeSsid, normalizeSsid } from "./constants";
-import { getAppConfig, getUserHoursTarget } from "./app-config";
+import { getUserHoursTarget } from "./app-config";
+import { getCachedAppConfig } from "./agent-config-cache";
 import { getAgentVersion } from "./agent-version";
 import { getDeviceForceAgentUpdate } from "./agent-update";
 import {
@@ -11,7 +12,7 @@ import { daySpanMsForDay, dayKeyInTimezone } from "./visits";
 import { dayBoundsFromKey } from "./timezone-dates";
 import { validateVisitTimestamps } from "./visit-validation";
 import { maybeDispatchHeartbeatAlerts } from "./heartbeat-alerts";
-import { loadDaySpanContext, runVisitMaintenance } from "./heartbeat-service";
+import { loadDaySpanContext, maybeRunVisitMaintenance } from "./heartbeat-service";
 import { parseAgentEventTimestamp, sanitizeSsid, sanitizeSerialNumber } from "./security";
 import { sanitizeSyncTrigger } from "./presence-timeline";
 import { randomUUID } from "crypto";
@@ -30,6 +31,12 @@ const AGENT_SYNC_EVENT_PRIORITY: Record<string, number> = {
   daily_summary: 6,
   health_ping: 7,
 };
+
+const VISIT_MAINTENANCE_EVENT_TYPES = new Set(["session_resume", "daily_summary"]);
+
+export function syncBatchNeedsVisitMaintenance(events: AgentSyncEvent[]): boolean {
+  return events.some((event) => VISIT_MAINTENANCE_EVENT_TYPES.has(event.type));
+}
 
 export function sortAgentSyncEventsForProcessing(events: AgentSyncEvent[]): AgentSyncEvent[] {
   return [...events].sort((a, b) => {
@@ -74,7 +81,7 @@ export async function processAgentSync(params: {
   appUrl: string;
   syncTrigger?: string | null;
 }) {
-  const config = await getAppConfig();
+  const config = await getCachedAppConfig();
   const allowlist = config.officeSsids;
   const ackedEventIds: string[] = [];
   const rejected: AgentSyncRejected[] = [];
@@ -353,11 +360,8 @@ export async function processAgentSync(params: {
     }
   }
 
-  const needsMaintenance = params.events.some(
-    (event) => event.type === "session_resume" || event.type === "daily_summary",
-  );
-  if (needsMaintenance) {
-    await runVisitMaintenance(params.userId, params.userTimezone);
+  if (syncBatchNeedsVisitMaintenance(params.events)) {
+    await maybeRunVisitMaintenance(params.userId, params.userTimezone, undefined, { force: true });
   }
 
   const openVisitRow = await prisma.visit.findFirst({

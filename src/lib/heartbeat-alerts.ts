@@ -28,7 +28,7 @@ export function selectHeartbeatAlertTypes(input: {
   return types;
 }
 
-async function isFirstInOfficeHeartbeatToday(
+async function isFirstInOfficePresenceToday(
   userId: string,
   timezone: string,
   recordedAt: Date,
@@ -37,14 +37,22 @@ async function isFirstInOfficeHeartbeatToday(
   if (!inOffice) return false;
   const dayKey = dayKeyInTimezone(recordedAt, timezone);
   const { start: dayStart } = dayBoundsFromKey(dayKey, timezone);
-  const priorCount = await prisma.heartbeat.count({
-    where: {
-      userId,
-      inOffice: true,
-      recordedAt: { gte: dayStart, lt: recordedAt },
-    },
-  });
-  return priorCount === 0;
+  const [priorHeartbeats, priorVisits] = await Promise.all([
+    prisma.heartbeat.count({
+      where: {
+        userId,
+        inOffice: true,
+        recordedAt: { gte: dayStart, lt: recordedAt },
+      },
+    }),
+    prisma.visit.count({
+      where: {
+        userId,
+        startAt: { gte: dayStart, lt: recordedAt },
+      },
+    }),
+  ]);
+  return priorHeartbeats === 0 && priorVisits === 0;
 }
 
 /**
@@ -68,7 +76,7 @@ export async function maybeDispatchHeartbeatAlerts(params: {
   }
 
   const [firstInOfficeToday, hoursStartedSent, hoursMetSent] = await Promise.all([
-    isFirstInOfficeHeartbeatToday(userId, timezone, recordedAt, inOffice),
+    isFirstInOfficePresenceToday(userId, timezone, recordedAt, inOffice),
     wasAlertDispatchedToday(userId, "hours_started", dayKey),
     wasAlertDispatchedToday(userId, "hours_met", dayKey),
   ]);

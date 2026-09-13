@@ -18,6 +18,19 @@ import { daySpanMsForDay, dayKeyInTimezone, effectiveVisitEnd, type DaySpanParam
 import { dayBoundsFromKey, getDayBounds } from "./timezone-dates";
 import { validateVisitTimestamps } from "./visit-validation";
 
+/** Skip repeat maintenance on dashboard reads within this window. */
+export const VISIT_MAINTENANCE_THROTTLE_MS = 15 * 60 * 1000;
+
+const lastMaintenanceAtByUser = new Map<string, number>();
+
+export function resetVisitMaintenanceThrottle(userId?: string) {
+  if (userId) {
+    lastMaintenanceAtByUser.delete(userId);
+    return;
+  }
+  lastMaintenanceAtByUser.clear();
+}
+
 export async function loadDaySpanContext(
   userId: string,
   dayKey: string,
@@ -33,7 +46,7 @@ export async function loadDaySpanContext(
   const allowlist = config.officeSsids;
   const staleMs = config.agentStaleMinutes * 60 * 1000;
   if (!options?.skipMaintenance) {
-    await runVisitMaintenance(userId, timezone, staleMs);
+    await maybeRunVisitMaintenance(userId, timezone, staleMs);
   }
 
   const { start: dayStart, end: dayEnd } = dayBoundsFromKey(dayKey, timezone);
@@ -293,6 +306,24 @@ export async function runVisitMaintenance(
   await closeEndOfDayOpenVisits(userId, timezone);
   const gapMs = staleMs ?? (await getAppConfig()).agentStaleMinutes * 60 * 1000;
   await closeStaleOpenVisits(userId, gapMs);
+}
+
+export async function maybeRunVisitMaintenance(
+  userId: string,
+  timezone: string,
+  staleMs?: number,
+  options?: { force?: boolean },
+) {
+  if (!options?.force) {
+    const lastAt = lastMaintenanceAtByUser.get(userId) ?? 0;
+    if (Date.now() - lastAt < VISIT_MAINTENANCE_THROTTLE_MS) {
+      return false;
+    }
+  }
+
+  await runVisitMaintenance(userId, timezone, staleMs);
+  lastMaintenanceAtByUser.set(userId, Date.now());
+  return true;
 }
 
 async function getLastOfficeDisconnectAt(

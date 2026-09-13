@@ -7,11 +7,13 @@ const presenceTransitionCreateMock = vi.hoisted(() => vi.fn());
 const activityTickCreateMock = vi.hoisted(() => vi.fn());
 const visitFindFirstMock = vi.hoisted(() => vi.fn());
 const visitFindManyMock = vi.hoisted(() => vi.fn());
+const visitCreateMock = vi.hoisted(() => vi.fn());
 const visitUpdateMock = vi.hoisted(() => vi.fn());
+const maybeDispatchHeartbeatAlertsMock = vi.hoisted(() => vi.fn());
 const dailySummaryUpsertMock = vi.hoisted(() => vi.fn());
 const userFindUniqueMock = vi.hoisted(() => vi.fn());
 const loadDaySpanContextMock = vi.hoisted(() => vi.fn());
-const runVisitMaintenanceMock = vi.hoisted(() => vi.fn());
+const maybeRunVisitMaintenanceMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -25,7 +27,7 @@ vi.mock("@/lib/db", () => ({
     visit: {
       findFirst: visitFindFirstMock,
       findMany: visitFindManyMock,
-      create: vi.fn(),
+      create: visitCreateMock,
       update: visitUpdateMock,
     },
     dailySummary: { upsert: dailySummaryUpsertMock },
@@ -33,13 +35,15 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 vi.mock("@/lib/app-config", () => ({
-  getAppConfig: vi.fn().mockResolvedValue({
+  getUserHoursTarget: vi.fn().mockResolvedValue(5),
+}));
+vi.mock("@/lib/agent-config-cache", () => ({
+  getCachedAppConfig: vi.fn().mockResolvedValue({
     officeSsids: ["OfficeConnect"],
     heartbeatIntervalMinutes: 5,
     agentStaleMinutes: 15,
-    agentMode: "event",
+    agentMode: "events",
   }),
-  getUserHoursTarget: vi.fn().mockResolvedValue(5),
 }));
 vi.mock("@/lib/agent-version", () => ({
   getAgentVersion: () => "1.3.2",
@@ -52,11 +56,11 @@ vi.mock("@/lib/agent-download", () => ({
   vercelProtectionBypassSecret: () => null,
 }));
 vi.mock("@/lib/heartbeat-alerts", () => ({
-  maybeDispatchHeartbeatAlerts: vi.fn(),
+  maybeDispatchHeartbeatAlerts: maybeDispatchHeartbeatAlertsMock,
 }));
 vi.mock("@/lib/heartbeat-service", () => ({
   loadDaySpanContext: loadDaySpanContextMock,
-  runVisitMaintenance: runVisitMaintenanceMock,
+  maybeRunVisitMaintenance: maybeRunVisitMaintenanceMock,
 }));
 
 import {
@@ -64,6 +68,7 @@ import {
   parseAgentSyncOpenVisit,
   processAgentSync,
   sortAgentSyncEventsForProcessing,
+  syncBatchNeedsVisitMaintenance,
 } from "../src/lib/agent-sync";
 import { dayBoundsFromKey } from "../src/lib/timezone-dates";
 
@@ -144,7 +149,7 @@ describe("processAgentSync session_resume", () => {
       lastHeartbeat: null,
       laptopActiveParams: {},
     });
-    runVisitMaintenanceMock.mockResolvedValue(undefined);
+    maybeRunVisitMaintenanceMock.mockResolvedValue(true);
   });
 
   it("parses gapMinutes on session_resume events", () => {
@@ -179,7 +184,12 @@ describe("processAgentSync session_resume", () => {
     });
 
     expect(loadDaySpanContextMock).not.toHaveBeenCalled();
-    expect(runVisitMaintenanceMock).toHaveBeenCalledWith("user-1", "Asia/Kolkata");
+    expect(maybeRunVisitMaintenanceMock).toHaveBeenCalledWith(
+      "user-1",
+      "Asia/Kolkata",
+      undefined,
+      { force: true },
+    );
     expect(presenceTransitionCreateMock).toHaveBeenCalledWith({
       data: expect.objectContaining({
         type: "session_resume",
@@ -376,6 +386,87 @@ describe("processAgentSync session_resume", () => {
       where: { id: "visit-1" },
       data: { endAt: disconnectAt },
     });
-    expect(runVisitMaintenanceMock).toHaveBeenCalled();
+    expect(maybeRunVisitMaintenanceMock).toHaveBeenCalled();
+  });
+
+  it("dispatches heartbeat alerts after visit_start on office Wi-Fi", async () => {
+    const startAt = "2026-09-13T09:00:00.000Z";
+    visitFindFirstMock.mockImplementation(async (args: { where?: { localVisitId?: string; endAt?: null } }) => {
+      if (args?.where?.localVisitId) return null;
+      if (args?.where?.endAt === null) return { id: "visit-1", endAt: null };
+      return null;
+    });
+    visitCreateMock.mockResolvedValue({
+      id: "visit-1",
+      userId: "user-1",
+      localVisitId: "lv-office",
+      startAt: new Date(startAt),
+      endAt: null,
+    });
+
+    await processAgentSync({
+      userId: "user-1",
+      userTimezone: "Asia/Kolkata",
+      deviceId: "device-1",
+      serialNumber: "SERIAL-1",
+      events: [
+        {
+          id: "evt-start",
+          type: "visit_start",
+          at: startAt,
+          localVisitId: "lv-office",
+          ssid: "OfficeConnect",
+        },
+      ],
+      appUrl: "https://office.example",
+    });
+
+    expect(maybeDispatchHeartbeatAlertsMock).toHaveBeenCalledWith({
+      userId: "user-1",
+      timezone: "Asia/Kolkata",
+      recordedAt: new Date(startAt),
+      inOffice: true,
+      hoursTarget: 5,
+    });
+  });
+
+  it("skips visit maintenance for activity_tick-only batches", async () => {
+    await processAgentSync({
+      userId: "user-1",
+      userTimezone: "Asia/Kolkata",
+      deviceId: "device-1",
+      serialNumber: "SERIAL-1",
+      events: [
+        {
+          id: "evt-tick",
+          type: "activity_tick",
+          at: "2026-09-13T08:00:00.000Z",
+          ssid: "HomeWiFi",
+        },
+      ],
+      appUrl: "https://office.example",
+    });
+
+    expect(maybeRunVisitMaintenanceMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("syncBatchNeedsVisitMaintenance", () => {
+  it("returns true for session_resume and daily_summary", () => {
+    expect(
+      syncBatchNeedsVisitMaintenance([{ id: "1", type: "session_resume" }]),
+    ).toBe(true);
+    expect(
+      syncBatchNeedsVisitMaintenance([{ id: "2", type: "daily_summary", dayKey: "2026-09-12" }]),
+    ).toBe(true);
+  });
+
+  it("returns false for activity_tick and health_ping only", () => {
+    expect(
+      syncBatchNeedsVisitMaintenance([
+        { id: "1", type: "activity_tick" },
+        { id: "2", type: "health_ping" },
+      ]),
+    ).toBe(false);
   });
 });

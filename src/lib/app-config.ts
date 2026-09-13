@@ -14,6 +14,7 @@ import {
   backfillHeartbeatsAndVisitsAfterAllowlistChange,
   hasHeartbeatAllowlistMismatches,
 } from "./ssid-backfill";
+import { invalidateAgentConfigCache } from "./agent-config-cache";
 
 export const DEFAULT_PENDING_TOKEN_TTL_DAYS = 7;
 export const DEFAULT_HEARTBEAT_RETENTION_DAYS = 7;
@@ -181,6 +182,7 @@ export async function updateAppConfig(data: Partial<AppConfigData>) {
     where: { id: CONFIG_ID },
     data: update,
   });
+  invalidateAgentConfigCache();
   return parseConfig(config);
 }
 

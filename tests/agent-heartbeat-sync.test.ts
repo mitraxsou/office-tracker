@@ -53,7 +53,9 @@ describe("office-heartbeat wake and sync behavior", () => {
   });
 
   it("polls agent config on an interval instead of every task run", () => {
-    expect(heartbeat).toContain("$ConfigFetchIntervalRuns = 30");
+    expect(heartbeat).toContain("$ConfigFetchIntervalRuns = 60");
+    expect(heartbeat).toContain("$ConfigCacheMaxAgeMinutes = 120");
+    expect(heartbeat).toContain("function Test-ConfigCacheFresh");
     expect(heartbeat).toContain("-Force:$forceConfigFetch");
     expect(heartbeat).not.toContain("Get-FreshVersionCheckConfig");
   });

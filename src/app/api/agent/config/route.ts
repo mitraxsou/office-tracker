@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { getUserByAgentToken } from "@/lib/auth";
-import { getAppConfig, getUserHoursTarget } from "@/lib/app-config";
+import { getUserHoursTarget } from "@/lib/app-config";
+import {
+  AGENT_CONFIG_CACHE_CONTROL,
+  getCachedAppConfig,
+} from "@/lib/agent-config-cache";
 import { getAgentVersion } from "@/lib/agent-version";
 import { getDeviceForceAgentUpdate } from "@/lib/agent-update";
 import {
@@ -23,7 +27,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 
-  const globalConfig = await getAppConfig();
+  const globalConfig = await getCachedAppConfig();
   const hoursTarget = await getUserHoursTarget(user);
 
   const { searchParams } = new URL(request.url);
@@ -54,16 +58,23 @@ export async function GET(request: Request) {
     console.error("[agent-config] Failed to record API hit");
   }
 
-  return NextResponse.json({
-    ssids: globalConfig.officeSsids,
-    hoursTarget,
-    timezone: user.timezone,
-    heartbeatIntervalMinutes: globalConfig.heartbeatIntervalMinutes,
-    apiVersion: API_VERSION,
-    agentScriptVersion: getAgentVersion(),
-    agentScriptFilesBase: appUrl ? agentScriptFilesBaseUrl(appUrl) : null,
-    vercelProtectionBypass: vercelProtectionBypassSecret(),
-    forceAgentUpdate,
-    agentMode: globalConfig.agentMode,
-  });
+  return NextResponse.json(
+    {
+      ssids: globalConfig.officeSsids,
+      hoursTarget,
+      timezone: user.timezone,
+      heartbeatIntervalMinutes: globalConfig.heartbeatIntervalMinutes,
+      apiVersion: API_VERSION,
+      agentScriptVersion: getAgentVersion(),
+      agentScriptFilesBase: appUrl ? agentScriptFilesBaseUrl(appUrl) : null,
+      vercelProtectionBypass: vercelProtectionBypassSecret(),
+      forceAgentUpdate,
+      agentMode: globalConfig.agentMode,
+    },
+    {
+      headers: {
+        "Cache-Control": AGENT_CONFIG_CACHE_CONTROL,
+      },
+    },
+  );
 }

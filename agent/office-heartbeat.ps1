@@ -8,10 +8,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-# Fetch /api/agent/config every N task runs (~2 min each). 30 runs ~= 60 min between polls.
-$ConfigFetchIntervalRuns = 30
+# Fetch /api/agent/config every N task runs (~2 min each). 60 runs ~= 2 h between polls.
+$ConfigFetchIntervalRuns = 60
+$ConfigCacheMaxAgeMinutes = 120
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.3.9"
+$AgentScriptVersion = "1.4.0"
 
 function Get-InstallDir {
     if ($env:OFFICETRACKER_INSTALL_DIR) {
@@ -561,10 +562,23 @@ function Fetch-ServerConfig([string]$ApiUrl, [string]$Token, [string]$SerialNumb
     return $response
 }
 
+function Test-ConfigCacheFresh([string]$CachePath) {
+    if (-not (Test-Path $CachePath)) { return $false }
+    try {
+        $mtime = (Get-Item -LiteralPath $CachePath).LastWriteTime
+        return ((Get-Date) - $mtime).TotalMinutes -lt $ConfigCacheMaxAgeMinutes
+    } catch {
+        return $false
+    }
+}
+
 function Get-ServerConfig([string]$ApiUrl, [string]$Token, [string]$SerialNumber, [switch]$Force) {
     $cachePath = Get-CachePath
     $counter = Get-RunCounter
     $shouldFetch = $Force -or $counter -eq 0 -or ($counter % $ConfigFetchIntervalRuns -eq 0)
+    if ($shouldFetch -and -not $Force -and (Test-ConfigCacheFresh $cachePath)) {
+        $shouldFetch = $false
+    }
 
     if ($shouldFetch) {
         try {
