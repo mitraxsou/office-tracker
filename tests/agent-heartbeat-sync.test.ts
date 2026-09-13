@@ -10,8 +10,9 @@ describe("office-heartbeat wake and sync behavior", () => {
   );
 
   it("bumps agent version to match version.txt", () => {
-    expect(getAgentVersion()).toBe("1.3.2");
-    expect(heartbeat).toContain('$AgentScriptVersion = "1.3.2"');
+    const version = getAgentVersion();
+    expect(version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(heartbeat).toContain(`$AgentScriptVersion = "${version}"`);
   });
 
   it("records visit_end at office Wi-Fi disconnect time", () => {
