@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 import { prisma } from "./db";
 import { ensureAppConfig, getAppConfig } from "./app-config";
 import crypto from "node:crypto";
@@ -157,15 +158,25 @@ async function signSessionPayload(payload: SessionPayload) {
     .sign(getSecret());
 }
 
-async function writeSessionCookie(token: string) {
-  const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, token, {
+function sessionCookieOptions() {
+  return {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: "lax" as const,
     maxAge: SESSION_MAX_AGE,
     path: "/",
-  });
+  };
+}
+
+async function writeSessionCookie(token: string) {
+  const cookieStore = await cookies();
+  cookieStore.set(SESSION_COOKIE, token, sessionCookieOptions());
+}
+
+/** Prefer in Route Handlers so Set-Cookie is attached to the JSON response. */
+export async function setSessionCookieOnResponse(response: NextResponse, userId: string) {
+  const token = await signSessionPayload({ userId });
+  response.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
 }
 
 async function readSessionPayload(): Promise<SessionPayload | null> {

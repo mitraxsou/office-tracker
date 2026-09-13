@@ -18,7 +18,7 @@ vi.mock("../src/lib/auth-rate-limit", () => ({
 
 vi.mock("../src/lib/auth", () => ({
   clearLoginAttempts: vi.fn(),
-  createSession: vi.fn(),
+  setSessionCookieOnResponse: vi.fn(),
   recordFailedLoginAttempt: vi.fn(),
 }));
 
@@ -45,7 +45,7 @@ import {
   checkOtpVerifyRateLimits,
   recordOtpRequestRateLimits,
 } from "../src/lib/auth-rate-limit";
-import { createSession, clearLoginAttempts, recordFailedLoginAttempt } from "../src/lib/auth";
+import { setSessionCookieOnResponse, clearLoginAttempts, recordFailedLoginAttempt } from "../src/lib/auth";
 import { setWelcomeToken, setInstallToken } from "../src/lib/welcome-token";
 import { prisma } from "../src/lib/db";
 
@@ -202,7 +202,7 @@ describe("POST /api/auth/otp/verify", () => {
 
     expect(res.status).toBe(200);
     expect(clearLoginAttempts).toHaveBeenCalled();
-    expect(createSession).toHaveBeenCalledWith("u1");
+    expect(setSessionCookieOnResponse).toHaveBeenCalled();
     expect(setWelcomeToken).toHaveBeenCalledWith("token-abc");
     expect(setInstallToken).toHaveBeenCalledWith("token-abc");
     const body = await res.json();

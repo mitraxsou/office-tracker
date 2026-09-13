@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { OTP_RESEND_COOLDOWN_MS } from "@/lib/auth-rate-limit-constants";
 
 type LoginFormProps = {
@@ -18,7 +17,6 @@ export function LoginForm({
   lockoutMessage,
   passwordLogin,
 }: LoginFormProps) {
-  const router = useRouter();
   const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -28,6 +26,7 @@ export function LoginForm({
   const [sentMessage, setSentMessage] = useState<string | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const prevCodeLengthRef = useRef(0);
+  const verifySucceededRef = useRef(false);
 
   const displayError = error ?? localError;
 
@@ -40,35 +39,46 @@ export function LoginForm({
   }, [cooldownSeconds]);
 
   const verifyCode = useCallback(async () => {
-    if (busy || lockedOut || code.length !== 6) return;
+    if (busy || lockedOut || code.length !== 6 || verifySucceededRef.current) return;
 
     setBusy(true);
     setLocalError(null);
 
-    const res = await fetch("/api/auth/otp/verify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, code }),
-    });
-    setBusy(false);
+    try {
+      const res = await fetch("/api/auth/otp/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ email, code }),
+      });
 
-    if (res.status === 429) {
-      const body = await res.json().catch(() => ({}));
-      const retry = typeof body.retryAfterSeconds === "number" ? body.retryAfterSeconds : 60;
-      setLocalError(body.error ?? `Try again in ${retry} seconds.`);
-      return;
+      if (verifySucceededRef.current) return;
+
+      if (res.status === 429) {
+        const body = await res.json().catch(() => ({}));
+        const retry = typeof body.retryAfterSeconds === "number" ? body.retryAfterSeconds : 60;
+        setLocalError(body.error ?? `Try again in ${retry} seconds.`);
+        setBusy(false);
+        return;
+      }
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setLocalError(body.error ?? "Sign-in failed");
+        setBusy(false);
+        return;
+      }
+
+      const body = await res.json();
+      verifySucceededRef.current = true;
+      window.location.assign(body.redirectTo ?? "/dashboard");
+    } catch {
+      if (!verifySucceededRef.current) {
+        setLocalError("Sign-in failed");
+        setBusy(false);
+      }
     }
-
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      setLocalError(body.error ?? "Sign-in failed");
-      return;
-    }
-
-    const body = await res.json();
-    router.push(body.redirectTo ?? "/dashboard");
-    router.refresh();
-  }, [busy, lockedOut, code, email, router]);
+  }, [busy, lockedOut, code, email]);
 
   useEffect(() => {
     if (step !== "code" || lockedOut || busy) {
@@ -228,6 +238,7 @@ export function LoginForm({
             onClick={() => {
               setStep("email");
               setCode("");
+              verifySucceededRef.current = false;
               setSentMessage(null);
               setLocalError(null);
               setCooldownSeconds(0);

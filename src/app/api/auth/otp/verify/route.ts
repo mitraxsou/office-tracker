@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import {
   clearLoginAttempts,
-  createSession,
   recordFailedLoginAttempt,
+  setSessionCookieOnResponse,
 } from "@/lib/auth";
 import {
   checkOtpVerifyRateLimits,
@@ -56,7 +56,6 @@ export async function POST(request: Request) {
   }
 
   await clearLoginAttempts();
-  await createSession(result.userId);
 
   const user = await prisma.user.findUnique({
     where: { id: result.userId },
@@ -80,7 +79,7 @@ export async function POST(request: Request) {
   const currentLegalVersion = await getCurrentLegalVersion();
   const redirectTo = getPostLoginRedirect(user, currentLegalVersion, { isNewUser: result.isNewUser });
 
-  return NextResponse.json(
+  const response = NextResponse.json(
     {
       ok: true,
       redirectTo,
@@ -88,4 +87,6 @@ export async function POST(request: Request) {
     },
     { headers: NO_STORE },
   );
+  await setSessionCookieOnResponse(response, result.userId);
+  return response;
 }
