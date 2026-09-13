@@ -6,6 +6,7 @@ import {
   latestDeviceLastSeenAt,
   lowActivityThreshold,
   minutesSinceAt,
+  resolveAgentSyncHealth,
   resolveInOfficeNow,
   shouldUseActivityTicks,
 } from "../src/lib/activity-signal";
@@ -78,6 +79,100 @@ describe("sync freshness helpers", () => {
     const at = new Date("2026-09-13T11:30:00Z");
     expect(minutesSinceAt(at, now)).toBe(30);
     expect(minutesSinceAt(null, now)).toBeNull();
+  });
+});
+
+describe("resolveAgentSyncHealth", () => {
+  const now = new Date("2026-09-13T12:00:00Z");
+  const registeredAt = new Date("2026-09-01T12:00:00Z");
+  const expectedPerDay = 288;
+
+  it("treats recent pulse activity as healthy even when lastSeenAt is older", () => {
+    const lastSyncedAt = new Date("2026-09-13T11:48:00Z");
+    const health = resolveAgentSyncHealth(
+      {
+        lastSyncedAt,
+        graceHours: 24,
+        pulseAgentHealthy: true,
+        pulsesLast24h: 40,
+        expectedPulsesPerDay: expectedPerDay,
+        deviceReferenceAt: registeredAt,
+      },
+      now,
+    );
+    expect(health.healthy).toBe(true);
+    expect(health.showStaleWarning).toBe(false);
+    expect(health.minutesSinceLastSync).toBe(12);
+  });
+
+  it("does not warn when lastSeenAt is within grace even if pulse is stale", () => {
+    const lastSyncedAt = new Date("2026-09-13T11:48:00Z");
+    const health = resolveAgentSyncHealth(
+      {
+        lastSyncedAt,
+        graceHours: 24,
+        pulseAgentHealthy: false,
+        pulsesLast24h: 40,
+        expectedPulsesPerDay: expectedPerDay,
+        deviceReferenceAt: registeredAt,
+      },
+      now,
+    );
+    expect(health.healthy).toBe(true);
+    expect(health.showStaleWarning).toBe(false);
+  });
+
+  it("does not warn when tick volume in 24h meets the expected threshold", () => {
+    const lastSyncedAt = new Date("2026-09-12T10:00:00Z");
+    const health = resolveAgentSyncHealth(
+      {
+        lastSyncedAt,
+        graceHours: 24,
+        pulseAgentHealthy: false,
+        pulsesLast24h: 40,
+        expectedPulsesPerDay: expectedPerDay,
+        deviceReferenceAt: registeredAt,
+      },
+      now,
+    );
+    expect(health.healthy).toBe(true);
+    expect(health.showStaleWarning).toBe(false);
+  });
+
+  it("warns only when beyond grace, pulse stale, and low tick volume", () => {
+    const lastSyncedAt = new Date("2026-09-12T10:00:00Z");
+    const health = resolveAgentSyncHealth(
+      {
+        lastSyncedAt,
+        graceHours: 24,
+        pulseAgentHealthy: false,
+        pulsesLast24h: 5,
+        expectedPulsesPerDay: expectedPerDay,
+        deviceReferenceAt: registeredAt,
+      },
+      now,
+    );
+    expect(health.healthy).toBe(false);
+    expect(health.showStaleWarning).toBe(true);
+    expect(health.lowActivity).toBe(true);
+  });
+
+  it("suppresses stale warning when user is syncing on the expected interval at home", () => {
+    const lastSyncedAt = new Date("2026-09-13T11:55:00Z");
+    const health = resolveAgentSyncHealth(
+      {
+        lastSyncedAt,
+        graceHours: 24,
+        pulseAgentHealthy: true,
+        pulsesLast24h: 120,
+        expectedPulsesPerDay: expectedPerDay,
+        deviceReferenceAt: registeredAt,
+      },
+      now,
+    );
+    expect(health.healthy).toBe(true);
+    expect(health.showStaleWarning).toBe(false);
+    expect(health.lowActivity).toBe(false);
   });
 });
 

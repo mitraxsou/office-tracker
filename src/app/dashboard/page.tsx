@@ -21,12 +21,11 @@ import { DashboardDetailsPanel } from "@/components/dashboard/DashboardDetailsPa
 import {
   deviceRegistrationReferenceAt,
   getLastOfficeActivityAt,
-  isLowActivityCount,
   latestDeviceLastSeenAt,
-  minutesSinceAt,
+  resolveAgentSyncHealth,
 } from "@/lib/activity-signal";
-import { computeDeviceAgentStatus } from "@/lib/device-status";
 import { formatLastHeartbeat } from "@/lib/visits";
+import { formatPulseAge } from "@/lib/pulse-age";
 
 export default async function DashboardPage() {
   const user = await requireAuthenticatedUser();
@@ -72,22 +71,26 @@ export default async function DashboardPage() {
   const isOutToday = await isUserOutOfOffice(user.id, summary.dayKey);
   const lastHeartbeat = summary.lastHeartbeat;
   const lastSyncedAt = latestDeviceLastSeenAt(user.agentDevices);
-  const syncStatus = computeDeviceAgentStatus(lastSyncedAt, graceHours);
-  const lastSyncedHealthy = syncStatus === "healthy";
+  const deviceReferenceAt = deviceRegistrationReferenceAt(user.agentDevices);
+  const syncHealth = resolveAgentSyncHealth({
+    lastSyncedAt,
+    graceHours,
+    pulseAgentHealthy: pulse.agentHealthy,
+    pulsesLast24h: pulse.pulsesLast24h,
+    expectedPulsesPerDay: pulse.expectedPulsesPerDay,
+    deviceReferenceAt,
+  });
   const agentNeverConnected = user.agentDevices.length === 0 || !lastSyncedAt;
   const agentStale =
-    !isOutToday && user.agentDevices.length > 0 && !!lastSyncedAt && !lastSyncedHealthy;
-  const deviceReferenceAt = deviceRegistrationReferenceAt(user.agentDevices);
+    !isOutToday &&
+    user.agentDevices.length > 0 &&
+    syncHealth.showStaleWarning;
   const agentLowPulses =
     !isOutToday &&
     user.agentDevices.length > 0 &&
-    lastSyncedHealthy &&
-    isLowActivityCount(
-      pulse.pulsesLast24h,
-      pulse.expectedPulsesPerDay,
-      deviceReferenceAt,
-    );
-  const minutesSinceLastSync = minutesSinceAt(lastSyncedAt);
+    pulse.agentHealthy &&
+    syncHealth.lowActivity;
+  const minutesSinceLastSync = syncHealth.minutesSinceLastSync;
   const ssidMissing =
     !!summary.lastHeartbeat && !summary.lastHeartbeat.ssid && summary.lastHeartbeat.inOffice === false;
   const openVisit = summary.visits.find((v) => v.endAt === null);
@@ -99,22 +102,26 @@ export default async function DashboardPage() {
       : null;
   const agentStatusValue = agentNeverConnected
     ? "Not connected"
-    : lastSyncedHealthy
+    : syncHealth.healthy
       ? "Healthy"
       : "Stale / offline";
   const agentStatusTone: StatusTone = agentNeverConnected
     ? "neutral"
-    : lastSyncedHealthy
+    : syncHealth.healthy
       ? "success"
       : "warning";
   const lastSyncedLabel = lastSyncedAt
-    ? formatLastHeartbeat(lastSyncedAt, summary.dayKey, user.timezone)
+    ? formatPulseAge({
+        minutes: minutesSinceLastSync,
+        lastPulseAt: lastSyncedAt,
+        timezone: user.timezone,
+      })
     : "None";
   const lastSyncedTone: StatusTone = !lastSyncedAt
     ? "muted"
-    : lastSyncedHealthy
-      ? "success"
-      : "warning";
+    : syncHealth.showStaleWarning
+      ? "warning"
+      : "neutral";
   const lastOfficeActivityLabel = lastOfficeActivityAt
     ? formatLastHeartbeat(lastOfficeActivityAt, summary.dayKey, user.timezone)
     : "None";
@@ -199,7 +206,7 @@ export default async function DashboardPage() {
           </p>
         )}
 
-        {adminAccess && !agentNeverConnected && !lastSyncedHealthy && !agentStale && (
+        {adminAccess && !agentNeverConnected && !syncHealth.healthy && !agentStale && (
           <p className="text-xs text-muted">
             Agent has not synced recently. Check Task Scheduler or re-run{" "}
             <Link href="/settings#install" className="text-accent hover:underline">

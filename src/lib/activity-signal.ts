@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { computeDeviceAgentStatus, type AgentDeviceStatus } from "./device-status";
 import { heartbeatInOffice } from "./heartbeat-office";
 
 export type AgentSignalSnapshot = {
@@ -71,6 +72,57 @@ export function latestDeviceLastSeenAt(
 export function minutesSinceAt(at: Date | null, now: Date = new Date()): number | null {
   if (!at) return null;
   return Math.round((now.getTime() - at.getTime()) / 60000);
+}
+
+export type AgentSyncHealthInput = {
+  lastSyncedAt: Date | null;
+  graceHours: number;
+  pulseAgentHealthy: boolean;
+  pulsesLast24h: number;
+  expectedPulsesPerDay: number;
+  deviceReferenceAt: Date | null;
+};
+
+export type AgentSyncHealth = {
+  /** Agent is receiving expected sync activity. */
+  healthy: boolean;
+  /** Show stale sync warning (genuinely not syncing). */
+  showStaleWarning: boolean;
+  lowActivity: boolean;
+  minutesSinceLastSync: number | null;
+  syncStatus: AgentDeviceStatus;
+};
+
+/**
+ * Dashboard sync health: stale warnings only when the agent is genuinely not syncing.
+ * Healthy when recent pulse, device lastSeen within grace, or expected tick volume in 24h.
+ */
+export function resolveAgentSyncHealth(
+  input: AgentSyncHealthInput,
+  now: Date = new Date(),
+): AgentSyncHealth {
+  const minutesSinceLastSync = minutesSinceAt(input.lastSyncedAt, now);
+  const syncStatus = computeDeviceAgentStatus(input.lastSyncedAt, input.graceHours, now);
+  const lastSeenWithinGrace = syncStatus === "healthy";
+  const lowActivity = isLowActivityCount(
+    input.pulsesLast24h,
+    input.expectedPulsesPerDay,
+    input.deviceReferenceAt,
+    now,
+  );
+
+  const healthy =
+    input.pulseAgentHealthy || lastSeenWithinGrace || !lowActivity;
+
+  const showStaleWarning = !!input.lastSyncedAt && !healthy;
+
+  return {
+    healthy,
+    showStaleWarning,
+    lowActivity,
+    minutesSinceLastSync,
+    syncStatus,
+  };
 }
 
 export async function getLastOfficeActivityAt(userId: string): Promise<Date | null> {
