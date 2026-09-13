@@ -8,9 +8,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-$ConfigFetchIntervalRuns = 5
+# Fetch /api/agent/config every N task runs (~2 min each). 30 runs ~= 60 min between polls.
+$ConfigFetchIntervalRuns = 30
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.3.8"
+$AgentScriptVersion = "1.3.9"
 
 function Get-InstallDir {
     if ($env:OFFICETRACKER_INSTALL_DIR) {
@@ -624,21 +625,6 @@ function Test-NeedsAgentUpdateFromResponse {
     return (Compare-AgentVersion $serverVersion $localVersion) -gt 0
 }
 
-function Get-FreshVersionCheckConfig {
-    param(
-        [string]$ApiUrl,
-        [string]$Token,
-        [string]$SerialNumber,
-        $FallbackConfig
-    )
-    try {
-        return Fetch-ServerConfig -ApiUrl $ApiUrl -Token $Token -SerialNumber $SerialNumber
-    } catch {
-        Write-Log "WARN fresh version config fetch failed: $($_.Exception.Message)"
-        return $FallbackConfig
-    }
-}
-
 function Get-SetupScriptPath {
     $paths = @(
         (Join-Path (Get-InstallDir) "setup.ps1"),
@@ -1031,21 +1017,21 @@ if (Test-Path $cachePath) {
     try { $cachedServerConfig = Get-Content $cachePath -Raw | ConvertFrom-Json } catch {}
 }
 
+$hourlyUpdateCheck = Test-ShouldRunHourlyUpdateCheck
+$forceConfigFetch = $isResumeRun -or $hourlyUpdateCheck
+
 try {
-    $serverConfig = Get-ServerConfig -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber
+    $serverConfig = Get-ServerConfig -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber `
+        -Force:$forceConfigFetch
 } catch {
     Write-Log "ERROR: Cannot fetch server config"
     if ($DryRun) { Write-Host "ERROR: Cannot fetch server config: $($_.Exception.Message)"; exit 1 }
     exit 1
 }
 
-$versionCheckConfig = Get-FreshVersionCheckConfig -ApiUrl $apiUrl -Token $token `
-    -SerialNumber $serialNumber -FallbackConfig $serverConfig
-if ($versionCheckConfig) { $serverConfig = $versionCheckConfig }
-
-$hourlyUpdateCheck = Test-ShouldRunHourlyUpdateCheck
-if (Test-NeedsAgentUpdateFromResponse -Response $versionCheckConfig) {
-    $forceUpdate = [bool]$versionCheckConfig.forceAgentUpdate
+if (Test-NeedsAgentUpdateFromResponse -Response $serverConfig) {
+    $forceUpdate = [bool]$serverConfig.forceAgentUpdate
+    if ($serverConfig.config -and $serverConfig.config.forceAgentUpdate) { $forceUpdate = $true }
     if (Invoke-AgentSelfUpdate -ApiUrl $apiUrl -Token $token -Force $forceUpdate) {
         Set-LastUpdateCheckTime
         Write-Log "EXIT after self-update; next run uses refreshed scripts"

@@ -34,7 +34,9 @@ describe("agent version", () => {
     expect(heartbeat).toContain("Invoke-LegacyHeartbeat");
     expect(heartbeat).toContain("event-queue.json");
     expect(heartbeat).toContain("[Math]::Max(2, [Math]::Min(60, $interval))");
-    expect(heartbeat).toContain("Get-FreshVersionCheckConfig");
+    expect(heartbeat).toContain("$ConfigFetchIntervalRuns = 30");
+    expect(heartbeat).toContain("$forceConfigFetch = $isResumeRun -or $hourlyUpdateCheck");
+    expect(heartbeat).not.toContain("Get-FreshVersionCheckConfig");
     expect(heartbeat).toContain("Ensure-AgentUpdateScripts");
     expect(heartbeat).toContain("Get-ServerAgentVersionFromResponse");
     expect(heartbeat).toContain("(Compare-AgentVersion $serverVersion $localVersion) -gt 0");

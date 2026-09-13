@@ -52,6 +52,12 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).not.toContain("return $Force -or ((Compare-AgentVersion $after $before) -gt 0)");
   });
 
+  it("polls agent config on an interval instead of every task run", () => {
+    expect(heartbeat).toContain("$ConfigFetchIntervalRuns = 30");
+    expect(heartbeat).toContain("-Force:$forceConfigFetch");
+    expect(heartbeat).not.toContain("Get-FreshVersionCheckConfig");
+  });
+
   it("syncs on home Wi-Fi via activity ticks without visit_start", () => {
     expect(heartbeat).toContain("$shouldSync = $isResumeRun -or $ssidChanged -or $activityDue");
     expect(heartbeat).toContain('Add-QueuedEvent -Type "activity_tick"');
