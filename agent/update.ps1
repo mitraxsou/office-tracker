@@ -16,22 +16,21 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-function Import-AgentDownloadModule {
-    $candidates = @(
+if (-not (Get-Command Invoke-AgentScriptBypass -ErrorAction SilentlyContinue)) {
+    foreach ($path in @(
         (Join-Path $PSScriptRoot "lib\agent-download.ps1"),
         (Join-Path $PSScriptRoot "agent-download.ps1"),
         (Join-Path $env:LOCALAPPDATA "OfficeTracker\lib\agent-download.ps1")
-    )
-    foreach ($path in $candidates) {
+    )) {
         if (Test-Path -LiteralPath $path) {
             . $path
-            return
+            break
         }
     }
-    throw "agent-download.ps1 module not found"
+    if (-not (Get-Command Invoke-AgentScriptBypass -ErrorAction SilentlyContinue)) {
+        throw "agent-download.ps1 module not found"
+    }
 }
-
-Import-AgentDownloadModule
 
 $setupPath = Join-Path $PSScriptRoot "setup.ps1"
 if (-not (Test-Path -LiteralPath $setupPath)) {

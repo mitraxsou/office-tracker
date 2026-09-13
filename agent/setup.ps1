@@ -41,23 +41,24 @@ function Get-ForceUpdateMarkerPath {
     Join-Path (Get-InstallDir) "force-update.txt"
 }
 
-function Import-AgentDownloadModule {
-    if (Get-Command Publish-AgentScriptTxt -ErrorAction SilentlyContinue) {
-        return
-    }
+function Get-AgentDownloadModuleCandidates {
     $candidates = @()
     if ($PSScriptRoot) {
         $candidates += Join-Path $PSScriptRoot "lib\agent-download.ps1"
         $candidates += Join-Path $PSScriptRoot "agent-download.ps1"
     }
     $candidates += Join-Path (Get-InstallDir) "lib\agent-download.ps1"
-    foreach ($path in $candidates) {
-        if (Test-Path -LiteralPath $path) {
-            . $path
-            return
-        }
+    return $candidates
+}
+
+function Get-AgentStorageModuleCandidates {
+    $candidates = @()
+    if ($PSScriptRoot) {
+        $candidates += Join-Path $PSScriptRoot "lib\agent-storage.ps1"
+        $candidates += Join-Path $PSScriptRoot "agent-storage.ps1"
     }
-    throw "agent-download.ps1 module not found"
+    $candidates += Join-Path (Get-InstallDir) "lib\agent-storage.ps1"
+    return $candidates
 }
 
 function Write-SetupLog([string]$Message) {
@@ -334,28 +335,28 @@ function Complete-Install {
     Write-Host "Re-running this setup command is safe anytime."
 }
 
-Import-AgentDownloadModule
-
-function Import-AgentStorageModule {
-    if (Get-Command Invoke-AgentLogMaintenance -ErrorAction SilentlyContinue) {
-        return $true
-    }
-    $candidates = @()
-    if ($PSScriptRoot) {
-        $candidates += Join-Path $PSScriptRoot "lib\agent-storage.ps1"
-        $candidates += Join-Path $PSScriptRoot "agent-storage.ps1"
-    }
-    $candidates += Join-Path (Get-InstallDir) "lib\agent-storage.ps1"
-    foreach ($path in $candidates) {
+if (-not (Get-Command Publish-AgentScriptTxt -ErrorAction SilentlyContinue)) {
+    foreach ($path in Get-AgentDownloadModuleCandidates) {
         if (Test-Path -LiteralPath $path) {
             . $path
-            return $true
+            break
         }
     }
-    return $false
+    if (-not (Get-Command Publish-AgentScriptTxt -ErrorAction SilentlyContinue)) {
+        throw "agent-download.ps1 module not found"
+    }
 }
 
-if (Import-AgentStorageModule) {
+if (-not (Get-Command Invoke-AgentLogMaintenance -ErrorAction SilentlyContinue)) {
+    foreach ($path in Get-AgentStorageModuleCandidates) {
+        if (Test-Path -LiteralPath $path) {
+            . $path
+            break
+        }
+    }
+}
+
+if (Get-Command Invoke-AgentLogMaintenance -ErrorAction SilentlyContinue) {
     Invoke-AgentLogMaintenance -Log { param($m) Write-SetupLog $m }
 }
 
@@ -436,7 +437,7 @@ try {
 
     Complete-Install -InstallDir $installDir -IsReinstall $isReinstall -ScriptsUpdated $shouldInstallScripts
 
-    if (Import-AgentStorageModule) {
+    if (Get-Command Invoke-AgentLogMaintenance -ErrorAction SilentlyContinue) {
         Invoke-AgentLogMaintenance -Log { param($m) Write-SetupLog $m }
     }
 

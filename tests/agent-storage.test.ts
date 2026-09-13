@@ -14,6 +14,8 @@ describe("agent local storage maintenance", () => {
     "utf8",
   );
   const setup = readFileSync(path.join(process.cwd(), "agent", "setup.ps1"), "utf8");
+  const install = readFileSync(path.join(process.cwd(), "agent", "install.ps1"), "utf8");
+  const updater = readFileSync(path.join(process.cwd(), "agent", "update.ps1"), "utf8");
   const download = readFileSync(
     path.join(process.cwd(), "agent", "lib", "agent-download.ps1"),
     "utf8",
@@ -40,9 +42,17 @@ describe("agent local storage maintenance", () => {
 
   it("runs maintenance on each heartbeat and setup", () => {
     expect(heartbeat).toContain("Invoke-LocalStorageMaintenance");
-    expect(heartbeat).toContain("Import-AgentStorageModule");
+    expect(heartbeat).toContain("Invoke-AgentStorageMaintenance");
+    expect(heartbeat).not.toContain("function Import-AgentStorageModule");
     expect(setup).toContain("Invoke-AgentLogMaintenance");
-    expect(setup).toContain("Import-AgentStorageModule");
+    expect(setup).not.toContain("function Import-AgentStorageModule");
+    expect(setup).not.toContain("function Import-AgentDownloadModule");
+  });
+
+  it("dot-sources agent modules at script scope, not inside import helpers", () => {
+    expect(heartbeat).toMatch(/if \(-not \(Get-Command Invoke-AgentStorageMaintenance[\s\S]*?\. \$modulePath/);
+    expect(install).not.toContain("function Import-AgentDownloadModule");
+    expect(updater).not.toContain("function Import-AgentDownloadModule");
   });
 
   it("bootstrap setup command downloads agent-storage.ps1 before IEX", () => {

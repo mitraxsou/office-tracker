@@ -36,9 +36,11 @@ describe("agent version", () => {
     expect(heartbeat).toContain("[Math]::Max(2, [Math]::Min(60, $interval))");
     expect(heartbeat).toContain("Get-FreshVersionCheckConfig");
     expect(heartbeat).toContain("Ensure-AgentUpdateScripts");
-    expect(heartbeat).toContain("Compare-AgentVersion $serverVersion (Get-LocalAgentVersion)) -gt 0");
+    expect(heartbeat).toContain("Get-ServerAgentVersionFromResponse");
+    expect(heartbeat).toContain("(Compare-AgentVersion $serverVersion $localVersion) -gt 0");
     expect(heartbeat).toContain("EXIT after self-update");
     expect(heartbeat).toContain("selfUpdated = Invoke-AgentSelfUpdate");
+    expect(heartbeat).not.toContain("return $Force -or ((Compare-AgentVersion $after $before) -gt 0)");
   });
 
   it("treats missing or different versions as needing update", () => {

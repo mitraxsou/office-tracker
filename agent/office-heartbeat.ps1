@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ConfigFetchIntervalRuns = 5
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.3.6"
+$AgentScriptVersion = "1.3.7"
 
 function Write-Log([string]$Message) {
     $logDir = Join-Path $env:LOCALAPPDATA "OfficeTracker\logs"
@@ -54,25 +54,8 @@ function Get-LocalAgentVersion {
 
 Write-Log "START v$(Get-LocalAgentVersion) event-mode"
 
-function Import-AgentStorageModule {
-    if (Get-Command Invoke-AgentStorageMaintenance -ErrorAction SilentlyContinue) {
-        return $true
-    }
-    $candidates = @(
-        (Join-Path (Get-InstallDir) "lib\agent-storage.ps1"),
-        (Join-Path (Get-InstallDir) "agent-storage.ps1")
-    )
-    foreach ($path in $candidates) {
-        if (Test-Path -LiteralPath $path) {
-            . $path
-            return $true
-        }
-    }
-    return $false
-}
-
 function Invoke-LocalStorageMaintenance {
-    if (-not (Import-AgentStorageModule)) { return }
+    if (-not (Get-Command Invoke-AgentStorageMaintenance -ErrorAction SilentlyContinue)) { return }
     $queue = @(Get-EventQueue)
     $result = Invoke-AgentStorageMaintenance -Log { param($m) Write-Log $m } -Events $queue
     if ($result.events.Count -ne $queue.Count) {
@@ -371,7 +354,6 @@ function Add-QueuedEvent {
     $queue = @(Get-EventQueue)
     $queue += $evt
     Set-EventQueue $queue
-    return $evt
 }
 
 function Get-SyncState {
@@ -386,7 +368,28 @@ function Get-SyncState {
         pendingSsid = $null
         pendingPreviousSsid = $null
     }
-    return Read-JsonFile (Get-SyncStatePath) $default
+    $data = Read-JsonFile (Get-SyncStatePath) $default
+    if ($data -is [hashtable]) { return $data }
+
+    # ConvertFrom-Json returns a PSCustomObject; normalize to a mutable hashtable for PS 5.1.
+    $state = @{}
+    foreach ($key in $default.Keys) {
+        if ($data.PSObject.Properties.Name -contains $key) {
+            $val = $data.$key
+            if ($key -eq "openVisit" -and $val) {
+                $state[$key] = @{
+                    localVisitId = [string]$val.localVisitId
+                    startAt = [string]$val.startAt
+                    ssid = [string]$val.ssid
+                }
+            } else {
+                $state[$key] = $val
+            }
+        } else {
+            $state[$key] = $default[$key]
+        }
+    }
+    return $state
 }
 
 function Set-SyncState($State) {
@@ -525,10 +528,12 @@ function Maybe-EnqueueDailySummary {
     $previousDayKey = if ($SyncState.dayKey) { [string]$SyncState.dayKey } else { $null }
     if ($previousDayKey -and $previousDayKey -ne $DayKey) {
         if ($SyncState.lastDailySummaryDayKey -ne $previousDayKey) {
+            $summaryOfficeMs = if ($null -ne $SyncState.dayOfficeMs) { [int]$SyncState.dayOfficeMs } else { 0 }
+            $summaryVisitCount = if ($null -ne $SyncState.dayVisitCount) { [int]$SyncState.dayVisitCount } else { 0 }
             Add-QueuedEvent -Type "daily_summary" -Fields @{
                 dayKey = $previousDayKey
-                officeMs = [int](if ($null -ne $SyncState.dayOfficeMs) { $SyncState.dayOfficeMs } else { 0 })
-                visitCount = [int](if ($null -ne $SyncState.dayVisitCount) { $SyncState.dayVisitCount } else { 0 })
+                officeMs = $summaryOfficeMs
+                visitCount = $summaryVisitCount
             }
             $SyncState.lastDailySummaryDayKey = $previousDayKey
         }
@@ -590,18 +595,30 @@ function Apply-SyncConfig {
     return $config
 }
 
+function Get-ServerAgentVersionFromResponse {
+    param($Response)
+    if (-not $Response) { return $null }
+    if ($Response.agentScriptVersion) { return [string]$Response.agentScriptVersion }
+    if ($Response.config -and $Response.config.agentScriptVersion) {
+        return [string]$Response.config.agentScriptVersion
+    }
+    return $null
+}
+
 function Test-NeedsAgentUpdateFromResponse {
     param($Response)
     if (-not $Response) { return $false }
-    if ($Response.forceAgentUpdate) { return $true }
-    $serverVersion = $null
-    if ($Response.agentScriptVersion) { $serverVersion = [string]$Response.agentScriptVersion }
-    elseif ($Response.config -and $Response.config.agentScriptVersion) {
-        $serverVersion = [string]$Response.config.agentScriptVersion
+    $localVersion = Get-LocalAgentVersion
+    $serverVersion = Get-ServerAgentVersionFromResponse -Response $Response
+    if ($serverVersion -and (Compare-AgentVersion $localVersion $serverVersion) -ge 0) {
+        # Local scripts are already current; let sync clear any pending force flag.
+        return $false
     }
+    if ($Response.forceAgentUpdate) { return $true }
+    if ($Response.config -and $Response.config.forceAgentUpdate) { return $true }
     if (-not $serverVersion) { return $false }
     # Only auto-update when the server bundle is newer than local scripts.
-    return (Compare-AgentVersion $serverVersion (Get-LocalAgentVersion)) -gt 0
+    return (Compare-AgentVersion $serverVersion $localVersion) -gt 0
 }
 
 function Get-FreshVersionCheckConfig {
@@ -630,20 +647,6 @@ function Get-SetupScriptPath {
     return $null
 }
 
-function Import-AgentDownloadModule {
-    $candidates = @(
-        (Join-Path (Get-InstallDir) "lib\agent-download.ps1"),
-        (Join-Path (Get-InstallDir) "agent-download.ps1")
-    )
-    foreach ($path in $candidates) {
-        if (Test-Path -LiteralPath $path) {
-            . $path
-            return $true
-        }
-    }
-    return $false
-}
-
 function Invoke-AgentSetupScript {
     param(
         [string]$SetupScript,
@@ -657,7 +660,18 @@ function Invoke-AgentSetupScript {
             -Value (Get-Date -Format "o") -Encoding UTF8
     }
 
-    if (Import-AgentDownloadModule) {
+    if (-not (Get-Command Invoke-AgentScriptBypass -ErrorAction SilentlyContinue)) {
+        foreach ($path in @(
+            (Join-Path (Get-InstallDir) "lib\agent-download.ps1"),
+            (Join-Path (Get-InstallDir) "agent-download.ps1")
+        )) {
+            if (Test-Path -LiteralPath $path) {
+                . $path
+                break
+            }
+        }
+    }
+    if (Get-Command Invoke-AgentScriptBypass -ErrorAction SilentlyContinue) {
         $bound = @{ ApiUrl = $ApiUrl; Token = $Token; Silent = $true }
         if ($Force) { $bound.Force = $true }
         Invoke-AgentScriptBypass -Ps1Path $SetupScript -BoundVars $bound -Hidden -Wait | Out-Null
@@ -747,7 +761,9 @@ function Invoke-AgentSelfUpdate([string]$ApiUrl, [string]$Token, [bool]$Force) {
         Invoke-AgentSetupScript -SetupScript $setupScript -ApiUrl $ApiUrl -Token $Token -Force:$Force
         $after = Get-LocalAgentVersion
         Write-Log "Auto-update finished local v$after"
-        return $Force -or ((Compare-AgentVersion $after $before) -gt 0)
+        # Only exit for a re-run when scripts actually changed; force reinstall alone
+        # should not block sync when the version is already current.
+        return (Compare-AgentVersion $after $before) -gt 0
     } catch {
         Write-Log "WARN auto-update failed: $($_.Exception.Message)"
         return $false
@@ -943,6 +959,18 @@ function Invoke-FlushSync {
         response = $response
         serverConfig = $serverConfig
         selfUpdated = $selfUpdated
+    }
+}
+
+if (-not (Get-Command Invoke-AgentStorageMaintenance -ErrorAction SilentlyContinue)) {
+    foreach ($modulePath in @(
+        (Join-Path (Get-InstallDir) "lib\agent-storage.ps1"),
+        (Join-Path (Get-InstallDir) "agent-storage.ps1")
+    )) {
+        if (Test-Path -LiteralPath $modulePath) {
+            . $modulePath
+            break
+        }
     }
 }
 
