@@ -23,6 +23,7 @@ import {
 import { recordDeviceScriptVersion } from "@/lib/agent-update";
 import { prisma } from "@/lib/db";
 import { maybeDispatchHeartbeatAlerts } from "@/lib/heartbeat-alerts";
+import { AGENT_API_ROUTES, recordAgentApiHit } from "@/lib/agent-api-hits";
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -107,6 +108,17 @@ export async function POST(request: Request) {
   }
 
   const globalConfig = await getAppConfig();
+
+  try {
+    await recordAgentApiHit({
+      userId: user.id,
+      deviceId: deviceResult.device.id,
+      route: AGENT_API_ROUTES.HEARTBEAT,
+      timezone: user.timezone,
+    });
+  } catch {
+    console.error("[heartbeat] Failed to record API hit");
+  }
 
   if (globalConfig.agentMode === "events") {
     const openVisitRow = await prisma.visit.findFirst({

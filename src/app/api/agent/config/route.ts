@@ -8,6 +8,8 @@ import {
   vercelProtectionBypassSecret,
 } from "@/lib/agent-download";
 import { API_VERSION, extractBearerToken, sanitizeSerialNumber } from "@/lib/security";
+import { AGENT_API_ROUTES, recordAgentApiHit } from "@/lib/agent-api-hits";
+import { prisma } from "@/lib/db";
 
 export async function GET(request: Request) {
   const token = extractBearerToken(request);
@@ -31,6 +33,26 @@ export async function GET(request: Request) {
     : false;
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? "";
+
+  let deviceId: string | null = null;
+  if (serialNumber) {
+    const device = await prisma.agentDevice.findFirst({
+      where: { userId: user.id, serialNumber },
+      select: { id: true },
+    });
+    deviceId = device?.id ?? null;
+  }
+
+  try {
+    await recordAgentApiHit({
+      userId: user.id,
+      deviceId,
+      route: AGENT_API_ROUTES.CONFIG,
+      timezone: user.timezone,
+    });
+  } catch {
+    console.error("[agent-config] Failed to record API hit");
+  }
 
   return NextResponse.json({
     ssids: globalConfig.officeSsids,

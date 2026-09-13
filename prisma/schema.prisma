@@ -81,6 +81,7 @@ model User {
   presenceTransitions  PresenceTransition[]
   activityTicks        ActivityTick[]
   agentEvents          AgentEvent[]
+  agentApiHitDaily     AgentApiHitDaily[]
 }
 
 model AlertDispatch {
@@ -205,6 +206,22 @@ model AgentDevice {
   lifecycleEvents AgentLifecycleEvent[]
 
   @@unique([userId, serialNumber])
+}
+
+model AgentApiHitDaily {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId  String   @default("")
+  route     String
+  dayKey    String
+  hitCount  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, deviceId, route, dayKey])
+  @@index([userId, dayKey])
+  @@index([deviceId, dayKey])
 }
 
 model AgentLifecycleEvent {

@@ -6,6 +6,8 @@
  *   npm run prisma:env -- tsx scripts/regression/create-regression-user.ts
  *
  * Requires POSTGRES_PRISMA_URL in .env.local (or Vercel Storage vars).
+ * Uses whichever database that URL points at (dev Neon by default, not prod theta).
+ * For production: npm run regression:create-prod (see docs/agent-regression-matrix.md).
  */
 
 import { PrismaClient } from "@prisma/client";
@@ -19,6 +21,7 @@ const REGRESSION_PASSWORD = "Regression-Only-2026!";
 const prisma = new PrismaClient();
 
 async function purgeRegressionUserData(userId: string) {
+  await prisma.agentApiHitDaily.deleteMany({ where: { userId } });
   await prisma.agentEvent.deleteMany({ where: { userId } });
   await prisma.activityTick.deleteMany({ where: { userId } });
   await prisma.presenceTransition.deleteMany({ where: { userId } });

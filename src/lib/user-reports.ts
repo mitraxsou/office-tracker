@@ -10,6 +10,7 @@ import { roundHoursToMinute } from "./visits";
 import { heartbeatInOffice } from "./heartbeat-office";
 import { getAgentVersion } from "./agent-version";
 import { isDeviceAgentVersionStale } from "./agent-update";
+import { getDeviceAgentApiHitTotals, getUserAgentApiHitTotals } from "./agent-api-hits";
 
 function dayKeyForTimezone(date: Date, timezone: string) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -90,6 +91,16 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
     take: 100,
   });
 
+  const [apiHitTotals, deviceApiHits] = await Promise.all([
+    getUserAgentApiHitTotals(userId, user.timezone),
+    Promise.all(
+      user.agentDevices.map(async (device) => ({
+        deviceId: device.id,
+        totals: await getDeviceAgentApiHitTotals(device.id, user.timezone),
+      })),
+    ),
+  ]);
+
   return {
     user: {
       id: user.id,
@@ -144,6 +155,10 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
     lifecycleEvents: await getLifecycleEventsForUser(user.id),
     tokens: summarizeAgentTokens(user.agentTokens),
     serverAppUrl: process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ?? null,
+    apiHits: {
+      totals: apiHitTotals,
+      byDevice: deviceApiHits,
+    },
   };
 }
 

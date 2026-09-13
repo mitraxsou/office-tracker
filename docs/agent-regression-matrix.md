@@ -6,6 +6,14 @@ PwC Office Pulse regression scenarios for the Windows agent (`agent/`) and porta
 
 **Dummy user:** `regression.dummy@office-tracker.test` (created by `scripts/regression/create-regression-user.ts`).
 
+**Not auto-deployed:** Running regression setup locally only writes to the database behind your current `POSTGRES_PRISMA_URL` (usually dev Neon from `.env.local`). The dummy user is **not** created on https://office-tracker-theta.vercel.app unless you run the create script against **production** Neon or create the user manually in prod admin.
+
+| Target | How to create regression user |
+|---|---|
+| Local / dev | `npm run prisma:env -- tsx scripts/regression/create-regression-user.ts` |
+| Prod (theta) | Set `POSTGRES_PRISMA_URL` to prod Neon (Vercel `office-tracker` production), then `$env:CONFIRM_PROD="yes"; npm run regression:create-prod` |
+| Prod (theta) alt | Create `regression.dummy@office-tracker.test` via `/admin` on theta and issue an agent token |
+
 | ID | Scenario | Agent steps / trigger | Expected agent behavior | Expected portal state | How to verify |
 |---|---|---|---|---|---|
 | H1 | Fresh install | Run bootstrap setup command from Settings | Downloads `agent-download.ps1` + `agent-storage.ps1` before `setup.ps1` IEX; writes `config.json`, `version.txt` | User shows registered device after first sync | `npm run test:regression` bootstrap test; laptop: check regression install dir |
@@ -30,6 +38,7 @@ PwC Office Pulse regression scenarios for the Windows agent (`agent/`) and porta
 | C10 | Last synced vs last office activity | Home sync after office day | Dashboard: last synced recent; last office activity shows office tick time | Two distinct timestamps on dashboard | Portal manual check; `resolveAgentSyncHealth` tests |
 | C11 | Duplicate event id | Re-send same `clientEventId` | Server acks without double-applying | Single visit row | API test / manual re-sync |
 | C12 | SSID not in allowlist | `visit_start` on home SSID | Server rejects `ssid_not_allowed` | No visit created | `tests/agent-sync.test.ts` (extend) |
+| C13 | API hit counting | POST `/api/agent/sync` (and legacy heartbeat, config) | Each successful agent API call increments daily counter | Admin user report shows day/month/year API hit totals | `tests/agent-api-hits.test.ts` |
 
 ## Automated coverage map
 
@@ -37,6 +46,7 @@ PwC Office Pulse regression scenarios for the Windows agent (`agent/`) and porta
 |---|---|
 | Agent script invariants | `tests/agent-heartbeat-sync.test.ts`, `tests/agent-storage.test.ts`, `tests/agent-version.test.ts`, `tests/agent-ps51-compat.test.ts` |
 | Server sync / ordering | `tests/agent-sync.test.ts`, `tests/heartbeat-eod.test.ts` |
+| Agent API hit totals | `tests/agent-api-hits.test.ts` |
 | Dashboard health | `tests/activity-signal.test.ts` |
 
 ## Laptop regression (manual + harness)
@@ -61,8 +71,9 @@ npm run prisma:env -- tsx scripts/regression/create-regression-user.ts
 |---|---|
 | `POSTGRES_PRISMA_URL` | Required for `create-regression-user.ts` and DB reset |
 | `OFFICETRACKER_INSTALL_DIR` | Override install path (default regression dir in harness) |
-| `REGRESSION_API_URL` | Portal base URL for live API checks (default `http://localhost:3000`) |
+| `REGRESSION_API_URL` | Portal base URL for live API checks (default `http://localhost:3000`; prod script sets theta) |
 | `NEXT_PUBLIC_APP_URL` | Used when seeding regression `config.json` |
+| `CONFIRM_PROD` | Must be `yes` for `npm run regression:create-prod` (writes to `POSTGRES_PRISMA_URL`) |
 
 ## Out of scope
 
