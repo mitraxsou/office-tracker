@@ -42,13 +42,9 @@ vi.mock("../src/lib/out-of-office", () => ({
   buildOutOfOfficeLinkUrl: buildOutOfOfficeLinkUrlMock,
 }));
 
-vi.mock("../src/lib/notification-prefs", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../src/lib/notification-prefs")>();
-  return {
-    ...actual,
-    getNotificationPrefs: getNotificationPrefsMock,
-  };
-});
+vi.mock("../src/lib/notification-prefs-server", () => ({
+  getNotificationPrefs: getNotificationPrefsMock,
+}));
 
 import { evaluateUserAlerts } from "../src/lib/integration-alerts";
 import { DEFAULT_NOTIFICATION_PREFS } from "../src/lib/notification-prefs";

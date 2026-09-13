@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { timezoneOptionsForUser } from "@/lib/constants";
 
 import type { EnrichedDevice } from "@/lib/device-enrichment";
-import { agentStatusClass } from "@/lib/device-enrichment";
+import { agentStatusClass } from "@/lib/device-status";
 import type { TimezoneRequestSummary } from "@/lib/timezone-requests";
 
 type Device = EnrichedDevice;

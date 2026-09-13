@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/db";
-import { getNotificationPrefs } from "@/lib/notification-prefs";
+import { getNotificationPrefs } from "@/lib/notification-prefs-server";
 import { analyzeScheduleForUser } from "@/lib/office-schedule-sync";
 
 export async function GET(

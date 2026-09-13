@@ -8,12 +8,12 @@ import {
   channelForAlert,
   deliversToTeams,
   getMinutesInTimezone,
-  getNotificationPrefs,
   isWorkDayNow,
   parseTimeToMinutes,
   type AlertDeliveryChannel,
   type NotificationPrefsData,
 } from "./notification-prefs";
+import { getNotificationPrefs } from "./notification-prefs-server";
 import { buildOutOfOfficeLinkUrl, isUserOutOfOffice } from "./out-of-office";
 import { userHasActiveInstalledDevice } from "./agent-lifecycle";
 import { heartbeatInOffice } from "./heartbeat-office";

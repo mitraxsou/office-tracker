@@ -16,7 +16,7 @@ vi.mock("@/lib/admin", () => ({
   requireAdmin: mocks.requireAdmin,
 }));
 
-vi.mock("@/lib/notification-prefs", () => ({
+vi.mock("@/lib/notification-prefs-server", () => ({
   getNotificationPrefs: mocks.getNotificationPrefs,
 }));
 

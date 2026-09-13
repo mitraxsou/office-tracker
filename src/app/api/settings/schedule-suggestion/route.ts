@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { getNotificationPrefs } from "@/lib/notification-prefs";
+import { getNotificationPrefs } from "@/lib/notification-prefs-server";
 import { analyzeScheduleForUser } from "@/lib/office-schedule-sync";
 
 export async function GET() {

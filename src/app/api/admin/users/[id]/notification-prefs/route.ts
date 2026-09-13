@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 import { logAuditEvent } from "@/lib/audit-log";
+import type { NotificationPrefsData } from "@/lib/notification-prefs";
 import {
   getNotificationPrefs,
   updateNotificationPrefs,
-  type NotificationPrefsData,
-} from "@/lib/notification-prefs";
+} from "@/lib/notification-prefs-server";
 
 export async function GET(
   _request: Request,

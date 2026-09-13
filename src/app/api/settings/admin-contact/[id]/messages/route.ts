@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { addAdminContactMessage } from "@/lib/admin-contact";
+import { addAdminContactMessage } from "@/lib/admin-contact-server";
 
 type RouteParams = { params: Promise<{ id: string }> };
 

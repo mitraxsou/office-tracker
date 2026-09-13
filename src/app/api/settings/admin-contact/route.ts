@@ -3,7 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import {
   createAdminContactThread,
   listUserAdminContactThreads,
-} from "@/lib/admin-contact";
+} from "@/lib/admin-contact-server";
 
 export async function GET() {
   const user = await getCurrentUser();

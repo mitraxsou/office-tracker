@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin";
-import { reopenAdminContactThread } from "@/lib/admin-contact";
+import { reopenAdminContactThread } from "@/lib/admin-contact-server";
 
 type RouteParams = { params: Promise<{ id: string }> };
 

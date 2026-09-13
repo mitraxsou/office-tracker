@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import type { NotificationPrefsData } from "@/lib/notification-prefs";
 import {
   getNotificationPrefs,
   updateNotificationPrefs,
-  type NotificationPrefsData,
-} from "@/lib/notification-prefs";
+} from "@/lib/notification-prefs-server";
 
 export async function GET() {
   const user = await getCurrentUser();

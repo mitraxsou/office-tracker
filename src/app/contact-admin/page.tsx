@@ -4,9 +4,9 @@ import { ContactAdminForm } from "@/components/ContactAdminForm";
 import { getCurrentUser } from "@/lib/auth";
 import {
   isValidAdminContactCategory,
-  listUserAdminContactThreads,
   type AdminContactCategory,
 } from "@/lib/admin-contact";
+import { listUserAdminContactThreads } from "@/lib/admin-contact-server";
 import { enforcePasswordChangeIfRequired, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
 
 export default async function ContactAdminPage({
