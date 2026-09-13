@@ -10,6 +10,7 @@ export const AGENT_DOWNLOAD_FILES = [
   "update.ps1",
   "setup.ps1",
   "agent-download.ps1",
+  "agent-storage.ps1",
   "version.txt",
 ] as const;
 
@@ -22,11 +23,13 @@ const CONTENT_TYPES: Record<AgentDownloadFileName, string> = {
   "update.ps1": "text/plain; charset=utf-8",
   "setup.ps1": "text/plain; charset=utf-8",
   "agent-download.ps1": "text/plain; charset=utf-8",
+  "agent-storage.ps1": "text/plain; charset=utf-8",
   "version.txt": "text/plain; charset=utf-8",
 };
 
 const FILE_PATHS: Partial<Record<AgentDownloadFileName, string>> = {
   "agent-download.ps1": "lib/agent-download.ps1",
+  "agent-storage.ps1": "lib/agent-storage.ps1",
 };
 
 export function isAgentDownloadFileName(name: string): name is AgentDownloadFileName {

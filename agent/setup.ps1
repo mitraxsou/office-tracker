@@ -248,15 +248,15 @@ function Install-AgentScripts {
         [string]$TargetDir
     )
     foreach ($file in $script:AgentDownloadFiles) {
-        if ($file -eq "agent-download.ps1") {
-            $src = Join-Path $SourceDir "lib\agent-download.ps1"
+        if ($file -eq "agent-download.ps1" -or $file -eq "agent-storage.ps1") {
+            $src = Join-Path $SourceDir "lib\$file"
             if (-not (Test-Path $src)) {
-                $src = Join-Path $SourceDir "agent-download.ps1"
+                $src = Join-Path $SourceDir $file
             }
             if (Test-Path $src) {
                 $libDir = Join-Path $TargetDir "lib"
                 New-Item -ItemType Directory -Path $libDir -Force | Out-Null
-                $destination = Join-Path $libDir "agent-download.ps1"
+                $destination = Join-Path $libDir $file
                 Remove-MarkOfWeb -Path $src
                 Copy-Item $src $destination -Force
                 Remove-MarkOfWeb -Path $destination
@@ -375,6 +375,28 @@ function Complete-Install {
 }
 
 Import-AgentDownloadModule
+
+function Import-AgentStorageModule {
+    if (Get-Command Invoke-AgentLogMaintenance -ErrorAction SilentlyContinue) {
+        return $true
+    }
+    $candidates = @()
+    if ($PSScriptRoot) {
+        $candidates += Join-Path $PSScriptRoot "lib\agent-storage.ps1"
+    }
+    $candidates += Join-Path (Get-InstallDir) "lib\agent-storage.ps1"
+    foreach ($path in $candidates) {
+        if (Test-Path -LiteralPath $path) {
+            . $path
+            return $true
+        }
+    }
+    return $false
+}
+
+if (Import-AgentStorageModule) {
+    Invoke-AgentLogMaintenance -Log { param($m) Write-SetupLog $m }
+}
 
 $installDir = Get-InstallDir
 if (-not (Test-Path $installDir)) {

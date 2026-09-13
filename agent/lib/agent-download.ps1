@@ -7,7 +7,8 @@ $script:AgentDownloadFiles = @(
     "install.ps1",
     "uninstall.ps1",
     "version.txt",
-    "agent-download.ps1"
+    "agent-download.ps1",
+    "agent-storage.ps1"
 )
 
 function Get-AgentInstallDir {
@@ -141,10 +142,10 @@ function Download-AgentScriptsFromApp {
     $headers = New-AgentDownloadHeaders -Token $Token -BypassSecret $BypassSecret
     foreach ($file in $script:AgentDownloadFiles) {
         $url = "$FilesBase/$file"
-        $dest = if ($file -eq "agent-download.ps1") {
+        $dest = if ($file -eq "agent-download.ps1" -or $file -eq "agent-storage.ps1") {
             $libDir = Join-Path $DestDir "lib"
             New-Item -ItemType Directory -Path $libDir -Force | Out-Null
-            Join-Path $libDir "agent-download.ps1"
+            Join-Path $libDir $file
         } else {
             Join-Path $DestDir $file
         }

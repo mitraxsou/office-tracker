@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ConfigFetchIntervalRuns = 5
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.3.3"
+$AgentScriptVersion = "1.3.4"
 
 function Write-Log([string]$Message) {
     $logDir = Join-Path $env:LOCALAPPDATA "OfficeTracker\logs"
@@ -53,6 +53,32 @@ function Get-LocalAgentVersion {
 }
 
 Write-Log "START v$(Get-LocalAgentVersion) event-mode"
+
+function Import-AgentStorageModule {
+    if (Get-Command Invoke-AgentStorageMaintenance -ErrorAction SilentlyContinue) {
+        return $true
+    }
+    $candidates = @(
+        (Join-Path (Get-InstallDir) "lib\agent-storage.ps1"),
+        (Join-Path (Get-InstallDir) "agent-storage.ps1")
+    )
+    foreach ($path in $candidates) {
+        if (Test-Path -LiteralPath $path) {
+            . $path
+            return $true
+        }
+    }
+    return $false
+}
+
+function Invoke-LocalStorageMaintenance {
+    if (-not (Import-AgentStorageModule)) { return }
+    $queue = @(Get-EventQueue)
+    $result = Invoke-AgentStorageMaintenance -Log { param($m) Write-Log $m } -Events $queue
+    if ($result.events.Count -ne $queue.Count) {
+        Set-EventQueue @($result.events)
+    }
+}
 
 function Get-LastRunTime {
     $path = Get-LastRunPath
@@ -918,6 +944,8 @@ function Invoke-FlushSync {
         selfUpdated = $selfUpdated
     }
 }
+
+Invoke-LocalStorageMaintenance
 
 $configPath = Get-ConfigPath
 if (-not (Test-Path $configPath)) {
