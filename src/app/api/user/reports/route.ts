@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { getUserHoursTarget, getAppConfig } from "@/lib/app-config";
 import { getUserReport } from "@/lib/user-reports";
-import { getMonthlyProgress } from "@/lib/monthly-progress";
+import { getMonthlyProgress } from "@/lib/monthly-progress-server";
 import { getApprovedExemptionsForUser } from "@/lib/compliance-exemptions";
 import { parseReportRange } from "@/lib/report-range";
 import { currentMonthKey } from "@/lib/month-range";

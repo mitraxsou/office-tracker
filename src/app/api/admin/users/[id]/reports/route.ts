@@ -4,7 +4,7 @@ import { getUserReport } from "@/lib/user-reports";
 import { parseReportRange } from "@/lib/report-range";
 import { currentMonthKey } from "@/lib/month-range";
 import { getAppConfig, getUserHoursTarget } from "@/lib/app-config";
-import { getMonthlyProgress } from "@/lib/monthly-progress";
+import { getMonthlyProgress } from "@/lib/monthly-progress-server";
 import { getApprovedExemptionsForUser } from "@/lib/compliance-exemptions";
 import { prisma } from "@/lib/db";
 

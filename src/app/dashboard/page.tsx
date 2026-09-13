@@ -4,7 +4,7 @@ import { getRealCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { getTodaySummary, getPulseStats } from "@/lib/heartbeat-service";
 import { getUserHoursTarget, getAppConfig, getEffectiveAgentStaleGraceHours } from "@/lib/app-config";
-import { getMonthlyProgress, getYearCompliance } from "@/lib/monthly-progress";
+import { getMonthlyProgress, getYearCompliance } from "@/lib/monthly-progress-server";
 import {
   getApprovedExemptionsForUser,
   getPendingExemptionMonthKeys,
