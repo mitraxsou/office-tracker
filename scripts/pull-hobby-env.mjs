@@ -59,7 +59,7 @@ console.log(`Pulling ${projectName} (${profile}) into ${outputFile} ...`);
 
 const result = spawnSync(
   "npx",
-  ["vercel", "env", "pull", outputPath, "--environment=production", "--yes"],
+  ["vercel", "env", "pull", outputPath, "--environment", "production", "-y"],
   { stdio: "inherit", env, cwd: repoRoot, shell: process.platform === "win32" },
 );
 
