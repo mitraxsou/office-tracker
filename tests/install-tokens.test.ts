@@ -189,6 +189,8 @@ describe("copy-paste agent commands", () => {
     expect(command).toContain("powershell -NoProfile -ExecutionPolicy Bypass -Command");
     expect(command).toContain("/api/agent/files/setup.ps1");
     expect(command).toContain("/api/agent/files/agent-download.ps1");
+    expect(command).toContain("/api/agent/files/agent-storage.ps1");
+    expect(command).toContain("agent-storage.ps1");
     expect(command).toContain("Publish-AgentScriptTxt");
     expect(command).toContain("$PSScriptRoot=$d");
     expect(command).toContain("Invoke-Expression");
@@ -203,6 +205,7 @@ describe("copy-paste agent commands", () => {
   it("zip-folder install uses IEX bypass on setup.ps1", () => {
     const command = buildInstallCommand("https://office.example", "tok");
     expect(command).toContain("agent-download.ps1");
+    expect(command).toContain("agent-storage.ps1");
     expect(command).toContain("Publish-AgentScriptTxt");
     expect(command).toContain("$PSScriptRoot=(Split-Path");
     expect(command).toContain("Invoke-Expression");

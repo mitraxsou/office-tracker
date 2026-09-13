@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ConfigFetchIntervalRuns = 5
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.3.5"
+$AgentScriptVersion = "1.3.6"
 
 function Write-Log([string]$Message) {
     $logDir = Join-Path $env:LOCALAPPDATA "OfficeTracker\logs"
@@ -714,6 +714,7 @@ function Ensure-AgentUpdateScripts {
         New-Item -ItemType Directory -Path $libDir -Force | Out-Null
         foreach ($pair in @(
                 @{ url = "$filesBase/agent-download.ps1"; dest = Join-Path $libDir "agent-download.ps1" },
+                @{ url = "$filesBase/agent-storage.ps1"; dest = Join-Path $libDir "agent-storage.ps1" },
                 @{ url = "$filesBase/setup.ps1"; dest = Join-Path $installDir "setup.ps1" },
                 @{ url = "$filesBase/update.ps1"; dest = Join-Path $installDir "update.ps1" }
             )) {

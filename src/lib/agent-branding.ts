@@ -63,7 +63,9 @@ function buildServerBootstrapCommand(appUrl: string, tokenSetup: string) {
     `$h=@{Authorization=(''Bearer ''+$Token)}; ` +
     `$lib=Join-Path $d ''lib''; New-Item -ItemType Directory -Path $lib -Force | Out-Null; ` +
     `Invoke-WebRequest -Uri ($ApiUrl+''/api/agent/files/agent-download.ps1'') -Headers $h -OutFile (Join-Path $lib ''agent-download.ps1'') -UseBasicParsing; ` +
+    `Invoke-WebRequest -Uri ($ApiUrl+''/api/agent/files/agent-storage.ps1'') -Headers $h -OutFile (Join-Path $lib ''agent-storage.ps1'') -UseBasicParsing; ` +
     `. (Join-Path $lib ''agent-download.ps1''); ` +
+    `. (Join-Path $lib ''agent-storage.ps1''); ` +
     `Invoke-WebRequest -Uri ($ApiUrl+''/api/agent/files/setup.ps1'') -Headers $h -OutFile (Join-Path $d ''setup.ps1'') -UseBasicParsing; ` +
     `$PSScriptRoot=$d; ` +
     `$t=Publish-AgentScriptTxt -Ps1Path (Join-Path $d ''setup.ps1''); ` +
@@ -77,6 +79,7 @@ function buildLocalIexCommand(scriptPath: string, appUrl: string, tokenExpr: str
   return (
     `powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $ErrorActionPreference='Stop'; ` +
     `. .\\lib\\agent-download.ps1; ` +
+    `. .\\lib\\agent-storage.ps1; ` +
     `$ApiUrl='${base}'; $Token=${tokenExpr}; ` +
     `$PSScriptRoot=(Split-Path (Resolve-Path '${scriptPath}') -Parent); ` +
     `$t=Publish-AgentScriptTxt -Ps1Path (Resolve-Path '${scriptPath}'); ` +

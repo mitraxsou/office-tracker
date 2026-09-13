@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
 import { AGENT_DOWNLOAD_FILES } from "@/lib/agent-download";
+import { buildSetupCommand } from "@/lib/agent-branding";
 
 describe("agent local storage maintenance", () => {
   const storage = readFileSync(
@@ -42,5 +43,12 @@ describe("agent local storage maintenance", () => {
     expect(heartbeat).toContain("Import-AgentStorageModule");
     expect(setup).toContain("Invoke-AgentLogMaintenance");
     expect(setup).toContain("Import-AgentStorageModule");
+  });
+
+  it("bootstrap setup command downloads agent-storage.ps1 before IEX", () => {
+    const command = buildSetupCommand("https://office.example", "tok");
+    expect(command).toContain("/api/agent/files/agent-storage.ps1");
+    expect(command).toContain("agent-storage.ps1");
+    expect(command.indexOf("agent-storage.ps1")).toBeLessThan(command.indexOf("setup.ps1"));
   });
 });

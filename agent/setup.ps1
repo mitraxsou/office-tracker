@@ -343,6 +343,7 @@ function Import-AgentStorageModule {
     $candidates = @()
     if ($PSScriptRoot) {
         $candidates += Join-Path $PSScriptRoot "lib\agent-storage.ps1"
+        $candidates += Join-Path $PSScriptRoot "agent-storage.ps1"
     }
     $candidates += Join-Path (Get-InstallDir) "lib\agent-storage.ps1"
     foreach ($path in $candidates) {
@@ -434,6 +435,10 @@ try {
     }
 
     Complete-Install -InstallDir $installDir -IsReinstall $isReinstall -ScriptsUpdated $shouldInstallScripts
+
+    if (Import-AgentStorageModule) {
+        Invoke-AgentLogMaintenance -Log { param($m) Write-SetupLog $m }
+    }
 
     if ($shouldInstallScripts -and -not $Silent -and -not $isFreshInstall) {
         Write-Host "My Office Pulse updated to v$newVersion." -ForegroundColor Green
