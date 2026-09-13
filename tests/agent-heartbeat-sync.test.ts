@@ -44,4 +44,23 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain("NEW_DAY visit_start on office Wi-Fi");
     expect(heartbeat).toContain("Start-LocalVisit -SyncState $syncState -Ssid $ssid");
   });
+
+  it("does not block sync when force update leaves version unchanged", () => {
+    expect(heartbeat).toContain("return (Compare-AgentVersion $after $before) -gt 0");
+    expect(heartbeat).toContain("if ($serverVersion -and (Compare-AgentVersion $localVersion $serverVersion) -ge 0)");
+    expect(heartbeat).toContain("Only exit for a re-run when scripts actually changed");
+    expect(heartbeat).not.toContain("return $Force -or ((Compare-AgentVersion $after $before) -gt 0)");
+  });
+
+  it("syncs on home Wi-Fi via activity ticks without visit_start", () => {
+    expect(heartbeat).toContain("$shouldSync = $isResumeRun -or $ssidChanged -or $activityDue");
+    expect(heartbeat).toContain('Add-QueuedEvent -Type "activity_tick"');
+    expect(heartbeat).not.toMatch(
+      /if \(\$activityDue\)[\s\S]*?Start-LocalVisit/,
+    );
+  });
+
+  it("honors OFFICETRACKER_INSTALL_DIR for isolated regression installs", () => {
+    expect(heartbeat).toContain("$env:OFFICETRACKER_INSTALL_DIR");
+  });
 });

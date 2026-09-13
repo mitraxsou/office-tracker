@@ -5,7 +5,9 @@ const agentEventUpsertMock = vi.hoisted(() => vi.fn());
 const presenceTransitionCreateMock = vi.hoisted(() => vi.fn());
 const activityTickCreateMock = vi.hoisted(() => vi.fn());
 const visitFindFirstMock = vi.hoisted(() => vi.fn());
+const visitFindManyMock = vi.hoisted(() => vi.fn());
 const visitUpdateMock = vi.hoisted(() => vi.fn());
+const dailySummaryUpsertMock = vi.hoisted(() => vi.fn());
 const userFindUniqueMock = vi.hoisted(() => vi.fn());
 const loadDaySpanContextMock = vi.hoisted(() => vi.fn());
 const runVisitMaintenanceMock = vi.hoisted(() => vi.fn());
@@ -18,8 +20,13 @@ vi.mock("@/lib/db", () => ({
     },
     presenceTransition: { create: presenceTransitionCreateMock },
     activityTick: { create: activityTickCreateMock },
-    visit: { findFirst: visitFindFirstMock, findMany: vi.fn(), create: vi.fn(), update: visitUpdateMock },
-    dailySummary: { upsert: vi.fn() },
+    visit: {
+      findFirst: visitFindFirstMock,
+      findMany: visitFindManyMock,
+      create: vi.fn(),
+      update: visitUpdateMock,
+    },
+    dailySummary: { upsert: dailySummaryUpsertMock },
     user: { findUnique: userFindUniqueMock },
   },
 }));
@@ -56,6 +63,7 @@ import {
   processAgentSync,
   sortAgentSyncEventsForProcessing,
 } from "../src/lib/agent-sync";
+import { dayBoundsFromKey } from "../src/lib/timezone-dates";
 
 describe("parseAgentSyncEvents", () => {
   it("parses valid event array", () => {
@@ -124,6 +132,8 @@ describe("processAgentSync session_resume", () => {
     presenceTransitionCreateMock.mockResolvedValue({});
     activityTickCreateMock.mockResolvedValue({});
     visitFindFirstMock.mockResolvedValue(null);
+    visitFindManyMock.mockResolvedValue([]);
+    dailySummaryUpsertMock.mockResolvedValue({});
     userFindUniqueMock.mockResolvedValue({ hoursTarget: 5 });
     loadDaySpanContextMock.mockResolvedValue({
       visits: [],
@@ -175,6 +185,119 @@ describe("processAgentSync session_resume", () => {
       }),
     });
     expect(result.ackedEventIds).toContain("evt-resume");
+  });
+
+  it("processes visit_end before daily_summary in the same batch", async () => {
+    const disconnectAt = new Date("2026-09-12T18:00:00.000Z");
+    const openVisit = {
+      id: "visit-1",
+      userId: "user-1",
+      localVisitId: "lv-1",
+      startAt: new Date("2026-09-12T04:00:00.000Z"),
+      endAt: null,
+    };
+    const callOrder: string[] = [];
+    visitFindFirstMock.mockImplementation(async (args: { where?: { localVisitId?: string } }) => {
+      if (args?.where?.localVisitId) return openVisit;
+      return null;
+    });
+    visitUpdateMock.mockImplementation(async () => {
+      callOrder.push("visit_end");
+      return {};
+    });
+    dailySummaryUpsertMock.mockImplementation(async () => {
+      callOrder.push("daily_summary");
+      return {};
+    });
+    const closedVisit = { ...openVisit, endAt: disconnectAt };
+    visitFindManyMock.mockResolvedValue([closedVisit]);
+    const { start: dayStart, end: dayEnd } = dayBoundsFromKey("2026-09-12", "Asia/Kolkata");
+    loadDaySpanContextMock.mockResolvedValue({
+      visits: [closedVisit],
+      params: {
+        dayStart,
+        dayEnd,
+        now: new Date("2026-09-13T00:05:00.000Z"),
+      },
+      lastHeartbeat: null,
+      laptopActiveParams: {},
+    });
+
+    await processAgentSync({
+      userId: "user-1",
+      userTimezone: "Asia/Kolkata",
+      deviceId: "device-1",
+      serialNumber: "SERIAL-1",
+      events: [
+        {
+          id: "evt-summary",
+          type: "daily_summary",
+          at: "2026-09-13T00:05:00.000Z",
+          dayKey: "2026-09-12",
+          officeMs: 5 * 60 * 60 * 1000,
+          visitCount: 1,
+        },
+        {
+          id: "evt-end",
+          type: "visit_end",
+          at: disconnectAt.toISOString(),
+          localVisitId: "lv-1",
+          previousSsid: "OfficeConnect",
+        },
+      ],
+      appUrl: "https://office.example",
+    });
+
+    expect(callOrder).toEqual(["visit_end", "daily_summary"]);
+  });
+
+  it("accepts home Wi-Fi activity_tick without creating a visit", async () => {
+    const result = await processAgentSync({
+      userId: "user-1",
+      userTimezone: "Asia/Kolkata",
+      deviceId: "device-1",
+      serialNumber: "SERIAL-1",
+      events: [
+        {
+          id: "evt-tick",
+          type: "activity_tick",
+          at: "2026-09-13T08:00:00.000Z",
+          ssid: "HomeWiFi",
+        },
+      ],
+      appUrl: "https://office.example",
+    });
+
+    expect(activityTickCreateMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        inOffice: false,
+        ssid: "HomeWiFi",
+      }),
+    });
+    expect(visitUpdateMock).not.toHaveBeenCalled();
+    expect(result.rejected).toEqual([]);
+    expect(result.serverState.inOfficeNow).toBe(false);
+  });
+
+  it("rejects visit_start when SSID is not on the office allowlist", async () => {
+    const result = await processAgentSync({
+      userId: "user-1",
+      userTimezone: "Asia/Kolkata",
+      deviceId: "device-1",
+      serialNumber: "SERIAL-1",
+      events: [
+        {
+          id: "evt-start",
+          type: "visit_start",
+          at: "2026-09-13T09:00:00.000Z",
+          localVisitId: "lv-home",
+          ssid: "HomeWiFi",
+        },
+      ],
+      appUrl: "https://office.example",
+    });
+
+    expect(result.rejected).toEqual([{ id: "evt-start", reason: "ssid_not_allowed" }]);
   });
 
   it("applies visit_end before running maintenance on wake batches", async () => {

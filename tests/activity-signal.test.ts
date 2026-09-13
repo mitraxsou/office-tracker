@@ -157,6 +157,42 @@ describe("resolveAgentSyncHealth", () => {
     expect(health.lowActivity).toBe(true);
   });
 
+  it("distinguishes last synced from low office activity on home Wi-Fi", () => {
+    const lastSyncedAt = new Date("2026-09-13T11:55:00Z");
+    const health = resolveAgentSyncHealth(
+      {
+        lastSyncedAt,
+        graceHours: 24,
+        pulseAgentHealthy: true,
+        pulsesLast24h: 200,
+        expectedPulsesPerDay: expectedPerDay,
+        deviceReferenceAt: registeredAt,
+      },
+      now,
+    );
+    expect(health.healthy).toBe(true);
+    expect(health.showStaleWarning).toBe(false);
+    expect(health.minutesSinceLastSync).toBe(5);
+  });
+
+  it("warns when last synced is stale and office activity ticks are low", () => {
+    const lastSyncedAt = new Date("2026-09-11T10:00:00Z");
+    const health = resolveAgentSyncHealth(
+      {
+        lastSyncedAt,
+        graceHours: 24,
+        pulseAgentHealthy: false,
+        pulsesLast24h: 3,
+        expectedPulsesPerDay: expectedPerDay,
+        deviceReferenceAt: registeredAt,
+      },
+      now,
+    );
+    expect(health.showStaleWarning).toBe(true);
+    expect(health.lowActivity).toBe(true);
+    expect(health.minutesSinceLastSync).toBeGreaterThan(24 * 60);
+  });
+
   it("suppresses stale warning when user is syncing on the expected interval at home", () => {
     const lastSyncedAt = new Date("2026-09-13T11:55:00Z");
     const health = resolveAgentSyncHealth(

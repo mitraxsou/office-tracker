@@ -55,6 +55,10 @@ describe("agent local storage maintenance", () => {
     expect(updater).not.toContain("function Import-AgentDownloadModule");
   });
 
+  it("honors OFFICETRACKER_INSTALL_DIR for regression installs", () => {
+    expect(storage).toContain("$env:OFFICETRACKER_INSTALL_DIR");
+  });
+
   it("bootstrap setup command downloads agent-storage.ps1 before IEX", () => {
     const command = buildSetupCommand("https://office.example", "tok");
     expect(command).toContain("/api/agent/files/agent-storage.ps1");

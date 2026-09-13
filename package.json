@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:regression": "vitest run tests/agent-heartbeat-sync.test.ts tests/agent-storage.test.ts tests/agent-version.test.ts tests/agent-sync.test.ts tests/agent-ps51-compat.test.ts tests/heartbeat-eod.test.ts tests/activity-signal.test.ts",
     "test:watch": "vitest",
     "db:generate": "node scripts/ensure-postgres-env.mjs --generate-only -- prisma generate",
     "db:push": "node scripts/ensure-postgres-env.mjs -- prisma db push",

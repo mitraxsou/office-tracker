@@ -12,16 +12,19 @@ $ConfigFetchIntervalRuns = 5
 $UpdateCheckIntervalMinutes = 60
 $AgentScriptVersion = "1.3.7"
 
+function Get-InstallDir {
+    if ($env:OFFICETRACKER_INSTALL_DIR) {
+        return [string]$env:OFFICETRACKER_INSTALL_DIR
+    }
+    Join-Path $env:LOCALAPPDATA "OfficeTracker"
+}
+
 function Write-Log([string]$Message) {
-    $logDir = Join-Path $env:LOCALAPPDATA "OfficeTracker\logs"
+    $logDir = Join-Path (Get-InstallDir) "logs"
     if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
     $logFile = Join-Path $logDir "heartbeat.log"
     $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message"
     Add-Content -Path $logFile -Value $line -ErrorAction SilentlyContinue
-}
-
-function Get-InstallDir {
-    Join-Path $env:LOCALAPPDATA "OfficeTracker"
 }
 
 function Get-StateDir {

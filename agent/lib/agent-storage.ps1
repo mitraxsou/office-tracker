@@ -20,6 +20,9 @@ $script:AgentExpendableEventTypes = @(
 )
 
 function Get-AgentInstallDir {
+    if ($env:OFFICETRACKER_INSTALL_DIR) {
+        return [string]$env:OFFICETRACKER_INSTALL_DIR
+    }
     Join-Path $env:LOCALAPPDATA "OfficeTracker"
 }
 
