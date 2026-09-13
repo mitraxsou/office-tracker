@@ -50,6 +50,20 @@ export function parseTimestamp(value: unknown): Date | null {
   return date;
 }
 
+/** Queued agent sync events may carry timestamps from before the last successful sync. */
+export function parseAgentEventTimestamp(value: unknown): Date | null {
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const now = Date.now();
+  const fiveMinutes = 5 * 60 * 1000;
+  const sevenDays = 7 * 24 * 60 * 60 * 1000;
+  if (date.getTime() > now + fiveMinutes || date.getTime() < now - sevenDays) {
+    return null;
+  }
+  return date;
+}
+
 export function extractBearerToken(request: Request): string | null {
   const auth = request.headers.get("authorization");
   if (auth?.startsWith("Bearer ")) {

@@ -22,6 +22,7 @@ export async function loadDaySpanContext(
   userId: string,
   dayKey: string,
   timezone: string,
+  options?: { skipMaintenance?: boolean },
 ): Promise<{
   visits: Awaited<ReturnType<typeof prisma.visit.findMany>>;
   params: DaySpanParams;
@@ -31,8 +32,9 @@ export async function loadDaySpanContext(
   const config = await getAppConfig();
   const allowlist = config.officeSsids;
   const staleMs = config.agentStaleMinutes * 60 * 1000;
-  await closeEndOfDayOpenVisits(userId, timezone);
-  await closeStaleOpenVisits(userId, staleMs);
+  if (!options?.skipMaintenance) {
+    await runVisitMaintenance(userId, timezone, staleMs);
+  }
 
   const { start: dayStart, end: dayEnd } = dayBoundsFromKey(dayKey, timezone);
   const now = new Date();
@@ -240,7 +242,7 @@ export async function closeStaleOpenVisits(userId: string, staleMs?: number) {
 
 /**
  * Close visits still open after their calendar day ended.
- * Uses the last heartbeat that day as logout time.
+ * Prefers agent-reported office Wi-Fi disconnect; falls back to last activity tick.
  */
 export async function closeEndOfDayOpenVisits(userId: string, timezone: string) {
   const open = await prisma.visit.findFirst({
@@ -255,6 +257,15 @@ export async function closeEndOfDayOpenVisits(userId: string, timezone: string) 
   if (visitDayKey >= todayKey) return false;
 
   const dayEnd = dayBoundsFromKey(visitDayKey, timezone).end;
+  const config = await getAppConfig();
+  const allowlist = config.officeSsids;
+  const officeDisconnectAt = await getLastOfficeDisconnectAt(
+    userId,
+    open.startAt,
+    dayEnd,
+    allowlist,
+  );
+
   const { useActivity } = await resolveAgentSignalMode(userId);
   const lastSignalAt = await getLastAgentSignalOnDay(
     userId,
@@ -263,7 +274,7 @@ export async function closeEndOfDayOpenVisits(userId: string, timezone: string) 
   );
 
   const fallback = open.updatedAt <= dayEnd ? open.updatedAt : open.startAt;
-  const endAt = lastSignalAt ?? fallback;
+  const endAt = officeDisconnectAt ?? lastSignalAt ?? fallback;
   const cappedEnd = endAt > dayEnd ? dayEnd : endAt;
 
   await prisma.visit.update({
@@ -271,6 +282,44 @@ export async function closeEndOfDayOpenVisits(userId: string, timezone: string) 
     data: { endAt: cappedEnd },
   });
   return true;
+}
+
+/** Run end-of-day and stale-visit cleanup after agent events are applied. */
+export async function runVisitMaintenance(
+  userId: string,
+  timezone: string,
+  staleMs?: number,
+) {
+  await closeEndOfDayOpenVisits(userId, timezone);
+  const gapMs = staleMs ?? (await getAppConfig()).agentStaleMinutes * 60 * 1000;
+  await closeStaleOpenVisits(userId, gapMs);
+}
+
+async function getLastOfficeDisconnectAt(
+  userId: string,
+  since: Date,
+  dayEnd: Date,
+  allowlist: string[],
+): Promise<Date | null> {
+  const transitions = await prisma.presenceTransition.findMany({
+    where: {
+      userId,
+      at: { gte: since, lte: dayEnd },
+      type: { in: ["wifi_disconnected", "ssid_changed"] },
+    },
+    orderBy: { at: "desc" },
+    select: { at: true, type: true, previousSsid: true },
+  });
+
+  for (const transition of transitions) {
+    const previousSsid = transition.previousSsid
+      ? normalizeSsid(transition.previousSsid)
+      : null;
+    if (isOfficeSsid(previousSsid, allowlist)) {
+      return transition.at;
+    }
+  }
+  return null;
 }
 
 export async function createManualVisit(params: {

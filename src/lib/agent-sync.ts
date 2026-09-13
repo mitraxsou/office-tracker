@@ -11,10 +11,34 @@ import { daySpanMsForDay, dayKeyInTimezone } from "./visits";
 import { dayBoundsFromKey } from "./timezone-dates";
 import { validateVisitTimestamps } from "./visit-validation";
 import { maybeDispatchHeartbeatAlerts } from "./heartbeat-alerts";
-import { loadDaySpanContext } from "./heartbeat-service";
-import { parseTimestamp, sanitizeSsid, sanitizeSerialNumber } from "./security";
+import { loadDaySpanContext, runVisitMaintenance } from "./heartbeat-service";
+import { parseAgentEventTimestamp, sanitizeSsid, sanitizeSerialNumber } from "./security";
 
 const SUMMARY_MISMATCH_MS = 5 * 60 * 1000;
+
+/** Process checkout and Wi-Fi transitions before daily summary / resume maintenance. */
+const AGENT_SYNC_EVENT_PRIORITY: Record<string, number> = {
+  visit_end: 0,
+  wifi_disconnected: 1,
+  ssid_changed: 1,
+  visit_start: 2,
+  wifi_connected: 3,
+  activity_tick: 4,
+  session_resume: 5,
+  daily_summary: 6,
+  health_ping: 7,
+};
+
+export function sortAgentSyncEventsForProcessing(events: AgentSyncEvent[]): AgentSyncEvent[] {
+  return [...events].sort((a, b) => {
+    const priorityDiff =
+      (AGENT_SYNC_EVENT_PRIORITY[a.type] ?? 99) - (AGENT_SYNC_EVENT_PRIORITY[b.type] ?? 99);
+    if (priorityDiff !== 0) return priorityDiff;
+    const aAt = a.at ? Date.parse(a.at) : 0;
+    const bAt = b.at ? Date.parse(b.at) : 0;
+    return aAt - bAt;
+  });
+}
 
 export type AgentSyncEvent = {
   id: string;
@@ -56,15 +80,9 @@ export async function processAgentSync(params: {
   let lastEventAt: Date | null = null;
   let lastInOffice = false;
 
-  const needsEodClose = params.events.some(
-    (event) => event.type === "session_resume" || event.type === "daily_summary",
-  );
-  if (needsEodClose) {
-    const todayKey = dayKeyInTimezone(new Date(), params.userTimezone);
-    await loadDaySpanContext(params.userId, todayKey, params.userTimezone);
-  }
+  const sortedEvents = sortAgentSyncEventsForProcessing(params.events);
 
-  for (const event of params.events) {
+  for (const event of sortedEvents) {
     if (!event.id || !event.type) {
       continue;
     }
@@ -77,7 +95,7 @@ export async function processAgentSync(params: {
       continue;
     }
 
-    const at = event.at ? parseTimestamp(event.at) : null;
+    const at = event.at ? parseAgentEventTimestamp(event.at) : null;
     if (!at && event.type !== "health_ping") {
       rejected.push({ id: event.id, reason: "invalid_timestamp" });
       ackedEventIds.push(event.id);
@@ -332,6 +350,13 @@ export async function processAgentSync(params: {
     }
   }
 
+  const needsMaintenance = params.events.some(
+    (event) => event.type === "session_resume" || event.type === "daily_summary",
+  );
+  if (needsMaintenance) {
+    await runVisitMaintenance(params.userId, params.userTimezone);
+  }
+
   const openVisitRow = await prisma.visit.findFirst({
     where: { userId: params.userId, endAt: null },
     orderBy: { startAt: "desc" },
@@ -409,7 +434,9 @@ async function computeServerOfficeMs(
   dayKey: string,
   timezone: string,
 ): Promise<number> {
-  const { visits, params } = await loadDaySpanContext(userId, dayKey, timezone);
+  const { visits, params } = await loadDaySpanContext(userId, dayKey, timezone, {
+    skipMaintenance: true,
+  });
   return daySpanMsForDay(visits, params);
 }
 

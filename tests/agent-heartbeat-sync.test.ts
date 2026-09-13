@@ -10,8 +10,15 @@ describe("office-heartbeat wake and sync behavior", () => {
   );
 
   it("bumps agent version to match version.txt", () => {
-    expect(getAgentVersion()).toBe("1.3.1");
-    expect(heartbeat).toContain('$AgentScriptVersion = "1.3.1"');
+    expect(getAgentVersion()).toBe("1.3.2");
+    expect(heartbeat).toContain('$AgentScriptVersion = "1.3.2"');
+  });
+
+  it("records visit_end at office Wi-Fi disconnect time", () => {
+    expect(heartbeat).toContain("End-LocalVisit -SyncState $SyncState -EndAt $disconnectAt -PreviousSsid $PreviousSsid");
+    expect(heartbeat).toContain("Add-QueuedEvent -Type \"visit_end\" -Fields $fields -At $disconnectAt");
+    expect(heartbeat).toContain("$transitionAt = Get-NowIso");
+    expect(heartbeat).toContain("Add-WifiChangeEvents -PreviousSsid $fromSsid -CurrentSsid $ssid -At $transitionAt");
   });
 
   it("queues session_resume and activity_tick on resume runs", () => {

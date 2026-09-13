@@ -10,7 +10,7 @@ $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ConfigFetchIntervalRuns = 5
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.3.1"
+$AgentScriptVersion = "1.3.2"
 
 function Write-Log([string]$Message) {
     $logDir = Join-Path $env:LOCALAPPDATA "OfficeTracker\logs"
@@ -330,12 +330,14 @@ function Set-EventQueue([array]$Events) {
 function Add-QueuedEvent {
     param(
         [string]$Type,
-        [hashtable]$Fields = @{}
+        [hashtable]$Fields = @{},
+        [string]$At
     )
+    $timestamp = if ($At) { $At } else { Get-NowIso }
     $evt = @{
         id = New-EventId
         type = $Type
-        at = Get-NowIso
+        at = $timestamp
     }
     foreach ($key in $Fields.Keys) {
         if ($null -ne $Fields[$key]) { $evt[$key] = $Fields[$key] }
@@ -411,18 +413,25 @@ function Start-LocalVisit {
 }
 
 function End-LocalVisit {
-    param($SyncState)
+    param(
+        $SyncState,
+        [string]$EndAt,
+        [string]$PreviousSsid
+    )
     $open = Get-OpenVisitFromState $SyncState
     if (-not $open) { return $SyncState }
+    $disconnectAt = if ($EndAt) { $EndAt } else { Get-NowIso }
     $start = [DateTime]::Parse($open.startAt)
-    $end = [DateTime]::UtcNow
+    $end = [DateTime]::Parse($disconnectAt)
     $durationMs = [Math]::Max(0, [int](($end - $start).TotalMilliseconds))
     if ($null -eq $SyncState.dayOfficeMs) { $SyncState.dayOfficeMs = 0 }
     $SyncState.dayOfficeMs = [int]$SyncState.dayOfficeMs + $durationMs
-    Add-QueuedEvent -Type "visit_end" -Fields @{
+    $fields = @{
         localVisitId = $open.localVisitId
         officeMs = $durationMs
     }
+    if ($PreviousSsid) { $fields.previousSsid = $PreviousSsid }
+    Add-QueuedEvent -Type "visit_end" -Fields $fields -At $disconnectAt
     $SyncState.openVisit = $null
     return $SyncState
 }
@@ -430,19 +439,21 @@ function End-LocalVisit {
 function Add-WifiChangeEvents {
     param(
         [string]$PreviousSsid,
-        [string]$CurrentSsid
+        [string]$CurrentSsid,
+        [string]$At
     )
+    $transitionAt = if ($At) { $At } else { Get-NowIso }
     $prevSet = [bool]$PreviousSsid
     $currSet = [bool]$CurrentSsid
     if (-not $prevSet -and $currSet) {
-        Add-QueuedEvent -Type "wifi_connected" -Fields @{ ssid = $CurrentSsid }
+        Add-QueuedEvent -Type "wifi_connected" -Fields @{ ssid = $CurrentSsid } -At $transitionAt
     } elseif ($prevSet -and -not $currSet) {
-        Add-QueuedEvent -Type "wifi_disconnected" -Fields @{ previousSsid = $PreviousSsid }
+        Add-QueuedEvent -Type "wifi_disconnected" -Fields @{ previousSsid = $PreviousSsid } -At $transitionAt
     } elseif ($prevSet -and $currSet -and $PreviousSsid -ne $CurrentSsid) {
         Add-QueuedEvent -Type "ssid_changed" -Fields @{
             ssid = $CurrentSsid
             previousSsid = $PreviousSsid
-        }
+        } -At $transitionAt
     }
 }
 
@@ -451,12 +462,14 @@ function Update-VisitBoundaries {
         $SyncState,
         [string]$PreviousSsid,
         [string]$CurrentSsid,
-        $ServerConfig
+        $ServerConfig,
+        [string]$TransitionAt
     )
     $wasOffice = Test-IsOfficeSsid -Ssid $PreviousSsid -ServerConfig $ServerConfig
     $isOffice = Test-IsOfficeSsid -Ssid $CurrentSsid -ServerConfig $ServerConfig
     if ($wasOffice -and -not $isOffice) {
-        $SyncState = End-LocalVisit -SyncState $SyncState
+        $disconnectAt = if ($TransitionAt) { $TransitionAt } else { Get-NowIso }
+        $SyncState = End-LocalVisit -SyncState $SyncState -EndAt $disconnectAt -PreviousSsid $PreviousSsid
     }
     if (-not $wasOffice -and $isOffice) {
         $SyncState = Start-LocalVisit -SyncState $SyncState -Ssid $CurrentSsid
@@ -910,9 +923,13 @@ if ($ssidChanged) {
     $alreadyQueued = $syncState.pendingSsid -and [string]$syncState.pendingSsid -eq $ssid
     if (-not $alreadyQueued) {
         $fromSsid = if ($syncState.pendingPreviousSsid) { [string]$syncState.pendingPreviousSsid } else { $previousSsid }
-        Add-WifiChangeEvents -PreviousSsid $fromSsid -CurrentSsid $ssid
+        # One timestamp for the whole office Wi-Fi disconnect transition. If the laptop slept on
+        # office Wi-Fi without disconnecting, checkout time is when we detect the SSID change
+        # (often on wake at home Wi-Fi the next morning).
+        $transitionAt = Get-NowIso
+        Add-WifiChangeEvents -PreviousSsid $fromSsid -CurrentSsid $ssid -At $transitionAt
         $syncState = Update-VisitBoundaries -SyncState $syncState -PreviousSsid $fromSsid `
-            -CurrentSsid $ssid -ServerConfig $serverConfig
+            -CurrentSsid $ssid -ServerConfig $serverConfig -TransitionAt $transitionAt
         $syncState.pendingSsid = $ssid
         $syncState.pendingPreviousSsid = $fromSsid
     }
