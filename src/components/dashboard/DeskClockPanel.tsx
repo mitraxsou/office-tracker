@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import {
   analogHandAngles,
   clockPartsInTimezone,
@@ -95,11 +102,31 @@ export function DeskClockPanel({
   const [now, setNow] = useState(() => new Date());
   const [settings, setSettings] = useState<DeskClockSettings>(DEFAULT_DESK_CLOCK_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRegionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setSettings(readDeskClockSettings());
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      const region = settingsRegionRef.current;
+      if (region && !region.contains(event.target as Node)) {
+        setSettingsOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSettingsOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [settingsOpen]);
 
   useEffect(() => {
     if (!mounted) return;
@@ -154,7 +181,7 @@ export function DeskClockPanel({
 
   return (
     <section className="card overflow-hidden p-0">
-      <div className="border-b border-[var(--border)]">
+      <div ref={settingsRegionRef} className="border-b border-[var(--border)]">
         <DeskClockTodayHeader
           dayKey={dayKey}
           settingsControl={
@@ -163,17 +190,23 @@ export function DeskClockPanel({
               className="btn-secondary inline-flex items-center justify-center p-1.5"
               aria-label="Desk clock settings"
               aria-expanded={settingsOpen}
-              onClick={() => setSettingsOpen((o) => !o)}
+              onClick={() => setSettingsOpen((open) => !open)}
             >
               <GearIcon />
             </button>
           }
         />
+        {settingsOpen && (
+          <DeskClockSettingsPanel
+            settings={settings}
+            onChange={updateSettings}
+            onHide={() => {
+              updateSettings({ hidden: true });
+              setSettingsOpen(false);
+            }}
+          />
+        )}
       </div>
-
-      {settingsOpen && (
-        <DeskClockSettingsRow settings={settings} onChange={updateSettings} />
-      )}
 
       <div className="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-start lg:gap-4">
         <div className="flex shrink-0 justify-center lg:justify-start">
@@ -255,67 +288,78 @@ function DeskClockTodayStatsGrid({
   );
 }
 
-function DeskClockSettingsRow({
+function DeskClockSettingsPanel({
   settings,
   onChange,
+  onHide,
 }: {
   settings: DeskClockSettings;
   onChange: (patch: Partial<DeskClockSettings>) => void;
+  onHide: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--background)] px-4 py-3 text-xs">
-      <SettingToggle
-        label="LED"
-        active={settings.face === "led"}
-        onClick={() => onChange({ face: "led" })}
-      />
-      <SettingToggle
-        label="Analog"
-        active={settings.face === "analog"}
-        onClick={() => onChange({ face: "analog" })}
-      />
-      <span className="mx-1 text-muted">|</span>
-      {(Object.keys(DESK_CLOCK_COLOR_CSS) as DeskClockColor[]).map((color) => (
-        <button
-          key={color}
-          type="button"
-          title={color}
-          aria-label={`Color ${color}`}
-          className={`h-5 w-5 rounded-full border-2 ${
-            settings.color === color ? "border-[var(--foreground)]" : "border-transparent"
-          }`}
-          style={{ backgroundColor: DESK_CLOCK_COLOR_CSS[color] }}
-          onClick={() => onChange({ color })}
+    <div
+      className="mx-4 mb-3 rounded-lg border border-[var(--border)] bg-[var(--background-elevated)] p-3 text-xs"
+      role="region"
+      aria-label="Desk clock customization"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <SettingToggle
+          label="LED"
+          active={settings.face === "led"}
+          onClick={() => onChange({ face: "led" })}
         />
-      ))}
-      <span className="mx-1 text-muted">|</span>
-      <SettingToggle
-        label="12h"
-        active={settings.hour12}
-        onClick={() => onChange({ hour12: true })}
-      />
-      <SettingToggle
-        label="24h"
-        active={!settings.hour12}
-        onClick={() => onChange({ hour12: false })}
-      />
-      <SettingToggle
-        label="Seconds"
-        active={settings.showSeconds}
-        onClick={() => onChange({ showSeconds: !settings.showSeconds })}
-      />
-      <SettingToggle
-        label="Calendar"
-        active={settings.showCalendar}
-        onClick={() => onChange({ showCalendar: !settings.showCalendar })}
-      />
-      <button
-        type="button"
-        className="ml-auto text-muted hover:text-accent hover:underline"
-        onClick={() => onChange({ hidden: true })}
-      >
-        Hide desk clock
-      </button>
+        <SettingToggle
+          label="Analog"
+          active={settings.face === "analog"}
+          onClick={() => onChange({ face: "analog" })}
+        />
+        <span className="mx-1 text-muted" aria-hidden>|</span>
+        {(Object.keys(DESK_CLOCK_COLOR_CSS) as DeskClockColor[]).map((color) => (
+          <button
+            key={color}
+            type="button"
+            title={color}
+            aria-label={`Color ${color}`}
+            aria-pressed={settings.color === color}
+            className={`h-5 w-5 rounded-full border-2 ${
+              settings.color === color ? "border-[var(--foreground)]" : "border-transparent"
+            }`}
+            style={{ backgroundColor: DESK_CLOCK_COLOR_CSS[color] }}
+            onClick={() => onChange({ color })}
+          />
+        ))}
+        <span className="mx-1 text-muted" aria-hidden>|</span>
+        <SettingToggle
+          label="12h"
+          active={settings.hour12}
+          onClick={() => onChange({ hour12: true })}
+        />
+        <SettingToggle
+          label="24h"
+          active={!settings.hour12}
+          onClick={() => onChange({ hour12: false })}
+        />
+        <SettingToggle
+          label="Seconds"
+          active={settings.showSeconds}
+          onClick={() => onChange({ showSeconds: !settings.showSeconds })}
+        />
+        <SettingToggle
+          label="Calendar"
+          active={settings.showCalendar}
+          onClick={() => onChange({ showCalendar: !settings.showCalendar })}
+        />
+      </div>
+      <div className="mt-3 border-t border-[var(--border)] pt-3">
+        <button
+          type="button"
+          className="btn-secondary w-full rounded-md px-3 py-2 text-left text-sm font-medium text-muted hover:text-accent"
+          onClick={onHide}
+        >
+          Hide desk clock
+        </button>
+      </div>
     </div>
   );
 }
