@@ -212,3 +212,50 @@ html[data-theme="light"] .picker-input::-webkit-calendar-picker-indicator {
   color: var(--deskclock-accent);
   text-shadow: 0 0 6px color-mix(in srgb, var(--deskclock-accent) 50%, transparent);
 }
+
+@keyframes office-pulse-logo-ring {
+  0%,
+  100% {
+    transform: scale(0.94);
+    opacity: 0.28;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 0.08;
+  }
+}
+
+@keyframes office-pulse-logo-breathe {
+  0%,
+  100% {
+    opacity: 0.82;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.office-pulse-logo__ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: office-pulse-logo-ring 2.8s ease-in-out infinite;
+}
+
+.office-pulse-logo__wave {
+  animation: office-pulse-logo-breathe 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .office-pulse-logo__ring,
+  .office-pulse-logo__wave {
+    animation: none;
+  }
+
+  .office-pulse-logo__ring {
+    opacity: 0.15;
+  }
+
+  .office-pulse-logo__wave {
+    opacity: 1;
+  }
+}
