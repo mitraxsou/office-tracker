@@ -15,6 +15,7 @@ import { AppNav } from "@/components/AppNav";
 import { MonthlyProgressMeter } from "@/components/MonthlyProgressMeter";
 import { YearComplianceMeter } from "@/components/YearComplianceMeter";
 import { DashboardRefreshButton } from "@/components/DashboardRefreshButton";
+import { DeskClockPanel } from "@/components/dashboard/DeskClockPanel";
 import { DashboardHeroSummary } from "@/components/dashboard/DashboardHeroSummary";
 import { DashboardAlerts } from "@/components/dashboard/DashboardAlerts";
 import { DashboardDetailsPanel } from "@/components/dashboard/DashboardDetailsPanel";
@@ -150,6 +151,13 @@ export default async function DashboardPage() {
           minutesSinceLastSync={minutesSinceLastSync}
           lastSyncedAt={lastSyncedAt}
           timezone={user.timezone}
+        />
+
+        <DeskClockPanel
+          timezone={user.timezone}
+          dayKey={summary.dayKey}
+          monthKey={monthlyProgress.monthKey}
+          monthDays={monthlyProgress.days}
         />
 
         <DashboardHeroSummary

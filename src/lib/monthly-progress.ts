@@ -72,6 +72,12 @@ export function dayKeysInMonthUpToToday(date: Date, timezone: string): string[] 
   return keys;
 }
 
+export type MonthlyProgressDay = {
+  dayKey: string;
+  hours: number;
+  metTarget: boolean;
+};
+
 export type MonthlyProgress = {
   monthKey: string;
   qualifyingDays: number;
@@ -83,6 +89,7 @@ export type MonthlyProgress = {
   remainingDays: number;
   daysElapsed: number;
   progressState: MonthlyProgressState;
+  days: MonthlyProgressDay[];
 };
 
 export type YearMonthComplianceStatus =
