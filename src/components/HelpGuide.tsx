@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useMemo } from "react";
 import {
   AGENT_EXTRACT_FOLDER,
   AGENT_INSTALL_DIR,
@@ -7,48 +10,27 @@ import {
   APP_NAME,
 } from "@/lib/agent-branding";
 import { APP_VERSION, getCurrentRelease, getVisibleReleaseBullets } from "@/lib/app-version";
-import { HelpStickyNav } from "@/components/HelpStickyNav";
+import { SectionNavLayout } from "@/components/SectionNavLayout";
+import { getHelpNavItems, resolveHelpHash } from "@/components/help-nav";
 
 type HelpGuideProps = {
   isLoggedIn: boolean;
   isAdmin: boolean;
 };
 
-function SectionAnchor({ id, children }: { id: string; children: React.ReactNode }) {
-  return (
-    <h2 id={id} className="scroll-mt-6 text-lg font-medium text-accent">
-      {children}
-    </h2>
-  );
-}
-
 export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
+  const navItems = useMemo(() => getHelpNavItems(isAdmin), [isAdmin]);
+
   return (
-    <div className="flex flex-col gap-6 md:flex-row md:gap-10">
-      <HelpStickyNav isAdmin={isAdmin} />
-
-      <div className="min-w-0 flex-1 space-y-8">
-        <div>
-          <h1 className="text-2xl font-semibold">How to use {APP_NAME}</h1>
-          <p className="mt-2 text-muted">
-            Internal pilot: track at least <strong>5 hours per day in the office</strong> on your PwC laptop.
-            A small Windows agent reports presence on office Wi-Fi. You can read this before you sign in.
-          </p>
-          {!isLoggedIn && (
-            <p className="mt-3 text-sm">
-              <Link href="/login" className="text-accent hover:underline">
-                Sign in
-              </Link>
-              {" · "}
-              <Link href="/register" className="text-accent hover:underline">
-                Register
-              </Link>
-            </p>
-          )}
-        </div>
-
-        <section id="whats-new" className="card scroll-mt-6 space-y-3 p-6">
-          <h2 className="text-lg font-medium text-accent">What&apos;s new in v{APP_VERSION}</h2>
+    <SectionNavLayout
+      items={navItems}
+      navTitle="Help section"
+      defaultActiveId="whats-new"
+      resolveHash={resolveHelpHash}
+    >
+      <div className="space-y-12">
+        <section id="whats-new" className="card scroll-mt-header space-y-3 p-6">
+          <h2 className="text-lg font-medium">What&apos;s new in v{APP_VERSION}</h2>
           <p className="text-xs text-muted">Released {getCurrentRelease().date}</p>
           <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
             {getVisibleReleaseBullets(getCurrentRelease(), isAdmin).map((bullet) => (
@@ -57,8 +39,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           </ul>
         </section>
 
-        <section className="card space-y-3 p-6">
-          <SectionAnchor id="overview">What it does</SectionAnchor>
+        <section id="overview" className="card scroll-mt-header space-y-3 p-6">
+          <h2 className="text-lg font-medium">What it does</h2>
           <p className="text-sm text-muted">
             {APP_NAME} counts time you spend in the office toward your daily hours target (5 hours in the pilot).
             Visits build from agent heartbeats on approved office Wi-Fi, manual check-in, or admin corrections.
@@ -80,8 +62,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           </ul>
         </section>
 
-        <section className="card space-y-3 p-6">
-          <SectionAnchor id="legal">Terms and privacy</SectionAnchor>
+        <section id="legal" className="card scroll-mt-header space-y-3 p-6">
+          <h2 className="text-lg font-medium">Terms and privacy</h2>
           <p className="text-sm text-muted">
             By signing in or installing the agent you agree to the{" "}
             <Link href="/terms" className="text-accent hover:underline">
@@ -95,8 +77,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           </p>
         </section>
 
-        <section className="card space-y-3 p-6">
-          <SectionAnchor id="account">Get an account</SectionAnchor>
+        <section id="account" className="card scroll-mt-header space-y-3 p-6">
+          <h2 className="text-lg font-medium">Get an account</h2>
           <ol className="list-decimal space-y-3 pl-5 text-sm text-muted">
             <li>
               <strong className="text-foreground">Sign in with OTP.</strong>{" "}
@@ -129,8 +111,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           </ol>
         </section>
 
-        <section className="card space-y-4 p-6">
-          <SectionAnchor id="setup-flow">Setup flow</SectionAnchor>
+        <section id="setup-flow" className="card scroll-mt-header space-y-4 p-6">
+          <h2 className="text-lg font-medium">Setup flow</h2>
           <pre className="overflow-x-auto rounded-lg border bg-[var(--background)] p-4 text-xs leading-relaxed text-muted">
 {`  ┌──────────────────┐     ┌──────────────────┐     ┌─────────────────────┐
   │ Sign in with OTP │ --> │ Accept terms &   │ --> │ Token ready in      │
@@ -148,8 +130,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           </p>
         </section>
 
-        <section id="install-agent" className="card scroll-mt-6 space-y-4 p-6">
-          <h2 className="text-lg font-medium text-accent">Install the Windows agent</h2>
+        <section id="install-agent" className="card scroll-mt-header space-y-4 p-6">
+          <h2 className="text-lg font-medium">Install the Windows agent</h2>
           <p className="text-sm text-muted">
             Run these steps on each PwC laptop in the pilot. Use <strong>PowerShell</strong>, not Command Prompt.
             No local admin password is required.
@@ -191,7 +173,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             </li>
           </ol>
 
-          <div id="install-first-time" className="scroll-mt-6 rounded-lg border border-[var(--border)] p-4">
+          <div id="install-first-time" className="scroll-mt-header rounded-lg border border-[var(--border)] p-4">
             <h3 className="text-sm font-medium">Install (first time on this laptop)</h3>
             <ol className="mt-3 list-decimal space-y-3 pl-5 text-sm">
               <li>
@@ -205,7 +187,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             </ol>
           </div>
 
-          <div id="update-agent" className="scroll-mt-6 rounded-lg border border-[var(--border)] p-4">
+          <div id="update-agent" className="scroll-mt-header rounded-lg border border-[var(--border)] p-4">
             <h3 className="text-sm font-medium">Update (agent already installed)</h3>
             <p className="mt-1 text-sm text-muted">
               Use this when Today shows a stale agent, after sleep issues, or when admins publish a new agent build.
@@ -231,8 +213,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           </p>
         </section>
 
-        <section id="daily-use" className="card scroll-mt-6 space-y-4 p-6">
-          <h2 className="text-lg font-medium text-accent">Today and Reports</h2>
+        <section id="daily-use" className="card scroll-mt-header space-y-4 p-6">
+          <h2 className="text-lg font-medium">Today and Reports</h2>
 
           <h3 className="text-sm font-medium">Today dashboard</h3>
           <p className="text-sm text-muted">
@@ -268,8 +250,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           </p>
         </section>
 
-        <section id="settings" className="card scroll-mt-6 space-y-4 p-6">
-          <h2 className="text-lg font-medium text-accent">Settings</h2>
+        <section id="settings" className="card scroll-mt-header space-y-4 p-6">
+          <h2 className="text-lg font-medium">Settings</h2>
           <p className="text-sm text-muted">
             Open <Link href="/settings" className="text-accent hover:underline">Settings</Link>. A sticky sidebar
             (or section picker on mobile) jumps to <strong>Agent</strong>, <strong>Account</strong>, and{" "}
@@ -304,8 +286,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           </dl>
         </section>
 
-        <section id="contact-admin" className="card scroll-mt-6 space-y-3 p-6">
-          <h2 className="text-lg font-medium text-accent">Contact admin</h2>
+        <section id="contact-admin" className="card scroll-mt-header space-y-3 p-6">
+          <h2 className="text-lg font-medium">Contact admin</h2>
           <p className="text-sm text-muted">
             Use <strong>Contact admin</strong> in the top navigation for pilot questions, agent problems you cannot fix,
             or product feedback. You can also open it from global search.
@@ -323,8 +305,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           )}
         </section>
 
-        <section id="troubleshooting" className="card scroll-mt-6 space-y-4 p-6">
-          <h2 className="text-lg font-medium text-accent">Troubleshooting</h2>
+        <section id="troubleshooting" className="card scroll-mt-header space-y-4 p-6">
+          <h2 className="text-lg font-medium">Troubleshooting</h2>
           <div className="space-y-4 text-sm">
             <div>
               <p className="font-medium">Agent not installed or never connected</p>
@@ -390,8 +372,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           )}
         </section>
 
-        <section id="presence" className="card scroll-mt-6 space-y-3 p-6">
-          <h2 className="text-lg font-medium text-accent">How office presence works</h2>
+        <section id="presence" className="card scroll-mt-header space-y-3 p-6">
+          <h2 className="text-lg font-medium">How office presence works</h2>
           <ul className="list-disc space-y-2 pl-5 text-sm text-muted">
             <li>Presence is automatic on approved office Wi-Fi SSIDs (admins maintain the list on the server).</li>
             <li>You do not edit SSID names on your laptop.</li>
@@ -414,8 +396,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
         </section>
 
         {isAdmin && (
-          <section id="admin" className="card scroll-mt-6 space-y-3 p-6">
-            <h2 className="text-lg font-medium text-accent">Admin notes</h2>
+          <section id="admin" className="card scroll-mt-header space-y-3 p-6">
+            <h2 className="text-lg font-medium">Admin notes</h2>
             <p className="text-sm text-muted">
               Full admin SOP:{" "}
               <Link href="/admin/guide" className="text-accent hover:underline">
@@ -440,6 +422,6 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           </section>
         )}
       </div>
-    </div>
+    </SectionNavLayout>
   );
 }
