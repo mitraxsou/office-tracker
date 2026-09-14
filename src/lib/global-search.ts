@@ -284,6 +284,7 @@ const DEFAULT_SEARCH_ENTRY_IDS = [
   "dashboard",
   "reports",
   "history",
+  "reports-corrections",
   "settings",
   "contact-admin",
   "settings-agent-install",

@@ -164,7 +164,7 @@ export function UserCorrectionRequests() {
 
       {!loading && requests.length === 0 && (
         <p className="text-sm text-muted">
-          No correction requests yet. Use &quot;Report issue&quot; on a visit in History.
+          No correction requests yet. Use &quot;Report issue&quot; on a visit under Reports → Visits.
         </p>
       )}
 
