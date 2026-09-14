@@ -2,12 +2,12 @@ import Link from "next/link";
 import {
   AGENT_EXTRACT_FOLDER,
   AGENT_INSTALL_DIR,
-  AGENT_PRODUCT_NAME,
   AGENT_TASK_NAME,
   AGENT_ZIP_STEM,
+  APP_NAME,
 } from "@/lib/agent-branding";
 import { APP_VERSION, getCurrentRelease, getVisibleReleaseBullets } from "@/lib/app-version";
-import { APP_NAME } from "@/lib/agent-branding";
+import { HelpStickyNav } from "@/components/HelpStickyNav";
 
 type HelpGuideProps = {
   isLoggedIn: boolean;
@@ -24,573 +24,422 @@ function SectionAnchor({ id, children }: { id: string; children: React.ReactNode
 
 export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold">How to use {APP_NAME}</h1>
-        <p className="mt-2 text-muted">
-          Step-by-step guide for the office presence pilot. You can read this before signing in.
-          This is a hobby project for fun, not official PwC tooling.
-        </p>
-        {!isLoggedIn && (
-          <p className="mt-3 text-sm">
-            <Link href="/login" className="text-accent hover:underline">
-              Sign in
-            </Link>
-            {" · "}
-            <Link href="/register" className="text-accent hover:underline">
-              Register
-            </Link>
+    <div className="flex flex-col gap-6 md:flex-row md:gap-10">
+      <HelpStickyNav isAdmin={isAdmin} />
+
+      <div className="min-w-0 flex-1 space-y-8">
+        <div>
+          <h1 className="text-2xl font-semibold">How to use {APP_NAME}</h1>
+          <p className="mt-2 text-muted">
+            Internal pilot: track at least <strong>5 hours per day in the office</strong> on your PwC laptop.
+            A small Windows agent reports presence on office Wi-Fi. You can read this before you sign in.
           </p>
-        )}
-      </div>
-
-      <nav className="card p-4 text-sm">
-        <p className="mb-2 font-medium">On this page</p>
-        <ul className="columns-1 gap-x-8 space-y-1 text-muted sm:columns-2">
-          <li>
-            <a href="#whats-new" className="text-accent hover:underline">
-              What&apos;s new
-            </a>
-          </li>
-          <li>
-            <a href="#overview" className="text-accent hover:underline">
-              What it does
-            </a>
-          </li>
-          <li>
-            <a href="#legal" className="text-accent hover:underline">
-              Terms and privacy
-            </a>
-          </li>
-          <li>
-            <a href="#account" className="text-accent hover:underline">
-              Get an account
-            </a>
-          </li>
-          <li>
-            <a href="#setup-flow" className="text-accent hover:underline">
-              Setup flow
-            </a>
-          </li>
-          <li>
-            <a href="#install-agent" className="text-accent hover:underline">
-              Install the agent
-            </a>
-          </li>
-          <li>
-            <a href="#update-agent" className="text-accent hover:underline">
-              Update the agent
-            </a>
-          </li>
-          <li>
-            <a href="#install-folder" className="text-accent hover:underline">
-              Open the install folder
-            </a>
-          </li>
-          <li>
-            <a href="#daily-use" className="text-accent hover:underline">
-              Daily use
-            </a>
-          </li>
-          <li>
-            <a href="#settings" className="text-accent hover:underline">
-              Settings
-            </a>
-          </li>
-          <li>
-            <a href="#troubleshooting" className="text-accent hover:underline">
-              Troubleshooting
-            </a>
-          </li>
-          <li>
-            <a href="#presence" className="text-accent hover:underline">
-              How presence works
-            </a>
-          </li>
-          {isAdmin && (
-            <li>
-              <a href="#admin" className="text-accent hover:underline">
-                Admin notes
-              </a>
-            </li>
+          {!isLoggedIn && (
+            <p className="mt-3 text-sm">
+              <Link href="/login" className="text-accent hover:underline">
+                Sign in
+              </Link>
+              {" · "}
+              <Link href="/register" className="text-accent hover:underline">
+                Register
+              </Link>
+            </p>
           )}
-        </ul>
-      </nav>
+        </div>
 
-      <section id="whats-new" className="card scroll-mt-6 space-y-3 p-6">
-        <h2 className="text-lg font-medium text-accent">What&apos;s new in v{APP_VERSION}</h2>
-        <p className="text-xs text-muted">Released {getCurrentRelease().date}</p>
-        <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
-          {getVisibleReleaseBullets(getCurrentRelease(), isAdmin).map((bullet) => (
-            <li key={bullet}>{bullet}</li>
-          ))}
-        </ul>
-      </section>
+        <section id="whats-new" className="card scroll-mt-6 space-y-3 p-6">
+          <h2 className="text-lg font-medium text-accent">What&apos;s new in v{APP_VERSION}</h2>
+          <p className="text-xs text-muted">Released {getCurrentRelease().date}</p>
+          <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
+            {getVisibleReleaseBullets(getCurrentRelease(), isAdmin).map((bullet) => (
+              <li key={bullet}>{bullet}</li>
+            ))}
+          </ul>
+        </section>
 
-      <section className="card space-y-3 p-6">
-        <SectionAnchor id="overview">What it does</SectionAnchor>
-        <p className="text-sm text-muted">
-          {APP_NAME} tracks whether you spend at least <strong>5 hours per day in the office</strong>{" "}
-          during the pilot. A small Windows agent on your PwC laptop reports presence automatically while
-          you are connected to office Wi-Fi. You can also check in or out manually if auto-detection fails.
-        </p>
-        <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
-          <li>Web dashboard: today&apos;s hours, visit history, and progress toward the daily target</li>
-          <li>Windows agent: wakes every 2 minutes and sends on the admin-set interval (5 minutes by default)</li>
-          <li>One install token per laptop; admins issue tokens and approve laptop removals</li>
-        </ul>
-      </section>
+        <section className="card space-y-3 p-6">
+          <SectionAnchor id="overview">What it does</SectionAnchor>
+          <p className="text-sm text-muted">
+            {APP_NAME} counts time you spend in the office toward your daily hours target (5 hours in the pilot).
+            Visits build from agent heartbeats on approved office Wi-Fi, manual check-in, or admin corrections.
+          </p>
+          <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
+            <li>
+              <strong>Today:</strong> desk clock, hours toward target, agent status, and check-in when Wi-Fi fails
+            </li>
+            <li>
+              <strong>Reports:</strong> monthly progress, visit log, and correction requests
+            </li>
+            <li>
+              <strong>Settings:</strong> install or update the agent, account details, and notification prefs
+            </li>
+            <li>
+              Windows agent: task <code>{AGENT_TASK_NAME}</code> wakes every 2 minutes and sends on the
+              server interval (5 minutes by default)
+            </li>
+          </ul>
+        </section>
 
-      <section className="card space-y-3 p-6">
-        <SectionAnchor id="legal">Terms and privacy</SectionAnchor>
-        <p className="text-sm text-muted">
-          {APP_NAME} is a voluntary hobby pilot. By signing in or installing the agent you
-          agree to the{" "}
-          <Link href="/terms" className="text-accent hover:underline">
-            Terms and Conditions
-          </Link>{" "}
-          and{" "}
-          <Link href="/privacy" className="text-accent hover:underline">
-            Privacy Policy
-          </Link>
-          . On first sign-in (or your next sign-in after an update), you must accept them before
-          using the dashboard.
-        </p>
-      </section>
-
-      <section className="card space-y-3 p-6">
-        <SectionAnchor id="account">Get an account</SectionAnchor>
-        <ol className="list-decimal space-y-3 pl-5 text-sm text-muted">
-          <li>
-            <strong className="text-foreground">Sign in with OTP (default).</strong>{" "}
-            {isLoggedIn ? (
-              <>You are signed in. Open </>
-            ) : (
-              <>
-                Go to{" "}
-                <Link href="/login" className="text-accent hover:underline">
-                  Sign in
-                </Link>
-                , enter your PwC email, and use the 6-digit code sent to Microsoft Teams. First-time
-                sign-in creates your account automatically. Open{" "}
-              </>
-            )}
-            <Link href="/settings#install" className="text-accent hover:underline">
-              Settings
+        <section className="card space-y-3 p-6">
+          <SectionAnchor id="legal">Terms and privacy</SectionAnchor>
+          <p className="text-sm text-muted">
+            By signing in or installing the agent you agree to the{" "}
+            <Link href="/terms" className="text-accent hover:underline">
+              Terms and Conditions
             </Link>{" "}
-            after your first login to set your profile and install the agent.
-          </li>
-          <li>
-            <strong className="text-foreground">Password fallback (optional).</strong> On the sign-in
-            page, expand <strong>Sign in with password</strong> after you set a password in Settings,
-            or if an admin gave you a temporary password after a reset.
-          </li>
-          <li>
-            <strong className="text-foreground">Install token.</strong> Your first OTP sign-in creates
-            a laptop install token automatically. Copy the install command from{" "}
-            <strong>Install or reinstall {AGENT_PRODUCT_NAME}</strong> in Settings.
-          </li>
-        </ol>
-        <p className="text-xs text-muted">
-          Pilot admins can still create accounts manually for edge cases. For most colleagues, OTP
-          self-registration is enough.
-        </p>
-      </section>
+            and{" "}
+            <Link href="/privacy" className="text-accent hover:underline">
+              Privacy Policy
+            </Link>
+            . After an update, you may need to accept them again before using the dashboard.
+          </p>
+        </section>
 
-      <section className="card space-y-4 p-6">
-        <SectionAnchor id="setup-flow">Setup flow</SectionAnchor>
-        <pre className="overflow-x-auto rounded-lg border bg-[var(--background)] p-4 text-xs leading-relaxed text-muted">
+        <section className="card space-y-3 p-6">
+          <SectionAnchor id="account">Get an account</SectionAnchor>
+          <ol className="list-decimal space-y-3 pl-5 text-sm text-muted">
+            <li>
+              <strong className="text-foreground">Sign in with OTP.</strong>{" "}
+              {isLoggedIn ? (
+                <>You are signed in. Open </>
+              ) : (
+                <>
+                  Go to{" "}
+                  <Link href="/login" className="text-accent hover:underline">
+                    Sign in
+                  </Link>
+                  , enter your PwC email, and use the 6-digit code in Microsoft Teams. First sign-in creates
+                  your account. Open{" "}
+                </>
+              )}
+              <Link href="/settings#agent" className="text-accent hover:underline">
+                Settings
+              </Link>{" "}
+              (Agent section) to install the agent on each laptop.
+            </li>
+            <li>
+              <strong className="text-foreground">Password sign-in (optional).</strong> Expand{" "}
+              <strong>Sign in with password</strong> on the login page after you set a password in Settings, or
+              when an admin reset your password.
+            </li>
+            <li>
+              <strong className="text-foreground">Install token.</strong> Your first OTP sign-in creates a laptop
+              token. Copy <strong>Copy install command</strong> from Settings → Agent for that laptop.
+            </li>
+          </ol>
+        </section>
+
+        <section className="card space-y-4 p-6">
+          <SectionAnchor id="setup-flow">Setup flow</SectionAnchor>
+          <pre className="overflow-x-auto rounded-lg border bg-[var(--background)] p-4 text-xs leading-relaxed text-muted">
 {`  ┌──────────────────┐     ┌──────────────────┐     ┌─────────────────────┐
-  │ Sign in with OTP │ --> │ Accept terms &   │ --> │ Install token ready │
-  │ (auto account)   │     │ set profile      │     │ in Settings         │
+  │ Sign in with OTP │ --> │ Accept terms &   │ --> │ Token ready in      │
+  │ (auto account)   │     │ set profile      │     │ Settings → Agent    │
   └──────────────────┘     └──────────────────┘     └─────────────────────┘
                                                               │
                                                               v
   ┌──────────────────┐     ┌──────────────────┐     ┌─────────────────────┐
-  │ Dashboard shows  │ <-- │ Agent syncs      │ <-- │ Copy setup cmd,    │
-  │ office hours     │     │ with server      │     │ run in PowerShell  │
+  │ Today shows      │ <-- │ Agent syncs      │ <-- │ Download zip, run   │
+  │ office hours     │     │ with server      │     │ install in PowerShell│
   └──────────────────┘     └──────────────────┘     └─────────────────────┘`}
-        </pre>
-        <p className="text-sm text-muted">
-          Total setup time is usually 5 to 10 minutes per laptop. Re-running install is safe; it refreshes
-          an existing install.
-        </p>
-      </section>
-
-      <section className="card space-y-4 p-6">
-        <SectionAnchor id="install-agent">Install the Windows agent</SectionAnchor>
-        <p className="text-sm text-muted">
-          Do this on each PwC laptop you use for the pilot. Use <strong>PowerShell</strong>, not Command
-          Prompt. No IT admin password is required.
-        </p>
-        <h3 className="text-sm font-medium">Steps 1 to 4: prepare (same for install and update)</h3>
-        <ol className="list-decimal space-y-4 pl-5 text-sm">
-          <li>
-            <span className="font-medium">Sign in</span> and open{" "}
-            <Link href="/settings#install" className="text-accent hover:underline">
-              Settings
-            </Link>
-            .
-          </li>
-          <li>
-            <span className="font-medium">Download the agent zip</span>
-            <p className="mt-1 text-muted">
-              Click <strong>Download agent (.zip)</strong> and save <code>{AGENT_ZIP_STEM}.zip</code>{" "}
-              to Downloads. On PwC laptops that is often <code>OneDrive - PwC\Downloads</code>.
-            </p>
-          </li>
-          <li>
-            <span className="font-medium">Extract the zip</span>
-            <p className="mt-1 text-muted">
-              Right-click the zip, choose <strong>Extract All</strong>, and extract to Downloads.
-              Because the zip is named <code>{AGENT_ZIP_STEM}.zip</code>, Extract All may create a
-              nested folder such as <code>{`${AGENT_ZIP_STEM}\\${AGENT_EXTRACT_FOLDER}`}</code>. Keep
-              opening folders until you see <code>install.ps1</code> and <code>update.ps1</code>.
-            </p>
-          </li>
-          <li>
-            <span className="font-medium">Open PowerShell in that folder</span>
-            <p className="mt-1 text-muted">
-              In that extracted folder, Shift + right-click empty space and choose{" "}
-              <strong>Open PowerShell window here</strong> (or Terminal). Run <code>dir</code>; it
-              must list <code>install.ps1</code>. Copied commands use <code>.\install.ps1</code>{" "}
-              and <code>.\update.ps1</code> and only work from this folder.
-            </p>
-            <p className="mt-1 text-xs text-muted">
-              If you are not already in that folder, <code>cd</code> into it first. Example nested
-              path:{" "}
-              <code>{`cd "$env:USERPROFILE\\OneDrive - PwC\\Downloads\\${AGENT_ZIP_STEM}\\${AGENT_EXTRACT_FOLDER}"`}</code>
-            </p>
-          </li>
-        </ol>
-
-        <div id="install-first-time" className="scroll-mt-6 rounded-lg border border-[var(--border)] p-4">
-          <h3 className="text-sm font-medium">Install (first time on this laptop)</h3>
-          <p className="mt-1 text-sm text-muted">
-            Follow this path when the agent has never run on this laptop.
+          </pre>
+          <p className="text-sm text-muted">
+            Plan about 5 to 10 minutes per laptop. Re-running install refreshes an existing setup.
           </p>
-          <ol className="mt-3 list-decimal space-y-3 pl-5 text-sm">
+        </section>
+
+        <section id="install-agent" className="card scroll-mt-6 space-y-4 p-6">
+          <h2 className="text-lg font-medium text-accent">Install the Windows agent</h2>
+          <p className="text-sm text-muted">
+            Run these steps on each PwC laptop in the pilot. Use <strong>PowerShell</strong>, not Command Prompt.
+            No local admin password is required.
+          </p>
+          <h3 className="text-sm font-medium">Steps 1 to 4: prepare (install and update)</h3>
+          <ol className="list-decimal space-y-4 pl-5 text-sm">
             <li>
-              <span className="font-medium">Copy the install command</span>
+              <span className="font-medium">Sign in</span> and open{" "}
+              <Link href="/settings#install" className="text-accent hover:underline">
+                Settings → Agent
+              </Link>
+              .
+            </li>
+            <li>
+              <span className="font-medium">Download the agent zip</span>
               <p className="mt-1 text-muted">
-                In Settings, under <strong>Install or reinstall {AGENT_PRODUCT_NAME}</strong>, find the
-                card for this laptop and click <strong>Copy install command</strong> in the{" "}
-                <strong>Install (first time)</strong> section. If you have no tokens, ask your admin to
-                issue one from Admin → Users &amp; tokens.
+                Click <strong>Download agent (.zip)</strong>. Save <code>{AGENT_ZIP_STEM}.zip</code> to Downloads
+                (often <code>OneDrive - PwC\Downloads</code>).
               </p>
             </li>
             <li>
-              <span className="font-medium">Paste and run in PowerShell</span>
+              <span className="font-medium">Extract the zip</span>
               <p className="mt-1 text-muted">
-                Paste into the PowerShell window from the extract folder (right-click or Ctrl+V), then
-                press Enter. The command must run from the folder that contains{" "}
-                <code>install.ps1</code>. The agent installs to <code>{AGENT_INSTALL_DIR}</code> and
-                registers scheduled task <code>{AGENT_TASK_NAME}</code>.
+                Use <strong>Extract All</strong>. Nested folders are common: open until you see{" "}
+                <code>install.ps1</code> and <code>update.ps1</code> in the same folder.
+              </p>
+            </li>
+            <li>
+              <span className="font-medium">Open PowerShell in that folder</span>
+              <p className="mt-1 text-muted">
+                Shift + right-click empty space → <strong>Open PowerShell window here</strong>. Run{" "}
+                <code>dir</code>; it must list <code>install.ps1</code>. Commands use <code>.\install.ps1</code> and{" "}
+                <code>.\update.ps1</code> from this folder only.
+              </p>
+              <p className="mt-1 text-xs text-muted">
+                Example:{" "}
+                <code>{`cd "$env:USERPROFILE\\OneDrive - PwC\\Downloads\\${AGENT_ZIP_STEM}\\${AGENT_EXTRACT_FOLDER}"`}</code>
               </p>
             </li>
           </ol>
-        </div>
 
-        <div id="update-agent" className="scroll-mt-6 rounded-lg border border-[var(--border)] p-4">
-          <h3 className="text-sm font-medium">Update (agent already installed)</h3>
-          <p className="mt-1 text-sm text-muted">
-            Follow this path when the laptop already has the agent and you need a newer version or a
-            fix for a stale install.
-          </p>
-          <ol className="mt-3 list-decimal space-y-3 pl-5 text-sm">
-            <li>
-              <span className="font-medium">Copy the update command</span>
-              <p className="mt-1 text-muted">
-                In the same Settings card for this laptop, click <strong>Copy update command</strong>{" "}
-                in the <strong>Update (already installed)</strong> section. Use the token that matches
-                this laptop.
-              </p>
-            </li>
-            <li>
-              <span className="font-medium">Paste and run in PowerShell</span>
-              <p className="mt-1 text-muted">
-                Run it from the same extract folder, which must contain <code>update.ps1</code>. The
-                update refreshes the scripts and the <code>{AGENT_TASK_NAME}</code> task without
-                changing your token.
-              </p>
-            </li>
-          </ol>
-        </div>
+          <div id="install-first-time" className="scroll-mt-6 rounded-lg border border-[var(--border)] p-4">
+            <h3 className="text-sm font-medium">Install (first time on this laptop)</h3>
+            <ol className="mt-3 list-decimal space-y-3 pl-5 text-sm">
+              <li>
+                In Settings → Agent, open the laptop card and click <strong>Copy install command</strong> under{" "}
+                <strong>Install (first time)</strong>. No token? Ask your pilot admin.
+              </li>
+              <li>
+                Paste into PowerShell in the extract folder and press Enter. Files install to{" "}
+                <code>{AGENT_INSTALL_DIR}</code> and register task <code>{AGENT_TASK_NAME}</code>.
+              </li>
+            </ol>
+          </div>
 
-        <div>
-          <h3 className="text-sm font-medium">Last step for both paths: confirm on the dashboard</h3>
-          <p className="mt-1 text-sm text-muted">
+          <div id="update-agent" className="scroll-mt-6 rounded-lg border border-[var(--border)] p-4">
+            <h3 className="text-sm font-medium">Update (agent already installed)</h3>
+            <p className="mt-1 text-sm text-muted">
+              Use this when Today shows a stale agent, after sleep issues, or when admins publish a new agent build.
+            </p>
+            <ol className="mt-3 list-decimal space-y-3 pl-5 text-sm">
+              <li>
+                Download and extract the latest zip, open PowerShell in that folder, then click{" "}
+                <strong>Copy update command</strong> for this laptop in Settings → Agent.
+              </li>
+              <li>
+                Paste and run. The update refreshes scripts and the scheduled task without changing your token.
+              </li>
+            </ol>
+          </div>
+
+          <p className="text-sm text-muted">
             Within 2 to 4 minutes, open{" "}
             <Link href="/dashboard" className="text-accent hover:underline">
               Today
             </Link>
-            . <strong>Agent status</strong> should show healthy, and your laptop serial should appear
-            under Registered laptops in Settings.
+            . Agent status should look healthy, and the laptop serial should appear under registered laptops in
+            Settings → Agent.
           </p>
-        </div>
-      </section>
+        </section>
 
-      <section className="card space-y-4 p-6">
-        <SectionAnchor id="install-folder">Open the install folder in Windows Explorer</SectionAnchor>
-        <p className="text-sm text-muted">
-          The agent files live at <code>{AGENT_INSTALL_DIR}</code> (your user AppData folder, not Program
-          Files).
-        </p>
-        <div className="space-y-3 text-sm">
-          <div>
-            <p className="font-medium">Option A: Run dialog</p>
-            <ol className="mt-1 list-decimal space-y-1 pl-5 text-muted">
-              <li>Press <kbd className="rounded border px-1">Win</kbd> + <kbd className="rounded border px-1">R</kbd></li>
-              <li>
-                Type or paste: <code>%LOCALAPPDATA%\OfficeTracker</code>
-              </li>
-              <li>Press Enter. File Explorer opens the folder.</li>
-            </ol>
-          </div>
-          <div>
-            <p className="font-medium">Option B: File Explorer address bar</p>
-            <ol className="mt-1 list-decimal space-y-1 pl-5 text-muted">
-              <li>Open File Explorer</li>
-              <li>Click the address bar at the top (or press Alt+D)</li>
-              <li>
-                Paste <code>%LOCALAPPDATA%\OfficeTracker</code> and press Enter
-              </li>
-            </ol>
-          </div>
-          <div>
-            <p className="font-medium">Copy a path from the address bar</p>
-            <p className="mt-1 text-muted">
-              Click the address bar once to select the full path, then press Ctrl+C. You can paste it into
-              email, chat, or another app with Ctrl+V.
-            </p>
-          </div>
-        </div>
-        <p className="text-xs text-muted">
-          Useful files: <code>office-heartbeat.ps1</code>, <code>run-heartbeat.vbs</code>, and{" "}
-          <code>logs\heartbeat.log</code> for troubleshooting.
-        </p>
-      </section>
+        <section id="daily-use" className="card scroll-mt-6 space-y-4 p-6">
+          <h2 className="text-lg font-medium text-accent">Today and Reports</h2>
 
-      <section className="card space-y-3 p-6">
-        <SectionAnchor id="daily-use">Daily use</SectionAnchor>
-        <h3 className="text-sm font-medium">Today dashboard</h3>
-        <p className="text-sm text-muted">
-          Open <strong>Today</strong> to see progress toward your daily target, monthly office-day
-          progress, year compliance calendar, whether you are in the office now, and today&apos;s visits.
-          The agent updates this automatically when you are on office Wi-Fi.
-        </p>
-        <h3 className="text-sm font-medium">Manual check-in and check-out</h3>
-        <p className="text-sm text-muted">
-          If auto-detection fails (for example, Wi-Fi issues), use <strong>Check in</strong> when you arrive
-          and <strong>Check out</strong> when you leave on the Today page. VPN does not count as in-office.
-        </p>
-        <h3 className="text-sm font-medium">History and reports</h3>
-        <p className="text-sm text-muted">
-          Open <strong>Reports</strong> for monthly charts and calendar. Use the <strong>Visits</strong> tab
-          for your visit log and <strong>Report issue</strong>. Track admin replies on the{" "}
-          <strong>Corrections</strong> tab.
-        </p>
-        <h3 className="text-sm font-medium">HR exemptions on the year calendar</h3>
-        <p className="text-sm text-muted">
-          If you have HR approval for a month or day you could not meet the office target, click that
-          month on the year compliance calendar and use <strong>Notify admin</strong>. An admin will log
-          the exemption after verification. The month shows as compliant only after it is logged.
-        </p>
-      </section>
-
-      <section className="card space-y-4 p-6">
-        <SectionAnchor id="settings">Settings</SectionAnchor>
-        <dl className="space-y-4 text-sm">
-          <div>
-            <dt className="font-medium">Timezone</dt>
-            <dd className="mt-1 text-muted">
-              Set your timezone so today&apos;s hours, visit times, and alert schedule match your work day.
-              Default for the pilot is often Asia/Kolkata.
-            </dd>
-          </div>
-          <div>
-            <dt className="font-medium">Office schedule and alerts</dt>
-            <dd className="mt-1 text-muted">
-              Choose your usual office days (Wednesday and Friday by default) and a delivery channel
-              per alert: in the app only, Microsoft Teams only, or both. {APP_NAME} can tell you when
-              office hours start, when you meet your daily target, or when the agent needs attention.
-              Recent agent activity on home or other non-office Wi-Fi is treated as working from home and does
-              not trigger a not-in-office reminder. An admin can also send you a one-off in-app or Teams
-              message.
-            </dd>
-          </div>
-          <div>
-            <dt className="font-medium">Out of office</dt>
-            <dd className="mt-1 text-muted">
-              Mark days when you are away (leave, WFH without laptop, etc.). No reminders are sent for those
-              days. You can also mark out from a one-click link in Teams or in-app alerts. Open Settings → Out of
-              office, or use the link in your alert.
-            </dd>
-          </div>
-          <div>
-            <dt className="font-medium">Install or reinstall agent</dt>
-            <dd className="mt-1 text-muted">
-              At the top of Settings, each laptop card has an <strong>Install (first time)</strong>{" "}
-              section and a separate <strong>Update (already installed)</strong> section. Use one or
-              the other, not both. Each token binds to one laptop serial on first sync, and both
-              commands must be run from the extracted folder that contains the scripts.
-            </dd>
-          </div>
-          <div>
-            <dt className="font-medium">Registered laptops and removal requests</dt>
-            <dd className="mt-1 text-muted">
-              Each laptop registers on first agent sync. To remove an old or replaced laptop, click{" "}
-              <strong>Request removal</strong> in Settings. An admin must approve before the device is
-              removed (this prevents accidental de-registration).
-            </dd>
-          </div>
-          <div>
-            <dt className="font-medium">Uninstall</dt>
-            <dd className="mt-1 text-muted">
-              Copy the uninstall command from Settings, run it in PowerShell from the extracted agent
-              folder, or from the install folder. This removes the scheduled task and local files.
-            </dd>
-          </div>
-        </dl>
-      </section>
-
-      <section className="card space-y-4 p-6">
-        <SectionAnchor id="troubleshooting">Troubleshooting</SectionAnchor>
-        <div className="space-y-4 text-sm">
-          <div>
-            <p className="font-medium">Agent not installed or never connected</p>
-            <p className="mt-1 text-muted">
-              Complete the install steps above. Confirm you used the correct install token and production URL.
-            </p>
-          </div>
-          <div>
-            <p className="font-medium">Agent stale or offline</p>
-            <p className="mt-1 text-muted">
-              Open Settings and go to Install or reinstall. Download and extract the latest agent
-              zip, open PowerShell in that folder, copy the <strong>update command</strong>, and
-              paste it. Check Task Scheduler for task <code>{AGENT_TASK_NAME}</code>. If it still
-              does not sync, review <code>%LOCALAPPDATA%\OfficeTracker\logs\heartbeat.log</code> or
-              contact your pilot admin.
-            </p>
-          </div>
-          <div>
-            <p className="font-medium">After sleep or laptop wake</p>
-            <p className="mt-1 text-muted">
-              Agent sync pauses while the laptop sleeps. After wake or unlock, the agent should recover within about
-              5 minutes by default (unlock and power-resume checks may run sooner). Wi-Fi may take a few seconds to
-              reconnect; the agent retries SSID detection automatically. Refresh the Today dashboard if agent status
-              still looks stale after a minute.
-            </p>
-          </div>
-          <div>
-            <p className="font-medium">Low activity but agent shows connected</p>
-            <p className="mt-1 text-muted">
-              The scheduled task may not be running reliably. Download the latest zip, open
-              PowerShell in the extract folder, paste the update command, then confirm the{" "}
-              <code>{AGENT_TASK_NAME}</code> task exists and last run time is recent.
-            </p>
-          </div>
-          <div>
-            <p className="font-medium">Wi-Fi name differs from Windows tray</p>
-            <p className="mt-1 text-muted">
-              The agent reports your laptop&apos;s Wi-Fi network name (SSID). During captive portal sign-in,
-              Windows may briefly show a domain name such as <code>pwcglb.com</code> instead of{" "}
-              <code>ExternalConnect</code>. The agent prefers the actual WLAN name from netsh. If activity shows
-              the wrong network or &quot;Identifying...&quot;, wait a minute for Wi-Fi to settle, or use{" "}
-              <strong>Check in</strong> on the Today page.
-            </p>
-          </div>
-          <div>
-            <p className="font-medium">Hours not updating in the office</p>
-            <p className="mt-1 text-muted">
-              Use manual check-in on the Today page. If the problem persists, contact your pilot admin.
-            </p>
-          </div>
-          <div>
-            <p className="font-medium">Wrong laptop or token regenerated</p>
-            <p className="mt-1 text-muted">
-              Each token is tied to one laptop serial after first use. Use the token issued for that machine.
-              If admin regenerated your token, re-run the new install command on the affected laptop.
-            </p>
-          </div>
-        </div>
-        {isLoggedIn && (
-          <p className="text-sm">
-            <Link href="/settings#install" className="btn-primary inline-block px-4 py-2 text-sm">
-              Open install steps
-            </Link>
-          </p>
-        )}
-      </section>
-
-      <section className="card space-y-3 p-6">
-        <SectionAnchor id="presence">How office presence works</SectionAnchor>
-        <ul className="list-disc space-y-2 pl-5 text-sm text-muted">
-          <li>
-            The app detects when you are in the office <strong>automatically</strong> via office Wi-Fi. You
-            do not configure Wi-Fi names on your laptop.
-          </li>
-          <li>Office network rules are set by admins on the server only.</li>
-          <li>Manual check-in/out covers edge cases when auto-detection fails.</li>
-          <li>
-            <strong>Not counted:</strong> VPN (for example GlobalProtect), home networks, and time away from
-            the laptop without a manual check-out.
-          </li>
-          <li>
-            The agent syncs with the server about every 5 minutes by default. A gap longer than about 15 minutes ends the
-            current visit.
-          </li>
-        </ul>
-      </section>
-
-      <section className="card space-y-3 p-6">
-        <h2 className="text-lg font-medium text-accent">Security (summary)</h2>
-        <ul className="list-disc space-y-2 pl-5 text-sm text-muted">
-          <li>Your dashboard uses an httpOnly session cookie. You only see your own visits and hours.</li>
-          <li>
-            The Windows agent uses a per-laptop token, not your email password. Tokens are stored as hashes
-            on the server.
-          </li>
-          <li>
-            The laptop stores only the API URL and token. Office detection rules and daily targets come from
-            the server.
-          </li>
-          <li>Passwords and tokens are never logged.</li>
-        </ul>
-      </section>
-
-      {isAdmin && (
-        <section id="admin" className="card space-y-3 p-6">
-          <h2 className="text-lg font-medium text-accent">Admin notes</h2>
+          <h3 className="text-sm font-medium">Today dashboard</h3>
           <p className="text-sm text-muted">
-            For the full admin reference (SOP, troubleshooting, global settings, Power Automate, and
-            breakglass), open the{" "}
-            <Link href="/admin/guide" className="text-accent hover:underline">
-              Admin guide
-            </Link>
-            .
+            <Link href="/dashboard" className="text-accent hover:underline">
+              Today
+            </Link>{" "}
+            is your home view. The <strong>desk clock</strong> shows progress toward today&apos;s hours target. Use
+            the gear control to show or hide the clock. Mini stats cover agent status, last sync, in-office now, and
+            laptop active time (agent running today, not VPN time).
           </p>
-          <ul className="list-disc space-y-2 pl-5 text-sm text-muted">
-            <li>
-              Issue install tokens from <Link href="/admin" className="text-accent hover:underline">Admin</Link>{" "}
-              → Users &amp; tokens.
-            </li>
-            <li>
-              Configure office Wi-Fi SSIDs and daily hours target in{" "}
-              <Link href="/admin/settings" className="text-accent hover:underline">
-                Admin settings
+          <p className="text-sm text-muted">
+            Scroll the page for monthly office-day progress and the year compliance calendar. Refresh if agent status
+            looks old after wake from sleep.
+          </p>
+
+          <h3 className="text-sm font-medium">Check in and check out</h3>
+          <p className="text-sm text-muted">
+            When office Wi-Fi is wrong or missing, tap <strong>Check in</strong> on arrival and{" "}
+            <strong>Check out</strong> when you leave. GlobalProtect and other VPN paths do not count as in-office.
+          </p>
+
+          <h3 className="text-sm font-medium">Reports</h3>
+          <p className="text-sm text-muted">
+            Open <strong>Reports</strong> for monthly charts and calendars. On the <strong>Visits</strong> tab, review
+            your log and use <strong>Report issue</strong> on a visit to request an admin correction. Track replies on
+            the <strong>Corrections</strong> tab.
+          </p>
+
+          <h3 className="text-sm font-medium">HR exemptions on the year calendar</h3>
+          <p className="text-sm text-muted">
+            With HR approval for a month you could not meet the target, select that month on the year calendar and use{" "}
+            <strong>Notify admin</strong>. An admin logs the exemption after verification.
+          </p>
+        </section>
+
+        <section id="settings" className="card scroll-mt-6 space-y-4 p-6">
+          <h2 className="text-lg font-medium text-accent">Settings</h2>
+          <p className="text-sm text-muted">
+            Open <Link href="/settings" className="text-accent hover:underline">Settings</Link>. A sticky sidebar
+            (or section picker on mobile) jumps to <strong>Agent</strong>, <strong>Account</strong>, and{" "}
+            <strong>Notifications</strong>. URLs like <code>#install</code> still open the Agent section and scroll to
+            install steps.
+          </p>
+          <dl className="space-y-4 text-sm">
+            <div>
+              <dt className="font-medium">Agent</dt>
+              <dd className="mt-1 text-muted">
+                Download the zip, copy install or update commands, and manage registered laptops. Request removal when
+                you retire a machine. Copy the uninstall command here when you leave the pilot. Read-only fields show
+                your daily hours and monthly office-day targets (admins set org defaults).
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium">Account</dt>
+              <dd className="mt-1 text-muted">
+                Set timezone so visits and alerts match your work day (pilot default is often Asia/Kolkata). Update
+                display name or email via profile change requests when your directory name changes.
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium">Notifications</dt>
+              <dd className="mt-1 text-muted">
+                Pick usual office days, alert times, and delivery (in-app, Teams, or both). Mark{" "}
+                <strong>Out of office</strong> for leave. Alerts can remind you at office start, when you hit your
+                daily target, or when the agent needs attention. Recent agent activity on home Wi-Fi is treated as WFH
+                and does not trigger a false not-in-office ping.
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        <section id="contact-admin" className="card scroll-mt-6 space-y-3 p-6">
+          <h2 className="text-lg font-medium text-accent">Contact admin</h2>
+          <p className="text-sm text-muted">
+            Use <strong>Contact admin</strong> in the top navigation for pilot questions, agent problems you cannot fix,
+            or product feedback. You can also open it from global search.
+          </p>
+          <p className="text-sm text-muted">
+            For a wrong visit time, prefer <strong>Report issue</strong> on that visit under Reports → Visits so admins
+            see the date and duration in context.
+          </p>
+          {isLoggedIn && (
+            <p className="text-sm">
+              <Link href="/contact-admin" className="btn-primary inline-block px-4 py-2 text-sm">
+                Open Contact admin
               </Link>
-              . Normal users cannot see or edit SSID names.
-            </li>
+            </p>
+          )}
+        </section>
+
+        <section id="troubleshooting" className="card scroll-mt-6 space-y-4 p-6">
+          <h2 className="text-lg font-medium text-accent">Troubleshooting</h2>
+          <div className="space-y-4 text-sm">
+            <div>
+              <p className="font-medium">Agent not installed or never connected</p>
+              <p className="mt-1 text-muted">
+                Finish install steps above. Confirm the install command used the token for this laptop and the production
+                app URL from Settings.
+              </p>
+            </div>
+            <div>
+              <p className="font-medium">Agent stale or offline</p>
+              <p className="mt-1 text-muted">
+                Settings → Agent: download the latest zip, extract, open PowerShell in that folder, run the{" "}
+                <strong>update command</strong>. Check Task Scheduler for <code>{AGENT_TASK_NAME}</code>. Review{" "}
+                <code>%LOCALAPPDATA%\OfficeTracker\logs\heartbeat.log</code> or{" "}
+                <Link href="/contact-admin" className="text-accent hover:underline">
+                  contact admin
+                </Link>
+                .
+              </p>
+            </div>
+            <div>
+              <p className="font-medium">Wrong or missing Wi-Fi name (SSID)</p>
+              <p className="mt-1 text-muted">
+                The agent reads your WLAN name via netsh (IT may block Location; you do not need to turn Location on).
+                During captive portal sign-in, Windows may briefly show <code>pwcglb.com</code> instead of{" "}
+                <code>ExternalConnect</code>. Wait for Wi-Fi to settle or use <strong>Check in</strong> on Today.
+              </p>
+            </div>
+            <div>
+              <p className="font-medium">After sleep or laptop wake</p>
+              <p className="mt-1 text-muted">
+                Heartbeats pause while asleep. After unlock, allow about 5 minutes for the next pulse. Refresh Today if
+                status still looks stale.
+              </p>
+            </div>
+            <div>
+              <p className="font-medium">Hours stuck in the office</p>
+              <p className="mt-1 text-muted">
+                Use manual check-in on Today. If it persists, report the visit or contact your pilot admin.
+              </p>
+            </div>
+            <div>
+              <p className="font-medium">Open the agent folder on disk</p>
+              <p className="mt-1 text-muted">
+                Press Win+R, paste <code>%LOCALAPPDATA%\OfficeTracker</code>, Enter. Useful files:{" "}
+                <code>office-heartbeat.ps1</code>, <code>run-heartbeat.vbs</code>, <code>logs\heartbeat.log</code>.
+              </p>
+            </div>
+            <div>
+              <p className="font-medium">Wrong laptop or regenerated token</p>
+              <p className="mt-1 text-muted">
+                Each token binds to one laptop serial on first sync. After admin regenerates a token, run the new install
+                command on that laptop only.
+              </p>
+            </div>
+          </div>
+          {isLoggedIn && (
+            <p className="text-sm">
+              <Link href="/settings#install" className="btn-primary inline-block px-4 py-2 text-sm">
+                Open Agent install steps
+              </Link>
+            </p>
+          )}
+        </section>
+
+        <section id="presence" className="card scroll-mt-6 space-y-3 p-6">
+          <h2 className="text-lg font-medium text-accent">How office presence works</h2>
+          <ul className="list-disc space-y-2 pl-5 text-sm text-muted">
+            <li>Presence is automatic on approved office Wi-Fi SSIDs (admins maintain the list on the server).</li>
+            <li>You do not edit SSID names on your laptop.</li>
+            <li>Manual check-in and check-out cover gaps when auto-detection fails.</li>
             <li>
-              View org-wide compliance on the admin calendar and day reports. Drill into a user from
-              the user table.
+              <strong>Not counted:</strong> VPN (for example GlobalProtect), home networks, and gaps longer than about 15
+              minutes without a heartbeat (ends the visit).
             </li>
-            <li>Approve laptop removal, visit corrections, timezone changes, and log HR exemptions.</li>
-            <li>Send custom Teams or in-app notifications from a user&apos;s admin profile.</li>
+            <li>Default heartbeat interval is about 5 minutes; admins can change it between 2 and 60 minutes.</li>
           </ul>
         </section>
-      )}
+
+        <section className="card space-y-3 p-6">
+          <h2 className="text-lg font-medium text-accent">Security (summary)</h2>
+          <ul className="list-disc space-y-2 pl-5 text-sm text-muted">
+            <li>Dashboard access uses an httpOnly session cookie. You only see your own visits.</li>
+            <li>The agent uses a per-laptop token, not your email password. Tokens are hashed on the server.</li>
+            <li>The laptop stores only API URL and token. Wi-Fi rules and targets come from the server.</li>
+          </ul>
+        </section>
+
+        {isAdmin && (
+          <section id="admin" className="card scroll-mt-6 space-y-3 p-6">
+            <h2 className="text-lg font-medium text-accent">Admin notes</h2>
+            <p className="text-sm text-muted">
+              Full admin SOP:{" "}
+              <Link href="/admin/guide" className="text-accent hover:underline">
+                Admin guide
+              </Link>
+              .
+            </p>
+            <ul className="list-disc space-y-2 pl-5 text-sm text-muted">
+              <li>
+                Issue tokens from <Link href="/admin" className="text-accent hover:underline">Admin</Link> → Users
+                &amp; tokens.
+              </li>
+              <li>
+                Office SSIDs and hours targets:{" "}
+                <Link href="/admin/settings" className="text-accent hover:underline">
+                  Admin settings
+                </Link>
+                .
+              </li>
+              <li>Approve removals, visit corrections, timezone changes, and HR exemptions.</li>
+            </ul>
+          </section>
+        )}
+      </div>
     </div>
   );
 }

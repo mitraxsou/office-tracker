@@ -14,7 +14,7 @@ export default async function HelpPage() {
   return (
     <>
       <AppNav />
-      <main className="mx-auto max-w-3xl px-4 py-8">
+      <main className="mx-auto max-w-5xl px-4 py-8">
         <HelpGuide isLoggedIn={!!user} isAdmin={user ? isAdmin(user) : false} />
         <LegalFooter className="mt-8" />
       </main>
