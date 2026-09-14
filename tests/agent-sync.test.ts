@@ -453,6 +453,68 @@ describe("processAgentSync session_resume", () => {
 
     expect(maybeRunVisitMaintenanceMock).not.toHaveBeenCalled();
   });
+
+  it("accepts hours_target_met and evaluates alerts", async () => {
+    const metAt = "2026-09-13T14:05:00.000Z";
+    await processAgentSync({
+      userId: "user-1",
+      userTimezone: "Asia/Kolkata",
+      deviceId: "device-1",
+      serialNumber: "SERIAL-1",
+      events: [
+        {
+          id: "evt-met",
+          type: "hours_target_met",
+          at: metAt,
+          dayKey: "2026-09-13",
+          officeMs: 5 * 60 * 60 * 1000,
+        },
+      ],
+      appUrl: "https://office.example",
+    });
+
+    expect(maybeDispatchHeartbeatAlertsMock).toHaveBeenCalledWith({
+      userId: "user-1",
+      timezone: "Asia/Kolkata",
+      recordedAt: new Date(metAt),
+      inOffice: false,
+      hoursTarget: 5,
+    });
+  });
+
+  it("evaluates alerts on every sync even when events are duplicates", async () => {
+    agentEventFindUniqueMock.mockResolvedValue({ id: "existing" });
+    visitFindFirstMock.mockResolvedValue({
+      id: "visit-open",
+      endAt: null,
+      startAt: new Date("2026-09-13T09:00:00.000Z"),
+    });
+
+    await processAgentSync({
+      userId: "user-1",
+      userTimezone: "Asia/Kolkata",
+      deviceId: "device-1",
+      serialNumber: "SERIAL-1",
+      events: [
+        {
+          id: "evt-dup",
+          type: "activity_tick",
+          at: "2026-09-13T08:00:00.000Z",
+          ssid: "OfficeConnect",
+        },
+      ],
+      appUrl: "https://office.example",
+    });
+
+    expect(maybeDispatchHeartbeatAlertsMock).toHaveBeenCalledTimes(1);
+    expect(maybeDispatchHeartbeatAlertsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user-1",
+        inOffice: true,
+        hoursTarget: 5,
+      }),
+    );
+  });
 });
 
 describe("syncBatchNeedsVisitMaintenance", () => {

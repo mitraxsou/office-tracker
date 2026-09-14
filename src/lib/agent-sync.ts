@@ -27,6 +27,7 @@ const AGENT_SYNC_EVENT_PRIORITY: Record<string, number> = {
   visit_start: 2,
   wifi_connected: 3,
   activity_tick: 4,
+  hours_target_met: 4,
   session_resume: 5,
   daily_summary: 6,
   health_ping: 7,
@@ -329,6 +330,19 @@ export async function processAgentSync(params: {
           ackedEventIds.push(event.id);
           break;
         }
+        case "hours_target_met": {
+          const metDayKey = event.dayKey?.trim();
+          if (!metDayKey || !/^\d{4}-\d{2}-\d{2}$/.test(metDayKey)) {
+            rejected.push({ id: event.id, reason: "invalid_day_key" });
+            ackedEventIds.push(event.id);
+            await recordAgentEvent(params.userId, params.deviceId, event, "rejected");
+            break;
+          }
+          lastEventAt = eventAt;
+          await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
+          ackedEventIds.push(event.id);
+          break;
+        }
         case "health_ping": {
           await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
           ackedEventIds.push(event.id);
@@ -383,18 +397,18 @@ export async function processAgentSync(params: {
     select: { hoursTarget: true },
   });
   const hoursTarget = await getUserHoursTarget({ hoursTarget: userRow?.hoursTarget ?? null });
-  if (lastEventAt) {
-    try {
-      await maybeDispatchHeartbeatAlerts({
-        userId: params.userId,
-        timezone: params.userTimezone,
-        recordedAt: lastEventAt,
-        inOffice: lastInOffice,
-        hoursTarget,
-      });
-    } catch {
-      console.error("[agent-sync] Failed to evaluate alerts");
-    }
+  const alertRecordedAt = lastEventAt ?? new Date();
+  const alertInOffice = Boolean(openVisitRow) || lastInOffice;
+  try {
+    await maybeDispatchHeartbeatAlerts({
+      userId: params.userId,
+      timezone: params.userTimezone,
+      recordedAt: alertRecordedAt,
+      inOffice: alertInOffice,
+      hoursTarget,
+    });
+  } catch {
+    console.error("[agent-sync] Failed to evaluate alerts");
   }
 
   const forceAgentUpdate = await getDeviceForceAgentUpdate(params.userId, params.serialNumber);
