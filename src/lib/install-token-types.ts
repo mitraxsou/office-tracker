@@ -11,6 +11,4 @@ export type InstallTokenForUser = {
   boundSerialNumber: string | null;
   /** Commands read the token from config.json on an already-installed laptop. */
   usesLocalConfig?: boolean;
-  /** Switch installed agent to this app URL without re-downloading scripts. */
-  retargetCommand?: string;
 };

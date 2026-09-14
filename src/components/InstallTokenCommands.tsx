@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { AGENT_INSTALL_DIR } from "@/lib/agent-branding";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { InstallTokenForUser } from "@/lib/install-token-types";
 
@@ -182,26 +181,6 @@ export function InstallTokenCommands({
                 {copiedId === `${t.id}-setup` ? "Copied!" : "Copy setup command"}
               </button>
             </div>
-
-            {t.retargetCommand && t.status === "bound" && (
-              <div className="mt-3 rounded border border-[var(--border)] p-3">
-                <p className="text-sm font-medium">Switch server URL (already installed)</p>
-                <p className="mt-1 text-xs text-muted">
-                  Paste in any PowerShell window. Updates <code>{AGENT_INSTALL_DIR}\config.json</code>{" "}
-                  to this site. Your token stays the same. No zip download required.
-                </p>
-                <pre className="mt-2 overflow-x-auto rounded border bg-[var(--background-elevated)] p-2 text-xs whitespace-pre-wrap">
-                  {t.retargetCommand}
-                </pre>
-                <button
-                  type="button"
-                  onClick={() => handleCopy(t.retargetCommand!, `${t.id}-retarget`)}
-                  className="btn-secondary mt-2 px-3 py-1 text-xs"
-                >
-                  {copiedId === `${t.id}-retarget` ? "Copied!" : "Copy switch-server command"}
-                </button>
-              </div>
-            )}
 
             <details className="mt-3 rounded border border-[var(--border)] p-3">
               <summary className="cursor-pointer text-sm font-medium text-muted">

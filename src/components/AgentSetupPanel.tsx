@@ -74,14 +74,6 @@ export function AgentSetupPanel({
             </p>
           </li>
           <li>
-            <span className="font-medium">Switch server URL only (optional)</span>
-            <p className="mt-1 text-muted">
-              If the agent is already installed and you only need to point it at this site, use{" "}
-              <strong>Switch server URL</strong> on the laptop card instead. Your token stays the
-              same.
-            </p>
-          </li>
-          <li>
             <span className="font-medium">Check agent status above</span>
             <p className="mt-1 text-muted">
               Within 2 to 4 minutes, <strong>Agent status</strong> should show connected and your

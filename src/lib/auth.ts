@@ -9,7 +9,6 @@ import { encryptPendingToken, decryptPendingToken } from "./token-crypto";
 import {
   buildInstallCommand,
   buildInstallCommandFromLocalConfig,
-  buildRetargetApiUrlCommand,
   buildSetupCommand,
   buildSetupCommandFromLocalConfig,
   buildUpdateCommand,
@@ -402,10 +401,6 @@ function buildInstallTokenEntry(
   const plain = revealStoredPendingToken(token);
   const status: "pending" | "bound" = token.boundSerialNumber ? "bound" : "pending";
 
-  const retargetCommand = token.boundSerialNumber
-    ? buildRetargetApiUrlCommand(appUrl)
-    : undefined;
-
   if (plain) {
     return {
       id: token.id,
@@ -415,7 +410,6 @@ function buildInstallTokenEntry(
       setupCommand: buildSetupCommand(appUrl, plain),
       installCommand: buildInstallCommand(appUrl, plain),
       updateCommand: buildUpdateCommand(appUrl, plain),
-      retargetCommand,
       createdAt: token.createdAt.toISOString(),
       status,
       boundSerialNumber: token.boundSerialNumber,
@@ -431,7 +425,6 @@ function buildInstallTokenEntry(
       setupCommand: buildSetupCommandFromLocalConfig(appUrl),
       installCommand: buildInstallCommandFromLocalConfig(appUrl),
       updateCommand: buildUpdateCommandFromLocalConfig(appUrl),
-      retargetCommand,
       createdAt: token.createdAt.toISOString(),
       status,
       boundSerialNumber: token.boundSerialNumber,
