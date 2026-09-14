@@ -80,7 +80,9 @@ export function VisitList({
     }
     setReportingId(null);
     setReportMessage("");
-    setActionSuccess("Correction request sent. Track status under My correction requests above.");
+    setActionSuccess(
+      "Correction request sent. Track status under Reports → Corrections.",
+    );
     router.refresh();
   }
 

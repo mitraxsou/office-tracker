@@ -149,7 +149,7 @@ export function UserCorrectionRequests() {
         <div>
           <h2 className="text-lg font-medium">My correction requests</h2>
           <p className="text-sm text-muted">
-            Track status and read admin replies on visits you reported from History.
+            Track status and read admin replies on visits you reported from Reports → Visits.
           </p>
         </div>
         {openCount > 0 && (
@@ -164,7 +164,7 @@ export function UserCorrectionRequests() {
 
       {!loading && requests.length === 0 && (
         <p className="text-sm text-muted">
-          No correction requests yet. Use &quot;Report issue&quot; on a visit in History.
+          No correction requests yet. Use &quot;Report issue&quot; on a visit under Reports → Visits.
         </p>
       )}
 
