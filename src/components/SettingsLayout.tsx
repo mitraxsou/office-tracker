@@ -1,0 +1,152 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+
+export type SettingsSectionId = "agent" | "account" | "notifications" | "diagnostics";
+
+type SettingsLayoutProps = {
+  adminAccess?: boolean;
+  isWelcome?: boolean;
+  sections: {
+    agent: ReactNode;
+    account: ReactNode;
+    notifications: ReactNode;
+    diagnostics?: ReactNode;
+  };
+};
+
+const SECTION_LABELS: Record<SettingsSectionId, string> = {
+  agent: "Agent",
+  account: "Account",
+  notifications: "Notifications",
+  diagnostics: "Diagnostics",
+};
+
+function hashToSectionId(hash: string, adminAccess: boolean): SettingsSectionId | null {
+  const h = hash.replace("#", "");
+  if (h === "install" || h === "agent" || h === "") return "agent";
+  if (h === "account" || h === "notifications") return h;
+  if (h === "diagnostics" && adminAccess) return "diagnostics";
+  return null;
+}
+
+export function SettingsLayout({ adminAccess = false, isWelcome, sections }: SettingsLayoutProps) {
+  const navItems = useMemo(() => {
+    const ids: SettingsSectionId[] = ["agent", "account", "notifications"];
+    if (adminAccess) ids.push("diagnostics");
+    return ids;
+  }, [adminAccess]);
+
+  const [activeId, setActiveId] = useState<SettingsSectionId>("agent");
+
+  const scrollToId = useCallback((targetId: string) => {
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    window.requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
+
+  useEffect(() => {
+    const applyHash = () => {
+      const raw = window.location.hash.replace("#", "");
+      const section = hashToSectionId(window.location.hash, adminAccess) ?? "agent";
+      setActiveId(section);
+
+      if (raw === "install") {
+        scrollToId("install");
+        return;
+      }
+      if (raw === "agent") {
+        scrollToId("agent");
+        return;
+      }
+      if (raw === "account" || raw === "notifications" || (raw === "diagnostics" && adminAccess)) {
+        scrollToId(raw);
+        return;
+      }
+      if (!raw && isWelcome) {
+        scrollToId("agent");
+      }
+    };
+
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, [adminAccess, isWelcome, scrollToId]);
+
+  function navigate(sectionId: SettingsSectionId) {
+    setActiveId(sectionId);
+    window.history.replaceState(null, "", `#${sectionId}`);
+    scrollToId(sectionId);
+  }
+
+  return (
+    <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-10">
+      <label className="block md:hidden">
+        <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted">
+          Settings section
+        </span>
+        <select
+          value={activeId}
+          onChange={(event) => navigate(event.target.value as SettingsSectionId)}
+          className="w-full rounded-lg border px-3 py-2.5 text-sm"
+          aria-label="Settings section"
+        >
+          {navItems.map((id) => (
+            <option key={id} value={id}>
+              {SECTION_LABELS[id]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <nav className="hidden w-44 shrink-0 md:block" aria-label="Settings sections">
+        <ul className="sticky top-6 space-y-1 border-l border-[var(--border)] pl-3">
+          {navItems.map((id) => {
+            const isActive = id === activeId;
+            return (
+              <li key={id}>
+                <button
+                  type="button"
+                  onClick={() => navigate(id)}
+                  className={`w-full rounded-r-lg py-1.5 pl-3 text-left text-sm transition-colors ${
+                    isActive
+                      ? "border-l-2 border-[var(--pwc-orange)] bg-[var(--pwc-orange)]/10 font-medium text-accent"
+                      : "text-muted hover:text-[var(--foreground)]"
+                  }`}
+                >
+                  {SECTION_LABELS[id]}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+
+      <div className="min-w-0 flex-1 space-y-12">
+        <section id="agent" className="scroll-mt-6 space-y-6">
+          <h2 className="text-lg font-medium">Agent</h2>
+          {sections.agent}
+        </section>
+
+        <section id="account" className="scroll-mt-6 space-y-6">
+          <h2 className="text-lg font-medium">Account</h2>
+          {sections.account}
+        </section>
+
+        <section id="notifications" className="scroll-mt-6 space-y-6">
+          <h2 className="text-lg font-medium">Notifications</h2>
+          {sections.notifications}
+        </section>
+
+        {adminAccess && sections.diagnostics && (
+          <section id="diagnostics" className="scroll-mt-6 space-y-6">
+            <h2 className="text-lg font-medium">Diagnostics</h2>
+            {sections.diagnostics}
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
