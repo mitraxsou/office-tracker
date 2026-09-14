@@ -82,24 +82,26 @@ export function SettingsLayout({ adminAccess = false, isWelcome, sections }: Set
   }
 
   return (
-    <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-10">
-      <label className="block md:hidden">
-        <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted">
-          Settings section
-        </span>
-        <select
-          value={activeId}
-          onChange={(event) => navigate(event.target.value as SettingsSectionId)}
-          className="w-full rounded-lg border px-3 py-2.5 text-sm"
-          aria-label="Settings section"
-        >
-          {navItems.map((id) => (
-            <option key={id} value={id}>
-              {SECTION_LABELS[id]}
-            </option>
-          ))}
-        </select>
-      </label>
+    <div className="flex flex-col gap-6 md:flex-row md:gap-10">
+      <div className="sticky top-4 z-10 -mx-4 bg-[var(--background)] px-4 pb-2 md:hidden">
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-muted">
+            Settings section
+          </span>
+          <select
+            value={activeId}
+            onChange={(event) => navigate(event.target.value as SettingsSectionId)}
+            className="w-full rounded-lg border px-3 py-2.5 text-sm"
+            aria-label="Settings section"
+          >
+            {navItems.map((id) => (
+              <option key={id} value={id}>
+                {SECTION_LABELS[id]}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       <nav className="hidden w-44 shrink-0 md:block" aria-label="Settings sections">
         <ul className="sticky top-6 space-y-1 border-l border-[var(--border)] pl-3">
