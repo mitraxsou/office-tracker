@@ -73,6 +73,11 @@ export async function getMonthlyProgress(
       dayKeys.length,
       daysInCalendarMonth,
     ),
+    days: dayKeys.map((dayKey, i) => ({
+      dayKey,
+      hours: Math.round((dailyHours[i] ?? 0) * 10) / 10,
+      metTarget: dayQualifiesForTarget(dailyHours[i] ?? 0, hoursTarget),
+    })),
   };
 }
 

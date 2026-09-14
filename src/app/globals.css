@@ -193,3 +193,22 @@ html[data-theme="light"] .picker-input {
 html[data-theme="light"] .picker-input::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }
+
+.deskclock-led {
+  background: #0a0a0a;
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.6);
+  --deskclock-accent: #4fc3f7;
+}
+
+.deskclock-led-digit {
+  color: var(--deskclock-accent);
+  text-shadow:
+    0 0 8px color-mix(in srgb, var(--deskclock-accent) 80%, transparent),
+    0 0 20px color-mix(in srgb, var(--deskclock-accent) 45%, transparent);
+}
+
+.deskclock-led-text,
+.deskclock-led-secondary {
+  color: var(--deskclock-accent);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--deskclock-accent) 50%, transparent);
+}
