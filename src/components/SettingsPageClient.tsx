@@ -8,7 +8,6 @@ import { NotificationPrefsForm } from "@/components/NotificationPrefsForm";
 import { OutOfOfficeSection } from "@/components/OutOfOfficeSection";
 import { AgentGraceSection } from "@/components/AgentGraceSection";
 import { AgentSetupPanel } from "@/components/AgentSetupPanel";
-import { ThemePreference } from "@/components/ThemeToggle";
 import type { EnrichedDevice } from "@/lib/device-enrichment";
 import type { InstallTokenForUser } from "@/lib/install-token-types";
 import type { TimezoneRequestSummary } from "@/lib/timezone-requests";
@@ -103,8 +102,6 @@ export function SettingsPageClient({
           appUrl={appUrl}
         />
       )}
-
-      <ThemePreference className="mb-6" />
 
       <UserSettingsForm
         timezone={timezone}
