@@ -80,7 +80,6 @@ export async function AppNav() {
   const primaryNavLinks: NavLink[] = [
     { href: "/dashboard", label: "Today" },
     { href: "/reports", label: "Reports" },
-    { href: "/history", label: "History" },
     { href: "/settings", label: "Settings" },
     { href: "/help", label: "Help" },
   ];

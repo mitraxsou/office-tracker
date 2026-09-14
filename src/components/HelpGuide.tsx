@@ -386,8 +386,9 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
         </p>
         <h3 className="text-sm font-medium">History and reports</h3>
         <p className="text-sm text-muted">
-          <strong>History</strong> lists past visits. <strong>Reports</strong> shows weekly summaries for
-          your own data.
+          Open <strong>Reports</strong> for monthly charts and calendar. Use the <strong>Visits</strong> tab
+          for your visit log and <strong>Report issue</strong>. Track admin replies on the{" "}
+          <strong>Corrections</strong> tab.
         </p>
         <h3 className="text-sm font-medium">HR exemptions on the year calendar</h3>
         <p className="text-sm text-muted">
