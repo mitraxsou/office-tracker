@@ -3,7 +3,6 @@ import { logAuditEvent } from "./audit-log";
 import { prisma } from "./db";
 import { purgeOldHeartbeats } from "./heartbeat-retention";
 import { purgeOldRateLimitEvents } from "./auth-rate-limit";
-import { syncOfficeSchedulesFromHistory } from "./office-schedule-sync";
 import { dispatchPendingAlerts } from "./power-automate-notify";
 
 export const CRON_JOBS = [
@@ -15,7 +14,7 @@ export const CRON_JOBS = [
     scheduleUtc: "Daily at 10:00 UTC",
     scheduleIst: "Daily at 15:30 IST",
     purpose:
-      "Sends eligible Office Pulse alerts through Power Automate when the alert channel is Microsoft Teams. App-only alerts appear on the dashboard. Vercel Hobby only allows one run per day. In-office hours_started and hours_met alerts also send from agent heartbeats.",
+      "Teams backup for hours_started and hours_met only. Primary delivery is from agent heartbeats. Vercel Hobby allows one run per day. Schedule-based reminders are not evaluated on this cron.",
     expectedIntervalMs: 24 * 60 * 60 * 1000,
     healthyWithinMs: 2 * 24 * 60 * 60 * 1000,
   },
@@ -29,17 +28,6 @@ export const CRON_JOBS = [
     purpose: "Deletes raw heartbeats older than the configured retention window. Visits are kept.",
     expectedIntervalMs: 24 * 60 * 60 * 1000,
     healthyWithinMs: 2 * 24 * 60 * 60 * 1000,
-  },
-  {
-    name: "office-schedule",
-    label: "Office schedule sync",
-    path: "/api/cron/office-schedule",
-    schedule: "30 16 * * 0",
-    scheduleUtc: "Sunday at 16:30 UTC",
-    scheduleIst: "Sunday at 22:00 IST",
-    purpose: "Infers office schedules from visit history for users who have not set a custom schedule.",
-    expectedIntervalMs: 7 * 24 * 60 * 60 * 1000,
-    healthyWithinMs: 8 * 24 * 60 * 60 * 1000,
   },
 ] as const;
 
@@ -72,8 +60,7 @@ async function runJobLogic(jobName: CronJobName): Promise<CronResult> {
     return { ok: true, ...result, rateLimitPurged };
   }
 
-  const result = await syncOfficeSchedulesFromHistory();
-  return { ok: true, ...result };
+  throw new Error(`Unknown cron job: ${jobName}`);
 }
 
 function errorMessage(error: unknown): string {

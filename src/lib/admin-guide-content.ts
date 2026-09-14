@@ -103,7 +103,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         ordered: true,
         items: [
           "Review org calendar view for the month. Spot patterns (low attendance days, stale agent clusters).",
-          "Check Global settings cron jobs: agent-alerts, purge-heartbeats, office-schedule should show Working or a recent manual run.",
+          "Check Global settings cron jobs: agent-alerts and purge-heartbeats should show Working or a recent manual run.",
           "Issue install tokens for new joiners or new laptops before they ask.",
           "Glance at Audit log for unexpected config changes or impersonation sessions.",
         ],

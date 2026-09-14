@@ -201,7 +201,7 @@ async function dispatchAlerts(
 }
 
 export async function dispatchPendingAlerts(dependencies: DispatchDependencies = {}) {
-  const pending = await getIntegrationAlerts();
+  const pending = await getIntegrationAlerts("hours_started,hours_met");
   return dispatchAlerts(pending.alerts, dependencies);
 }
 

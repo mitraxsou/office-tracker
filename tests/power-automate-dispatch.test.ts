@@ -2,16 +2,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { IntegrationAlert } from "../src/lib/integration-alerts";
 
 const {
+  getIntegrationAlerts,
   getIntegrationAlertsForUser,
   persistInAppAlerts,
   acknowledgeIntegrationAlerts,
 } = vi.hoisted(() => ({
+  getIntegrationAlerts: vi.fn(),
   getIntegrationAlertsForUser: vi.fn(),
   persistInAppAlerts: vi.fn(),
   acknowledgeIntegrationAlerts: vi.fn(),
 }));
 
 vi.mock("../src/lib/integration-alerts", () => ({
+  getIntegrationAlerts,
   getIntegrationAlertsForUser,
   acknowledgeIntegrationAlerts,
 }));
@@ -20,7 +23,7 @@ vi.mock("../src/lib/in-app-notifications", () => ({
   persistInAppAlerts,
 }));
 
-import { dispatchUserAlerts } from "../src/lib/power-automate-notify";
+import { dispatchPendingAlerts, dispatchUserAlerts } from "../src/lib/power-automate-notify";
 
 const baseAlert: Omit<IntegrationAlert, "type" | "message" | "deliveryChannel" | "notifyTeams"> = {
   userId: "user-1",
@@ -36,6 +39,19 @@ const baseAlert: Omit<IntegrationAlert, "type" | "message" | "deliveryChannel" |
   helpUrl: "https://pulse.example/help",
   outOfOfficeUrl: "https://pulse.example/out-of-office",
 };
+
+describe("dispatchPendingAlerts", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getIntegrationAlerts.mockResolvedValue({ generatedAt: new Date().toISOString(), alerts: [] });
+  });
+
+  it("evaluates only hours_started and hours_met on the daily cron", async () => {
+    await dispatchPendingAlerts({ webhookUrl: null });
+
+    expect(getIntegrationAlerts).toHaveBeenCalledWith("hours_started,hours_met");
+  });
+});
 
 describe("dispatchUserAlerts delivery channels", () => {
   beforeEach(() => {
