@@ -31,14 +31,14 @@ export default async function AdminVisitReportsPage() {
           </p>
         </div>
         <AdminSubNav active="corrections" />
-        <div id="admin_contact" className="scroll-mt-6"><AdminContactSubmissions /></div>
-        <div id="manual_visit" className="scroll-mt-6"><AdminManualVisitRequests /></div>
-        <div id="timezone_change" className="scroll-mt-6"><AdminTimezoneChangeRequests /></div>
-        <div id="profile_change" className="scroll-mt-6"><AdminProfileChangeRequests /></div>
-        <div id="prior_compliance" className="scroll-mt-6"><AdminPriorComplianceRequests /></div>
-        <div id="compliance_exemption" className="scroll-mt-6"><AdminComplianceExemptionRequests /></div>
-        <div id="device_removal" className="scroll-mt-6"><AdminDeviceRemovalRequests /></div>
-        <div id="visit_correction" className="scroll-mt-6"><AdminVisitReports /></div>
+        <div id="admin_contact" className="scroll-mt-header"><AdminContactSubmissions /></div>
+        <div id="manual_visit" className="scroll-mt-header"><AdminManualVisitRequests /></div>
+        <div id="timezone_change" className="scroll-mt-header"><AdminTimezoneChangeRequests /></div>
+        <div id="profile_change" className="scroll-mt-header"><AdminProfileChangeRequests /></div>
+        <div id="prior_compliance" className="scroll-mt-header"><AdminPriorComplianceRequests /></div>
+        <div id="compliance_exemption" className="scroll-mt-header"><AdminComplianceExemptionRequests /></div>
+        <div id="device_removal" className="scroll-mt-header"><AdminDeviceRemovalRequests /></div>
+        <div id="visit_correction" className="scroll-mt-header"><AdminVisitReports /></div>
       </main>
     </>
   );

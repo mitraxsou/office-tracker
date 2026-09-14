@@ -41,7 +41,8 @@ export async function AppNav() {
 
   if (!user) {
     return (
-      <nav className="border-b border-[var(--border)] bg-[var(--background-elevated)]">
+      <header className="app-site-header sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--background-elevated)]">
+        <nav>
         <div className="mx-auto flex max-w-6xl min-w-0 items-center justify-between gap-3 px-4 py-3 md:py-4">
           <Link href="/help" className="flex min-w-0 shrink items-center gap-2 font-semibold">
             <OfficePulseLogo />
@@ -64,7 +65,8 @@ export async function AppNav() {
           </div>
           <AppNavMobileGuestMenu />
         </div>
-      </nav>
+        </nav>
+      </header>
     );
   }
 
@@ -128,11 +130,11 @@ export async function AppNav() {
   );
 
   return (
-    <>
+    <header className="app-site-header sticky top-0 z-50 bg-[var(--background-elevated)]">
       {impersonation && (
         <ImpersonationBanner email={impersonation.email} name={impersonation.name} />
       )}
-      <nav className="border-b border-[var(--border)] bg-[var(--background-elevated)]">
+      <nav className="border-b border-[var(--border)]">
         <div className="mx-auto flex max-w-6xl min-w-0 items-center justify-between gap-2 px-4 py-3 md:gap-3 md:py-4">
           <div className="flex min-w-0 items-center gap-4 lg:gap-6">
             <Link href="/dashboard" className="flex min-w-0 shrink items-center gap-2 font-semibold">
@@ -171,6 +173,6 @@ export async function AppNav() {
           </div>
         </div>
       </nav>
-    </>
+    </header>
   );
 }

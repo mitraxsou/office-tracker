@@ -10,7 +10,7 @@ import {
 
 function SectionAnchor({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <h2 id={id} className="scroll-mt-6 text-lg font-medium text-accent">
+    <h2 id={id} className="scroll-mt-header text-lg font-medium text-accent">
       {children}
     </h2>
   );
@@ -97,7 +97,7 @@ export function AdminGuide() {
 
   return (
     <div className="lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-8">
-      <aside className="mb-6 lg:sticky lg:top-6 lg:mb-0 lg:self-start">
+      <aside className="mb-6 lg:sticky lg:top-[var(--app-sticky-subnav-top)] lg:mb-0 lg:self-start">
         <div className="card p-4 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted lg:hidden">
             On this page
@@ -127,7 +127,7 @@ export function AdminGuide() {
         </div>
 
         {ADMIN_GUIDE_SECTIONS.map((section) => (
-          <section key={section.id} className="card scroll-mt-6 space-y-3 p-6">
+          <section key={section.id} className="card scroll-mt-header space-y-3 p-6">
             <SectionAnchor id={section.id}>{section.title}</SectionAnchor>
             <div className="space-y-3">
               {section.blocks.map((block, index) => (
