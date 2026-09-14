@@ -82,6 +82,7 @@ export const GLOBAL_SEARCH_INDEX: GlobalSearchEntry[] = [
     href: "/settings#agent",
     keywords: ["agent", "status", "heartbeat", "laptop", "device", "serial"],
     group: "settings",
+    adminOnly: true,
   },
   {
     id: "settings-timezone",

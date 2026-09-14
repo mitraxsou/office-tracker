@@ -93,14 +93,16 @@ export function SettingsPageClient({
         installTokens={installTokens}
         legacyBoundCount={legacyBoundCount}
         localDevAgentPath={localDevAgentPath}
-      />
-
-      <AgentStatusPanel
-        installTokens={installTokens}
-        legacyBoundCount={legacyBoundCount}
-        appUrl={appUrl}
         adminAccess={adminAccess}
       />
+
+      {adminAccess && (
+        <AgentStatusPanel
+          installTokens={installTokens}
+          legacyBoundCount={legacyBoundCount}
+          appUrl={appUrl}
+        />
+      )}
 
       <ThemePreference className="mb-6" />
 

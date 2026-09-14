@@ -19,6 +19,7 @@ type AgentSetupPanelProps = {
   installTokens?: InstallTokenForUser[];
   legacyBoundCount?: number;
   localDevAgentPath?: string | null;
+  adminAccess?: boolean;
 };
 
 export function AgentSetupPanel({
@@ -26,6 +27,7 @@ export function AgentSetupPanel({
   installTokens = [],
   legacyBoundCount = 0,
   localDevAgentPath,
+  adminAccess = false,
 }: AgentSetupPanelProps) {
   const [copiedUninstall, setCopiedUninstall] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
@@ -74,11 +76,23 @@ export function AgentSetupPanel({
             </p>
           </li>
           <li>
-            <span className="font-medium">Check agent status above</span>
+            <span className="font-medium">
+              {adminAccess ? "Check agent status below" : "Confirm on your dashboard"}
+            </span>
             <p className="mt-1 text-muted">
-              Within 2 to 4 minutes, <strong>Agent status</strong> should show connected and your
-              laptop serial under Registered laptops. If not, confirm you used the correct token
-              and production URL.
+              {adminAccess ? (
+                <>
+                  Within 2 to 4 minutes, <strong>Agent status</strong> should show connected and your
+                  laptop serial under Registered laptops. If not, confirm you used the correct token
+                  and production URL.
+                </>
+              ) : (
+                <>
+                  Within 2 to 4 minutes, office hours on your <a href="/dashboard">dashboard</a>{" "}
+                  should start updating. If not, confirm you used the correct token and production
+                  URL, or see <a href="/help#troubleshooting">troubleshooting</a>.
+                </>
+              )}
             </p>
           </li>
         </ol>

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, getRealCurrentUser } from "@/lib/auth";
+import { isAdmin } from "@/lib/admin";
 import { deviceRegistrationReferenceAt, isLowActivityCount } from "@/lib/activity-signal";
 import { getTodaySummary, getPulseStats } from "@/lib/heartbeat-service";
-import { getAppConfig, getUserHoursTarget, getEffectiveAgentStaleGraceHours } from "@/lib/app-config";
+import { getUserHoursTarget, getEffectiveAgentStaleGraceHours } from "@/lib/app-config";
 import { isUserOutOfOffice } from "@/lib/out-of-office";
 import { dayKeyInTimezone } from "@/lib/notification-prefs";
 import { isTokenExpired } from "@/lib/token-expiry";
@@ -13,7 +14,11 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const config = await getAppConfig();
+  const realUser = await getRealCurrentUser();
+  if (!isAdmin(realUser ?? user)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const hoursTarget = await getUserHoursTarget(user);
   const graceHours = await getEffectiveAgentStaleGraceHours(user);
   const summary = await getTodaySummary(user.id, user.timezone, hoursTarget, graceHours);

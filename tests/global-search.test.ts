@@ -33,6 +33,9 @@ describe("global search filters", () => {
     const userResults = filterGlobalSearch("admin", { isAdmin: false });
     expect(userResults.some((entry) => entry.id === "admin-inbox")).toBe(false);
     expect(userResults.some((entry) => entry.id === "action-report-bug")).toBe(true);
+
+    const agentStatusResults = filterGlobalSearch("agent status", { isAdmin: false });
+    expect(agentStatusResults.some((entry) => entry.id === "settings-agent-status")).toBe(false);
   });
 
   it("includes admin-only entries for admins", () => {
