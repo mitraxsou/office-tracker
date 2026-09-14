@@ -166,10 +166,18 @@ export const GLOBAL_SEARCH_INDEX: GlobalSearchEntry[] = [
   },
   {
     id: "help-daily-use",
-    label: "Daily use",
-    description: "Check-ins, dashboard, and routine tasks",
+    label: "Today and Reports",
+    description: "Desk clock, check-in, and visit history",
     href: "/help#daily-use",
-    keywords: ["daily", "routine", "check in"],
+    keywords: ["today", "desk clock", "reports", "check in", "dashboard"],
+    group: "help",
+  },
+  {
+    id: "help-contact-admin",
+    label: "Contact admin",
+    description: "Message pilot admins from the help guide",
+    href: "/help#contact-admin",
+    keywords: ["contact", "admin", "support", "help"],
     group: "help",
   },
   {
