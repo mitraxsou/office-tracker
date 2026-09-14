@@ -26,11 +26,18 @@ describe("parseDeskClockSettings", () => {
     });
   });
 
+  it("preserves saved LED face preference", () => {
+    expect(parseDeskClockSettings(JSON.stringify({ face: "led" }))).toEqual({
+      ...DEFAULT_DESK_CLOCK_SETTINGS,
+      face: "led",
+    });
+  });
+
   it("ignores invalid enum values", () => {
     const parsed = parseDeskClockSettings(
       JSON.stringify({ face: "neon", color: "purple", hidden: true }),
     );
-    expect(parsed.face).toBe("led");
+    expect(parsed.face).toBe("analog");
     expect(parsed.color).toBe("blue");
     expect(parsed.hidden).toBe(true);
   });
