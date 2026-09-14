@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 $ConfigFetchIntervalRuns = 60
 $ConfigCacheMaxAgeMinutes = 120
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.4.0"
+$AgentScriptVersion = "1.5.0"
 
 function Get-InstallDir {
     if ($env:OFFICETRACKER_INSTALL_DIR) {
@@ -369,6 +369,9 @@ function Get-SyncState {
         dayKey = $null
         dayOfficeMs = 0
         dayVisitCount = 0
+        dayLaptopActiveMs = 0
+        uptimeSessionStartAt = $null
+        firstAgentOnAt = $null
         openVisit = $null
         pendingSsid = $null
         pendingPreviousSsid = $null
@@ -511,6 +514,90 @@ function Update-VisitBoundaries {
     return $SyncState
 }
 
+function Get-UptimeSessionEndTime {
+    param($SyncState)
+    if ($SyncState.lastActivityTickAt) {
+        try { return [DateTime]::Parse([string]$SyncState.lastActivityTickAt) } catch {}
+    }
+    $lastRun = Get-LastRunTime
+    if ($lastRun) { return $lastRun }
+    return Get-Date
+}
+
+function Close-UptimeSessionIfOpen {
+    param(
+        $SyncState,
+        [DateTime]$EndAt
+    )
+    if (-not $SyncState.uptimeSessionStartAt) { return $SyncState }
+    try {
+        $start = [DateTime]::Parse([string]$SyncState.uptimeSessionStartAt)
+        if ($EndAt -gt $start) {
+            $delta = [int](($EndAt - $start).TotalMilliseconds)
+            if ($null -eq $SyncState.dayLaptopActiveMs) { $SyncState.dayLaptopActiveMs = 0 }
+            $SyncState.dayLaptopActiveMs = [int]$SyncState.dayLaptopActiveMs + $delta
+        }
+    } catch {}
+    $SyncState.uptimeSessionStartAt = $null
+    return $SyncState
+}
+
+function Start-UptimeSession {
+    param(
+        $SyncState,
+        [string]$AtIso
+    )
+    if ($SyncState.uptimeSessionStartAt) { return $SyncState }
+    $SyncState.uptimeSessionStartAt = $AtIso
+    if (-not $SyncState.firstAgentOnAt) {
+        $SyncState.firstAgentOnAt = $AtIso
+    }
+    return $SyncState
+}
+
+function Sync-UptimeForActivityRun {
+    param(
+        $SyncState,
+        [switch]$IsResumeRun
+    )
+    $nowIso = Get-NowIso
+    if ($IsResumeRun) {
+        $endAt = Get-UptimeSessionEndTime -SyncState $SyncState
+        $SyncState = Close-UptimeSessionIfOpen -SyncState $SyncState -EndAt $endAt
+    }
+    $SyncState = Start-UptimeSession -SyncState $SyncState -AtIso $nowIso
+    return $SyncState
+}
+
+function Get-LaptopActiveMsSnapshot {
+    param($SyncState)
+    $total = if ($null -ne $SyncState.dayLaptopActiveMs) { [int]$SyncState.dayLaptopActiveMs } else { 0 }
+    if ($SyncState.uptimeSessionStartAt) {
+        try {
+            $start = [DateTime]::Parse([string]$SyncState.uptimeSessionStartAt)
+            $total += [int](((Get-Date) - $start).TotalMilliseconds)
+        } catch {}
+    }
+    return [Math]::Max(0, $total)
+}
+
+function Get-UptimeEventFields {
+    param($SyncState)
+    $fields = @{ laptopActiveMs = (Get-LaptopActiveMsSnapshot -SyncState $SyncState) }
+    if ($SyncState.firstAgentOnAt) {
+        $fields.firstAgentOnAt = [string]$SyncState.firstAgentOnAt
+    }
+    return $fields
+}
+
+function Reset-UptimeDayFields {
+    param($SyncState)
+    $SyncState.dayLaptopActiveMs = 0
+    $SyncState.uptimeSessionStartAt = $null
+    $SyncState.firstAgentOnAt = $null
+    return $SyncState
+}
+
 function Test-ActivityTickDue {
     param(
         $SyncState,
@@ -533,17 +620,25 @@ function Maybe-EnqueueDailySummary {
     $previousDayKey = if ($SyncState.dayKey) { [string]$SyncState.dayKey } else { $null }
     if ($previousDayKey -and $previousDayKey -ne $DayKey) {
         if ($SyncState.lastDailySummaryDayKey -ne $previousDayKey) {
+            $endAt = Get-UptimeSessionEndTime -SyncState $SyncState
+            $SyncState = Close-UptimeSessionIfOpen -SyncState $SyncState -EndAt $endAt
             $summaryOfficeMs = if ($null -ne $SyncState.dayOfficeMs) { [int]$SyncState.dayOfficeMs } else { 0 }
             $summaryVisitCount = if ($null -ne $SyncState.dayVisitCount) { [int]$SyncState.dayVisitCount } else { 0 }
-            Add-QueuedEvent -Type "daily_summary" -Fields @{
+            $summaryFields = @{
                 dayKey = $previousDayKey
                 officeMs = $summaryOfficeMs
                 visitCount = $summaryVisitCount
+                laptopActiveMs = (Get-LaptopActiveMsSnapshot -SyncState $SyncState)
             }
+            if ($SyncState.firstAgentOnAt) {
+                $summaryFields.firstAgentOnAt = [string]$SyncState.firstAgentOnAt
+            }
+            Add-QueuedEvent -Type "daily_summary" -Fields $summaryFields
             $SyncState.lastDailySummaryDayKey = $previousDayKey
         }
         $SyncState.dayOfficeMs = 0
         $SyncState.dayVisitCount = 0
+        $SyncState = Reset-UptimeDayFields -SyncState $SyncState
     }
     $SyncState.dayKey = $DayKey
     return $SyncState
@@ -1113,7 +1208,13 @@ if ($isResumeRun) {
     }
 }
 if ($isResumeRun -or $activityDue) {
-    Add-QueuedEvent -Type "activity_tick" -Fields @{ ssid = $ssid }
+    $syncState = Sync-UptimeForActivityRun -SyncState $syncState -IsResumeRun:($isResumeRun)
+    $tickFields = @{ ssid = $ssid }
+    $uptimeFields = Get-UptimeEventFields -SyncState $syncState
+    foreach ($key in $uptimeFields.Keys) {
+        $tickFields[$key] = $uptimeFields[$key]
+    }
+    Add-QueuedEvent -Type "activity_tick" -Fields $tickFields
     $activityTickQueued = $true
     $pendingEvents = @(Get-EventQueue)
 }

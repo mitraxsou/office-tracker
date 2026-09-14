@@ -11,6 +11,7 @@ const visitCreateMock = vi.hoisted(() => vi.fn());
 const visitUpdateMock = vi.hoisted(() => vi.fn());
 const maybeDispatchHeartbeatAlertsMock = vi.hoisted(() => vi.fn());
 const dailySummaryUpsertMock = vi.hoisted(() => vi.fn());
+const dailySummaryFindUniqueMock = vi.hoisted(() => vi.fn());
 const userFindUniqueMock = vi.hoisted(() => vi.fn());
 const loadDaySpanContextMock = vi.hoisted(() => vi.fn());
 const maybeRunVisitMaintenanceMock = vi.hoisted(() => vi.fn());
@@ -30,7 +31,7 @@ vi.mock("@/lib/db", () => ({
       create: visitCreateMock,
       update: visitUpdateMock,
     },
-    dailySummary: { upsert: dailySummaryUpsertMock },
+    dailySummary: { upsert: dailySummaryUpsertMock, findUnique: dailySummaryFindUniqueMock },
     user: { findUnique: userFindUniqueMock },
   },
 }));
@@ -142,12 +143,14 @@ describe("processAgentSync session_resume", () => {
     visitFindFirstMock.mockResolvedValue(null);
     visitFindManyMock.mockResolvedValue([]);
     dailySummaryUpsertMock.mockResolvedValue({});
+    dailySummaryFindUniqueMock.mockResolvedValue(null);
     userFindUniqueMock.mockResolvedValue({ hoursTarget: 5 });
     loadDaySpanContextMock.mockResolvedValue({
       visits: [],
       params: {},
       lastHeartbeat: null,
       laptopActiveParams: {},
+      firstAgentOnAt: null,
     });
     maybeRunVisitMaintenanceMock.mockResolvedValue(true);
   });
@@ -234,6 +237,7 @@ describe("processAgentSync session_resume", () => {
       },
       lastHeartbeat: null,
       laptopActiveParams: {},
+      firstAgentOnAt: null,
     });
 
     await processAgentSync({

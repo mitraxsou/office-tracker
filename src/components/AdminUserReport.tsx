@@ -493,7 +493,7 @@ export function AdminUserReport({
             </dd>
           </div>
           <div>
-            <dt className="text-muted">Laptop active today</dt>
+            <dt className="text-muted">Agent uptime today</dt>
             <dd>{data.today.laptopActiveHours.toFixed(1)}h</dd>
           </div>
           <div>

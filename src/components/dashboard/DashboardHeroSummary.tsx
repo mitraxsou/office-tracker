@@ -7,6 +7,7 @@ type DashboardHeroSummaryProps = {
   targetHours: number;
   metTarget: boolean;
   laptopActiveHours: number;
+  firstAgentOnAt: Date | null;
   firstCheckIn: Date | null;
   dayKey: string;
   timezone: string;
@@ -22,13 +23,14 @@ type DashboardHeroSummaryProps = {
 };
 
 const LAPTOP_TOOLTIP =
-  "Time from your first agent activity today to your last (or now if the agent is still running). Counts whenever the My Office Pulse agent is active on your laptop, not only on office Wi-Fi.";
+  "Total time today your laptop was on with the My Office Pulse agent running. Sleep and long gaps between pulses are excluded. This is not the span from first to last pulse.";
 
 export function DashboardHeroSummary({
   totalHours,
   targetHours,
   metTarget,
   laptopActiveHours,
+  firstAgentOnAt,
   firstCheckIn,
   dayKey,
   timezone,
@@ -82,9 +84,13 @@ export function DashboardHeroSummary({
           tone={firstCheckIn ? "success" : "muted"}
         />
         <MiniStat
-          label="Laptop active"
+          label="Agent uptime"
           value={`${laptopActiveHours.toFixed(1)}h`}
-          tooltip={LAPTOP_TOOLTIP}
+          tooltip={
+            firstAgentOnAt
+              ? `${LAPTOP_TOOLTIP} First switch-on today: ${formatTime(firstAgentOnAt, timezone)}.`
+              : LAPTOP_TOOLTIP
+          }
         />
       </div>
 

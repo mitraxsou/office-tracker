@@ -157,6 +157,7 @@ export default async function DashboardPage() {
           targetHours={summary.hoursTarget}
           metTarget={summary.metTarget}
           laptopActiveHours={summary.laptopActiveHours}
+          firstAgentOnAt={summary.firstAgentOnAt}
           firstCheckIn={firstCheckIn}
           dayKey={summary.dayKey}
           timezone={user.timezone}
@@ -196,13 +197,6 @@ export default async function DashboardPage() {
                 {d.serialNumber}
               </code>
             ))}
-          </p>
-        )}
-
-        {adminAccess && lastHeartbeat && (
-          <p className="text-xs text-muted">
-            Last SSID: {lastHeartbeat.ssid ?? "none"} · VPN (diagnostic only):{" "}
-            {lastHeartbeat.vpnGateway ?? "n/a"}. VPN does not count toward hours.
           </p>
         )}
 

@@ -1,15 +1,23 @@
+import { formatTime } from "@/lib/visits";
+
 type LaptopActiveCardProps = {
   laptopActiveHours: number;
+  firstAgentOnAt?: Date | null;
+  timezone?: string;
 };
 
 const TOOLTIP =
-  "Time from your first agent activity today to your last (or now if the agent is still running). Counts whenever the My Office Pulse agent is active on your laptop, not only on office Wi-Fi. Requires you to be logged in with the agent task active.";
+  "Total time today your laptop was on with the My Office Pulse agent running. Sleep and long gaps between pulses are excluded.";
 
-export function LaptopActiveCard({ laptopActiveHours }: LaptopActiveCardProps) {
+export function LaptopActiveCard({
+  laptopActiveHours,
+  firstAgentOnAt,
+  timezone,
+}: LaptopActiveCardProps) {
   return (
     <div className="card border border-[var(--border)] p-4">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-sm text-muted">Laptop active today</p>
+        <p className="text-sm text-muted">Agent uptime today</p>
         <MetricHelp tooltip={TOOLTIP} />
       </div>
       <p className="mt-1 text-2xl font-semibold">
@@ -17,7 +25,9 @@ export function LaptopActiveCard({ laptopActiveHours }: LaptopActiveCardProps) {
         <span className="text-base font-normal text-muted">h</span>
       </p>
       <p className="mt-1 text-xs text-muted">
-        First to last agent activity today (any network).
+        {firstAgentOnAt && timezone
+          ? `First switch-on ${formatTime(firstAgentOnAt, timezone)}.`
+          : "Reported by your laptop agent."}
       </p>
     </div>
   );
