@@ -48,20 +48,25 @@ describe("agentUptimeMsFromSignals", () => {
     ).toBe(0);
   });
 
-  it("sums one continuous session from ticks and extends to now", () => {
-    const signals: UptimeSignal[] = [
-      { at: new Date("2026-09-02T09:00:00.000+05:30"), kind: "tick" },
-      { at: new Date("2026-09-02T09:05:00.000+05:30"), kind: "tick" },
-      { at: new Date("2026-09-02T09:10:00.000+05:30"), kind: "tick" },
-    ];
+  it("extends an open session to now when the agent was recently active", () => {
+    const signals: UptimeSignal[] = [];
+    for (let m = 0; m <= 5 * 60 + 55; m += 10) {
+      const h = 9 + Math.floor(m / 60);
+      const min = m % 60;
+      signals.push({
+        at: new Date(`2026-09-02T${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}:00.000+05:30`),
+        kind: "tick",
+      });
+    }
     const { dayStart, dayEnd } = dayBounds("2026-09-02");
+    const last = signals[signals.length - 1].at;
     const ms = agentUptimeMsFromSignals(signals, {
       dayStart,
       dayEnd,
       now: new Date("2026-09-02T15:00:00.000+05:30"),
       staleMs,
       isCurrentDay: true,
-      lastSignalOverall: signals[2].at,
+      lastSignalOverall: last,
     });
     expect(ms).toBe(6 * 60 * 60 * 1000);
   });
@@ -69,7 +74,7 @@ describe("agentUptimeMsFromSignals", () => {
   it("ends a session when tick gap exceeds stale window", () => {
     const signals: UptimeSignal[] = [
       { at: new Date("2026-09-02T09:00:00.000+05:30"), kind: "tick" },
-      { at: new Date("2026-09-02T10:00:00.000+05:30"), kind: "tick" },
+      { at: new Date("2026-09-02T09:10:00.000+05:30"), kind: "tick" },
       { at: new Date("2026-09-02T14:30:00.000+05:30"), kind: "tick" },
       { at: new Date("2026-09-02T16:00:00.000+05:30"), kind: "tick" },
     ];
@@ -82,7 +87,7 @@ describe("agentUptimeMsFromSignals", () => {
       isCurrentDay: true,
       lastSignalOverall: signals[3].at,
     });
-    expect(ms).toBe(2.5 * 60 * 60 * 1000);
+    expect(ms).toBe(10 * 60 * 1000);
   });
 
   it("does not extend to now on a past day", () => {
@@ -122,18 +127,23 @@ describe("resolveLaptopActiveForDay", () => {
   });
 
   it("falls back to session signals when agent ms is missing", () => {
-    const signals: UptimeSignal[] = [
-      { at: new Date("2026-09-02T09:00:00.000+05:30"), kind: "tick" },
-      { at: new Date("2026-09-02T09:05:00.000+05:30"), kind: "tick" },
-      { at: new Date("2026-09-02T09:10:00.000+05:30"), kind: "tick" },
-    ];
+    const signals: UptimeSignal[] = [];
+    for (let m = 0; m <= 118; m += 10) {
+      const h = 9 + Math.floor(m / 60);
+      const min = m % 60;
+      signals.push({
+        at: new Date(`2026-09-02T${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}:00.000+05:30`),
+        kind: "tick",
+      });
+    }
+    const last = signals[signals.length - 1].at;
     const hours = laptopActiveHoursForDay(
       baseParams({
         uptimeSignals: signals,
-        lastSignalOverall: signals[2].at,
+        lastSignalOverall: last,
         now: new Date("2026-09-02T11:00:00.000+05:30"),
       }),
     );
-    expect(hours).toBe(2);
+    expect(hours).toBeCloseTo(2, 5);
   });
 });
