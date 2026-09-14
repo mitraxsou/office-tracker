@@ -12,6 +12,7 @@ import type { InstallTokenForUser } from "@/lib/install-token-types";
 import type { TimezoneRequestSummary } from "@/lib/timezone-requests";
 import type { ProfileChangeRequestSummary } from "@/lib/profile-change-requests";
 import { ProfileChangeSection } from "@/components/ProfileChangeSection";
+import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 import { SettingsLayout } from "@/components/SettingsLayout";
 
 type Device = EnrichedDevice;
@@ -44,6 +45,9 @@ type SettingsPageClientProps = {
   profileChangeBlocked?: boolean;
   profileChangeBlockedMessage?: string | null;
   lockSettings?: boolean;
+  showChangePassword?: boolean;
+  changePasswordRequired?: boolean;
+  isBreakglass?: boolean;
 };
 
 export function SettingsPageClient({
@@ -64,6 +68,9 @@ export function SettingsPageClient({
   profileChangeBlocked,
   profileChangeBlockedMessage,
   lockSettings,
+  showChangePassword = true,
+  changePasswordRequired = false,
+  isBreakglass = false,
 }: SettingsPageClientProps) {
   const [devices, setDevices] = useState(initialDevices);
 
@@ -89,18 +96,42 @@ export function SettingsPageClient({
     timezoneRequestState,
   };
 
-  return (
+  const accountSection = (
     <>
+      {showChangePassword && (
+        <ChangePasswordForm required={changePasswordRequired} isBreakglass={isBreakglass} />
+      )}
       {lockSettings ? (
-        <p className="mb-6 text-sm text-muted">
-          Other settings are available after you set a new password above.
+        <p className="text-sm text-muted">
+          Other settings are available after you set a new password in this section.
         </p>
       ) : (
-        <SettingsLayout
-          adminAccess={adminAccess}
-          isWelcome={isWelcome}
-          sections={{
-            agent: (
+        <>
+          <UserSettingsForm
+            {...sharedFormProps}
+            isWelcome={false}
+            sections={{ org: true, timezone: true, devices: false }}
+          />
+          <ProfileChangeSection
+            currentName={currentName}
+            currentEmail={currentEmail}
+            profileChangeState={profileChangeState}
+            blocked={profileChangeBlocked}
+            blockedMessage={profileChangeBlockedMessage}
+          />
+        </>
+      )}
+    </>
+  );
+
+  return (
+    <>
+      <SettingsLayout
+        adminAccess={adminAccess}
+        isWelcome={isWelcome}
+        accountOnly={lockSettings}
+        sections={{
+          agent: lockSettings ? null : (
               <>
                 <AgentSetupPanel
                   appUrl={appUrl}
@@ -116,29 +147,14 @@ export function SettingsPageClient({
                 <AgentGraceSection />
               </>
             ),
-            account: (
-              <>
-                <UserSettingsForm
-                  {...sharedFormProps}
-                  isWelcome={false}
-                  sections={{ org: true, timezone: true, devices: false }}
-                />
-                <ProfileChangeSection
-                  currentName={currentName}
-                  currentEmail={currentEmail}
-                  profileChangeState={profileChangeState}
-                  blocked={profileChangeBlocked}
-                  blockedMessage={profileChangeBlockedMessage}
-                />
-              </>
-            ),
-            notifications: (
+            account: accountSection,
+            notifications: lockSettings ? null : (
               <>
                 <NotificationPrefsForm />
                 <OutOfOfficeSection />
               </>
             ),
-            diagnostics: (
+            diagnostics: lockSettings ? null : (
               <AgentStatusPanel
                 installTokens={installTokens}
                 legacyBoundCount={legacyBoundCount}
@@ -147,7 +163,6 @@ export function SettingsPageClient({
             ),
           }}
         />
-      )}
     </>
   );
 }

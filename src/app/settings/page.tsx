@@ -1,5 +1,4 @@
 import { isBreakglassEmail } from "@/lib/breakglass";
-import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 import { OnboardingForm } from "@/components/OnboardingForm";
 import { SetInitialPasswordForm } from "@/components/SetInitialPasswordForm";
 import {
@@ -72,14 +71,6 @@ export default async function SettingsPage({
           </p>
         </div>
 
-        {!mustChangePassword && !showInitialPassword && (
-          <ChangePasswordForm required={false} isBreakglass={isBreakglass} />
-        )}
-
-        {mustChangePassword && (
-          <ChangePasswordForm required={mustChangePassword} isBreakglass={isBreakglass} />
-        )}
-
         {showOnboarding && (
           <OnboardingForm
             currentEmail={user.email}
@@ -112,6 +103,9 @@ export default async function SettingsPage({
           profileChangeBlocked={!!profileChangeBlockedMessage}
           profileChangeBlockedMessage={profileChangeBlockedMessage}
           lockSettings={mustChangePassword}
+          showChangePassword={!showInitialPassword}
+          changePasswordRequired={mustChangePassword}
+          isBreakglass={isBreakglass}
         />
       </main>
     </>
