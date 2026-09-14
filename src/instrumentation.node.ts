@@ -601,6 +601,9 @@ export async function registerNode() {
     await prisma.$executeRawUnsafe(
       'CREATE INDEX IF NOT EXISTS "DailySummary_dayKey_idx" ON "DailySummary"("dayKey");'
     );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "DailySummary" ADD COLUMN IF NOT EXISTS "firstAgentOnAt" TIMESTAMP(3);'
+    );
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "PresenceTransition" (
         "id" TEXT NOT NULL,

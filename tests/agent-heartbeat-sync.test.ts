@@ -26,6 +26,7 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain('Add-QueuedEvent -Type "session_resume"');
     expect(heartbeat).toContain("if ($isResumeRun -or $activityDue)");
     expect(heartbeat).toContain('Add-QueuedEvent -Type "activity_tick"');
+    expect(heartbeat).toContain("laptopActiveMs");
     expect(heartbeat).toContain("$shouldSync = $isResumeRun -or $ssidChanged");
   });
 

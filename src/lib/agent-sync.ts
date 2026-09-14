@@ -60,6 +60,7 @@ export type AgentSyncEvent = {
   dayKey?: string;
   visitCount?: number;
   laptopActiveMs?: number;
+  firstAgentOnAt?: string;
   gapMinutes?: number;
 };
 
@@ -260,6 +261,10 @@ export async function processAgentSync(params: {
               inOffice,
             },
           });
+          await upsertAgentDailyUptime(params.userId, dayKey, {
+            laptopActiveMs: event.laptopActiveMs,
+            firstAgentOnAt: parseFirstAgentOnAt(event.firstAgentOnAt),
+          });
           lastEventAt = eventAt;
           lastInOffice = inOffice;
           await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
@@ -304,6 +309,7 @@ export async function processAgentSync(params: {
               visitCount: event.visitCount ?? dayVisits.length,
               firstCheckInAt: firstCheckIn,
               lastCheckOutAt: lastCheckOut,
+              firstAgentOnAt: parseFirstAgentOnAt(event.firstAgentOnAt),
               source: "agent",
               verified,
             },
@@ -313,6 +319,9 @@ export async function processAgentSync(params: {
               visitCount: event.visitCount ?? dayVisits.length,
               firstCheckInAt: firstCheckIn,
               lastCheckOutAt: lastCheckOut,
+              ...(parseFirstAgentOnAt(event.firstAgentOnAt)
+                ? { firstAgentOnAt: parseFirstAgentOnAt(event.firstAgentOnAt) }
+                : {}),
               verified,
             },
           });
@@ -473,6 +482,55 @@ async function recordSyncBatch(params: {
   });
 }
 
+async function upsertAgentDailyUptime(
+  userId: string,
+  dayKey: string,
+  fields: { laptopActiveMs?: number; firstAgentOnAt?: Date | null },
+) {
+  const laptopActiveMs = fields.laptopActiveMs;
+  const firstAgentOnAt = fields.firstAgentOnAt;
+  if (laptopActiveMs == null && firstAgentOnAt == null) return;
+
+  const existing = await prisma.dailySummary.findUnique({
+    where: { userId_dayKey: { userId, dayKey } },
+    select: { laptopActiveMs: true, firstAgentOnAt: true },
+  });
+
+  const nextMs =
+    laptopActiveMs != null
+      ? Math.max(laptopActiveMs, existing?.laptopActiveMs ?? 0)
+      : (existing?.laptopActiveMs ?? 0);
+  const nextFirst =
+    firstAgentOnAt ??
+    existing?.firstAgentOnAt ??
+    null;
+
+  await prisma.dailySummary.upsert({
+    where: { userId_dayKey: { userId, dayKey } },
+    create: {
+      userId,
+      dayKey,
+      officeMs: 0,
+      laptopActiveMs: nextMs,
+      firstAgentOnAt: nextFirst,
+      visitCount: 0,
+      source: "agent",
+      verified: true,
+    },
+    update: {
+      laptopActiveMs: nextMs,
+      ...(nextFirst ? { firstAgentOnAt: nextFirst } : {}),
+    },
+  });
+}
+
+function parseFirstAgentOnAt(raw: unknown): Date | null {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  const parsed = Date.parse(raw);
+  if (Number.isNaN(parsed)) return null;
+  return new Date(parsed);
+}
+
 async function computeServerOfficeMs(
   userId: string,
   dayKey: string,
@@ -502,6 +560,8 @@ export function parseAgentSyncEvents(raw: unknown): AgentSyncEvent[] {
       dayKey: typeof record.dayKey === "string" ? record.dayKey : undefined,
       visitCount: typeof record.visitCount === "number" ? record.visitCount : undefined,
       laptopActiveMs: typeof record.laptopActiveMs === "number" ? record.laptopActiveMs : undefined,
+      firstAgentOnAt:
+        typeof record.firstAgentOnAt === "string" ? record.firstAgentOnAt : undefined,
       gapMinutes: typeof record.gapMinutes === "number" ? record.gapMinutes : undefined,
     });
   }

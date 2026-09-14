@@ -13,7 +13,7 @@ import {
 } from "./activity-signal";
 import { heartbeatInOffice } from "./heartbeat-office";
 import { maybePurgeOldHeartbeats } from "./heartbeat-retention";
-import { laptopActiveHoursForDay, type LaptopActiveParams } from "./laptop-active";
+import { resolveLaptopActiveForDay, laptopActiveHoursForDay, type LaptopActiveParams } from "./laptop-active";
 import { daySpanMsForDay, dayKeyInTimezone, effectiveVisitEnd, type DaySpanParams } from "./visits";
 import { dayBoundsFromKey, getDayBounds } from "./timezone-dates";
 import { validateVisitTimestamps } from "./visit-validation";
@@ -41,6 +41,7 @@ export async function loadDaySpanContext(
   params: DaySpanParams;
   lastHeartbeat: AgentSignalSnapshot | null;
   laptopActiveParams: LaptopActiveParams;
+  firstAgentOnAt: Date | null;
 }> {
   const config = await getAppConfig();
   const allowlist = config.officeSsids;
@@ -65,10 +66,20 @@ export async function loadDaySpanContext(
 
   let firstInOfficeHeartbeatAt: Date | null = null;
   let lastInOfficeHeartbeatAt: Date | null = null;
-  let firstHeartbeatAt: Date | null = null;
-  let lastHeartbeatOnDay: Date | null = null;
   let lastSignalOverall: Date | null = null;
   let lastHeartbeat: AgentSignalSnapshot | null = null;
+  let uptimeSignals: import("./laptop-active").UptimeSignal[] = [];
+  let agentLaptopActiveMs: number | null = null;
+  let agentFirstAgentOnAt: Date | null = null;
+
+  const dailySummary = await prisma.dailySummary.findUnique({
+    where: { userId_dayKey: { userId, dayKey } },
+    select: { laptopActiveMs: true, firstAgentOnAt: true },
+  });
+  if (dailySummary) {
+    agentLaptopActiveMs = dailySummary.laptopActiveMs;
+    agentFirstAgentOnAt = dailySummary.firstAgentOnAt;
+  }
 
   if (useActivity) {
     const dayTicks = await prisma.activityTick.findMany({
@@ -79,10 +90,9 @@ export async function loadDaySpanContext(
     const inOfficeToday = dayTicks.filter((tick) => tick.inOffice);
     firstInOfficeHeartbeatAt = inOfficeToday[0]?.at ?? null;
     lastInOfficeHeartbeatAt = inOfficeToday[inOfficeToday.length - 1]?.at ?? null;
-    firstHeartbeatAt = dayTicks[0]?.at ?? null;
-    lastHeartbeatOnDay = dayTicks[dayTicks.length - 1]?.at ?? null;
     lastSignalOverall = lastActivity?.at ?? null;
     lastHeartbeat = lastActivity ? activityTickToSignal(lastActivity) : null;
+    uptimeSignals = dayTicks.map((tick) => ({ at: tick.at, kind: "tick" as const }));
   } else {
     const dayHeartbeats = await prisma.heartbeat.findMany({
       where: {
@@ -96,11 +106,39 @@ export async function loadDaySpanContext(
     firstInOfficeHeartbeatAt = inOfficeToday[0]?.recordedAt ?? null;
     lastInOfficeHeartbeatAt =
       inOfficeToday[inOfficeToday.length - 1]?.recordedAt ?? null;
-    firstHeartbeatAt = dayHeartbeats[0]?.recordedAt ?? null;
-    lastHeartbeatOnDay = dayHeartbeats[dayHeartbeats.length - 1]?.recordedAt ?? null;
     lastSignalOverall = lastHeartbeatRow?.recordedAt ?? null;
     lastHeartbeat = lastHeartbeatRow ? heartbeatToSignal(lastHeartbeatRow, allowlist) : null;
+    uptimeSignals = dayHeartbeats.map((row) => ({
+      at: row.recordedAt,
+      kind: "tick" as const,
+    }));
   }
+
+  const sessionResumes = await prisma.presenceTransition.findMany({
+    where: {
+      userId,
+      type: "session_resume",
+      at: { gte: dayStart, lte: dayEnd },
+    },
+    orderBy: { at: "asc" },
+    select: { at: true },
+  });
+  for (const row of sessionResumes) {
+    uptimeSignals.push({ at: row.at, kind: "session_resume" });
+  }
+  uptimeSignals.sort((a, b) => a.at.getTime() - b.at.getTime());
+
+  const laptopActiveParams: LaptopActiveParams = {
+    dayStart,
+    dayEnd,
+    now,
+    staleMs,
+    agentLaptopActiveMs,
+    agentFirstAgentOnAt,
+    uptimeSignals,
+    lastSignalOverall,
+  };
+  const { firstAgentOnAt } = resolveLaptopActiveForDay(laptopActiveParams);
 
   return {
     visits,
@@ -119,10 +157,12 @@ export async function loadDaySpanContext(
       dayEnd,
       now,
       staleMs,
-      firstHeartbeatAt,
-      lastHeartbeatAt: lastHeartbeatOnDay,
-      lastHeartbeatOverall: lastSignalOverall,
+      agentLaptopActiveMs,
+      agentFirstAgentOnAt,
+      uptimeSignals,
+      lastSignalOverall,
     },
+    firstAgentOnAt,
   };
 }
 
@@ -415,7 +455,7 @@ export async function getTodaySummary(
 ) {
   const now = new Date();
   const { dayKey } = getDayBounds(now, timezone);
-  const { visits, params, lastHeartbeat, laptopActiveParams } = await loadDaySpanContext(
+  const { visits, params, lastHeartbeat, laptopActiveParams, firstAgentOnAt } = await loadDaySpanContext(
     userId,
     dayKey,
     timezone,
@@ -441,6 +481,7 @@ export async function getTodaySummary(
     dayKey,
     totalHours,
     laptopActiveHours,
+    firstAgentOnAt,
     hoursTarget,
     metTarget: totalHours >= hoursTarget,
     remainingHours: Math.max(0, hoursTarget - totalHours),
@@ -472,6 +513,23 @@ export function laptopActiveHoursFromContext(
   laptopActiveParams: LaptopActiveParams,
 ): number {
   return laptopActiveHoursForDay(laptopActiveParams);
+}
+
+export async function loadLaptopActiveForDay(
+  userId: string,
+  dayKey: string,
+  timezone: string,
+) {
+  const { laptopActiveParams, firstAgentOnAt } = await loadDaySpanContext(
+    userId,
+    dayKey,
+    timezone,
+    { skipMaintenance: true },
+  );
+  return {
+    hours: laptopActiveHoursForDay(laptopActiveParams),
+    firstAgentOnAt,
+  };
 }
 
 export async function getPulseStats(userId: string, graceHours: number) {

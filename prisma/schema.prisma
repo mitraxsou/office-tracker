@@ -459,6 +459,7 @@ model DailySummary {
   officeMs       Int
   laptopActiveMs Int      @default(0)
   visitCount     Int      @default(0)
+  firstAgentOnAt DateTime?
   firstCheckInAt DateTime?
   lastCheckOutAt DateTime?
   source         String   @default("agent")

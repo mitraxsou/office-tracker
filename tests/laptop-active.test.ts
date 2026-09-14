@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { VISIT_GAP_MS } from "../src/lib/constants";
 import {
+  agentUptimeMsFromSignals,
   laptopActiveHoursForDay,
-  laptopActiveMsForDay,
+  resolveLaptopActiveForDay,
   type LaptopActiveParams,
+  type UptimeSignal,
 } from "../src/lib/laptop-active";
 
 const staleMs = VISIT_GAP_MS;
@@ -23,109 +25,115 @@ function baseParams(overrides: Partial<LaptopActiveParams> = {}): LaptopActivePa
     dayEnd,
     now: new Date("2026-09-02T15:00:00.000+05:30"),
     staleMs,
-    firstHeartbeatAt: null,
-    lastHeartbeatAt: null,
-    lastHeartbeatOverall: null,
+    agentLaptopActiveMs: null,
+    agentFirstAgentOnAt: null,
+    uptimeSignals: [],
+    lastSignalOverall: null,
     ...overrides,
   };
 }
 
-describe("laptopActiveMsForDay", () => {
-  it("returns 0 when there are no heartbeats", () => {
-    expect(laptopActiveMsForDay(baseParams())).toBe(0);
+describe("agentUptimeMsFromSignals", () => {
+  it("returns 0 when there are no signals", () => {
+    const { dayStart, dayEnd } = dayBounds("2026-09-02");
+    expect(
+      agentUptimeMsFromSignals([], {
+        dayStart,
+        dayEnd,
+        now: new Date("2026-09-02T12:00:00.000+05:30"),
+        staleMs,
+        isCurrentDay: true,
+        lastSignalOverall: null,
+      }),
+    ).toBe(0);
   });
 
-  it("returns span from first to last pulse on a past day", () => {
-    const first = new Date("2026-09-01T09:00:00.000+05:30");
-    const last = new Date("2026-09-01T18:00:00.000+05:30");
-    const { dayStart, dayEnd } = dayBounds("2026-09-01");
-    const ms = laptopActiveMsForDay({
+  it("sums one continuous session from ticks and extends to now", () => {
+    const signals: UptimeSignal[] = [
+      { at: new Date("2026-09-02T09:00:00.000+05:30"), kind: "tick" },
+      { at: new Date("2026-09-02T09:05:00.000+05:30"), kind: "tick" },
+      { at: new Date("2026-09-02T09:10:00.000+05:30"), kind: "tick" },
+    ];
+    const { dayStart, dayEnd } = dayBounds("2026-09-02");
+    const ms = agentUptimeMsFromSignals(signals, {
       dayStart,
       dayEnd,
-      now: new Date("2026-09-02T10:00:00.000+05:30"),
+      now: new Date("2026-09-02T15:00:00.000+05:30"),
       staleMs,
-      firstHeartbeatAt: first,
-      lastHeartbeatAt: last,
-      lastHeartbeatOverall: last,
-    });
-    expect(ms).toBe(9 * 60 * 60 * 1000);
-    expect(laptopActiveHoursForDay({
-      dayStart,
-      dayEnd,
-      now: new Date("2026-09-02T10:00:00.000+05:30"),
-      staleMs,
-      firstHeartbeatAt: first,
-      lastHeartbeatAt: last,
-      lastHeartbeatOverall: last,
-    })).toBe(9);
-  });
-
-  it("extends to now on the current day when agent is still pulsing", () => {
-    const first = new Date("2026-09-02T09:00:00.000+05:30");
-    const last = new Date("2026-09-02T14:58:00.000+05:30");
-    const now = new Date("2026-09-02T15:00:00.000+05:30");
-    const ms = laptopActiveMsForDay({
-      ...baseParams(),
-      firstHeartbeatAt: first,
-      lastHeartbeatAt: last,
-      lastHeartbeatOverall: last,
-      now,
+      isCurrentDay: true,
+      lastSignalOverall: signals[2].at,
     });
     expect(ms).toBe(6 * 60 * 60 * 1000);
   });
 
-  it("does not extend to now when agent is stale on the current day", () => {
-    const first = new Date("2026-09-02T09:00:00.000+05:30");
-    const last = new Date("2026-09-02T12:00:00.000+05:30");
-    const now = new Date("2026-09-02T18:00:00.000+05:30");
-    const ms = laptopActiveMsForDay({
-      ...baseParams(),
-      firstHeartbeatAt: first,
-      lastHeartbeatAt: last,
-      lastHeartbeatOverall: last,
-      now,
+  it("ends a session when tick gap exceeds stale window", () => {
+    const signals: UptimeSignal[] = [
+      { at: new Date("2026-09-02T09:00:00.000+05:30"), kind: "tick" },
+      { at: new Date("2026-09-02T10:00:00.000+05:30"), kind: "tick" },
+      { at: new Date("2026-09-02T14:30:00.000+05:30"), kind: "tick" },
+      { at: new Date("2026-09-02T16:00:00.000+05:30"), kind: "tick" },
+    ];
+    const { dayStart, dayEnd } = dayBounds("2026-09-02");
+    const ms = agentUptimeMsFromSignals(signals, {
+      dayStart,
+      dayEnd,
+      now: new Date("2026-09-02T16:00:00.000+05:30"),
+      staleMs,
+      isCurrentDay: true,
+      lastSignalOverall: signals[3].at,
     });
-    expect(ms).toBe(3 * 60 * 60 * 1000);
+    expect(ms).toBe(2.5 * 60 * 60 * 1000);
   });
 
-  it("counts all pulses regardless of office Wi-Fi", () => {
-    const first = new Date("2026-09-02T08:00:00.000+05:30");
-    const last = new Date("2026-09-02T17:30:00.000+05:30");
-    const ms = laptopActiveMsForDay({
-      ...baseParams(),
-      firstHeartbeatAt: first,
-      lastHeartbeatAt: last,
-      lastHeartbeatOverall: last,
-      now: new Date("2026-09-02T17:30:00.000+05:30"),
+  it("does not extend to now on a past day", () => {
+    const signals: UptimeSignal[] = [
+      { at: new Date("2026-09-01T09:00:00.000+05:30"), kind: "tick" },
+      { at: new Date("2026-09-01T09:05:00.000+05:30"), kind: "tick" },
+      { at: new Date("2026-09-01T09:10:00.000+05:30"), kind: "tick" },
+    ];
+    const { dayStart, dayEnd } = dayBounds("2026-09-01");
+    const ms = agentUptimeMsFromSignals(signals, {
+      dayStart,
+      dayEnd,
+      now: new Date("2026-09-02T10:00:00.000+05:30"),
+      staleMs,
+      isCurrentDay: false,
+      lastSignalOverall: signals[2].at,
     });
-    expect(ms).toBe(9.5 * 60 * 60 * 1000);
+    expect(ms).toBe(10 * 60 * 1000);
+  });
+});
+
+describe("resolveLaptopActiveForDay", () => {
+  it("prefers agent-reported ms and extends on the current day", () => {
+    const last = new Date("2026-09-02T14:58:00.000+05:30");
+    const now = new Date("2026-09-02T15:00:00.000+05:30");
+    const firstOn = new Date("2026-09-02T09:00:00.000+05:30");
+    const result = resolveLaptopActiveForDay(
+      baseParams({
+        agentLaptopActiveMs: 5 * 60 * 60 * 1000,
+        agentFirstAgentOnAt: firstOn,
+        lastSignalOverall: last,
+        now,
+      }),
+    );
+    expect(result.ms).toBe(5 * 60 * 60 * 1000 + 2 * 60 * 1000);
+    expect(result.firstAgentOnAt).toEqual(firstOn);
   });
 
-  it("caps span at 24 hours", () => {
-    const first = new Date("2026-09-02T00:00:00.000+05:30");
-    const last = new Date("2026-09-02T23:59:00.000+05:30");
-    const ms = laptopActiveMsForDay({
-      ...baseParams(),
-      firstHeartbeatAt: first,
-      lastHeartbeatAt: last,
-      lastHeartbeatOverall: last,
-      now: new Date("2026-09-02T23:59:59.999+05:30"),
-    });
-    expect(ms).toBeLessThanOrEqual(24 * 60 * 60 * 1000);
-    expect(ms).toBeGreaterThan(23 * 60 * 60 * 1000);
-  });
-
-  it("extends from a single pulse when agent is still running", () => {
-    const pulse = new Date("2026-09-02T09:00:00.000+05:30");
-    const now = new Date("2026-09-02T11:00:00.000+05:30");
-    const recentPulse = new Date("2026-09-02T10:58:00.000+05:30");
-    const ms = laptopActiveMsForDay({
-      ...baseParams(),
-      firstHeartbeatAt: pulse,
-      lastHeartbeatAt: pulse,
-      lastHeartbeatOverall: recentPulse,
-      now,
-    });
-    expect(ms).toBe(2 * 60 * 60 * 1000);
+  it("falls back to session signals when agent ms is missing", () => {
+    const signals: UptimeSignal[] = [
+      { at: new Date("2026-09-02T09:00:00.000+05:30"), kind: "tick" },
+      { at: new Date("2026-09-02T09:05:00.000+05:30"), kind: "tick" },
+      { at: new Date("2026-09-02T09:10:00.000+05:30"), kind: "tick" },
+    ];
+    const hours = laptopActiveHoursForDay(
+      baseParams({
+        uptimeSignals: signals,
+        lastSignalOverall: signals[2].at,
+        now: new Date("2026-09-02T11:00:00.000+05:30"),
+      }),
+    );
+    expect(hours).toBe(2);
   });
 });

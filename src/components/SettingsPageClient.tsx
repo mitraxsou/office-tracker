@@ -8,7 +8,6 @@ import { NotificationPrefsForm } from "@/components/NotificationPrefsForm";
 import { OutOfOfficeSection } from "@/components/OutOfOfficeSection";
 import { AgentGraceSection } from "@/components/AgentGraceSection";
 import { AgentSetupPanel } from "@/components/AgentSetupPanel";
-import { OfficeScheduleSuggestionCard } from "@/components/OfficeScheduleSuggestionCard";
 import { ThemePreference } from "@/components/ThemeToggle";
 import type { EnrichedDevice } from "@/lib/device-enrichment";
 import type { InstallTokenForUser } from "@/lib/install-token-types";
@@ -104,8 +103,6 @@ export function SettingsPageClient({
           appUrl={appUrl}
         />
       )}
-
-      <OfficeScheduleSuggestionCard />
 
       <ThemePreference className="mb-6" />
 

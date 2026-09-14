@@ -11,10 +11,6 @@
     {
       "path": "/api/cron/purge-heartbeats",
       "schedule": "15 0 * * *"
-    },
-    {
-      "path": "/api/cron/office-schedule",
-      "schedule": "30 16 * * 0"
     }
   ]
 }
