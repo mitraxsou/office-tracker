@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import {
   analogHandAngles,
   clockPartsInTimezone,
@@ -12,14 +12,56 @@ import {
   type DeskClockSettings,
 } from "@/lib/desk-clock";
 import type { MonthlyProgressDay } from "@/lib/monthly-progress";
+import { DashboardRefreshButton } from "@/components/DashboardRefreshButton";
 import { DeskClockCalendar } from "./DeskClockCalendar";
+import { DashboardMiniStat, type StatusTone } from "@/components/dashboard/DashboardMiniStat";
+import { formatTime } from "@/lib/visits";
+
+const LAPTOP_TOOLTIP =
+  "Total time today your laptop was on with the My Office Pulse agent running. Sleep and long gaps between pulses are excluded. This is not the span from first to last pulse.";
+
+export type DeskClockTodayStats = {
+  totalHours: number;
+  targetHours: number;
+  metTarget: boolean;
+  inOfficeNow: boolean;
+  agentStatusValue: string;
+  agentStatusTone: StatusTone;
+  firstCheckIn: Date | null;
+  laptopActiveHours: number;
+  firstAgentOnAt: Date | null;
+  lastSyncedLabel: string;
+  lastSyncedTone: StatusTone;
+};
 
 type DeskClockPanelProps = {
   timezone: string;
   dayKey: string;
   monthKey: string;
   monthDays: MonthlyProgressDay[];
+  todayStats: DeskClockTodayStats;
 };
+
+function DeskClockTodayHeader({
+  dayKey,
+  settingsControl,
+}: {
+  dayKey: string;
+  settingsControl?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <div>
+        <h1 className="text-xl font-semibold sm:text-2xl">Today</h1>
+        <p className="text-xs text-muted sm:text-sm">{dayKey} · Your hours only</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <DashboardRefreshButton />
+        {settingsControl}
+      </div>
+    </div>
+  );
+}
 
 function GearIcon() {
   return (
@@ -34,15 +76,21 @@ function GearIcon() {
       strokeLinejoin="round"
       aria-hidden
     >
-      <circle cx="12" cy="12" r="3" />
       <path
-        d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"
+        d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"
       />
+      <circle cx="12" cy="12" r="3" />
     </svg>
   );
 }
 
-export function DeskClockPanel({ timezone, dayKey, monthKey, monthDays }: DeskClockPanelProps) {
+export function DeskClockPanel({
+  timezone,
+  dayKey,
+  monthKey,
+  monthDays,
+  todayStats,
+}: DeskClockPanelProps) {
   const [mounted, setMounted] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [settings, setSettings] = useState<DeskClockSettings>(DEFAULT_DESK_CLOCK_SETTINGS);
@@ -70,23 +118,31 @@ export function DeskClockPanel({ timezone, dayKey, monthKey, monthDays }: DeskCl
 
   if (!mounted) {
     return (
-      <section className="card p-4 sm:p-5" aria-hidden>
-        <div className="h-32 animate-pulse rounded-lg bg-[var(--border)]/30" />
+      <section className="card overflow-hidden p-0" aria-hidden>
+        <div className="border-b border-[var(--border)]">
+          <DeskClockTodayHeader dayKey={dayKey} />
+        </div>
+        <div className="p-4 sm:p-5">
+          <div className="h-32 animate-pulse rounded-lg bg-[var(--border)]/30" />
+        </div>
       </section>
     );
   }
 
   if (settings.hidden) {
     return (
-      <p className="text-sm">
-        <button
-          type="button"
-          className="text-accent hover:underline"
-          onClick={() => updateSettings({ hidden: false })}
-        >
-          Show desk clock
-        </button>
-      </p>
+      <div className="space-y-3">
+        <DeskClockTodayHeader dayKey={dayKey} />
+        <p className="text-sm">
+          <button
+            type="button"
+            className="text-accent hover:underline"
+            onClick={() => updateSettings({ hidden: false })}
+          >
+            Show desk clock
+          </button>
+        </p>
+      </div>
     );
   }
 
@@ -98,25 +154,29 @@ export function DeskClockPanel({ timezone, dayKey, monthKey, monthDays }: DeskCl
 
   return (
     <section className="card overflow-hidden p-0">
-      <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-2">
-        <p className="text-xs font-medium text-muted">Desk clock</p>
-        <button
-          type="button"
-          className="btn-secondary inline-flex items-center justify-center p-1.5"
-          aria-label="Desk clock settings"
-          aria-expanded={settingsOpen}
-          onClick={() => setSettingsOpen((o) => !o)}
-        >
-          <GearIcon />
-        </button>
+      <div className="border-b border-[var(--border)]">
+        <DeskClockTodayHeader
+          dayKey={dayKey}
+          settingsControl={
+            <button
+              type="button"
+              className="btn-secondary inline-flex items-center justify-center p-1.5"
+              aria-label="Desk clock settings"
+              aria-expanded={settingsOpen}
+              onClick={() => setSettingsOpen((o) => !o)}
+            >
+              <GearIcon />
+            </button>
+          }
+        />
       </div>
 
       {settingsOpen && (
         <DeskClockSettingsRow settings={settings} onChange={updateSettings} />
       )}
 
-      <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-center sm:gap-8 sm:p-6">
-        <div className="flex min-w-0 flex-1 justify-center">
+      <div className="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-start lg:gap-4">
+        <div className="flex shrink-0 justify-center lg:justify-start">
           {settings.face === "led" ? (
             <LedFace parts={parts} accent={accent} showSeconds={settings.showSeconds} />
           ) : (
@@ -128,11 +188,70 @@ export function DeskClockPanel({ timezone, dayKey, monthKey, monthDays }: DeskCl
             />
           )}
         </div>
+        <DeskClockTodayStatsGrid timezone={timezone} stats={todayStats} />
         {settings.showCalendar && (
-          <DeskClockCalendar monthKey={monthKey} todayKey={dayKey} monthDays={monthDays} />
+          <div className="shrink-0 lg:ml-auto">
+            <DeskClockCalendar monthKey={monthKey} todayKey={dayKey} monthDays={monthDays} />
+          </div>
         )}
       </div>
     </section>
+  );
+}
+
+function DeskClockTodayStatsGrid({
+  timezone,
+  stats,
+}: {
+  timezone: string;
+  stats: DeskClockTodayStats;
+}) {
+  const remaining = Math.max(0, stats.targetHours - stats.totalHours);
+  const officeHoursValue = `${stats.totalHours.toFixed(1)} / ${stats.targetHours}h`;
+  const targetTone: StatusTone = stats.metTarget ? "success" : "warning";
+
+  return (
+    <div className="min-w-0 flex-1">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <DashboardMiniStat
+          label="Office hours"
+          value={officeHoursValue}
+          tone={targetTone}
+        />
+        <DashboardMiniStat
+          label="Target"
+          value={stats.metTarget ? "Met" : `${remaining.toFixed(1)}h left`}
+          tone={targetTone}
+        />
+        <DashboardMiniStat
+          label="In office"
+          value={stats.inOfficeNow ? "Yes" : "No"}
+          tone={stats.inOfficeNow ? "success" : "neutral"}
+        />
+        <DashboardMiniStat label="Agent" value={stats.agentStatusValue} tone={stats.agentStatusTone} />
+        <DashboardMiniStat
+          label="First check-in"
+          value={stats.firstCheckIn ? formatTime(stats.firstCheckIn, timezone) : "None"}
+          tone={stats.firstCheckIn ? "success" : "muted"}
+        />
+        <DashboardMiniStat
+          label="Agent uptime"
+          value={`${stats.laptopActiveHours.toFixed(1)}h`}
+          tooltip={
+            stats.firstAgentOnAt
+              ? `${LAPTOP_TOOLTIP} First switch-on today: ${formatTime(stats.firstAgentOnAt, timezone)}.`
+              : LAPTOP_TOOLTIP
+          }
+        />
+        <div className="col-span-2 sm:col-span-3">
+          <DashboardMiniStat
+            label="Last synced"
+            value={stats.lastSyncedLabel}
+            tone={stats.lastSyncedTone}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 

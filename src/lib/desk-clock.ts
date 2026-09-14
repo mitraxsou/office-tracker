@@ -13,7 +13,7 @@ export type DeskClockSettings = {
 };
 
 export const DEFAULT_DESK_CLOCK_SETTINGS: DeskClockSettings = {
-  face: "led",
+  face: "analog",
   color: "blue",
   hour12: true,
   showSeconds: true,

@@ -14,7 +14,6 @@ import { isUserOutOfOffice } from "@/lib/out-of-office";
 import { AppNav } from "@/components/AppNav";
 import { MonthlyProgressMeter } from "@/components/MonthlyProgressMeter";
 import { YearComplianceMeter } from "@/components/YearComplianceMeter";
-import { DashboardRefreshButton } from "@/components/DashboardRefreshButton";
 import { DeskClockPanel } from "@/components/dashboard/DeskClockPanel";
 import { DashboardHeroSummary } from "@/components/dashboard/DashboardHeroSummary";
 import { DashboardAlerts } from "@/components/dashboard/DashboardAlerts";
@@ -132,16 +131,6 @@ export default async function DashboardPage() {
     <>
       <AppNav />
       <main className="mx-auto max-w-5xl space-y-4 px-4 py-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-semibold sm:text-2xl">Today</h1>
-            <p className="text-xs text-muted sm:text-sm">
-              {summary.dayKey} · Your hours only
-            </p>
-          </div>
-          <DashboardRefreshButton />
-        </div>
-
         <DashboardAlerts
           agentNeverConnected={agentNeverConnected}
           ssidMissing={ssidMissing}
@@ -158,20 +147,27 @@ export default async function DashboardPage() {
           dayKey={summary.dayKey}
           monthKey={monthlyProgress.monthKey}
           monthDays={monthlyProgress.days}
+          todayStats={{
+            totalHours: summary.totalHours,
+            targetHours: summary.hoursTarget,
+            metTarget: summary.metTarget,
+            inOfficeNow: summary.inOfficeNow,
+            agentStatusValue,
+            agentStatusTone,
+            firstCheckIn,
+            laptopActiveHours: summary.laptopActiveHours,
+            firstAgentOnAt: summary.firstAgentOnAt,
+            lastSyncedLabel,
+            lastSyncedTone,
+          }}
         />
 
         <DashboardHeroSummary
           totalHours={summary.totalHours}
           targetHours={summary.hoursTarget}
           metTarget={summary.metTarget}
-          laptopActiveHours={summary.laptopActiveHours}
-          firstAgentOnAt={summary.firstAgentOnAt}
-          firstCheckIn={firstCheckIn}
           dayKey={summary.dayKey}
           timezone={user.timezone}
-          inOfficeNow={summary.inOfficeNow}
-          agentStatusValue={agentStatusValue}
-          agentStatusTone={agentStatusTone}
           lastSyncedLabel={lastSyncedLabel}
           lastSyncedTone={lastSyncedTone}
           lastOfficeActivityLabel={lastOfficeActivityLabel}
