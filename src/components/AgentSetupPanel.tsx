@@ -42,7 +42,7 @@ export function AgentSetupPanel({
   );
 
   return (
-    <div id="install" className="scroll-mt-6 space-y-6">
+    <div id="install" className="scroll-mt-header space-y-6">
       <section className="card border-[var(--pwc-orange)] p-6">
         <h2 className="mb-2 text-lg font-medium text-[var(--pwc-orange)]">
           Install or update {AGENT_PRODUCT_NAME}

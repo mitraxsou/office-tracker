@@ -6,6 +6,21 @@
   --pwc-orange-muted: rgba(253, 81, 8, 0.15);
   --success: #2ecc71;
   --warning: #fd5108;
+  /* Sticky AppNav height (py-3 / md:py-4 row). Side navs and hash anchors use offsets below it. */
+  --app-header-height: 3.25rem;
+  --app-viewas-banner-height: 0px;
+  --app-sticky-subnav-top: calc(var(--app-header-height) + var(--app-viewas-banner-height) + 1.5rem);
+  --app-scroll-anchor-offset: calc(var(--app-header-height) + var(--app-viewas-banner-height) + 1rem);
+}
+
+@media (min-width: 768px) {
+  :root {
+    --app-header-height: 4rem;
+  }
+}
+
+.app-site-header:has(.banner-viewas) {
+  --app-viewas-banner-height: 2.75rem;
 }
 
 html[data-theme="dark"],
@@ -122,6 +137,10 @@ html[data-theme="light"] .text-red-400 {
 html[data-theme="light"] .text-blue-300,
 html[data-theme="light"] .text-blue-400 {
   color: #1d4ed8;
+}
+
+.scroll-mt-header {
+  scroll-margin-top: var(--app-scroll-anchor-offset);
 }
 
 .text-muted {

@@ -66,7 +66,7 @@ function MobileDrawer({
     <>
       <button
         type="button"
-        className="fixed inset-0 z-40 bg-black/60"
+        className="fixed inset-0 z-[60] bg-black/60"
         aria-label="Close navigation menu"
         onClick={onClose}
       />
@@ -75,7 +75,7 @@ function MobileDrawer({
         role="dialog"
         aria-modal="true"
         aria-label="Navigation menu"
-        className="fixed inset-y-0 right-0 z-50 flex w-[min(100vw-3rem,20rem)] flex-col border-l border-[var(--border)] bg-[var(--background-elevated)] shadow-xl"
+        className="fixed inset-y-0 right-0 z-[70] flex w-[min(100vw-3rem,20rem)] flex-col border-l border-[var(--border)] bg-[var(--background-elevated)] shadow-xl"
       >
         <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
           <div className="min-w-0">
