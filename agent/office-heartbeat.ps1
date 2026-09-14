@@ -375,6 +375,7 @@ function Get-SyncState {
         openVisit = $null
         pendingSsid = $null
         pendingPreviousSsid = $null
+        hoursMetSentDayKey = $null
     }
     $data = Read-JsonFile (Get-SyncStatePath) $default
     if ($data -is [hashtable]) { return $data }
@@ -638,9 +639,54 @@ function Maybe-EnqueueDailySummary {
         }
         $SyncState.dayOfficeMs = 0
         $SyncState.dayVisitCount = 0
+        $SyncState.hoursMetSentDayKey = $null
         $SyncState = Reset-UptimeDayFields -SyncState $SyncState
     }
     $SyncState.dayKey = $DayKey
+    return $SyncState
+}
+
+function Get-CurrentDayOfficeMs {
+    param($SyncState)
+    $total = if ($null -ne $SyncState.dayOfficeMs) { [int]$SyncState.dayOfficeMs } else { 0 }
+    $open = Get-OpenVisitFromState $SyncState
+    if ($open) {
+        try {
+            $start = [DateTime]::Parse([string]$open.startAt)
+            $total += [Math]::Max(0, [int](((Get-Date) - $start).TotalMilliseconds))
+        } catch {}
+    }
+    return [Math]::Max(0, $total)
+}
+
+function Get-HoursTargetMs {
+    param($ServerConfig)
+    $hours = 5
+    if ($ServerConfig -and $null -ne $ServerConfig.hoursTarget) {
+        $hours = [double]$ServerConfig.hoursTarget
+    }
+    if ($hours -le 0) { $hours = 5 }
+    return [int]($hours * 60 * 60 * 1000)
+}
+
+function Maybe-EnqueueHoursTargetMet {
+    param(
+        $SyncState,
+        [string]$DayKey,
+        $ServerConfig
+    )
+    if ($SyncState.hoursMetSentDayKey -and [string]$SyncState.hoursMetSentDayKey -eq $DayKey) {
+        return $SyncState
+    }
+    $targetMs = Get-HoursTargetMs -ServerConfig $ServerConfig
+    $officeMs = Get-CurrentDayOfficeMs -SyncState $SyncState
+    if ($officeMs -lt $targetMs) { return $SyncState }
+    Add-QueuedEvent -Type "hours_target_met" -Fields @{
+        dayKey = $DayKey
+        officeMs = $officeMs
+    }
+    $SyncState.hoursMetSentDayKey = $DayKey
+    Write-Log "hours_target_met officeMs=$officeMs targetMs=$targetMs"
     return $SyncState
 }
 
@@ -992,11 +1038,13 @@ function Get-SyncTrigger {
     param(
         [bool]$IsResumeRun,
         [bool]$SsidChanged,
+        [bool]$HoursTargetMetQueued,
         [bool]$ActivityDue,
         [int]$QueuedEventCount
     )
     if ($IsResumeRun) { return "resume_wake" }
     if ($SsidChanged) { return "ssid_change" }
+    if ($HoursTargetMetQueued) { return "hours_target_met" }
     if ($ActivityDue) { return "activity_tick" }
     if ($QueuedEventCount -gt 0) { return "queued_events" }
     return "health_ping"
@@ -1193,6 +1241,10 @@ if ($ssidChanged) {
         Add-WifiChangeEvents -PreviousSsid $fromSsid -CurrentSsid $ssid -At $transitionAt
         $syncState = Update-VisitBoundaries -SyncState $syncState -PreviousSsid $fromSsid `
             -CurrentSsid $ssid -ServerConfig $serverConfig -TransitionAt $transitionAt
+        if (Test-IsOfficeSsid -Ssid $ssid -ServerConfig $serverConfig) {
+            $syncState = Maybe-EnqueueHoursTargetMet -SyncState $syncState -DayKey $dayKey `
+                -ServerConfig $serverConfig
+        }
         $syncState.pendingSsid = $ssid
         $syncState.pendingPreviousSsid = $fromSsid
     }
@@ -1217,6 +1269,11 @@ if ($isResumeRun -or $activityDue) {
     Add-QueuedEvent -Type "activity_tick" -Fields $tickFields
     $activityTickQueued = $true
     $pendingEvents = @(Get-EventQueue)
+}
+
+if (Test-IsOfficeSsid -Ssid $ssid -ServerConfig $serverConfig) {
+    $syncState = Maybe-EnqueueHoursTargetMet -SyncState $syncState -DayKey $dayKey `
+        -ServerConfig $serverConfig
 }
 
 if ($DryRun) {
@@ -1244,8 +1301,10 @@ if ($DryRun) {
 
 $shouldSync = $isResumeRun -or $ssidChanged -or $activityDue -or (@(Get-EventQueue).Count -gt 0)
 if ($shouldSync) {
+    $hoursTargetMetQueued = @((Get-EventQueue) | Where-Object { $_.type -eq "hours_target_met" }).Count -gt 0
     $syncTrigger = Get-SyncTrigger -IsResumeRun $isResumeRun -SsidChanged $ssidChanged `
-        -ActivityDue $activityDue -QueuedEventCount (@(Get-EventQueue).Count)
+        -HoursTargetMetQueued $hoursTargetMetQueued -ActivityDue $activityDue `
+        -QueuedEventCount (@(Get-EventQueue).Count)
     $flush = Invoke-FlushSync -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber `
         -ScriptVersion $scriptVersion -SyncState $syncState -AllowHealthPing:(-not $ssidChanged) `
         -FallbackSsid $ssid -VpnGateway $vpnGateway -SyncTrigger $syncTrigger

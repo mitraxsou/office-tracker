@@ -79,4 +79,12 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain('return "resume_wake"');
     expect(heartbeat).toContain('-SyncTrigger $syncTrigger');
   });
+
+  it("queues hours_target_met when local office time reaches server hours target", () => {
+    expect(heartbeat).toContain("function Maybe-EnqueueHoursTargetMet");
+    expect(heartbeat).toContain('Add-QueuedEvent -Type "hours_target_met"');
+    expect(heartbeat).toContain("hoursMetSentDayKey");
+    expect(heartbeat).toContain('return "hours_target_met"');
+    expect(heartbeat).toContain("function Get-CurrentDayOfficeMs");
+  });
 });
