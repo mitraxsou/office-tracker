@@ -71,12 +71,14 @@ describe("agent version", () => {
   it("builds an IEX-bypass install command for zip folder", () => {
     const command = buildInstallCommand("https://office.example", "token-123");
     expect(command).toContain("Invoke-AgentScriptBypass");
+    expect(command).toContain("Force = `$true");
     expect(command).not.toContain("-File");
   });
 
   it("builds an IEX-bypass update command for zip folder", () => {
     const command = buildUpdateCommand("https://office.example", "token-123");
     expect(command).toContain("Invoke-AgentScriptBypass");
+    expect(command).toContain("Force = `$true");
     expect(command).not.toContain("-File");
   });
 
@@ -91,6 +93,19 @@ describe("agent version", () => {
       expect(out.trim()).toBe("OK");
     },
     35_000,
+  );
+
+  it(
+    "zip reinstall smoke test runs bypass with Force from agent folder",
+    () => {
+      const script = path.join(process.cwd(), "tests/fixtures/run-zip-reinstall-smoke.ps1");
+      const out = execSync(
+        `powershell -NoProfile -ExecutionPolicy Bypass -File "${script}"`,
+        { encoding: "utf8", timeout: 120_000 },
+      );
+      expect(out.trim()).toBe("OK");
+    },
+    125_000,
   );
 
   it(

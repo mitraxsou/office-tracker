@@ -11,10 +11,11 @@ import {
   buildBootstrapUninstallCommandFromLocalConfig,
   buildInstallCommand,
   buildInstallCommandFromLocalConfig,
-  buildSetupCommand,
   buildSetupCommandFromLocalConfig,
   buildUpdateCommand,
   buildUpdateCommandFromLocalConfig,
+  buildZipReinstallCommand,
+  buildZipReinstallCommandFromLocalConfig,
 } from "./agent-branding";
 import { isTokenExpired, revokeExpiredPendingTokens } from "./token-expiry";
 import { clearAgentDeregistration } from "./agent-deregister";
@@ -409,7 +410,7 @@ function buildInstallTokenEntry(
       label: token.label,
       prefix: token.tokenPrefix,
       plainToken: plain,
-      setupCommand: buildSetupCommand(appUrl, plain),
+      setupCommand: buildZipReinstallCommand(appUrl, plain),
       bootstrapUninstallCommand: buildBootstrapUninstallCommand(appUrl, plain),
       installCommand: buildInstallCommand(appUrl, plain),
       updateCommand: buildUpdateCommand(appUrl, plain),
@@ -425,7 +426,7 @@ function buildInstallTokenEntry(
       label: token.label,
       prefix: token.tokenPrefix,
       plainToken: null,
-      setupCommand: buildSetupCommandFromLocalConfig(appUrl),
+      setupCommand: buildZipReinstallCommandFromLocalConfig(appUrl),
       bootstrapUninstallCommand: buildBootstrapUninstallCommandFromLocalConfig(appUrl),
       installCommand: buildInstallCommandFromLocalConfig(appUrl),
       updateCommand: buildUpdateCommandFromLocalConfig(appUrl),

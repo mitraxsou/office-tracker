@@ -1,6 +1,6 @@
 # Agent setup / update recovery (corrupt version.txt)
 
-For a full **uninstall then reinstall** (no zip), use **Clean reinstall (laptop issues)** on the Settings install page: copy step 1 (uninstall), then step 2 (setup).
+Standard flow: **download zip → extract → open PowerShell in that folder → Copy reinstall command** on Settings. That one command installs the latest agent from the server (with `-Force`). Optional: run `uninstall.ps1` from the zip folder first for a clean slate.
 
 
 If the pasted **setup/update** command fails with:

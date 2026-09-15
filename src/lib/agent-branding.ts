@@ -75,32 +75,55 @@ function buildServerBootstrapCommand(appUrl: string, tokenSetup: string) {
 }
 
 /** Run a local script via IEX bypass (zip extract folder). */
-function buildLocalIexCommand(scriptPath: string, appUrl: string, tokenExpr: string) {
+function buildLocalIexCommand(
+  scriptPath: string,
+  appUrl: string,
+  tokenExpr: string,
+  options?: { force?: boolean },
+) {
   const base = escapePsSingleQuoted(trimTrailingSlash(appUrl));
+  const forceBinding = options?.force ? "; Force = `$true" : "";
   return (
     `powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $ErrorActionPreference='Stop'; ` +
+    `if (-not (Test-Path '.\\lib\\agent-download.ps1')) { Write-Host 'Open PowerShell in the folder that contains setup.ps1 (extracted zip).'; exit 1 }; ` +
     `. .\\lib\\agent-download.ps1; ` +
     `. .\\lib\\agent-storage.ps1; ` +
     `$ApiUrl='${base}'; $Token=${tokenExpr}; ` +
+    `$env:OFFICEPULSE_SETUP_API_URL=$ApiUrl; $env:OFFICEPULSE_SETUP_TOKEN=$Token; ` +
     `$PSScriptRoot=(Split-Path (Resolve-Path '${scriptPath}') -Parent); ` +
-    `$code = Invoke-AgentScriptBypass -Ps1Path (Resolve-Path '${scriptPath}') -BoundVars @{ ApiUrl='${base}'; Token=${tokenExpr} } -Wait; ` +
+    `$code = Invoke-AgentScriptBypass -Ps1Path (Resolve-Path '${scriptPath}') -BoundVars @{ ApiUrl='${base}'; Token=${tokenExpr}${forceBinding} } -Wait; ` +
     `if ($code -ne 0) { exit $code } }"`
   );
 }
 
-/** Install command to paste after Open PowerShell here in the folder that contains install.ps1. */
+/** Zip folder: always refresh scripts from server (install, update, or fix a bad install). */
+export function buildZipReinstallCommand(appUrl: string, token: string) {
+  return buildLocalIexCommand(
+    AGENT_RELATIVE_SETUP_SCRIPT,
+    appUrl,
+    `'${escapePsSingleQuoted(token)}'`,
+    { force: true },
+  );
+}
+
+export function buildZipReinstallCommandFromLocalConfig(appUrl: string) {
+  const tokenExpr = `(Get-Content (Join-Path $env:LOCALAPPDATA '${AGENT_INSTALL_FOLDER}\\config.json') -Raw | ConvertFrom-Json).token`;
+  return buildLocalIexCommand(AGENT_RELATIVE_SETUP_SCRIPT, appUrl, tokenExpr, { force: true });
+}
+
+/** @deprecated Same as buildZipReinstallCommand — use reinstall command from extracted zip. */
 export function buildInstallCommand(appUrl: string, token: string) {
-  return buildLocalIexCommand(AGENT_RELATIVE_SETUP_SCRIPT, appUrl, `'${escapePsSingleQuoted(token)}'`);
+  return buildZipReinstallCommand(appUrl, token);
 }
 
-/** Update command to paste from the same extract folder (update.ps1 -ApiUrl -Token). */
+/** @deprecated Same as buildZipReinstallCommand. */
 export function buildUpdateCommand(appUrl: string, token: string) {
-  return buildLocalIexCommand(AGENT_RELATIVE_SETUP_SCRIPT, appUrl, `'${escapePsSingleQuoted(token)}'`);
+  return buildZipReinstallCommand(appUrl, token);
 }
 
-/** Unified setup command (install or update, no zip). Preferred for new agent v1.3. */
+/** Primary copy-paste command: run from extracted zip folder; installs latest agent from server. */
 export function buildSetupCommand(appUrl: string, token: string) {
-  return buildServerBootstrapCommand(appUrl, `$Token=''${escapePsSingleQuoted(token)}''`);
+  return buildZipReinstallCommand(appUrl, token);
 }
 
 /** Download uninstall.ps1 from server and run (no zip). Auth uses Bearer token for /api/agent/files. */
@@ -130,11 +153,9 @@ export function buildBootstrapUninstallCommandFromLocalConfig(appUrl: string) {
   return buildServerBootstrapUninstallCommand(appUrl, tokenSetup);
 }
 
-/** Setup command for laptops that already have the agent token in local config.json. */
+/** Reinstall from zip when token is only in local config.json. */
 export function buildSetupCommandFromLocalConfig(appUrl: string) {
-  const tokenSetup =
-    `$cfg = Get-Content (Join-Path $env:LOCALAPPDATA ''${AGENT_INSTALL_FOLDER}\\config.json'') -Raw | ConvertFrom-Json; $Token = [string]$cfg.token`;
-  return buildServerBootstrapCommand(appUrl, tokenSetup);
+  return buildZipReinstallCommandFromLocalConfig(appUrl);
 }
 
 const AGENT_LOCAL_CONFIG_PS = `$env:LOCALAPPDATA\\${AGENT_INSTALL_FOLDER}\\config.json`;

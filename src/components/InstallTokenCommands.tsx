@@ -126,9 +126,10 @@ export function InstallTokenCommands({
   if (installTokens.length === 0) {
     return (
       <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 text-sm">
-        <p className="font-medium text-amber-200/90">Get your setup command</p>
+        <p className="font-medium text-amber-200/90">Get your reinstall command</p>
         <p className="mt-1 text-muted">
-          Complete both steps below, then paste the setup command in PowerShell.
+          Generate a token, extract the agent zip, open PowerShell in that folder, then paste the
+          reinstall command.
         </p>
         <ol className="mt-4 list-decimal space-y-4 pl-5">
           <li>
@@ -151,10 +152,10 @@ export function InstallTokenCommands({
             )}
           </li>
           <li>
-            <span className="font-medium text-muted">Copy setup command</span>
+            <span className="font-medium text-muted">Copy reinstall command</span>
             <p className="mt-1 text-xs text-muted">
               After step 1, a laptop card appears here with{" "}
-              <strong>Copy setup command</strong>. Run that command in PowerShell.
+              <strong>Copy reinstall command</strong>.
             </p>
           </li>
         </ol>
@@ -219,9 +220,10 @@ export function InstallTokenCommands({
             )}
 
             <div className="mt-3 rounded border border-[var(--pwc-orange)]/40 bg-[var(--pwc-orange)]/5 p-3">
-              <p className="text-sm font-medium text-[var(--pwc-orange)]">Setup (install or update)</p>
+              <p className="text-sm font-medium text-[var(--pwc-orange)]">Reinstall command</p>
               <p className="mt-1 text-xs text-muted">
-                Paste in PowerShell. Installs or updates the agent from the server. No zip download.
+                Run from the extracted zip folder in PowerShell. Installs the latest agent from
+                this server (first install, update, or repair).
               </p>
               <pre className="mt-2 overflow-x-auto rounded border bg-[var(--background-elevated)] p-2 text-xs whitespace-pre-wrap">
                 {t.setupCommand}
@@ -231,68 +233,15 @@ export function InstallTokenCommands({
                 onClick={() => handleCopy(t.setupCommand, `${t.id}-setup`)}
                 className="btn-primary mt-2 px-3 py-1.5 text-xs"
               >
-                {copiedId === `${t.id}-setup` ? "Copied!" : "Copy setup command"}
+                {copiedId === `${t.id}-setup` ? "Copied!" : "Copy reinstall command"}
               </button>
+              <a
+                href="/api/agent/download"
+                className="btn-secondary mt-2 inline-block px-3 py-1.5 text-xs"
+              >
+                Download agent (.zip)
+              </a>
             </div>
-
-            <details className="mt-3 rounded border border-[var(--border)] p-3">
-              <summary className="cursor-pointer text-sm font-medium text-muted">
-                Advanced: zip-based install or script refresh
-              </summary>
-              <div className="mt-3 space-y-3 text-xs text-muted">
-                <p>
-                  Only use these if the setup command above does not work on your laptop. Download
-                  the agent zip, extract it, open PowerShell in that folder, then use one of the
-                  commands below.
-                </p>
-                <a href="/api/agent/download" className="btn-secondary inline-block px-3 py-1 text-xs">
-                  Download agent (.zip)
-                </a>
-
-                <div className="rounded border border-[var(--border)] bg-[var(--background-elevated)] p-3">
-                  <p className="text-sm font-medium text-foreground">
-                    {t.status === "bound" ? "Refresh scripts from zip folder" : "Install from zip folder"}
-                  </p>
-                  <p className="mt-1">
-                    The folder must contain <code>install.ps1</code>.
-                    {t.status === "bound" &&
-                      " Safe to re-run on an existing install (copies scripts from this folder)."}
-                  </p>
-                  <pre className="mt-2 overflow-x-auto rounded border bg-[var(--background)] p-2 text-xs whitespace-pre-wrap">
-                    {t.installCommand}
-                  </pre>
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(t.installCommand, t.id)}
-                    className="btn-secondary mt-2 px-3 py-1 text-xs"
-                  >
-                    {copiedId === t.id
-                      ? "Copied!"
-                      : t.status === "bound"
-                        ? "Copy refresh command"
-                        : "Copy install command"}
-                  </button>
-                </div>
-
-                <div className="rounded border border-[var(--border)] bg-[var(--background-elevated)] p-3">
-                  <p className="text-sm font-medium text-foreground">Update scripts from zip folder</p>
-                  <p className="mt-1">
-                    Runs <code>update.ps1</code> from the extract folder. Prefer the setup command
-                    above for server-side updates without a zip.
-                  </p>
-                  <pre className="mt-2 overflow-x-auto rounded border bg-[var(--background)] p-2 text-xs whitespace-pre-wrap">
-                    {t.updateCommand}
-                  </pre>
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(t.updateCommand, `${t.id}-update`)}
-                    className="btn-secondary mt-2 px-3 py-1 text-xs"
-                  >
-                    {copiedId === `${t.id}-update` ? "Copied!" : "Copy update command"}
-                  </button>
-                </div>
-              </div>
-            </details>
 
             <div className="mt-3 rounded border border-[var(--border)] bg-[var(--background-elevated)] p-3">
               <p className="text-sm font-medium">Laptop token</p>
