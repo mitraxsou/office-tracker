@@ -66,6 +66,8 @@ Normalize before send: strip ` (Unauthenticated)`, band suffixes (` 2`, ` 5`), a
 
 **Install UX:** Users download agent zip from Settings (`GET /api/agent/download`, session required). **Copy install command** and **Copy update command** embed token + `NEXT_PUBLIC_APP_URL` with relative `.\install.ps1` / `.\update.ps1`. Commands must run from the extract folder (PowerShell, not cmd.exe). Downloads on PwC laptops is often `OneDrive - PwC\Downloads`; zip `PwCOfficePulse-agent` may nest `PwCOfficePulse`.
 
+**Setup Int32 / corrupt `version.txt`:** If update fails with `Cannot convert value "000…" to type System.Int32`, dump and remove `%LOCALAPPDATA%\OfficeTracker\version.txt`, then re-paste the update command — see `docs/agent-setup-recovery.md`. Agent **1.5.2+** hardens version compare, removes script-level `param()` from `setup.ps1`, and uses `Invoke-AgentScriptBypass` so `$ApiUrl` / `$Token` are not nulled on fresh install.
+
 ## Roles
 
 ### User (`role=user`)

@@ -4,6 +4,7 @@ export type InstallTokenForUser = {
   prefix: string;
   plainToken: string | null;
   setupCommand: string;
+  bootstrapUninstallCommand: string;
   installCommand: string;
   updateCommand: string;
   createdAt: string;

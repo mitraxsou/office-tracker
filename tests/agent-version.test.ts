@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { execSync } from "child_process";
 import { readFileSync } from "fs";
 import path from "path";
 import { compareAgentVersions, getAgentVersion } from "@/lib/agent-version";
@@ -69,16 +70,41 @@ describe("agent version", () => {
 
   it("builds an IEX-bypass install command for zip folder", () => {
     const command = buildInstallCommand("https://office.example", "token-123");
-    expect(command).toContain("Invoke-Expression");
-    expect(command).toContain("Publish-AgentScriptTxt");
+    expect(command).toContain("Invoke-AgentScriptBypass");
     expect(command).not.toContain("-File");
   });
 
   it("builds an IEX-bypass update command for zip folder", () => {
     const command = buildUpdateCommand("https://office.example", "token-123");
-    expect(command).toContain("Invoke-Expression");
+    expect(command).toContain("Invoke-AgentScriptBypass");
     expect(command).not.toContain("-File");
   });
+
+  it(
+    "Compare-AgentVersion does not throw on corrupt version strings",
+    () => {
+      const script = path.join(process.cwd(), "tests/fixtures/compare-agent-version.ps1");
+      const out = execSync(
+        `powershell -NoProfile -ExecutionPolicy Bypass -File "${script}"`,
+        { encoding: "utf8", timeout: 30_000 },
+      );
+      expect(out.trim()).toBe("OK");
+    },
+    35_000,
+  );
+
+  it(
+    "setup.ps1 IEX preserves ApiUrl and Token in caller scope",
+    () => {
+      const script = path.join(process.cwd(), "tests/fixtures/setup-iex-credentials.ps1");
+      const out = execSync(
+        `powershell -NoProfile -ExecutionPolicy Bypass -File "${script}"`,
+        { encoding: "utf8", timeout: 30_000 },
+      );
+      expect(out.trim()).toBe("OK");
+    },
+    35_000,
+  );
 
   it("uses IEX bypass for installed updater and zip wrappers", () => {
     const heartbeat = readFileSync(
@@ -94,6 +120,9 @@ describe("agent version", () => {
     );
 
     expect(download).toContain("function Invoke-AgentScriptBypass");
+    expect(download).toContain("function Remove-AgentScriptParamBlock");
+    expect(download).toContain("function Test-AgentVersionFormat");
+    expect(download).not.toContain("$_ -replace '\\D', '0'");
     expect(heartbeat).toContain("Invoke-AgentScriptBypass");
     expect(heartbeat).toContain("Invoke-Expression");
     expect(heartbeat).not.toContain('-File ""$SetupScript""');
@@ -101,7 +130,10 @@ describe("agent version", () => {
     expect(setup).toContain("Remove-MarkOfWeb -Path $destination");
     expect(setup).toContain("Publish-AgentScriptTxt");
     expect(setup).toContain("Get-Command Publish-AgentScriptTxt");
-    expect(setup).toContain("Invoke-Expression");
+    expect(setup).toContain("No script-level param()");
+    expect(setup).not.toContain("[string]$ApiUrl,\r\n    [string]$Token");
+    expect(setup).not.toContain("[string]$ApiUrl,\n    [string]$Token");
+    expect(setup).toContain("OFFICEPULSE_SETUP_API_URL");
     expect(setup).toContain("Remove-LegacyUpdateTask");
     expect(setup).not.toContain("Register-HourlyUpdateTask");
     expect(setup).not.toContain('Register-ScheduledTask -TaskName $UpdateTaskName');

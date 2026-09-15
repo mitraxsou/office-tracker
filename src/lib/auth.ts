@@ -7,6 +7,8 @@ import { ensureAppConfig, getAppConfig } from "./app-config";
 import crypto from "node:crypto";
 import { encryptPendingToken, decryptPendingToken } from "./token-crypto";
 import {
+  buildBootstrapUninstallCommand,
+  buildBootstrapUninstallCommandFromLocalConfig,
   buildInstallCommand,
   buildInstallCommandFromLocalConfig,
   buildSetupCommand,
@@ -408,6 +410,7 @@ function buildInstallTokenEntry(
       prefix: token.tokenPrefix,
       plainToken: plain,
       setupCommand: buildSetupCommand(appUrl, plain),
+      bootstrapUninstallCommand: buildBootstrapUninstallCommand(appUrl, plain),
       installCommand: buildInstallCommand(appUrl, plain),
       updateCommand: buildUpdateCommand(appUrl, plain),
       createdAt: token.createdAt.toISOString(),
@@ -423,6 +426,7 @@ function buildInstallTokenEntry(
       prefix: token.tokenPrefix,
       plainToken: null,
       setupCommand: buildSetupCommandFromLocalConfig(appUrl),
+      bootstrapUninstallCommand: buildBootstrapUninstallCommandFromLocalConfig(appUrl),
       installCommand: buildInstallCommandFromLocalConfig(appUrl),
       updateCommand: buildUpdateCommandFromLocalConfig(appUrl),
       createdAt: token.createdAt.toISOString(),

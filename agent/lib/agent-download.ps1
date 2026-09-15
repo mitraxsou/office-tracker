@@ -33,14 +33,32 @@ function Remove-MarkOfWebFromTree {
         ForEach-Object { Remove-MarkOfWeb -Path $_.FullName }
 }
 
+function Test-AgentVersionFormat {
+    param([string]$Version)
+    $t = [string]$Version
+    if (-not $t) { return $false }
+    return $t.Trim() -match '^\d+(\.\d+){0,3}$'
+}
+
+function Normalize-AgentVersionString {
+    param([string]$Version)
+    if (Test-AgentVersionFormat $Version) { return $Version.Trim() }
+    return "0.0.0"
+}
+
 function Compare-AgentVersion {
     param([string]$Left, [string]$Right)
     $parse = {
         param([string]$v)
-        $v.Trim().Split(".") | ForEach-Object { [int]($_ -replace '\D', '0') }
+        $normalized = Normalize-AgentVersionString $v
+        $normalized.Split(".") | ForEach-Object {
+            $part = 0
+            [void][int]::TryParse($_, [ref]$part)
+            $part
+        }
     }
-    $lv = & $parse $Left
-    $rv = & $parse $Right
+    $lv = @(& $parse $Left)
+    $rv = @(& $parse $Right)
     $len = [Math]::Max($lv.Count, $rv.Count)
     for ($i = 0; $i -lt $len; $i++) {
         $l = if ($i -lt $lv.Count) { $lv[$i] } else { 0 }
@@ -54,14 +72,49 @@ function Compare-AgentVersion {
 function Get-LocalAgentVersion {
     $path = Get-AgentVersionPath
     if (-not (Test-Path $path)) { return "0.0.0" }
-    return (Get-Content $path -Raw -ErrorAction SilentlyContinue).Trim()
+    $fromFile = Get-Content $path -Raw -ErrorAction SilentlyContinue
+    if (-not $fromFile) { return "0.0.0" }
+    return Normalize-AgentVersionString $fromFile.Trim()
+}
+
+function Remove-AgentScriptParamBlock {
+    param([string]$Content)
+    if (-not $Content) { return $Content }
+    if ($Content -notmatch '^\s*param\s*\(') { return $Content }
+
+    $idx = $Content.IndexOf("param")
+    $depth = 0
+    $inString = $false
+    $quote = [char]0
+    for ($i = $idx; $i -lt $Content.Length; $i++) {
+        $ch = $Content[$i]
+        if ($inString) {
+            if ($ch -eq $quote) { $inString = $false }
+            continue
+        }
+        if ($ch -eq '"' -or $ch -eq "'") {
+            $inString = $true
+            $quote = $ch
+            continue
+        }
+        if ($ch -eq '(') { $depth++ }
+        elseif ($ch -eq ')') {
+            $depth--
+            if ($depth -eq 0) {
+                return $Content.Substring($i + 1).TrimStart()
+            }
+        }
+    }
+    return $Content
 }
 
 function Publish-AgentScriptTxt {
     param([string]$Ps1Path)
     Remove-MarkOfWeb -Path $Ps1Path
     $txtPath = [System.IO.Path]::ChangeExtension($Ps1Path, ".txt")
-    Copy-Item $Ps1Path $txtPath -Force
+    $raw = Get-Content -LiteralPath $Ps1Path -Raw
+    $body = Remove-AgentScriptParamBlock $raw
+    Set-Content -LiteralPath $txtPath -Value $body -Encoding UTF8
     Remove-MarkOfWeb -Path $txtPath
     return $txtPath
 }
@@ -152,5 +205,11 @@ function Download-AgentScriptsFromApp {
         & $Log "Downloading $url"
         Invoke-WebRequest -Uri $url -Headers $headers -OutFile $dest -UseBasicParsing -TimeoutSec 120
         Remove-MarkOfWeb -Path $dest
+        if ($file -eq "version.txt") {
+            $ver = (Get-Content -LiteralPath $dest -Raw -ErrorAction Stop).Trim()
+            if (-not (Test-AgentVersionFormat $ver)) {
+                throw "Downloaded version.txt is not a valid agent version (got $($ver.Length) chars)"
+            }
+        }
     }
 }

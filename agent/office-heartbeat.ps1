@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 $ConfigFetchIntervalRuns = 60
 $ConfigCacheMaxAgeMinutes = 120
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.5.0"
+$AgentScriptVersion = "1.5.2"
 
 function Get-InstallDir {
     if ($env:OFFICETRACKER_INSTALL_DIR) {
@@ -86,12 +86,30 @@ function Test-ResumeFromSleep {
 
 function Compare-AgentVersion {
     param([string]$Left, [string]$Right)
-    $parse = {
-        param([string]$v)
-        $v.Trim().Split(".") | ForEach-Object { [int]($_ -replace '\D', '0') }
+    if (Get-Command Normalize-AgentVersionString -ErrorAction SilentlyContinue) {
+        $parse = {
+            param([string]$v)
+            $normalized = Normalize-AgentVersionString $v
+            $normalized.Split(".") | ForEach-Object {
+                $part = 0
+                [void][int]::TryParse($_, [ref]$part)
+                $part
+            }
+        }
+    } else {
+        $parse = {
+            param([string]$v)
+            $t = $v.Trim()
+            if ($t -notmatch '^\d+(\.\d+){0,3}$') { $t = "0.0.0" }
+            $t.Split(".") | ForEach-Object {
+                $part = 0
+                [void][int]::TryParse($_, [ref]$part)
+                $part
+            }
+        }
     }
-    $lv = & $parse $Left
-    $rv = & $parse $Right
+    $lv = @(& $parse $Left)
+    $rv = @(& $parse $Right)
     $len = [Math]::Max($lv.Count, $rv.Count)
     for ($i = 0; $i -lt $len; $i++) {
         $l = if ($i -lt $lv.Count) { $lv[$i] } else { 0 }
@@ -823,7 +841,9 @@ function Invoke-AgentSetupScript {
     }
 
     $txtPath = [System.IO.Path]::ChangeExtension($SetupScript, ".txt")
-    if (-not (Test-Path -LiteralPath $txtPath)) {
+    if (Get-Command Publish-AgentScriptTxt -ErrorAction SilentlyContinue) {
+        $txtPath = Publish-AgentScriptTxt -Ps1Path $SetupScript
+    } elseif (-not (Test-Path -LiteralPath $txtPath)) {
         Copy-Item $SetupScript $txtPath -Force
         Unblock-File -LiteralPath $txtPath -ErrorAction SilentlyContinue
     }

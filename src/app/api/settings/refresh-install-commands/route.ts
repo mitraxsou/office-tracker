@@ -4,7 +4,12 @@ import {
   getUserInstallTokenState,
   regenerateAgentToken,
 } from "@/lib/auth";
-import { buildInstallCommand, buildSetupCommand, buildUpdateCommand } from "@/lib/agent-branding";
+import {
+  buildBootstrapUninstallCommand,
+  buildInstallCommand,
+  buildSetupCommand,
+  buildUpdateCommand,
+} from "@/lib/agent-branding";
 import { logAuditEvent } from "@/lib/audit-log";
 
 /** Issue a fresh token with copy-paste install/update commands (full -Token in command). */
@@ -40,6 +45,7 @@ export async function POST() {
   return NextResponse.json({
     token: plainToken,
     setupCommand: buildSetupCommand(appUrl, plainToken),
+    bootstrapUninstallCommand: buildBootstrapUninstallCommand(appUrl, plainToken),
     installCommand: buildInstallCommand(appUrl, plainToken),
     updateCommand: buildUpdateCommand(appUrl, plainToken),
     installTokens: after.installTokens,

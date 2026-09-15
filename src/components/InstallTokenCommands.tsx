@@ -12,8 +12,16 @@ type InstallTokenCommandsProps = {
   compact?: boolean;
 };
 
+export function needsRefreshInstallCommands(
+  installTokens: InstallTokenForUser[],
+  legacyBoundCount = 0,
+): boolean {
+  return legacyBoundCount > 0 || installTokens.some((t) => t.usesLocalConfig);
+}
+
 export function InstallTokenCommands({
   installTokens,
+  legacyBoundCount = 0,
   compact = false,
 }: InstallTokenCommandsProps) {
   const router = useRouter();
@@ -113,29 +121,74 @@ export function InstallTokenCommands({
     setTimeout(() => setCopiedId(null), 2000);
   }
 
+  const showRefreshCallout = needsRefreshInstallCommands(installTokens, legacyBoundCount);
+
   if (installTokens.length === 0) {
     return (
-      <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-sm text-muted">
-        <p>No install token is ready yet. Generate one here to copy the setup command.</p>
-        <button
-          type="button"
-          onClick={() => void handleGenerateInstallCommand()}
-          disabled={generating}
-          className="btn-primary mt-3 px-3 py-1.5 text-xs"
-        >
-          {generating ? "Generating..." : "Generate setup command"}
-        </button>
-        {generateError && (
-          <p className="mt-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
-            {generateError}
-          </p>
-        )}
+      <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-4 text-sm">
+        <p className="font-medium text-amber-200/90">Get your setup command</p>
+        <p className="mt-1 text-muted">
+          Complete both steps below, then paste the setup command in PowerShell.
+        </p>
+        <ol className="mt-4 list-decimal space-y-4 pl-5">
+          <li>
+            <span className="font-medium text-foreground">Generate token</span>
+            <p className="mt-1 text-xs text-muted">
+              Creates a laptop token and the one-line setup command for this server.
+            </p>
+            <button
+              type="button"
+              onClick={() => void handleGenerateInstallCommand()}
+              disabled={generating}
+              className="btn-primary mt-2 px-3 py-1.5 text-xs"
+            >
+              {generating ? "Generating..." : "Generate setup command"}
+            </button>
+            {generateError && (
+              <p className="mt-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
+                {generateError}
+              </p>
+            )}
+          </li>
+          <li>
+            <span className="font-medium text-muted">Copy setup command</span>
+            <p className="mt-1 text-xs text-muted">
+              After step 1, a laptop card appears here with{" "}
+              <strong>Copy setup command</strong>. Run that command in PowerShell.
+            </p>
+          </li>
+        </ol>
       </div>
     );
   }
 
   return (
     <>
+      {showRefreshCallout && (
+        <div
+          id="refresh-install-commands"
+          className="mb-4 scroll-mt-header rounded-lg border border-[var(--pwc-orange)]/50 bg-[var(--pwc-orange)]/10 p-4 text-sm"
+        >
+          <p className="font-medium text-[var(--pwc-orange)]">Refresh install commands</p>
+          <p className="mt-1 text-xs text-muted">
+            Your saved commands may read the token from the laptop config file or an older binding.
+            Issue a fresh token so copy-paste setup includes the full command again.
+          </p>
+          <button
+            type="button"
+            onClick={() => void handleRefreshInstallCommands()}
+            disabled={refreshing}
+            className="btn-primary mt-3 px-3 py-1.5 text-xs"
+          >
+            {refreshing ? "Working..." : "Refresh install commands"}
+          </button>
+          {refreshError && (
+            <p className="mt-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
+              {refreshError}
+            </p>
+          )}
+        </div>
+      )}
       <div className={compact ? "space-y-3" : "space-y-4"}>
         {installTokens.map((t) => (
           <div

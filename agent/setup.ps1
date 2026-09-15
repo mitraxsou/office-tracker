@@ -7,17 +7,33 @@
 #   .\setup.ps1 -ApiUrl "https://your-app.vercel.app" -Token "your-agent-token"
 #   .\setup.ps1 -Silent
 #   .\setup.ps1 -Force
-
-param(
-    [string]$ApiUrl,
-    [string]$Token,
-    [switch]$Silent,
-    [switch]$Verbose,
-    [switch]$Force,
-    [switch]$RequireAdmin
-)
+#
+# No script-level param() — IEX from bootstrap leaves $ApiUrl/$Token in caller scope;
+# param() would shadow them and break fresh install. -File switches are parsed from $args.
 
 $ErrorActionPreference = "Stop"
+
+if (-not (Get-Variable -Name Silent -Scope 0 -ErrorAction SilentlyContinue)) { $Silent = $false }
+if (-not (Get-Variable -Name Verbose -Scope 0 -ErrorAction SilentlyContinue)) { $Verbose = $false }
+if (-not (Get-Variable -Name Force -Scope 0 -ErrorAction SilentlyContinue)) { $Force = $false }
+if (-not (Get-Variable -Name RequireAdmin -Scope 0 -ErrorAction SilentlyContinue)) { $RequireAdmin = $false }
+
+if ($null -ne $args -and $args.Count -gt 0) {
+    for ($i = 0; $i -lt $args.Count; $i++) {
+        switch ([string]$args[$i]) {
+            "-ApiUrl" {
+                if ($i + 1 -lt $args.Count) { $ApiUrl = [string]$args[$i + 1]; $i++ }
+            }
+            "-Token" {
+                if ($i + 1 -lt $args.Count) { $Token = [string]$args[$i + 1]; $i++ }
+            }
+            "-Silent" { $Silent = $true }
+            "-Verbose" { $Verbose = $true }
+            "-Force" { $Force = $true }
+            "-RequireAdmin" { $RequireAdmin = $true }
+        }
+    }
+}
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $TaskName = "PwCOfficePulse"
@@ -374,6 +390,13 @@ if (Test-Path -LiteralPath $forceMarkerPath) {
 $configPath = Get-ConfigPath
 $isFreshInstall = -not (Test-Path $configPath)
 
+if (-not $ApiUrl -and $env:OFFICEPULSE_SETUP_API_URL) {
+    $ApiUrl = [string]$env:OFFICEPULSE_SETUP_API_URL
+}
+if (-not $Token -and $env:OFFICEPULSE_SETUP_TOKEN) {
+    $Token = [string]$env:OFFICEPULSE_SETUP_TOKEN
+}
+
 if ($isFreshInstall) {
     if (-not $ApiUrl -or -not $Token) {
         Write-SetupLog "ERROR fresh install requires ApiUrl and Token"
@@ -416,7 +439,18 @@ try {
     $newVersion = "0.0.0"
     $versionFile = Join-Path $tempDir "version.txt"
     if (Test-Path $versionFile) {
-        $newVersion = (Get-Content $versionFile -Raw).Trim()
+        $rawNewVersion = (Get-Content $versionFile -Raw).Trim()
+        if (Get-Command Normalize-AgentVersionString -ErrorAction SilentlyContinue) {
+            $newVersion = Normalize-AgentVersionString $rawNewVersion
+        } elseif ($rawNewVersion -match '^\d+(\.\d+){0,3}$') {
+            $newVersion = $rawNewVersion
+        } else {
+            Write-SetupLog "WARN invalid downloaded version.txt; treating as 0.0.0"
+            $newVersion = "0.0.0"
+        }
+        if ($newVersion -eq "0.0.0" -and $rawNewVersion -ne "0.0.0") {
+            Write-SetupLog "WARN rejected version string (len=$($rawNewVersion.Length))"
+        }
     }
 
     $localVersion = Get-LocalAgentVersion

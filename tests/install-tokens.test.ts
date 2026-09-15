@@ -6,6 +6,8 @@ import {
 } from "../src/lib/auth";
 import { decryptPendingToken, encryptPendingToken } from "../src/lib/token-crypto";
 import {
+  buildBootstrapUninstallCommand,
+  buildBootstrapUninstallCommandFromLocalConfig,
   buildInstallCommand,
   buildInstallCommandFromLocalConfig,
   buildSetupCommand,
@@ -190,9 +192,10 @@ describe("copy-paste agent commands", () => {
     expect(command).toContain("/api/agent/files/agent-download.ps1");
     expect(command).toContain("/api/agent/files/agent-storage.ps1");
     expect(command).toContain("agent-storage.ps1");
-    expect(command).toContain("Publish-AgentScriptTxt");
+    expect(command).toContain("Invoke-AgentScriptBypass");
     expect(command).toContain("$PSScriptRoot=$d");
-    expect(command).toContain("Invoke-Expression");
+    expect(command).toContain("BoundVars @{ ApiUrl=$ApiUrl; Token=$Token }");
+    expect(command).toContain("OFFICEPULSE_SETUP_API_URL");
     expect(command).toContain("$Token=''tok''");
     expect(command).toContain("$ApiUrl=''https://office.example''");
     expect(command).toContain("Authorization=(''Bearer ''+$Token)");
@@ -205,16 +208,16 @@ describe("copy-paste agent commands", () => {
     const command = buildInstallCommand("https://office.example", "tok");
     expect(command).toContain("agent-download.ps1");
     expect(command).toContain("agent-storage.ps1");
-    expect(command).toContain("Publish-AgentScriptTxt");
+    expect(command).toContain("Invoke-AgentScriptBypass");
     expect(command).toContain("$PSScriptRoot=(Split-Path");
-    expect(command).toContain("Invoke-Expression");
+    expect(command).toContain("BoundVars @{ ApiUrl=");
     expect(command).toContain("$Token='tok'");
     expect(command).not.toContain("-File");
   });
 
   it("zip-folder update uses the same IEX bypass as install", () => {
     const command = buildUpdateCommand("https://office.example", "tok");
-    expect(command).toContain("Publish-AgentScriptTxt");
+    expect(command).toContain("Invoke-AgentScriptBypass");
     expect(command).toContain("$Token='tok'");
     expect(command).not.toContain("-File");
   });
@@ -238,8 +241,25 @@ describe("copy-paste agent commands", () => {
     const command = buildSetupCommandFromLocalConfig("https://office.example");
     expect(command).toContain("config.json");
     expect(command).toContain("$cfg.token");
-    expect(command).toContain("Invoke-Expression");
+    expect(command).toContain("Invoke-AgentScriptBypass");
     expect(command).not.toContain("-File");
+  });
+
+  it("bootstrap uninstall downloads uninstall.ps1 without zip folder", () => {
+    const command = buildBootstrapUninstallCommand("https://office.example", "tok");
+    expect(command).toContain("/api/agent/files/uninstall.ps1");
+    expect(command).toContain("Authorization=(''Bearer ''+$Token)");
+    expect(command).toContain("$Token=''tok''");
+    expect(command).toContain("Invoke-Expression");
+    expect(command).not.toContain("Downloads");
+    expect(command).not.toContain("setup.ps1");
+  });
+
+  it("bootstrap uninstall from local config reads token for download auth", () => {
+    const command = buildBootstrapUninstallCommandFromLocalConfig("https://office.example");
+    expect(command).toContain("config.json");
+    expect(command).toContain("$cfg.token");
+    expect(command).toContain("/api/agent/files/uninstall.ps1");
   });
 
 });

@@ -58,6 +58,7 @@ function buildServerBootstrapCommand(appUrl: string, tokenSetup: string) {
     `powershell -NoProfile -ExecutionPolicy Bypass -Command '& { $ErrorActionPreference=''Stop''; ` +
     `[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; ` +
     `$ApiUrl=''${base}''; ${tokenSetup}; ` +
+    `$env:OFFICEPULSE_SETUP_API_URL=$ApiUrl; $env:OFFICEPULSE_SETUP_TOKEN=$Token; ` +
     `$d=Join-Path $env:TEMP (''OfficePulse-''+[guid]::NewGuid().ToString(''N'')); ` +
     `New-Item -ItemType Directory -Path $d -Force | Out-Null; ` +
     `$h=@{Authorization=(''Bearer ''+$Token)}; ` +
@@ -68,8 +69,8 @@ function buildServerBootstrapCommand(appUrl: string, tokenSetup: string) {
     `. (Join-Path $lib ''agent-storage.ps1''); ` +
     `Invoke-WebRequest -Uri ($ApiUrl+''/api/agent/files/setup.ps1'') -Headers $h -OutFile (Join-Path $d ''setup.ps1'') -UseBasicParsing; ` +
     `$PSScriptRoot=$d; ` +
-    `$t=Publish-AgentScriptTxt -Ps1Path (Join-Path $d ''setup.ps1''); ` +
-    `$s=Get-Content -Raw $t; Invoke-Expression $s }'`
+    `$code = Invoke-AgentScriptBypass -Ps1Path (Join-Path $d ''setup.ps1'') -BoundVars @{ ApiUrl=$ApiUrl; Token=$Token } -Wait; ` +
+    `if ($code -ne 0) { exit $code } }'`
   );
 }
 
@@ -82,8 +83,8 @@ function buildLocalIexCommand(scriptPath: string, appUrl: string, tokenExpr: str
     `. .\\lib\\agent-storage.ps1; ` +
     `$ApiUrl='${base}'; $Token=${tokenExpr}; ` +
     `$PSScriptRoot=(Split-Path (Resolve-Path '${scriptPath}') -Parent); ` +
-    `$t=Publish-AgentScriptTxt -Ps1Path (Resolve-Path '${scriptPath}'); ` +
-    `$s=Get-Content -Raw $t; Invoke-Expression $s }"`
+    `$code = Invoke-AgentScriptBypass -Ps1Path (Resolve-Path '${scriptPath}') -BoundVars @{ ApiUrl='${base}'; Token=${tokenExpr} } -Wait; ` +
+    `if ($code -ne 0) { exit $code } }"`
   );
 }
 
@@ -100,6 +101,33 @@ export function buildUpdateCommand(appUrl: string, token: string) {
 /** Unified setup command (install or update, no zip). Preferred for new agent v1.3. */
 export function buildSetupCommand(appUrl: string, token: string) {
   return buildServerBootstrapCommand(appUrl, `$Token=''${escapePsSingleQuoted(token)}''`);
+}
+
+/** Download uninstall.ps1 from server and run (no zip). Auth uses Bearer token for /api/agent/files. */
+function buildServerBootstrapUninstallCommand(appUrl: string, tokenSetup: string) {
+  const base = escapePsSingleQuoted(trimTrailingSlash(appUrl));
+  return (
+    `powershell -NoProfile -ExecutionPolicy Bypass -Command '& { $ErrorActionPreference=''Stop''; ` +
+    `[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; ` +
+    `$ApiUrl=''${base}''; ${tokenSetup}; ` +
+    `$d=Join-Path $env:TEMP (''OfficePulse-''+[guid]::NewGuid().ToString(''N'')); ` +
+    `New-Item -ItemType Directory -Path $d -Force | Out-Null; ` +
+    `$h=@{Authorization=(''Bearer ''+$Token)}; ` +
+    `$u=Join-Path $d ''uninstall.ps1''; ` +
+    `Invoke-WebRequest -Uri ($ApiUrl+''/api/agent/files/uninstall.ps1'') -Headers $h -OutFile $u -UseBasicParsing; ` +
+    `$body = Get-Content -Raw $u; Invoke-Expression $body; ` +
+    `if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }'`
+  );
+}
+
+export function buildBootstrapUninstallCommand(appUrl: string, token: string) {
+  return buildServerBootstrapUninstallCommand(appUrl, `$Token=''${escapePsSingleQuoted(token)}''`);
+}
+
+export function buildBootstrapUninstallCommandFromLocalConfig(appUrl: string) {
+  const tokenSetup =
+    `$cfg = Get-Content (Join-Path $env:LOCALAPPDATA ''${AGENT_INSTALL_FOLDER}\\config.json'') -Raw | ConvertFrom-Json; $Token = [string]$cfg.token`;
+  return buildServerBootstrapUninstallCommand(appUrl, tokenSetup);
 }
 
 /** Setup command for laptops that already have the agent token in local config.json. */
