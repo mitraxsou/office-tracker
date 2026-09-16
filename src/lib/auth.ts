@@ -333,6 +333,46 @@ export async function regenerateAgentToken(userId: string) {
   return issueAgentToken(userId);
 }
 
+/** Revoke one owned token and issue a replacement (self-service Settings). Other laptop tokens stay active. */
+export async function regenerateUserAgentToken(userId: string, tokenId?: string) {
+  if (tokenId) {
+    const old = await prisma.agentToken.findUnique({ where: { id: tokenId } });
+    if (!old || old.revokedAt || old.userId !== userId) {
+      throw new Error("Token not found");
+    }
+    await prisma.agentToken.update({
+      where: { id: tokenId },
+      data: { revokedAt: new Date(), pendingTokenEnc: null },
+    });
+    return issueAgentToken(userId, {
+      label: old.label ?? undefined,
+      issuedById: null,
+    });
+  }
+
+  const active = await prisma.agentToken.findMany({
+    where: { userId, revokedAt: null },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (active.length === 0) {
+    return issueAgentToken(userId, { label: "Initial laptop" });
+  }
+  if (active.length === 1) {
+    const old = active[0]!;
+    await prisma.agentToken.update({
+      where: { id: old.id },
+      data: { revokedAt: new Date(), pendingTokenEnc: null },
+    });
+    return issueAgentToken(userId, {
+      label: old.label ?? undefined,
+      issuedById: null,
+    });
+  }
+
+  throw new Error("Choose which laptop token to regenerate");
+}
+
 export async function revokeAgentToken(tokenId: string) {
   const token = await prisma.agentToken.findUnique({ where: { id: tokenId } });
   if (!token || token.revokedAt) return null;

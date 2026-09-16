@@ -63,6 +63,10 @@ function Get-AgentDownloadModuleCandidates {
         $candidates += Join-Path $PSScriptRoot "lib\agent-download.ps1"
         $candidates += Join-Path $PSScriptRoot "agent-download.ps1"
     }
+    if ($env:OFFICEPULSE_SETUP_ROOT) {
+        $candidates += Join-Path $env:OFFICEPULSE_SETUP_ROOT "lib\agent-download.ps1"
+        $candidates += Join-Path $env:OFFICEPULSE_SETUP_ROOT "agent-download.ps1"
+    }
     $candidates += Join-Path (Get-InstallDir) "lib\agent-download.ps1"
     return $candidates
 }
@@ -72,6 +76,10 @@ function Get-AgentStorageModuleCandidates {
     if ($PSScriptRoot) {
         $candidates += Join-Path $PSScriptRoot "lib\agent-storage.ps1"
         $candidates += Join-Path $PSScriptRoot "agent-storage.ps1"
+    }
+    if ($env:OFFICEPULSE_SETUP_ROOT) {
+        $candidates += Join-Path $env:OFFICEPULSE_SETUP_ROOT "lib\agent-storage.ps1"
+        $candidates += Join-Path $env:OFFICEPULSE_SETUP_ROOT "agent-storage.ps1"
     }
     $candidates += Join-Path (Get-InstallDir) "lib\agent-storage.ps1"
     return $candidates
@@ -430,6 +438,9 @@ Set-Content -Path $lockPath -Value (Get-Date -Format "o") -Encoding UTF8
 
 $tempDir = $null
 try {
+    if (-not (Test-AgentBearerToken -ApiUrl $ApiUrl -Token $Token)) {
+        throw "Agent install token was rejected by the server. In Settings, refresh or regenerate your install token, then run the new reinstall command."
+    }
     $downloadCfg = Get-AgentDownloadConfig -ApiUrl $ApiUrl -Token $Token
     $tempDir = Join-Path $env:TEMP "PwCOfficePulse-setup-$([Guid]::NewGuid().ToString('N'))"
     Download-AgentScriptsFromApp -FilesBase $downloadCfg.FilesBase -Token $Token `
