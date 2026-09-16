@@ -73,14 +73,14 @@ describe("agent version", () => {
     expect(command).toContain("Invoke-AgentScriptBypass");
     expect(command).toContain("Force = $true");
     expect(command).toContain("-Command '& {");
-    expect(command).not.toContain("-File");
+    expect(command).not.toMatch(/ -File /);
   });
 
   it("builds an IEX-bypass update command for zip folder", () => {
     const command = buildUpdateCommand("https://office.example", "token-123");
     expect(command).toContain("Invoke-AgentScriptBypass");
     expect(command).toContain("Force = $true");
-    expect(command).not.toContain("-File");
+    expect(command).not.toMatch(/ -File /);
   });
 
   it(

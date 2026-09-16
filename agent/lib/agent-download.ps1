@@ -127,6 +127,7 @@ function Invoke-AgentScriptBypass {
         [switch]$Wait
     )
     $txtPath = Publish-AgentScriptTxt -Ps1Path $Ps1Path
+    $setupDir = [System.IO.Path]::GetDirectoryName($Ps1Path)
     $assignments = @()
     foreach ($entry in $BoundVars.GetEnumerator()) {
         $key = $entry.Key
@@ -138,8 +139,23 @@ function Invoke-AgentScriptBypass {
         $sval = [string]$val -replace "'", "''"
         $assignments += "`$$key = '$sval'"
     }
+    if ($setupDir) {
+        $rootEsc = $setupDir -replace "'", "''"
+        $assignments += "`$env:OFFICEPULSE_SETUP_ROOT = '$rootEsc'"
+    }
     $prefix = if ($assignments.Count) { ($assignments -join "; ") + "; " } else { "" }
-    $command = "${prefix}`$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s"
+    $libPreload = @()
+    if ($setupDir) {
+        foreach ($rel in @("lib\agent-download.ps1", "lib\agent-storage.ps1")) {
+            $libPath = Join-Path $setupDir $rel
+            if (Test-Path -LiteralPath $libPath) {
+                $libEsc = $libPath -replace "'", "''"
+                $libPreload += "Unblock-File -LiteralPath '$libEsc' -ErrorAction SilentlyContinue; . '$libEsc'"
+            }
+        }
+    }
+    $preload = if ($libPreload.Count) { ($libPreload -join "; ") + "; " } else { "" }
+    $command = "${prefix}${preload}`$s = Get-Content -Raw '$txtPath'; Invoke-Expression `$s"
     $windowStyle = if ($Hidden) { "Hidden" } else { "Normal" }
     $waitFlag = if ($Wait) { $true } else { $false }
     $proc = Start-Process -FilePath "powershell.exe" `
@@ -158,6 +174,26 @@ function New-AgentDownloadHeaders {
         $headers["x-vercel-protection-bypass"] = $BypassSecret
     }
     return $headers
+}
+
+function Test-AgentBearerToken {
+    param([string]$ApiUrl, [string]$Token)
+    if (-not $ApiUrl -or -not $Token) { return $false }
+    $uri = "$($ApiUrl.TrimEnd('/'))/api/agent/config"
+    try {
+        $req = [System.Net.HttpWebRequest]::Create($uri)
+        $req.Method = "GET"
+        $req.Timeout = 30000
+        [void]$req.Headers.Add("Authorization", "Bearer $Token")
+        $resp = $req.GetResponse()
+        $code = [int]$resp.StatusCode
+        $resp.Close()
+        return $code -eq 200
+    } catch [System.Net.WebException] {
+        return $false
+    } catch {
+        return $false
+    }
 }
 
 function Get-AgentDownloadConfig {

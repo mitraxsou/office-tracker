@@ -85,6 +85,7 @@ function buildZipFolderReinstallCommand(appUrl: string, tokenSetup: string, forc
     `$setupPath = Join-Path $PWD ''setup.ps1''; ` +
     `if (-not (Test-Path -LiteralPath $libDl)) { Write-Host ''Open PowerShell in the extracted zip folder (need lib\\agent-download.ps1). Re-download the zip from Settings.''; exit 1 }; ` +
     `if (-not (Test-Path -LiteralPath $setupPath)) { Write-Host ''setup.ps1 not found in this folder.''; exit 1 }; ` +
+    `foreach ($p in @($libDl, $libSt, $setupPath)) { if (Test-Path -LiteralPath $p) { Unblock-File -LiteralPath $p -ErrorAction SilentlyContinue } }; ` +
     `. $libDl; . $libSt; ` +
     `$ApiUrl=''${base}''; ${tokenSetup}; ` +
     `$env:OFFICEPULSE_SETUP_API_URL=$ApiUrl; $env:OFFICEPULSE_SETUP_TOKEN=$Token; ` +

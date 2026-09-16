@@ -63,7 +63,14 @@ describe("agent local storage maintenance", () => {
     const command = buildSetupCommand("https://office.example", "tok");
     expect(command).toContain("lib\\agent-storage.ps1");
     expect(command).toContain(". $libSt");
+    expect(command).toContain("Unblock-File -LiteralPath $p");
     expect(command.indexOf("agent-storage.ps1")).toBeLessThan(command.indexOf("Invoke-AgentScriptBypass"));
     expect(command).not.toContain("/api/agent/files/agent-storage.ps1");
+  });
+
+  it("Invoke-AgentScriptBypass preloads lib modules for IEX subprocess", () => {
+    expect(download).toContain("OFFICEPULSE_SETUP_ROOT");
+    expect(download).toContain("lib\\agent-download.ps1");
+    expect(download).toContain("Unblock-File -LiteralPath '$libEsc'");
   });
 });

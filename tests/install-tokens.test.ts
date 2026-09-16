@@ -28,6 +28,10 @@ vi.mock("../src/lib/db", () => ({
 
 import { prisma } from "../src/lib/db";
 
+beforeEach(() => {
+  process.env.AUTH_SECRET = "test-auth-secret-that-is-at-least-32-characters";
+});
+
 describe("revealStoredPendingToken", () => {
   it("returns plain token for bound laptop when encrypted copy is kept", () => {
     const plain = "a".repeat(64);
@@ -215,14 +219,14 @@ describe("copy-paste agent commands", () => {
     expect(command).toContain("Join-Path $PWD");
     expect(command).toContain("BoundVars @{ ApiUrl=");
     expect(command).toContain("$Token=''tok''");
-    expect(command).not.toContain("-File");
+    expect(command).not.toMatch(/ -File /);
   });
 
   it("zip-folder update uses the same IEX bypass as install", () => {
     const command = buildUpdateCommand("https://office.example", "tok");
     expect(command).toContain("Invoke-AgentScriptBypass");
     expect(command).toContain("$Token=''tok''");
-    expect(command).not.toContain("-File");
+    expect(command).not.toMatch(/ -File /);
   });
 
   it("builds install command from local config.json for legacy bound tokens", () => {
@@ -230,14 +234,14 @@ describe("copy-paste agent commands", () => {
     expect(command).toContain("config.json");
     expect(command).toContain("$cfg.token");
     expect(command).toContain("Invoke-AgentScriptBypass");
-    expect(command).not.toContain("-File");
+    expect(command).not.toMatch(/ -File /);
   });
 
   it("builds update command from local config.json for legacy bound tokens", () => {
     const command = buildUpdateCommandFromLocalConfig("https://office.example");
     expect(command).toContain("config.json");
     expect(command).toContain("$cfg.token");
-    expect(command).not.toContain("-File");
+    expect(command).not.toMatch(/ -File /);
   });
 
   it("builds setup command from local config.json for legacy bound tokens", () => {
@@ -245,7 +249,7 @@ describe("copy-paste agent commands", () => {
     expect(command).toContain("config.json");
     expect(command).toContain("$cfg.token");
     expect(command).toContain("Invoke-AgentScriptBypass");
-    expect(command).not.toContain("-File");
+    expect(command).not.toMatch(/ -File /);
   });
 
   it("bootstrap uninstall downloads uninstall.ps1 without zip folder", () => {
