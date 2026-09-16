@@ -59,10 +59,11 @@ describe("agent local storage maintenance", () => {
     expect(storage).toContain("$env:OFFICETRACKER_INSTALL_DIR");
   });
 
-  it("bootstrap setup command downloads agent-storage.ps1 before IEX", () => {
+  it("reinstall command dot-sources lib agent-storage.ps1 before setup IEX", () => {
     const command = buildSetupCommand("https://office.example", "tok");
-    expect(command).toContain("/api/agent/files/agent-storage.ps1");
-    expect(command).toContain("agent-storage.ps1");
-    expect(command.indexOf("agent-storage.ps1")).toBeLessThan(command.indexOf("setup.ps1"));
+    expect(command).toContain("lib\\agent-storage.ps1");
+    expect(command).toContain(". $libSt");
+    expect(command.indexOf("agent-storage.ps1")).toBeLessThan(command.indexOf("Invoke-AgentScriptBypass"));
+    expect(command).not.toContain("/api/agent/files/agent-storage.ps1");
   });
 });

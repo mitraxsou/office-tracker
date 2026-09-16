@@ -32,6 +32,11 @@ const FILE_PATHS: Partial<Record<AgentDownloadFileName, string>> = {
   "agent-storage.ps1": "lib/agent-storage.ps1",
 };
 
+/** Path inside the agent zip (matches repo layout and reinstall command). */
+export function agentZipEntryPath(name: AgentDownloadFileName): string {
+  return FILE_PATHS[name] ?? name;
+}
+
 export function isAgentDownloadFileName(name: string): name is AgentDownloadFileName {
   return (AGENT_DOWNLOAD_FILES as readonly string[]).includes(name);
 }

@@ -74,44 +74,40 @@ function buildServerBootstrapCommand(appUrl: string, tokenSetup: string) {
   );
 }
 
-/** Run a local script via IEX bypass (zip extract folder). */
-function buildLocalIexCommand(
-  scriptPath: string,
-  appUrl: string,
-  tokenExpr: string,
-  options?: { force?: boolean },
-) {
+/** Run setup from extracted zip via IEX bypass. Single-quoted -Command so paste into PowerShell is safe. */
+function buildZipFolderReinstallCommand(appUrl: string, tokenSetup: string, force = true) {
   const base = escapePsSingleQuoted(trimTrailingSlash(appUrl));
-  const forceBinding = options?.force ? "; Force = `$true" : "";
+  const forceBinding = force ? "; Force = $true" : "";
   return (
-    `powershell -NoProfile -ExecutionPolicy Bypass -Command "& { $ErrorActionPreference='Stop'; ` +
-    `if (-not (Test-Path '.\\lib\\agent-download.ps1')) { Write-Host 'Open PowerShell in the folder that contains setup.ps1 (extracted zip).'; exit 1 }; ` +
-    `. .\\lib\\agent-download.ps1; ` +
-    `. .\\lib\\agent-storage.ps1; ` +
-    `$ApiUrl='${base}'; $Token=${tokenExpr}; ` +
+    `powershell -NoProfile -ExecutionPolicy Bypass -Command '& { $ErrorActionPreference=''Stop''; ` +
+    `$libDl = Join-Path $PWD ''lib\\agent-download.ps1''; ` +
+    `$libSt = Join-Path $PWD ''lib\\agent-storage.ps1''; ` +
+    `$setupPath = Join-Path $PWD ''setup.ps1''; ` +
+    `if (-not (Test-Path -LiteralPath $libDl)) { Write-Host ''Open PowerShell in the extracted zip folder (need lib\\agent-download.ps1). Re-download the zip from Settings.''; exit 1 }; ` +
+    `if (-not (Test-Path -LiteralPath $setupPath)) { Write-Host ''setup.ps1 not found in this folder.''; exit 1 }; ` +
+    `. $libDl; . $libSt; ` +
+    `$ApiUrl=''${base}''; ${tokenSetup}; ` +
     `$env:OFFICEPULSE_SETUP_API_URL=$ApiUrl; $env:OFFICEPULSE_SETUP_TOKEN=$Token; ` +
-    `$PSScriptRoot=(Split-Path (Resolve-Path '${scriptPath}') -Parent); ` +
-    `$code = Invoke-AgentScriptBypass -Ps1Path (Resolve-Path '${scriptPath}') -BoundVars @{ ApiUrl='${base}'; Token=${tokenExpr}${forceBinding} } -Wait; ` +
-    `if ($code -ne 0) { exit $code } }"`
+    `$code = Invoke-AgentScriptBypass -Ps1Path $setupPath -BoundVars @{ ApiUrl=$ApiUrl; Token=$Token${forceBinding} } -Wait; ` +
+    `if ($code -ne 0) { exit $code } }'`
   );
 }
 
 /** Zip folder: always refresh scripts from server (install, update, or fix a bad install). */
 export function buildZipReinstallCommand(appUrl: string, token: string) {
-  return buildLocalIexCommand(
-    AGENT_RELATIVE_SETUP_SCRIPT,
+  return buildZipFolderReinstallCommand(
     appUrl,
-    `'${escapePsSingleQuoted(token)}'`,
-    { force: true },
+    `$Token=''${escapePsSingleQuoted(token)}''`,
+    true,
   );
 }
 
 export function buildZipReinstallCommandFromLocalConfig(appUrl: string) {
-  const tokenExpr = `(Get-Content (Join-Path $env:LOCALAPPDATA '${AGENT_INSTALL_FOLDER}\\config.json') -Raw | ConvertFrom-Json).token`;
-  return buildLocalIexCommand(AGENT_RELATIVE_SETUP_SCRIPT, appUrl, tokenExpr, { force: true });
+  const tokenSetup =
+    `$cfg = Get-Content (Join-Path $env:LOCALAPPDATA ''${AGENT_INSTALL_FOLDER}\\config.json'') -Raw | ConvertFrom-Json; $Token = [string]$cfg.token`;
+  return buildZipFolderReinstallCommand(appUrl, tokenSetup, true);
 }
 
-/** @deprecated Same as buildZipReinstallCommand — use reinstall command from extracted zip. */
 export function buildInstallCommand(appUrl: string, token: string) {
   return buildZipReinstallCommand(appUrl, token);
 }
