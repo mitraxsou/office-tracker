@@ -397,6 +397,7 @@ if (Test-Path -LiteralPath $forceMarkerPath) {
 
 $configPath = Get-ConfigPath
 $isFreshInstall = -not (Test-Path $configPath)
+$shouldWriteAgentConfig = $false
 
 if (-not $ApiUrl -and $env:OFFICEPULSE_SETUP_API_URL) {
     $ApiUrl = [string]$env:OFFICEPULSE_SETUP_API_URL
@@ -413,10 +414,18 @@ if ($isFreshInstall) {
         }
         exit 1
     }
+    $shouldWriteAgentConfig = $true
 } else {
     $localConfig = Get-Content $configPath -Raw | ConvertFrom-Json
-    if (-not $ApiUrl) { $ApiUrl = [string]$localConfig.apiUrl.TrimEnd("/") }
-    if (-not $Token) { $Token = [string]$localConfig.token }
+    $storedApiUrl = [string]$localConfig.apiUrl
+    $storedToken = [string]$localConfig.token
+    if (-not $ApiUrl) { $ApiUrl = $storedApiUrl.TrimEnd("/") }
+    if (-not $Token) { $Token = $storedToken }
+    $apiChanged = $ApiUrl.TrimEnd("/") -ne $storedApiUrl.TrimEnd("/")
+    $tokenChanged = $Token -ne $storedToken
+    if ($Force -or $apiChanged -or $tokenChanged) {
+        $shouldWriteAgentConfig = $true
+    }
 }
 
 if ($RequireAdmin) {
@@ -440,6 +449,13 @@ $tempDir = $null
 try {
     if (-not (Test-AgentBearerToken -ApiUrl $ApiUrl -Token $Token)) {
         throw "Agent install token was rejected by the server. In Settings, refresh or regenerate your install token, then run the new reinstall command."
+    }
+    if ($shouldWriteAgentConfig) {
+        Write-AgentConfig -InstallDir $installDir -ApiUrlValue $ApiUrl -TokenValue $Token
+        if (-not $isFreshInstall) {
+            $cfgReasonEarly = if ($Force) { "force" } elseif ($tokenChanged) { "token" } else { "apiUrl" }
+            Write-SetupLog "Updated config.json early ($cfgReasonEarly)"
+        }
     }
     $downloadCfg = Get-AgentDownloadConfig -ApiUrl $ApiUrl -Token $Token
     $tempDir = Join-Path $env:TEMP "PwCOfficePulse-setup-$([Guid]::NewGuid().ToString('N'))"
@@ -476,8 +492,12 @@ try {
         Write-SetupLog "SKIP already at v$localVersion (server v$newVersion)"
     }
 
-    if ($isFreshInstall) {
+    if ($shouldWriteAgentConfig) {
         Write-AgentConfig -InstallDir $installDir -ApiUrlValue $ApiUrl -TokenValue $Token
+        if (-not $isFreshInstall) {
+            $cfgReason = if ($Force) { "force" } elseif ($tokenChanged) { "token" } else { "apiUrl" }
+            Write-SetupLog "Updated config.json ($cfgReason)"
+        }
     }
 
     Complete-Install -InstallDir $installDir -IsReinstall $isReinstall -ScriptsUpdated $shouldInstallScripts

@@ -159,4 +159,13 @@ describe("agent version", () => {
     expect(updater).not.toContain("& $setupPath");
     expect(installer).not.toContain("& $setupPath");
   });
+
+  it("setup.ps1 refreshes config.json on reinstall when token, apiUrl, or Force changes", () => {
+    const setup = readFileSync(path.join(process.cwd(), "agent", "setup.ps1"), "utf8");
+    expect(setup).toContain("$shouldWriteAgentConfig");
+    expect(setup).toContain("if ($Force -or $apiChanged -or $tokenChanged)");
+    expect(setup).toContain("if ($shouldWriteAgentConfig)");
+    expect(setup).toContain("Updated config.json early");
+    expect(setup).not.toMatch(/if \(\$isFreshInstall\) \{\s*\r?\n\s*Write-AgentConfig/s);
+  });
 });
