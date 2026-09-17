@@ -14,6 +14,7 @@ $script:AgentExpendableEventTypes = @(
     "health_ping",
     "activity_tick",
     "session_resume",
+    "session_suspend",
     "wifi_connected",
     "wifi_disconnected",
     "ssid_changed"

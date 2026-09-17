@@ -78,6 +78,8 @@ export function presenceEventLabel(params: {
         return "Switched to office Wi-Fi";
       }
       return "Changed Wi-Fi network";
+    case "session_suspend":
+      return currOffice ? "Laptop slept on office Wi-Fi" : "Laptop slept / suspended";
     case "session_resume":
       return "Laptop woke / resumed";
     case "activity_tick":
@@ -121,17 +123,65 @@ export function mergePresenceTimelineEntries(
   return sortPresenceTimelineEntries(merged);
 }
 
+const GAP_WIFI_LOOKBACK_BUFFER_MS = 15 * 60 * 1000;
+
+export function pickLastWifiBeforeGap(params: {
+  gapMs: number;
+  beforeMs: number;
+  lastSsidFromAgent?: string | null;
+  suspend?: { atMs: number; ssid: string | null } | null;
+  lastActivity?: { atMs: number; ssid: string | null } | null;
+  lastTransition?: { ssid: string | null; previousSsid: string | null } | null;
+}): string | null {
+  const { gapMs, beforeMs } = params;
+  const maxDelta = gapMs + GAP_WIFI_LOOKBACK_BUFFER_MS;
+
+  const fromAgent = params.lastSsidFromAgent
+    ? normalizeSsid(params.lastSsidFromAgent)
+    : null;
+  if (fromAgent) return fromAgent;
+
+  if (params.suspend?.ssid) {
+    const delta = beforeMs - params.suspend.atMs;
+    if (delta >= 0 && delta <= maxDelta) {
+      return normalizeSsid(params.suspend.ssid);
+    }
+  }
+
+  if (params.lastActivity?.ssid) {
+    const delta = beforeMs - params.lastActivity.atMs;
+    if (delta >= 0 && delta <= maxDelta) {
+      return normalizeSsid(params.lastActivity.ssid);
+    }
+  }
+
+  if (params.lastTransition?.ssid) {
+    return normalizeSsid(params.lastTransition.ssid);
+  }
+  if (params.lastTransition?.previousSsid) {
+    return normalizeSsid(params.lastTransition.previousSsid);
+  }
+  return null;
+}
+
 async function findLastWifiBefore(
   userId: string,
   before: Date,
   gapMs: number,
 ): Promise<string | null> {
-  const since = new Date(before.getTime() - gapMs);
-  const [tick, transition] = await Promise.all([
-    prisma.activityTick.findFirst({
-      where: { userId, at: { gte: since, lt: before } },
+  const beforeMs = before.getTime();
+  const since = new Date(beforeMs - gapMs);
+
+  const [suspend, tick, transition] = await Promise.all([
+    prisma.presenceTransition.findFirst({
+      where: { userId, type: "session_suspend", at: { lte: before } },
       orderBy: { at: "desc" },
-      select: { ssid: true },
+      select: { ssid: true, at: true },
+    }),
+    prisma.activityTick.findFirst({
+      where: { userId, at: { lt: before } },
+      orderBy: { at: "desc" },
+      select: { ssid: true, at: true },
     }),
     prisma.presenceTransition.findFirst({
       where: { userId, at: { gte: since, lt: before } },
@@ -139,11 +189,25 @@ async function findLastWifiBefore(
       select: { ssid: true, previousSsid: true },
     }),
   ]);
-  const fromTick = tick?.ssid ? normalizeSsid(tick.ssid) : null;
-  if (fromTick) return fromTick;
-  if (transition?.ssid) return normalizeSsid(transition.ssid);
-  if (transition?.previousSsid) return normalizeSsid(transition.previousSsid);
-  return null;
+
+  return pickLastWifiBeforeGap({
+    gapMs,
+    beforeMs,
+    suspend: suspend
+      ? { atMs: suspend.at.getTime(), ssid: suspend.ssid ? normalizeSsid(suspend.ssid) : null }
+      : null,
+    lastActivity: tick
+      ? { atMs: tick.at.getTime(), ssid: tick.ssid ? normalizeSsid(tick.ssid) : null }
+      : null,
+    lastTransition: transition
+      ? {
+          ssid: transition.ssid ? normalizeSsid(transition.ssid) : null,
+          previousSsid: transition.previousSsid
+            ? normalizeSsid(transition.previousSsid)
+            : null,
+        }
+      : null,
+  });
 }
 
 export async function getUserPresenceTimeline(
@@ -221,20 +285,32 @@ export async function getUserPresenceTimeline(
     }),
   ]);
 
-  const resumeGapByTime = new Map<number, number>();
+  type ResumeAgentMeta = { gapMinutes: number; lastSsidBeforeGap?: string | null };
+  const resumeMetaByTime = new Map<number, ResumeAgentMeta>();
   for (const event of resumeAgentEvents) {
-    const payload = event.payload as { gapMinutes?: number; at?: string } | null;
+    const payload = event.payload as {
+      gapMinutes?: number;
+      at?: string;
+      lastSsidBeforeGap?: string;
+    } | null;
     if (typeof payload?.gapMinutes !== "number") continue;
     const key = event.createdAt.getTime();
-    resumeGapByTime.set(key, payload.gapMinutes);
+    resumeMetaByTime.set(key, {
+      gapMinutes: payload.gapMinutes,
+      lastSsidBeforeGap: payload.lastSsidBeforeGap ?? null,
+    });
+  }
+
+  function resumeMetaNear(at: Date): ResumeAgentMeta | null {
+    const target = at.getTime();
+    for (const [key, meta] of resumeMetaByTime) {
+      if (Math.abs(key - target) <= 120_000) return meta;
+    }
+    return null;
   }
 
   function gapMinutesNear(at: Date): number | null {
-    const target = at.getTime();
-    for (const [key, gap] of resumeGapByTime) {
-      if (Math.abs(key - target) <= 120_000) return gap;
-    }
-    return null;
+    return resumeMetaNear(at)?.gapMinutes ?? null;
   }
 
   const presenceEntries: PresenceTimelineEntry[] = [];
@@ -245,10 +321,15 @@ export async function getUserPresenceTimeline(
     let lastWifiBeforeGap: string | null = null;
 
     if (row.type === "session_resume") {
-      const gap = gapMinutesNear(row.at);
+      const meta = resumeMetaNear(row.at);
+      const gap = meta?.gapMinutes ?? null;
       if (gap != null && gap >= 15) {
         gapMinutes = gap;
-        lastWifiBeforeGap = await findLastWifiBefore(userId, row.at, gap * 60 * 1000);
+        const fromAgent = meta?.lastSsidBeforeGap
+          ? normalizeSsid(meta.lastSsidBeforeGap)
+          : null;
+        lastWifiBeforeGap =
+          fromAgent ?? (await findLastWifiBefore(userId, row.at, gap * 60 * 1000));
       }
     }
 

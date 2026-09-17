@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   mergePresenceTimelineEntries,
+  pickLastWifiBeforeGap,
   presenceEventLabel,
   sortPresenceTimelineEntries,
   syncTriggerLabel,
@@ -47,6 +48,45 @@ describe("presence timeline labels", () => {
         officeSsids: OFFICE_SSIDS,
       }),
     ).toBe("Laptop woke / resumed");
+
+    expect(
+      presenceEventLabel({
+        kind: "session_suspend",
+        ssid: "pwcglb.com",
+        previousSsid: null,
+        inOffice: true,
+        officeSsids: OFFICE_SSIDS,
+      }),
+    ).toBe("Laptop slept on office Wi-Fi");
+  });
+
+  it("prefers pre-sleep office SSID for gap Wi-Fi label", () => {
+    const gapMs = 44.3 * 60 * 1000;
+    const beforeMs = Date.parse("2026-09-17T16:24:53.000Z");
+    const picked = pickLastWifiBeforeGap({
+      gapMs,
+      beforeMs,
+      lastSsidFromAgent: "pwcglb.com",
+      lastActivity: {
+        atMs: Date.parse("2026-09-17T15:36:00.000Z"),
+        ssid: "Ashutosh",
+      },
+    });
+    expect(picked).toBe("pwcglb.com");
+  });
+
+  it("uses last activity tick when it falls before the gap window edge", () => {
+    const gapMs = 44 * 60 * 1000;
+    const beforeMs = Date.parse("2026-09-17T16:24:53.000Z");
+    const picked = pickLastWifiBeforeGap({
+      gapMs,
+      beforeMs,
+      suspend: {
+        atMs: Date.parse("2026-09-17T15:40:53.000Z"),
+        ssid: "pwcglb.com",
+      },
+    });
+    expect(picked).toBe("pwcglb.com");
   });
 
   it("sanitizes sync trigger values", () => {

@@ -15,9 +15,12 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain(`$AgentScriptVersion = "${version}"`);
   });
 
-  it("records visit_end at office Wi-Fi disconnect time", () => {
-    expect(heartbeat).toContain("End-LocalVisit -SyncState $SyncState -EndAt $disconnectAt -PreviousSsid $PreviousSsid");
-    expect(heartbeat).toContain("Add-QueuedEvent -Type \"visit_end\" -Fields $fields -At $disconnectAt");
+  it("records visit_end at last run when sleeping on office Wi-Fi", () => {
+    expect(heartbeat).toContain("function Invoke-ResumeOfficeSleepCheckout");
+    expect(heartbeat).toContain("Add-QueuedEvent -Type \"session_suspend\"");
+    expect(heartbeat).toContain("End-LocalVisit -SyncState $SyncState -EndAt $suspendAtIso -PreviousSsid $LastKnownSsid");
+    expect(heartbeat).toContain("$suspendAtTime = $last");
+    expect(heartbeat).toContain("lastSsidBeforeGap = [string]$previousSsid");
     expect(heartbeat).toContain("$transitionAt = Get-NowIso");
     expect(heartbeat).toContain("Add-WifiChangeEvents -PreviousSsid $fromSsid -CurrentSsid $ssid -At $transitionAt");
   });

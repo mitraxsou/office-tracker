@@ -22,6 +22,7 @@ const SUMMARY_MISMATCH_MS = 5 * 60 * 1000;
 /** Process checkout and Wi-Fi transitions before daily summary / resume maintenance. */
 const AGENT_SYNC_EVENT_PRIORITY: Record<string, number> = {
   visit_end: 0,
+  session_suspend: 0,
   wifi_disconnected: 1,
   ssid_changed: 1,
   visit_start: 2,
@@ -63,6 +64,7 @@ export type AgentSyncEvent = {
   laptopActiveMs?: number;
   firstAgentOnAt?: string;
   gapMinutes?: number;
+  lastSsidBeforeGap?: string | null;
 };
 
 export type AgentSyncOpenVisit = {
@@ -344,6 +346,27 @@ export async function processAgentSync(params: {
           break;
         }
         case "health_ping": {
+          await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
+          ackedEventIds.push(event.id);
+          break;
+        }
+        case "session_suspend": {
+          const ssid = event.ssid ? normalizeSsid(sanitizeSsid(event.ssid) ?? event.ssid) : null;
+          const inOffice = isOfficeSsid(ssid, allowlist);
+          await prisma.presenceTransition.create({
+            data: {
+              userId: params.userId,
+              deviceId: params.deviceId,
+              type: "session_suspend",
+              at: eventAt,
+              dayKey,
+              ssid,
+              previousSsid: null,
+              inOffice,
+            },
+          });
+          lastEventAt = eventAt;
+          lastInOffice = inOffice;
           await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
           ackedEventIds.push(event.id);
           break;

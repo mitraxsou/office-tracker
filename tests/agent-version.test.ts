@@ -10,6 +10,10 @@ import {
 } from "@/lib/agent-version-display";
 import { buildInstallCommand, buildUpdateCommand } from "@/lib/agent-branding";
 
+function readAgentFile(relativePath: string): string {
+  return readFileSync(path.join(process.cwd(), "agent", relativePath), "utf8");
+}
+
 describe("agent version", () => {
   it("reads version from agent/version.txt", () => {
     expect(getAgentVersion()).toMatch(/^\d+\.\d+\.\d+$/);

@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 $ConfigFetchIntervalRuns = 60
 $ConfigCacheMaxAgeMinutes = 120
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.5.5"
+$AgentScriptVersion = "1.5.6"
 
 function Get-InstallDir {
     if ($env:OFFICETRACKER_INSTALL_DIR) {
@@ -511,6 +511,31 @@ function Add-WifiChangeEvents {
             previousSsid = $PreviousSsid
         } -At $transitionAt
     }
+}
+
+function Invoke-ResumeOfficeSleepCheckout {
+    param(
+        $SyncState,
+        $ServerConfig,
+        [string]$LastKnownSsid,
+        [DateTime]$SuspendAt,
+        [double]$ResumeGapMin
+    )
+    if (-not $LastKnownSsid) { return @{ syncState = $SyncState; handled = $false } }
+    if (-not (Test-IsOfficeSsid -Ssid $LastKnownSsid -ServerConfig $ServerConfig)) {
+        return @{ syncState = $SyncState; handled = $false }
+    }
+    $suspendAtIso = $SuspendAt.ToString("o")
+    $open = Get-OpenVisitFromState $SyncState
+    if ($open) {
+        $SyncState = End-LocalVisit -SyncState $SyncState -EndAt $suspendAtIso -PreviousSsid $LastKnownSsid
+    }
+    Add-QueuedEvent -Type "session_suspend" -Fields @{
+        ssid = $LastKnownSsid
+        gapMinutes = $ResumeGapMin
+    } -At $suspendAtIso
+    Write-Log "SLEEP checkout office ssid=$LastKnownSsid at $suspendAtIso (gap ${ResumeGapMin}m)"
+    return @{ syncState = $SyncState; handled = $true; suspendAtIso = $suspendAtIso }
 }
 
 function Update-VisitBoundaries {
@@ -1208,9 +1233,11 @@ if (-not (Test-Path $configPath)) {
 }
 
 $resumeGapMin = $null
+$suspendAtTime = $null
 $isResumeRun = Test-ResumeFromSleep
 if ($isResumeRun) {
     $last = Get-LastRunTime
+    if ($last) { $suspendAtTime = $last }
     $resumeGapMin = [Math]::Round(((Get-Date) - $last).TotalMinutes, 1)
     Write-Log "RESUME detected (gap ${resumeGapMin}m since last run)"
 }
@@ -1286,6 +1313,12 @@ if ($dayRolledOver) {
     }
 }
 
+if ($isResumeRun -and $suspendAtTime) {
+    $sleepCheckout = Invoke-ResumeOfficeSleepCheckout -SyncState $syncState -ServerConfig $serverConfig `
+        -LastKnownSsid $previousSsid -SuspendAt $suspendAtTime -ResumeGapMin $resumeGapMin
+    $syncState = $sleepCheckout.syncState
+}
+
 $ssidChanged = ($previousSsid -ne $ssid)
 $pendingEvents = @()
 
@@ -1293,9 +1326,6 @@ if ($ssidChanged) {
     $alreadyQueued = $syncState.pendingSsid -and [string]$syncState.pendingSsid -eq $ssid
     if (-not $alreadyQueued) {
         $fromSsid = if ($syncState.pendingPreviousSsid) { [string]$syncState.pendingPreviousSsid } else { $previousSsid }
-        # One timestamp for the whole office Wi-Fi disconnect transition. If the laptop slept on
-        # office Wi-Fi without disconnecting, checkout time is when we detect the SSID change
-        # (often on wake at home Wi-Fi the next morning).
         $transitionAt = Get-NowIso
         Add-WifiChangeEvents -PreviousSsid $fromSsid -CurrentSsid $ssid -At $transitionAt
         $syncState = Update-VisitBoundaries -SyncState $syncState -PreviousSsid $fromSsid `
@@ -1313,10 +1343,12 @@ if ($ssidChanged) {
 $activityTickQueued = $false
 $activityDue = Test-ActivityTickDue -SyncState $syncState -IntervalMinutes $heartbeatInterval
 if ($isResumeRun) {
-    Add-QueuedEvent -Type "session_resume" -Fields @{
+    $resumeFields = @{
         gapMinutes = $resumeGapMin
         ssid = $ssid
     }
+    if ($previousSsid) { $resumeFields.lastSsidBeforeGap = [string]$previousSsid }
+    Add-QueuedEvent -Type "session_resume" -Fields $resumeFields
 }
 if ($isResumeRun -or $activityDue) {
     $syncState = Sync-UptimeForActivityRun -SyncState $syncState -IsResumeRun:($isResumeRun)
