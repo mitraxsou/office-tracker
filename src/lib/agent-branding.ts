@@ -31,6 +31,12 @@ export const AGENT_EXTRACT_FOLDER = "PwCOfficePulse";
 /** Downloaded zip filename (no .zip) - Extract All may nest this around AGENT_EXTRACT_FOLDER */
 export const AGENT_ZIP_STEM = "PwCOfficePulse-agent";
 
+/** Browser download filename including agent bundle version (e.g. PwCOfficePulse-agent-v1.5.6.zip). */
+export function formatAgentZipDownloadFilename(version: string) {
+  const safe = version.trim().replace(/[^0-9A-Za-z._-]+/g, "");
+  return `${AGENT_ZIP_STEM}-v${safe || "unknown"}.zip`;
+}
+
 /** Human-readable extract location for UI copy */
 export const AGENT_DOWNLOAD_FOLDER = `%USERPROFILE%\\Downloads\\${AGENT_EXTRACT_FOLDER}`;
 
@@ -89,7 +95,7 @@ function buildZipFolderReinstallCommand(appUrl: string, tokenSetup: string, forc
     `. $libDl; . $libSt; ` +
     `$ApiUrl=''${base}''; ${tokenSetup}; ` +
     `$env:OFFICEPULSE_SETUP_API_URL=$ApiUrl; $env:OFFICEPULSE_SETUP_TOKEN=$Token; ` +
-    `$code = Invoke-AgentScriptBypass -Ps1Path $setupPath -BoundVars @{ ApiUrl=$ApiUrl; Token=$Token${forceBinding} } -Wait; ` +
+        `$code = Invoke-AgentScriptBypass -Ps1Path $setupPath -BoundVars @{ ApiUrl=$ApiUrl; Token=$Token; Verbose=$true${forceBinding} } -Wait; ` +
     `if ($code -ne 0) { exit $code } }'`
   );
 }

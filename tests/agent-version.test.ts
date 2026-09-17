@@ -8,7 +8,11 @@ import {
   describeDeviceAgentVersion,
   summarizeDeviceAgentVersions,
 } from "@/lib/agent-version-display";
-import { buildInstallCommand, buildUpdateCommand } from "@/lib/agent-branding";
+import {
+  buildInstallCommand,
+  buildUpdateCommand,
+  formatAgentZipDownloadFilename,
+} from "@/lib/agent-branding";
 
 function readAgentFile(relativePath: string): string {
   return readFileSync(path.join(process.cwd(), "agent", relativePath), "utf8");
@@ -17,6 +21,10 @@ function readAgentFile(relativePath: string): string {
 describe("agent version", () => {
   it("reads version from agent/version.txt", () => {
     expect(getAgentVersion()).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
+  it("names agent zip downloads with bundle version", () => {
+    expect(formatAgentZipDownloadFilename("1.5.6")).toBe("PwCOfficePulse-agent-v1.5.6.zip");
   });
 
   it("compares semantic versions", () => {
@@ -168,8 +176,16 @@ describe("agent version", () => {
     const setup = readAgentFile("setup.ps1");
     expect(setup).toContain("function Reset-LocalAgentInstall");
     expect(setup).toContain("Force reinstall: clearing local agent");
-    expect(setup).toContain("if ($Force -and (Test-Path -LiteralPath (Get-ConfigPath)))");
-    expect(setup).toContain("Reset-LocalAgentInstall");
+    expect(setup).toContain("$pendingForceReset = $Force");
+    const downloadIdx = setup.indexOf("Download-AgentScriptsFromApp");
+    const resetIdx = setup.indexOf("if ($pendingForceReset)");
+    const tokenIdx = setup.indexOf("Test-AgentBearerToken");
+    expect(tokenIdx).toBeGreaterThan(-1);
+    expect(downloadIdx).toBeGreaterThan(tokenIdx);
+    expect(resetIdx).toBeGreaterThan(downloadIdx);
+    expect(setup).not.toMatch(
+      /\$configPath = Get-ConfigPath[\s\S]{0,800}Reset-LocalAgentInstall[\s\S]{0,800}Test-AgentBearerToken/,
+    );
   });
 
   it("setup.ps1 verifies required files after install", () => {

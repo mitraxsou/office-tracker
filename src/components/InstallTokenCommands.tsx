@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { InstallTokenForUser } from "@/lib/install-token-types";
+import { formatAgentZipDownloadFilename } from "@/lib/agent-branding";
 
 type InstallTokenCommandsProps = {
   installTokens: InstallTokenForUser[];
   legacyBoundCount?: number;
   compact?: boolean;
+  serverAgentVersion?: string | null;
 };
 
 export function needsRefreshInstallCommands(
@@ -23,7 +25,11 @@ export function InstallTokenCommands({
   installTokens,
   legacyBoundCount = 0,
   compact = false,
+  serverAgentVersion = null,
 }: InstallTokenCommandsProps) {
+  const zipDownloadName = serverAgentVersion
+    ? formatAgentZipDownloadFilename(serverAgentVersion)
+    : null;
   const router = useRouter();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<string | null>(null);
@@ -252,9 +258,15 @@ export function InstallTokenCommands({
             <div className="mt-3 rounded border border-[var(--pwc-orange)]/40 bg-[var(--pwc-orange)]/5 p-3">
               <p className="text-sm font-medium text-[var(--pwc-orange)]">Reinstall command</p>
               <p className="mt-1 text-xs text-muted">
-                Run from the extracted zip folder in PowerShell. Clears the local agent folder
-                (config, logs, queue), installs the latest scripts from this server, and verifies
-                required files (first install or full reinstall).
+                Download the versioned zip from this site, extract it, open PowerShell in that
+                folder, then paste this command. It uninstalls the previous local agent (config,
+                logs, queue) and installs{" "}
+                {serverAgentVersion ? (
+                  <strong>v{serverAgentVersion}</strong>
+                ) : (
+                  "the latest version"
+                )}{" "}
+                from this server.
               </p>
               <pre className="mt-2 overflow-x-auto rounded border bg-[var(--background-elevated)] p-2 text-xs whitespace-pre-wrap">
                 {t.setupCommand}
@@ -270,7 +282,9 @@ export function InstallTokenCommands({
                 href="/api/agent/download"
                 className="btn-secondary mt-2 inline-block px-3 py-1.5 text-xs"
               >
-                Download agent (.zip)
+                {zipDownloadName
+                  ? `Download ${zipDownloadName}`
+                  : "Download agent (.zip)"}
               </a>
             </div>
 

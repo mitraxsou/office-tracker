@@ -14,6 +14,7 @@ import type { ProfileChangeRequestSummary } from "@/lib/profile-change-requests"
 import { ProfileChangeSection } from "@/components/ProfileChangeSection";
 import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 import { SettingsLayout } from "@/components/SettingsLayout";
+import { AgentActivityPanel } from "@/components/AgentActivityPanel";
 import type { UserAgentVersionSummary } from "@/lib/agent-update";
 
 type Device = EnrichedDevice;
@@ -159,11 +160,14 @@ export function SettingsPageClient({
               </>
             ),
             diagnostics: lockSettings ? null : (
-              <AgentStatusPanel
-                installTokens={installTokens}
-                legacyBoundCount={legacyBoundCount}
-                appUrl={appUrl}
-              />
+              <>
+                <AgentActivityPanel />
+                <AgentStatusPanel
+                  installTokens={installTokens}
+                  legacyBoundCount={legacyBoundCount}
+                  appUrl={appUrl}
+                />
+              </>
             ),
           }}
         />

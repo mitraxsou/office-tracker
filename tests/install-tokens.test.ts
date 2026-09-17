@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   backfillInstallTokenEncIfNeeded,
+  dedupeInstallTokensByBoundSerial,
   revealStoredPendingToken,
   persistPendingTokenEnc,
 } from "../src/lib/auth";
+import type { InstallTokenForUser } from "../src/lib/install-token-types";
 import { decryptPendingToken, encryptPendingToken } from "../src/lib/token-crypto";
 import {
   buildBootstrapUninstallCommand,
@@ -269,4 +271,32 @@ describe("copy-paste agent commands", () => {
     expect(command).toContain("/api/agent/files/uninstall.ps1");
   });
 
+  it("dedupes install tokens to one card per bound laptop serial", () => {
+    const base: InstallTokenForUser = {
+      id: "1",
+      label: "Initial laptop",
+      prefix: "aaaa",
+      plainToken: "t1",
+      setupCommand: "cmd1",
+      bootstrapUninstallCommand: "u1",
+      installCommand: "i1",
+      updateCommand: "up1",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      status: "bound",
+      boundSerialNumber: "PG04YGZF",
+    };
+    const newer: InstallTokenForUser = {
+      ...base,
+      id: "2",
+      label: "Laptop 16/9/2026",
+      prefix: "fbbb",
+      plainToken: "t2",
+      setupCommand: "cmd2",
+      createdAt: "2026-09-16T00:00:00.000Z",
+    };
+    const result = dedupeInstallTokensByBoundSerial([base, newer]);
+    expect(result).toHaveLength(1);
+    expect(result[0]?.id).toBe("2");
+    expect(result[0]?.prefix).toBe("fbbb");
+  });
 });

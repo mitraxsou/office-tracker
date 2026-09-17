@@ -8,7 +8,7 @@ import {
   AGENT_PRODUCT_NAME,
   AGENT_TASK_NAME,
   AGENT_STARTUP_SHORTCUT,
-  AGENT_ZIP_STEM,
+  formatAgentZipDownloadFilename,
   buildUninstallCommand,
   defaultInstallScriptDir,
 } from "@/lib/agent-branding";
@@ -44,6 +44,10 @@ export function AgentSetupPanel({
   const scriptDir = defaultInstallScriptDir(isLocalDev ? localDevAgentPath : null);
   const startupPath = `%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\${AGENT_STARTUP_SHORTCUT}`;
   const showRefreshCallout = needsRefreshInstallCommands(installTokens, legacyBoundCount);
+  const serverAgentVersion = agentVersionSummary?.serverVersion ?? null;
+  const zipDownloadName = serverAgentVersion
+    ? formatAgentZipDownloadFilename(serverAgentVersion)
+    : "PwCOfficePulse-agent-v….zip";
 
   const zipUninstallCommand = useMemo(
     () => buildUninstallCommand(isLocalDev ? scriptDir : undefined),
@@ -94,7 +98,9 @@ export function AgentSetupPanel({
           <li>
             <span className="font-medium">Download and extract the agent zip</span>
             <p className="mt-1 text-muted">
-              Get <code>{AGENT_ZIP_STEM}.zip</code> from your laptop card below or{" "}
+              Download <code>{zipDownloadName}</code>
+              {serverAgentVersion ? ` (agent v${serverAgentVersion})` : ""} from your laptop card
+              below or{" "}
               <a href="/api/agent/download" className="text-accent hover:underline">
                 download here
               </a>
@@ -119,6 +125,7 @@ export function AgentSetupPanel({
               <InstallTokenCommands
                 installTokens={installTokens}
                 legacyBoundCount={legacyBoundCount}
+                serverAgentVersion={serverAgentVersion}
               />
             </div>
           </li>

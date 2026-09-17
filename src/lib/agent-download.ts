@@ -12,6 +12,7 @@ export const AGENT_DOWNLOAD_FILES = [
   "agent-download.ps1",
   "agent-storage.ps1",
   "version.txt",
+  "test-connection.ps1",
 ] as const;
 
 export type AgentDownloadFileName = (typeof AGENT_DOWNLOAD_FILES)[number];
@@ -25,6 +26,7 @@ const CONTENT_TYPES: Record<AgentDownloadFileName, string> = {
   "agent-download.ps1": "text/plain; charset=utf-8",
   "agent-storage.ps1": "text/plain; charset=utf-8",
   "version.txt": "text/plain; charset=utf-8",
+  "test-connection.ps1": "text/plain; charset=utf-8",
 };
 
 const FILE_PATHS: Partial<Record<AgentDownloadFileName, string>> = {

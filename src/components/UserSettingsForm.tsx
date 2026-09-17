@@ -280,13 +280,16 @@ export function UserSettingsForm({
                     {d.agentVersionStale ? (
                       <span className="text-[var(--pwc-orange)]">
                         {" "}
-                        · update to v{d.serverAgentVersion} recommended
+                        · download zip v{d.serverAgentVersion} and run reinstall from Settings
                       </span>
                     ) : (
                       <span className="text-green-400/90"> · up to date</span>
                     )}
                     {d.forceAgentUpdate && (
-                      <span className="text-amber-300"> · update queued by admin</span>
+                      <span className="text-amber-300">
+                        {" "}
+                        · admin requested update — use zip + reinstall below
+                      </span>
                     )}
                   </span>
                 )}

@@ -428,6 +428,42 @@ export function revealStoredPendingToken(
   return decryptPendingToken(token.pendingTokenEnc);
 }
 
+/** One reinstall card per laptop serial; keep newest token when duplicates exist (e.g. after regenerate). */
+export function dedupeInstallTokensByBoundSerial(
+  tokens: InstallTokenForUser[],
+): InstallTokenForUser[] {
+  const unbound: InstallTokenForUser[] = [];
+  const bySerial = new Map<string, InstallTokenForUser>();
+
+  for (const token of tokens) {
+    if (!token.boundSerialNumber) {
+      unbound.push(token);
+      continue;
+    }
+    const serial = token.boundSerialNumber;
+    const existing = bySerial.get(serial);
+    if (!existing) {
+      bySerial.set(serial, token);
+      continue;
+    }
+    const keepNew =
+      new Date(token.createdAt).getTime() >= new Date(existing.createdAt).getTime();
+    const preferred =
+      keepNew
+        ? token.plainToken || !existing.plainToken
+          ? token
+          : existing
+        : existing.plainToken || !token.plainToken
+          ? existing
+          : token;
+    bySerial.set(serial, preferred);
+  }
+
+  return [...unbound, ...bySerial.values()].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+  );
+}
+
 function buildInstallTokenEntry(
   token: {
     id: string;
@@ -496,9 +532,11 @@ export async function getUserInstallTokenState(
     orderBy: { createdAt: "asc" },
   });
 
-  const installTokens = tokens
-    .map((t) => buildInstallTokenEntry(t, appUrl))
-    .filter((t): t is InstallTokenForUser => t !== null);
+  const installTokens = dedupeInstallTokensByBoundSerial(
+    tokens
+      .map((t) => buildInstallTokenEntry(t, appUrl))
+      .filter((t): t is InstallTokenForUser => t !== null),
+  );
 
   const legacyBoundCount = tokens.filter(
     (t) => t.boundSerialNumber && !revealStoredPendingToken(t),

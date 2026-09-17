@@ -90,7 +90,7 @@ function Write-SetupLog([string]$Message) {
     if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
     $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message"
     Add-Content -Path (Join-Path $logDir "setup.log") -Value $line -ErrorAction SilentlyContinue
-    if ($Verbose -and -not $Silent) { Write-Host $Message }
+    if (-not $Silent) { Write-Host $Message }
 }
 
 function Test-IsAdmin {
@@ -188,7 +188,8 @@ function Test-AgentInstallLayout {
         "uninstall.ps1",
         "run-heartbeat.vbs",
         "lib\agent-download.ps1",
-        "lib\agent-storage.ps1"
+        "lib\agent-storage.ps1",
+        "test-connection.ps1"
     )
     $missing = @()
     foreach ($rel in $required) {
@@ -480,10 +481,6 @@ if (Test-Path -LiteralPath $forceMarkerPath) {
     Remove-Item -LiteralPath $forceMarkerPath -Force -ErrorAction SilentlyContinue
 }
 
-if ($Force -and (Test-Path -LiteralPath (Get-ConfigPath))) {
-    Reset-LocalAgentInstall
-}
-
 $configPath = Get-ConfigPath
 $isFreshInstall = -not (Test-Path $configPath)
 $shouldWriteAgentConfig = $false
@@ -536,12 +533,17 @@ if (Test-Path $lockPath) {
 
 Set-Content -Path $lockPath -Value (Get-Date -Format "o") -Encoding UTF8
 
+$pendingForceReset = $Force -and (
+    (Test-Path -LiteralPath (Get-ConfigPath)) -or (Test-ExistingInstall)
+)
+$isReinstallForComplete = Test-ExistingInstall
+
 $tempDir = $null
 try {
     if (-not (Test-AgentBearerToken -ApiUrl $ApiUrl -Token $Token)) {
         throw "Agent install token was rejected by the server. In Settings, refresh or regenerate your install token, then run the new reinstall command."
     }
-    if ($shouldWriteAgentConfig) {
+    if ($shouldWriteAgentConfig -and -not $pendingForceReset) {
         Write-AgentConfig -InstallDir $installDir -ApiUrlValue $ApiUrl -TokenValue $Token
         if (-not $isFreshInstall) {
             $cfgReasonEarly = if ($Force) { "force" } elseif ($tokenChanged) { "token" } else { "apiUrl" }
@@ -553,6 +555,14 @@ try {
     Download-AgentScriptsFromApp -FilesBase $downloadCfg.FilesBase -Token $Token `
         -BypassSecret $downloadCfg.BypassSecret -DestDir $tempDir `
         -Log { param($m) Write-SetupLog $m }
+
+    if ($pendingForceReset) {
+        Reset-LocalAgentInstall
+        if (-not (Test-Path -LiteralPath $installDir)) {
+            New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+        }
+        $isReinstallForComplete = $true
+    }
 
     $newVersion = "0.0.0"
     $versionFile = Join-Path $tempDir "version.txt"
@@ -572,8 +582,7 @@ try {
     }
 
     $localVersion = Get-LocalAgentVersion
-    $isReinstall = Test-ExistingInstall
-    $shouldInstallScripts = $isFreshInstall -or $Force -or (Compare-AgentVersion $newVersion $localVersion) -ne 0
+    $shouldInstallScripts = $isFreshInstall -or $Force -or $pendingForceReset -or (Compare-AgentVersion $newVersion $localVersion) -ne 0
 
     if ($shouldInstallScripts) {
         $reason = if ($isFreshInstall) { "fresh install" } elseif ($Force) { "force" } else { "version $localVersion -> $newVersion" }
@@ -591,15 +600,20 @@ try {
         }
     }
 
-    Complete-Install -InstallDir $installDir -IsReinstall $isReinstall -ScriptsUpdated $shouldInstallScripts
+    Complete-Install -InstallDir $installDir -IsReinstall $isReinstallForComplete -ScriptsUpdated $shouldInstallScripts
     Test-AgentInstallLayout -InstallDir $installDir
 
     if (Get-Command Invoke-AgentLogMaintenance -ErrorAction SilentlyContinue) {
         Invoke-AgentLogMaintenance -Log { param($m) Write-SetupLog $m }
     }
 
-    if ($shouldInstallScripts -and -not $Silent -and -not $isFreshInstall) {
-        Write-Host "My Office Pulse updated to v$newVersion." -ForegroundColor Green
+    $installedVersion = Get-LocalAgentVersion
+    if (-not $Silent) {
+        Write-Host ""
+        Write-Host "SUCCESS: My Office Pulse agent v$installedVersion is installed." -ForegroundColor Green
+        Write-Host "  Folder: $installDir" -ForegroundColor Gray
+        Write-Host "  Log:    $(Join-Path $installDir 'logs\setup.log')" -ForegroundColor Gray
+        Write-Host "  Test:   powershell -NoProfile -ExecutionPolicy Bypass -File `"$(Join-Path $installDir 'test-connection.ps1')`"" -ForegroundColor Cyan
     }
 } catch {
     Write-SetupLog "ERROR $($_.Exception.Message)"

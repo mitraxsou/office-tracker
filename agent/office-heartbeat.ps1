@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 $ConfigFetchIntervalRuns = 60
 $ConfigCacheMaxAgeMinutes = 120
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.5.6"
+$AgentScriptVersion = "1.5.7"
 
 function Get-InstallDir {
     if ($env:OFFICETRACKER_INSTALL_DIR) {
