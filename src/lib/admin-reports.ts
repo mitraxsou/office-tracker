@@ -9,10 +9,16 @@ import {
   type AdminOrgCalendarDay,
 } from "./admin-day-compliance";
 import { userHasInstalledAgentForStaleChecks, isUserAgentDeregistered } from "./agent-deregister";
+import {
+  agentModeUsesActivityTicks,
+  dayPulsesInRange,
+  groupAgentPulseRowsByUserId,
+  lastAgentSignalAtOrBefore,
+} from "./activity-signal";
 import { summarizeAgentTokens } from "./auth";
 import { prisma } from "./db";
 import { getAppConfig, getEffectiveAgentStaleGraceHours, getUserHoursTarget } from "./app-config";
-import { getTodaySummary } from "./heartbeat-service";
+import { getTodaySummary, type DayPulseRow } from "./heartbeat-service";
 import { allDayKeysInMonth, currentMonthKey, monthBoundsFromKey } from "./month-range";
 import { revokeExpiredPendingTokens } from "./token-expiry";
 import { roundHours, type VisitForDaySpan } from "./visits";
@@ -35,38 +41,14 @@ type UserCalendarPreload = {
   hadInstalledDevice: boolean;
   hoursTarget: number;
   graceHours: number;
+  useActivity: boolean;
   oooRanges: Array<{ startDate: string; endDate: string }>;
   visits: VisitForDaySpan[];
-  heartbeats: Array<{ recordedAt: Date; ssid: string | null; inOffice: boolean }>;
+  pulses: DayPulseRow[];
 };
 
 function isUserOooOnDay(ranges: Array<{ startDate: string; endDate: string }>, dayKey: string) {
   return ranges.some((r) => isDayKeyInRange(dayKey, r.startDate, r.endDate));
-}
-
-function heartbeatsForDay(
-  heartbeats: Array<{ recordedAt: Date; ssid: string | null; inOffice: boolean }>,
-  dayStart: Date,
-  dayEnd: Date,
-) {
-  return heartbeats.filter(
-    (h) => h.recordedAt.getTime() >= dayStart.getTime() && h.recordedAt.getTime() <= dayEnd.getTime(),
-  );
-}
-
-function lastHeartbeatBefore(
-  heartbeats: Array<{ recordedAt: Date }>,
-  dayEnd: Date,
-): Date | null {
-  let last: Date | null = null;
-  for (const h of heartbeats) {
-    if (h.recordedAt.getTime() <= dayEnd.getTime()) {
-      last = h.recordedAt;
-    } else {
-      break;
-    }
-  }
-  return last;
 }
 
 function visitsForDayWindow(visits: VisitForDaySpan[], dayStart: Date, dayEnd: Date) {
@@ -80,11 +62,12 @@ function visitsForDayWindow(visits: VisitForDaySpan[], dayStart: Date, dayEnd: D
 async function preloadUserCalendarData(
   users: CalendarUserRow[],
   monthKey: string,
+  useActivity: boolean,
 ): Promise<UserCalendarPreload[]> {
   const bounds = monthBoundsFromKey(monthKey, "Asia/Kolkata");
   const userIds = users.map((u) => u.id);
 
-  const [oooRows, visitRows, heartbeatRows] = await Promise.all([
+  const [oooRows, visitRows, pulseRows] = await Promise.all([
     prisma.userOutOfOffice.findMany({
       where: {
         userId: { in: userIds },
@@ -102,14 +85,30 @@ async function preloadUserCalendarData(
       select: { userId: true, id: true, startAt: true, endAt: true, source: true, ssid: true, updatedAt: true },
       orderBy: { startAt: "asc" },
     }),
-    prisma.heartbeat.findMany({
-      where: {
-        userId: { in: userIds },
-        recordedAt: { lte: bounds.to },
-      },
-      select: { userId: true, recordedAt: true, ssid: true, inOffice: true },
-      orderBy: [{ userId: "asc" }, { recordedAt: "asc" }],
-    }),
+    useActivity
+      ? prisma.activityTick.findMany({
+          where: {
+            userId: { in: userIds },
+            at: { lte: bounds.to },
+          },
+          select: { userId: true, at: true, ssid: true, inOffice: true },
+          orderBy: [{ userId: "asc" }, { at: "asc" }],
+        })
+      : prisma.heartbeat.findMany({
+          where: {
+            userId: { in: userIds },
+            recordedAt: { lte: bounds.to },
+          },
+          select: { userId: true, recordedAt: true, ssid: true, inOffice: true },
+          orderBy: [{ userId: "asc" }, { recordedAt: "asc" }],
+        }).then((rows) =>
+          rows.map((row) => ({
+            userId: row.userId,
+            at: row.recordedAt,
+            ssid: row.ssid,
+            inOffice: row.inOffice,
+          })),
+        ),
   ]);
 
   const oooByUser = new Map<string, Array<{ startDate: string; endDate: string }>>();
@@ -133,19 +132,7 @@ async function preloadUserCalendarData(
     visitsByUser.set(row.userId, list);
   }
 
-  const heartbeatsByUser = new Map<
-    string,
-    Array<{ recordedAt: Date; ssid: string | null; inOffice: boolean }>
-  >();
-  for (const row of heartbeatRows) {
-    const list = heartbeatsByUser.get(row.userId) ?? [];
-    list.push({
-      recordedAt: row.recordedAt,
-      ssid: row.ssid,
-      inOffice: row.inOffice,
-    });
-    heartbeatsByUser.set(row.userId, list);
-  }
+  const pulsesByUser = groupAgentPulseRowsByUserId(pulseRows);
 
   return Promise.all(
     users.map(async (user) => ({
@@ -156,9 +143,10 @@ async function preloadUserCalendarData(
       }),
       hoursTarget: await getUserHoursTarget(user),
       graceHours: await getEffectiveAgentStaleGraceHours(user),
+      useActivity,
       oooRanges: oooByUser.get(user.id) ?? [],
       visits: visitsByUser.get(user.id) ?? [],
-      heartbeats: heartbeatsByUser.get(user.id) ?? [],
+      pulses: pulsesByUser.get(user.id) ?? [],
     })),
   );
 }
@@ -169,6 +157,7 @@ export async function getAdminOrgCalendarDays(
 ): Promise<{ monthKey: string; timezone: string; days: AdminOrgCalendarDay[] }> {
   const monthDayKeys = allDayKeysInMonth(monthKey);
   const config = await getAppConfig();
+  const useActivity = agentModeUsesActivityTicks(config.agentMode);
 
   const users = await prisma.user.findMany({
     orderBy: { email: "asc" },
@@ -184,7 +173,7 @@ export async function getAdminOrgCalendarDays(
     },
   });
 
-  const preloaded = await preloadUserCalendarData(users, monthKey);
+  const preloaded = await preloadUserCalendarData(users, monthKey, useActivity);
   const now = new Date();
 
   const days: AdminOrgCalendarDay[] = monthDayKeys.map((dayKey) => {
@@ -207,17 +196,18 @@ export async function getAdminOrgCalendarDays(
     let totalAttendedHours = 0;
     const rows = preloaded.map((ctx) => {
       const { start: dayStart, end: dayEnd } = dayBoundsFromKey(dayKey, ctx.user.timezone);
-      const dayHeartbeats = heartbeatsForDay(ctx.heartbeats, dayStart, dayEnd);
+      const dayPulses = dayPulsesInRange(ctx.pulses, dayStart, dayEnd);
       const dayVisits = visitsForDayWindow(ctx.visits, dayStart, dayEnd);
 
       const row = computeUserDayComplianceRow({
         user: ctx.user,
         dayKey,
         hadInstalledDevice: ctx.hadInstalledDevice,
-        lastHeartbeatBeforeDayEnd: lastHeartbeatBefore(ctx.heartbeats, dayEnd),
+        lastHeartbeatBeforeDayEnd: lastAgentSignalAtOrBefore(ctx.pulses, dayEnd),
         ooo: isUserOooOnDay(ctx.oooRanges, dayKey),
         visits: dayVisits,
-        dayHeartbeats,
+        dayPulses,
+        useActivity: ctx.useActivity,
         officeSsids: config.officeSsids,
         hoursTarget: ctx.hoursTarget,
         graceHours: ctx.graceHours,
@@ -237,6 +227,7 @@ export async function getAdminReports(options?: { days?: number; monthKey?: stri
   const config = await getAppConfig();
   const defaultTz = "Asia/Kolkata";
   const monthKey = options?.monthKey ?? currentMonthKey(defaultTz);
+  const agentMode = config.agentMode;
 
   await revokeExpiredPendingTokens();
 
@@ -252,21 +243,15 @@ export async function getAdminReports(options?: { days?: number; monthKey?: stri
   const todayComplianceRows = await Promise.all(
     users.map(async (user) => {
       const todayKey = todayKeyForTimezone(user.timezone, now);
-      const { end: dayEnd } = dayBoundsFromKey(todayKey, user.timezone);
       const hadInstalledDevice = userHasInstalledAgentForStaleChecks({
         agentDeregisteredAt: user.agentDeregisteredAt,
         agentDevices: user.agentDevices,
-      });
-      const lastHeartbeat = await prisma.heartbeat.findFirst({
-        where: { userId: user.id, recordedAt: { lte: dayEnd } },
-        orderBy: { recordedAt: "desc" },
-        select: { recordedAt: true },
       });
       return evaluateUserDayCompliance({
         user,
         dayKey: todayKey,
         hadInstalledDevice,
-        lastHeartbeatBeforeDayEnd: lastHeartbeat?.recordedAt ?? null,
+        agentMode,
       });
     }),
   );

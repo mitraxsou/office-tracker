@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  agentModeUsesActivityTicks,
   deviceRegistrationReferenceAt,
   expectedTicksPerDay,
   isLowActivityCount,
   latestDeviceLastSeenAt,
+  lastAgentSignalAtOrBefore,
   lowActivityThreshold,
   minutesSinceAt,
   resolveAgentSyncHealth,
@@ -16,6 +18,30 @@ describe("expectedTicksPerDay", () => {
     expect(expectedTicksPerDay(5)).toBe(288);
     expect(expectedTicksPerDay(10)).toBe(144);
     expect(expectedTicksPerDay(2)).toBe(720);
+  });
+});
+
+describe("agentModeUsesActivityTicks", () => {
+  it("defaults to activity ticks for events mode", () => {
+    expect(agentModeUsesActivityTicks("events")).toBe(true);
+    expect(agentModeUsesActivityTicks(undefined)).toBe(true);
+  });
+
+  it("uses heartbeats only when admin set legacy heartbeat mode", () => {
+    expect(agentModeUsesActivityTicks("heartbeat")).toBe(false);
+  });
+});
+
+describe("lastAgentSignalAtOrBefore", () => {
+  it("returns the latest pulse at or before the cutoff", () => {
+    const rows = [
+      { at: new Date("2026-09-04T09:00:00Z") },
+      { at: new Date("2026-09-04T12:00:00Z") },
+      { at: new Date("2026-09-04T15:00:00Z") },
+    ];
+    expect(lastAgentSignalAtOrBefore(rows, new Date("2026-09-04T13:00:00Z"))).toEqual(
+      new Date("2026-09-04T12:00:00Z"),
+    );
   });
 });
 

@@ -1,9 +1,19 @@
 import { userHasInstalledAgentForStaleChecks } from "./agent-deregister";
+import {
+  agentModeUsesActivityTicks,
+  dayPulsesInRange,
+  getLastAgentSignalBefore,
+  groupAgentPulseRowsByUserId,
+  lastAgentSignalAtOrBefore,
+} from "./activity-signal";
 import { getAppConfig, getEffectiveAgentStaleGraceHours, getUserHoursTarget } from "./app-config";
-import { heartbeatInOffice } from "./heartbeat-office";
-import { loadDaySpanContext } from "./heartbeat-service";
+import {
+  filterInOfficeDayPulses,
+  loadDayPulseRowsForDay,
+  type DayPulseRow,
+} from "./heartbeat-service";
 import { isoWeekdayFromDayKey } from "./office-schedule";
-import { isUserOutOfOffice } from "./out-of-office";
+import { isDayKeyInRange, isUserOutOfOffice } from "./out-of-office";
 import { prisma } from "./db";
 import { dayBoundsFromKey, dayKeyInTimezone, isCurrentCalendarDay, isFutureDayKey } from "./timezone-dates";
 import { daySpanMsForDay, roundHoursToMinute, type VisitForDaySpan } from "./visits";
@@ -198,13 +208,15 @@ type ComplianceUser = {
   agentDeregisteredAt: Date | null;
 };
 
-type DayHeartbeatRow = {
-  recordedAt: Date;
-  ssid: string | null;
-  inOffice: boolean;
-};
-
 type DayVisitRow = VisitForDaySpan;
+
+function visitsOverlappingDay(visits: DayVisitRow[], dayStart: Date, dayEnd: Date) {
+  return visits.filter((v) => {
+    const start = v.startAt.getTime();
+    const end = (v.endAt ?? dayEnd).getTime();
+    return start <= dayEnd.getTime() && end >= dayStart.getTime();
+  });
+}
 
 export function computeUserDayComplianceRow(input: {
   user: ComplianceUser;
@@ -213,7 +225,8 @@ export function computeUserDayComplianceRow(input: {
   lastHeartbeatBeforeDayEnd: Date | null;
   ooo: boolean;
   visits: DayVisitRow[];
-  dayHeartbeats: DayHeartbeatRow[];
+  dayPulses: DayPulseRow[];
+  useActivity: boolean;
   officeSsids: string[];
   hoursTarget: number;
   graceHours: number;
@@ -231,12 +244,13 @@ export function computeUserDayComplianceRow(input: {
     hadInstalledDevice: input.hadInstalledDevice,
   });
 
-  const inOfficeToday = input.dayHeartbeats.filter((h) =>
-    heartbeatInOffice(h, input.officeSsids),
+  const inOfficeToday = filterInOfficeDayPulses(
+    input.dayPulses,
+    input.useActivity,
+    input.officeSsids,
   );
-  const firstInOfficeHeartbeatAt = inOfficeToday[0]?.recordedAt ?? null;
-  const lastInOfficeHeartbeatAt = inOfficeToday[inOfficeToday.length - 1]?.recordedAt ?? null;
-  const lastHeartbeatOnDay = input.dayHeartbeats[input.dayHeartbeats.length - 1]?.recordedAt ?? null;
+  const firstInOfficeHeartbeatAt = inOfficeToday[0]?.at ?? null;
+  const lastInOfficeHeartbeatAt = inOfficeToday[inOfficeToday.length - 1]?.at ?? null;
 
   const params = {
     dayStart,
@@ -251,7 +265,7 @@ export function computeUserDayComplianceRow(input: {
   const hours = roundHoursToMinute(totalMs / (1000 * 60 * 60));
   const metTarget = hours >= input.hoursTarget;
 
-  const inOfficeHeartbeats = inOfficeToday.map((h) => h.recordedAt);
+  const inOfficeHeartbeats = inOfficeToday.map((h) => h.at);
   const attended = userAttendedOnDay({
     visits: input.visits,
     dayStart,
@@ -286,34 +300,52 @@ export async function evaluateUserDayCompliance(input: {
   user: ComplianceUser;
   dayKey: string;
   hadInstalledDevice: boolean;
-  lastHeartbeatBeforeDayEnd: Date | null;
+  lastHeartbeatBeforeDayEnd?: Date | null;
+  useActivity?: boolean;
+  agentMode?: string;
 }): Promise<AdminDayUserRow> {
   const { user, dayKey } = input;
-  const hoursTarget = await getUserHoursTarget(user);
-  const graceHours = await getEffectiveAgentStaleGraceHours(user);
-  const config = await getAppConfig();
+  const [hoursTarget, graceHours, config] = await Promise.all([
+    getUserHoursTarget(user),
+    getEffectiveAgentStaleGraceHours(user),
+    getAppConfig(),
+  ]);
+  const agentMode = input.agentMode ?? config.agentMode;
+  const useActivity = input.useActivity ?? agentModeUsesActivityTicks(agentMode);
   const { start: dayStart, end: dayEnd } = dayBoundsFromKey(dayKey, user.timezone);
+  const now = new Date();
 
-  const ooo = await isUserOutOfOffice(user.id, dayKey);
-  const { visits, params } = await loadDaySpanContext(user.id, dayKey, user.timezone);
+  const lastHeartbeatBeforeDayEnd =
+    input.lastHeartbeatBeforeDayEnd !== undefined
+      ? input.lastHeartbeatBeforeDayEnd
+      : await getLastAgentSignalBefore(user.id, dayEnd, useActivity);
 
-  const dayHeartbeats = await prisma.heartbeat.findMany({
-    where: { userId: user.id, recordedAt: { gte: dayStart, lte: dayEnd } },
-    select: { recordedAt: true, ssid: true, inOffice: true },
-  });
+  const [ooo, visits, dayPulses] = await Promise.all([
+    isUserOutOfOffice(user.id, dayKey),
+    prisma.visit.findMany({
+      where: {
+        userId: user.id,
+        startAt: { lte: dayEnd },
+        OR: [{ endAt: null }, { endAt: { gte: dayStart } }],
+      },
+      orderBy: { startAt: "asc" },
+    }),
+    loadDayPulseRowsForDay(user.id, dayStart, dayEnd, useActivity),
+  ]);
 
   return computeUserDayComplianceRow({
     user,
     dayKey,
     hadInstalledDevice: input.hadInstalledDevice,
-    lastHeartbeatBeforeDayEnd: input.lastHeartbeatBeforeDayEnd,
+    lastHeartbeatBeforeDayEnd,
     ooo,
     visits,
-    dayHeartbeats,
+    dayPulses,
+    useActivity,
     officeSsids: config.officeSsids,
     hoursTarget,
     graceHours,
-    now: params.now,
+    now,
   });
 }
 
@@ -321,6 +353,10 @@ export async function getAdminDayCompliance(
   dayKey: string,
   timezone = "Asia/Kolkata",
 ): Promise<AdminDayComplianceSummary> {
+  const config = await getAppConfig();
+  const useActivity = agentModeUsesActivityTicks(config.agentMode);
+  const officeSsids = config.officeSsids;
+
   const users = await prisma.user.findMany({
     orderBy: { email: "asc" },
     select: {
@@ -346,28 +382,130 @@ export async function getAdminDayCompliance(
     return emptyFutureDayCompliance(dayKey, users, hoursTargets);
   }
 
-  const { end: dayEnd } = dayBoundsFromKey(dayKey, timezone);
+  const userIds = users.map((u) => u.id);
+  const userBounds = users.map((user) => {
+    const { start, end } = dayBoundsFromKey(dayKey, user.timezone);
+    return { userId: user.id, dayStart: start, dayEnd: end };
+  });
+  const rangeStartMs = Math.min(...userBounds.map((b) => b.dayStart.getTime()));
+  const rangeEndMs = Math.max(...userBounds.map((b) => b.dayEnd.getTime()));
+  const rangeStart = new Date(rangeStartMs);
+  const rangeEnd = new Date(rangeEndMs);
 
-  const rows = await Promise.all(
-    users.map(async (user) => {
-      const hadInstalledDevice = userHasInstalledAgentForStaleChecks({
+  const graceHoursList = await Promise.all(
+    users.map((user) => getEffectiveAgentStaleGraceHours(user)),
+  );
+  const maxGraceHours = Math.max(...graceHoursList, 24);
+  const staleLookbackStart = new Date(rangeStartMs - maxGraceHours * 60 * 60 * 1000);
+
+  const [oooRows, visitRows, pulseRows, hoursTargets] = await Promise.all([
+    prisma.userOutOfOffice.findMany({
+      where: {
+        userId: { in: userIds },
+        startDate: { lte: dayKey },
+        endDate: { gte: dayKey },
+      },
+      select: { userId: true, startDate: true, endDate: true },
+    }),
+    prisma.visit.findMany({
+      where: {
+        userId: { in: userIds },
+        startAt: { lte: rangeEnd },
+        OR: [{ endAt: null }, { endAt: { gte: rangeStart } }],
+      },
+      select: {
+        userId: true,
+        id: true,
+        startAt: true,
+        endAt: true,
+        source: true,
+        ssid: true,
+        updatedAt: true,
+      },
+      orderBy: { startAt: "asc" },
+    }),
+    useActivity
+      ? prisma.activityTick.findMany({
+          where: {
+            userId: { in: userIds },
+            at: { gte: staleLookbackStart, lte: rangeEnd },
+          },
+          select: { userId: true, at: true, ssid: true, inOffice: true },
+          orderBy: [{ userId: "asc" }, { at: "asc" }],
+        })
+      : prisma.heartbeat.findMany({
+          where: {
+            userId: { in: userIds },
+            recordedAt: { gte: staleLookbackStart, lte: rangeEnd },
+          },
+          select: {
+            userId: true,
+            recordedAt: true,
+            ssid: true,
+            inOffice: true,
+          },
+          orderBy: [{ userId: "asc" }, { recordedAt: "asc" }],
+        }).then((rows) =>
+          rows.map((row) => ({
+            userId: row.userId,
+            at: row.recordedAt,
+            ssid: row.ssid,
+            inOffice: row.inOffice,
+          })),
+        ),
+    Promise.all(users.map((user) => getUserHoursTarget(user))),
+  ]);
+
+  const oooByUser = new Map<string, Array<{ startDate: string; endDate: string }>>();
+  for (const row of oooRows) {
+    const list = oooByUser.get(row.userId) ?? [];
+    list.push({ startDate: row.startDate, endDate: row.endDate });
+    oooByUser.set(row.userId, list);
+  }
+
+  const visitsByUser = new Map<string, DayVisitRow[]>();
+  for (const row of visitRows) {
+    const list = visitsByUser.get(row.userId) ?? [];
+    list.push({
+      id: row.id,
+      startAt: row.startAt,
+      endAt: row.endAt,
+      source: row.source,
+      ssid: row.ssid,
+      updatedAt: row.updatedAt,
+    });
+    visitsByUser.set(row.userId, list);
+  }
+
+  const pulsesByUser = groupAgentPulseRowsByUserId(pulseRows);
+
+  const rows = users.map((user, index) => {
+    const bounds = userBounds.find((b) => b.userId === user.id)!;
+    const userPulses = pulsesByUser.get(user.id) ?? [];
+    const dayPulses = dayPulsesInRange(userPulses, bounds.dayStart, bounds.dayEnd);
+    const lastSignal = lastAgentSignalAtOrBefore(userPulses, bounds.dayEnd);
+    const dayVisits = visitsOverlappingDay(visitsByUser.get(user.id) ?? [], bounds.dayStart, bounds.dayEnd);
+    const oooRanges = oooByUser.get(user.id) ?? [];
+    const ooo = oooRanges.some((r) => isDayKeyInRange(dayKey, r.startDate, r.endDate));
+
+    return computeUserDayComplianceRow({
+      user,
+      dayKey,
+      hadInstalledDevice: userHasInstalledAgentForStaleChecks({
         agentDeregisteredAt: user.agentDeregisteredAt,
         agentDevices: user.agentDevices,
-      });
-      const lastHeartbeat = await prisma.heartbeat.findFirst({
-        where: { userId: user.id, recordedAt: { lte: dayEnd } },
-        orderBy: { recordedAt: "desc" },
-        select: { recordedAt: true },
-      });
-
-      return evaluateUserDayCompliance({
-        user,
-        dayKey,
-        hadInstalledDevice,
-        lastHeartbeatBeforeDayEnd: lastHeartbeat?.recordedAt ?? null,
-      });
-    }),
-  );
+      }),
+      lastHeartbeatBeforeDayEnd: lastSignal,
+      ooo,
+      visits: dayVisits,
+      dayPulses,
+      useActivity,
+      officeSsids,
+      hoursTarget: hoursTargets[index] ?? 0,
+      graceHours: graceHoursList[index] ?? maxGraceHours,
+      now,
+    });
+  });
 
   return {
     date: dayKey,

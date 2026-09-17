@@ -5,8 +5,8 @@ import { aggregateHoursForDay, aggregateLaptopActiveForDay } from "./day-hours";
 import { getTodaySummary, getPulseStats } from "./heartbeat-service";
 import {
   activityTickToSignal,
+  agentModeUsesActivityTicks,
   heartbeatToSignal,
-  resolveAgentSignalMode,
 } from "./activity-signal";
 import { summarizeAgentTokens } from "./auth";
 import { getLifecycleEventsForUser } from "./agent-lifecycle";
@@ -86,30 +86,7 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
     orderBy: { startAt: "desc" },
   });
 
-  const { useActivity } = await resolveAgentSignalMode(userId);
-  const recentSignals = useActivity
-    ? await prisma.activityTick.findMany({
-        where: { userId, at: { gte: from, lte: end } },
-        orderBy: { at: "desc" },
-        take: 100,
-        select: { id: true, at: true, inOffice: true, ssid: true },
-      })
-    : await prisma.heartbeat.findMany({
-        where: {
-          userId,
-          recordedAt: { gte: from, lte: end },
-        },
-        orderBy: { recordedAt: "desc" },
-        take: 100,
-        select: {
-          id: true,
-          recordedAt: true,
-          inOffice: true,
-          ssid: true,
-          vpnGateway: true,
-          source: true,
-        },
-      });
+  const useActivity = agentModeUsesActivityTicks(config.agentMode);
 
   const [apiHitTotals, deviceApiHits] = await Promise.all([
     getUserAgentApiHitTotals(userId, user.timezone),
@@ -148,7 +125,14 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
       ssid: v.ssid,
     })),
     heartbeats: useActivity
-      ? recentSignals.map((tick) => {
+      ? (
+          await prisma.activityTick.findMany({
+            where: { userId, at: { gte: from, lte: end } },
+            orderBy: { at: "desc" },
+            take: 100,
+            select: { id: true, at: true, inOffice: true, ssid: true },
+          })
+        ).map((tick) => {
           const signal = activityTickToSignal(tick);
           return {
             id: tick.id,
@@ -159,7 +143,24 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
             source: signal.source,
           };
         })
-      : recentSignals.map((h) => {
+      : (
+          await prisma.heartbeat.findMany({
+            where: {
+              userId,
+              recordedAt: { gte: from, lte: end },
+            },
+            orderBy: { recordedAt: "desc" },
+            take: 100,
+            select: {
+              id: true,
+              recordedAt: true,
+              inOffice: true,
+              ssid: true,
+              vpnGateway: true,
+              source: true,
+            },
+          })
+        ).map((h) => {
           const signal = heartbeatToSignal(h, config.officeSsids);
           return {
             id: h.id,

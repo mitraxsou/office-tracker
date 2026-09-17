@@ -27,6 +27,7 @@ vi.mock("../src/lib/app-config", () => ({
   getAppConfig: vi.fn().mockResolvedValue({
     officeSsids: ["OfficeConnect"],
     agentStaleGraceHours: 24,
+    agentMode: "events",
   }),
   getUserHoursTarget: vi.fn().mockResolvedValue(5),
   getEffectiveAgentStaleGraceHours: vi.fn().mockResolvedValue(24),
@@ -93,7 +94,7 @@ describe("evaluateUserAlerts in events mode", () => {
 
     expect(alerts).toHaveLength(1);
     expect(alerts[0]?.type).toBe("hours_started");
-    expect(heartbeatFindManyMock).toHaveBeenCalled();
+    expect(heartbeatFindManyMock).not.toHaveBeenCalled();
     expect(visitFindFirstMock).toHaveBeenCalled();
   });
 

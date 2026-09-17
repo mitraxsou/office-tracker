@@ -21,6 +21,55 @@ import { validateVisitTimestamps } from "./visit-validation";
 /** Skip repeat maintenance on dashboard reads within this window. */
 export const VISIT_MAINTENANCE_THROTTLE_MS = 15 * 60 * 1000;
 
+export type DayPulseRow = {
+  at: Date;
+  ssid: string | null;
+  inOffice: boolean;
+};
+
+export function filterInOfficeDayPulses(
+  dayPulses: DayPulseRow[],
+  useActivity: boolean,
+  officeSsids: string[],
+): DayPulseRow[] {
+  if (useActivity) return dayPulses.filter((p) => p.inOffice);
+  return dayPulses.filter((p) => heartbeatInOffice(p, officeSsids));
+}
+
+export async function loadDayPulseRowsForDay(
+  userId: string,
+  dayStart: Date,
+  dayEnd: Date,
+  useActivity: boolean,
+): Promise<DayPulseRow[]> {
+  if (useActivity) {
+    const dayTicks = await prisma.activityTick.findMany({
+      where: { userId, at: { gte: dayStart, lte: dayEnd } },
+      orderBy: { at: "asc" },
+      select: { at: true, ssid: true, inOffice: true },
+    });
+    return dayTicks.map((tick) => ({
+      at: tick.at,
+      ssid: tick.ssid,
+      inOffice: tick.inOffice,
+    }));
+  }
+
+  const dayHeartbeats = await prisma.heartbeat.findMany({
+    where: {
+      userId,
+      recordedAt: { gte: dayStart, lte: dayEnd },
+    },
+    orderBy: { recordedAt: "asc" },
+    select: { recordedAt: true, ssid: true, inOffice: true },
+  });
+  return dayHeartbeats.map((row) => ({
+    at: row.recordedAt,
+    ssid: row.ssid,
+    inOffice: row.inOffice,
+  }));
+}
+
 const lastMaintenanceAtByUser = new Map<string, number>();
 
 export function resetVisitMaintenanceThrottle(userId?: string) {
@@ -53,7 +102,7 @@ export async function loadDaySpanContext(
   const { start: dayStart, end: dayEnd } = dayBoundsFromKey(dayKey, timezone);
   const now = new Date();
   const { useActivity, lastActivity, lastHeartbeat: lastHeartbeatRow } =
-    await resolveAgentSignalMode(userId);
+    await resolveAgentSignalMode(userId, { agentMode: config.agentMode });
 
   const visits = await prisma.visit.findMany({
     where: {
@@ -81,38 +130,18 @@ export async function loadDaySpanContext(
     agentFirstAgentOnAt = dailySummary.firstAgentOnAt;
   }
 
+  const dayPulses = await loadDayPulseRowsForDay(userId, dayStart, dayEnd, useActivity);
+  const inOfficeToday = filterInOfficeDayPulses(dayPulses, useActivity, allowlist);
+  firstInOfficeHeartbeatAt = inOfficeToday[0]?.at ?? null;
+  lastInOfficeHeartbeatAt = inOfficeToday[inOfficeToday.length - 1]?.at ?? null;
   if (useActivity) {
-    const dayTicks = await prisma.activityTick.findMany({
-      where: { userId, at: { gte: dayStart, lte: dayEnd } },
-      orderBy: { at: "asc" },
-      select: { at: true, ssid: true, inOffice: true },
-    });
-    const inOfficeToday = dayTicks.filter((tick) => tick.inOffice);
-    firstInOfficeHeartbeatAt = inOfficeToday[0]?.at ?? null;
-    lastInOfficeHeartbeatAt = inOfficeToday[inOfficeToday.length - 1]?.at ?? null;
     lastSignalOverall = lastActivity?.at ?? null;
     lastHeartbeat = lastActivity ? activityTickToSignal(lastActivity) : null;
-    uptimeSignals = dayTicks.map((tick) => ({ at: tick.at, kind: "tick" as const }));
   } else {
-    const dayHeartbeats = await prisma.heartbeat.findMany({
-      where: {
-        userId,
-        recordedAt: { gte: dayStart, lte: dayEnd },
-      },
-      orderBy: { recordedAt: "asc" },
-      select: { recordedAt: true, ssid: true, inOffice: true },
-    });
-    const inOfficeToday = dayHeartbeats.filter((h) => heartbeatInOffice(h, allowlist));
-    firstInOfficeHeartbeatAt = inOfficeToday[0]?.recordedAt ?? null;
-    lastInOfficeHeartbeatAt =
-      inOfficeToday[inOfficeToday.length - 1]?.recordedAt ?? null;
     lastSignalOverall = lastHeartbeatRow?.recordedAt ?? null;
     lastHeartbeat = lastHeartbeatRow ? heartbeatToSignal(lastHeartbeatRow, allowlist) : null;
-    uptimeSignals = dayHeartbeats.map((row) => ({
-      at: row.recordedAt,
-      kind: "tick" as const,
-    }));
   }
+  uptimeSignals = dayPulses.map((row) => ({ at: row.at, kind: "tick" as const }));
 
   const sessionResumes = await prisma.presenceTransition.findMany({
     where: {
@@ -319,7 +348,7 @@ export async function closeEndOfDayOpenVisits(userId: string, timezone: string) 
     allowlist,
   );
 
-  const { useActivity } = await resolveAgentSignalMode(userId);
+  const { useActivity } = await resolveAgentSignalMode(userId, { agentMode: config.agentMode });
   const lastSignalAt = await getLastAgentSignalOnDay(
     userId,
     { gte: open.startAt, lte: dayEnd },
@@ -536,42 +565,53 @@ export async function getPulseStats(userId: string, graceHours: number) {
   const now = new Date();
   const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const config = await getAppConfig();
+  const { useActivity, lastActivity, lastHeartbeat, activityCount24h } =
+    await resolveAgentSignalMode(userId, { agentMode: config.agentMode });
 
-  const [
-    { useActivity, lastActivity, lastHeartbeat, activityCount24h },
-    recentActivity,
-    activity24h,
-    pulsesLast24h,
-    recentPulses,
-    heartbeats24h,
-  ] = await Promise.all([
-    resolveAgentSignalMode(userId),
-    prisma.activityTick.findMany({
-      where: { userId },
-      orderBy: { at: "desc" },
-      take: 12,
-      select: { at: true, inOffice: true, ssid: true },
-    }),
-    prisma.activityTick.findMany({
-      where: { userId, at: { gte: since24h } },
-      select: { at: true },
-      orderBy: { at: "asc" },
-    }),
-    prisma.heartbeat.count({
-      where: { userId, recordedAt: { gte: since24h } },
-    }),
-    prisma.heartbeat.findMany({
-      where: { userId },
-      orderBy: { recordedAt: "desc" },
-      take: 12,
-      select: { recordedAt: true, inOffice: true, ssid: true, vpnGateway: true, source: true },
-    }),
-    prisma.heartbeat.findMany({
-      where: { userId, recordedAt: { gte: since24h } },
-      select: { recordedAt: true },
-      orderBy: { recordedAt: "asc" },
-    }),
-  ]);
+  const [recentActivity, activity24h, recentPulses, heartbeats24h, pulsesLast24h] =
+    await Promise.all([
+      useActivity
+        ? prisma.activityTick.findMany({
+            where: { userId },
+            orderBy: { at: "desc" },
+            take: 12,
+            select: { at: true, inOffice: true, ssid: true },
+          })
+        : Promise.resolve([]),
+      useActivity
+        ? prisma.activityTick.findMany({
+            where: { userId, at: { gte: since24h } },
+            select: { at: true },
+            orderBy: { at: "asc" },
+          })
+        : Promise.resolve([]),
+      useActivity
+        ? Promise.resolve([])
+        : prisma.heartbeat.findMany({
+            where: { userId },
+            orderBy: { recordedAt: "desc" },
+            take: 12,
+            select: {
+              recordedAt: true,
+              inOffice: true,
+              ssid: true,
+              vpnGateway: true,
+              source: true,
+            },
+          }),
+      useActivity
+        ? Promise.resolve([])
+        : prisma.heartbeat.findMany({
+            where: { userId, recordedAt: { gte: since24h } },
+            select: { recordedAt: true },
+            orderBy: { recordedAt: "asc" },
+          }),
+      useActivity
+        ? Promise.resolve(0)
+        : prisma.heartbeat.count({
+            where: { userId, recordedAt: { gte: since24h } },
+          }),
+    ]);
 
   const lastSignalAt = useActivity ? lastActivity?.at : lastHeartbeat?.recordedAt;
 

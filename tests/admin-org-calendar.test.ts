@@ -88,7 +88,8 @@ describe("computeUserDayComplianceRow OOO override", () => {
           endAt: new Date("2026-09-04T16:00:00+05:30"),
         },
       ],
-      dayHeartbeats: [],
+      dayPulses: [],
+      useActivity: false,
       officeSsids: ["OfficeConnect"],
       hoursTarget: 5,
       graceHours: 24,
@@ -107,7 +108,8 @@ describe("computeUserDayComplianceRow OOO override", () => {
       lastHeartbeatBeforeDayEnd: null,
       ooo: false,
       visits: [],
-      dayHeartbeats: [],
+      dayPulses: [],
+      useActivity: false,
       officeSsids: ["OfficeConnect"],
       hoursTarget: 5,
       graceHours: 24,
@@ -133,7 +135,8 @@ describe("computeUserDayComplianceRow OOO override", () => {
           endAt: new Date("2026-09-03T16:00:00+05:30"),
         },
       ],
-      dayHeartbeats: [],
+      dayPulses: [],
+      useActivity: false,
       officeSsids: ["OfficeConnect"],
       hoursTarget: 5,
       graceHours: 24,
@@ -153,7 +156,8 @@ describe("computeUserDayComplianceRow OOO override", () => {
       lastHeartbeatBeforeDayEnd: null,
       ooo: false,
       visits: [],
-      dayHeartbeats: [],
+      dayPulses: [],
+      useActivity: false,
       officeSsids: ["OfficeConnect"],
       hoursTarget: 5,
       graceHours: 24,
@@ -161,6 +165,50 @@ describe("computeUserDayComplianceRow OOO override", () => {
 
     expect(row.status).toBe("no_visit");
     expect(row.agentStaleOnDay).toBe(false);
+  });
+
+  it("counts in-office activity ticks when useActivity is true", () => {
+    const row = computeUserDayComplianceRow({
+      user,
+      dayKey: "2026-09-04",
+      hadInstalledDevice: true,
+      lastHeartbeatBeforeDayEnd: new Date("2026-09-04T18:00:00+05:30"),
+      ooo: false,
+      visits: [],
+      dayPulses: [
+        {
+          at: new Date("2026-09-04T10:00:00+05:30"),
+          ssid: "OfficeConnect",
+          inOffice: true,
+        },
+      ],
+      useActivity: true,
+      officeSsids: ["OfficeConnect"],
+      hoursTarget: 5,
+      graceHours: 24,
+    });
+
+    expect(row.attended).toBe(true);
+    expect(row.status).toBe("attended_not_met");
+  });
+
+  it("uses activity tick for stale check when heartbeats are absent", () => {
+    const row = computeUserDayComplianceRow({
+      user,
+      dayKey: "2026-09-04",
+      hadInstalledDevice: true,
+      lastHeartbeatBeforeDayEnd: new Date("2026-09-04T17:00:00+05:30"),
+      ooo: false,
+      visits: [],
+      dayPulses: [],
+      useActivity: true,
+      officeSsids: ["OfficeConnect"],
+      hoursTarget: 5,
+      graceHours: 24,
+    });
+
+    expect(row.agentStaleOnDay).toBe(false);
+    expect(row.status).toBe("no_visit");
   });
 
   it("does not mark attended on a future day from an open visit", () => {
@@ -179,7 +227,8 @@ describe("computeUserDayComplianceRow OOO override", () => {
           endAt: null,
         },
       ],
-      dayHeartbeats: [],
+      dayPulses: [],
+      useActivity: false,
       officeSsids: ["OfficeConnect"],
       hoursTarget: 5,
       graceHours: 24,

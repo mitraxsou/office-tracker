@@ -15,6 +15,7 @@ import {
 } from "./notification-prefs";
 import { getNotificationPrefs } from "./notification-prefs-server";
 import { buildOutOfOfficeLinkUrl, isUserOutOfOffice } from "./out-of-office";
+import { agentModeUsesActivityTicks } from "./activity-signal";
 import { userHasActiveInstalledDevice } from "./agent-lifecycle";
 import { heartbeatInOffice } from "./heartbeat-office";
 
@@ -85,31 +86,35 @@ async function hadInOfficePresenceToday(
   dayStart: Date,
   dayEnd: Date,
   allowlist: string[],
+  useActivity: boolean,
 ): Promise<boolean> {
+  const visitToday = await prisma.visit.findFirst({
+    where: {
+      userId,
+      startAt: { lte: dayEnd },
+      OR: [{ endAt: null }, { endAt: { gte: dayStart } }],
+    },
+    select: { id: true },
+  });
+  if (visitToday) return true;
+
+  if (useActivity) {
+    const inOfficeTick = await prisma.activityTick.findFirst({
+      where: {
+        userId,
+        at: { gte: dayStart, lte: dayEnd },
+        inOffice: true,
+      },
+      select: { id: true },
+    });
+    return inOfficeTick !== null;
+  }
+
   const beats = await prisma.heartbeat.findMany({
     where: { userId, recordedAt: { gte: dayStart, lte: dayEnd } },
     select: { ssid: true, inOffice: true },
   });
-  if (beats.some((b) => heartbeatInOffice(b, allowlist))) return true;
-
-  const inOfficeTick = await prisma.activityTick.findFirst({
-    where: {
-      userId,
-      at: { gte: dayStart, lte: dayEnd },
-      inOffice: true,
-    },
-    select: { id: true },
-  });
-  if (inOfficeTick) return true;
-
-  const visitToday = await prisma.visit.findFirst({
-    where: {
-      userId,
-      startAt: { gte: dayStart, lte: dayEnd },
-    },
-    select: { id: true },
-  });
-  return visitToday !== null;
+  return beats.some((b) => heartbeatInOffice(b, allowlist));
 }
 
 function buildAbsentMessage(
@@ -193,6 +198,7 @@ async function evaluateUserAlerts(
     dayStart,
     dayEnd,
     config.officeSsids,
+    agentModeUsesActivityTicks(config.agentMode),
   );
 
   const alerts: IntegrationAlert[] = [];

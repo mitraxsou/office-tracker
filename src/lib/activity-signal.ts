@@ -1,3 +1,4 @@
+import { getAppConfig } from "./app-config";
 import { prisma } from "./db";
 import { computeDeviceAgentStatus, type AgentDeviceStatus } from "./device-status";
 import { heartbeatInOffice } from "./heartbeat-office";
@@ -27,6 +28,52 @@ export function shouldUseActivityTicks(
   hasLastHeartbeat: boolean,
 ): boolean {
   return activityCount24h > 0 || (hasLastActivity && !hasLastHeartbeat);
+}
+
+/** Server reporting uses activity ticks unless admin explicitly set legacy heartbeat mode. */
+export function agentModeUsesActivityTicks(agentMode: string | null | undefined): boolean {
+  return (agentMode ?? "events") !== "heartbeat";
+}
+
+export type AgentPulseRow = {
+  at: Date;
+  ssid: string | null;
+  inOffice: boolean;
+};
+
+/** Rows must be sorted ascending by `at`. */
+export function lastAgentSignalAtOrBefore(
+  rows: Array<{ at: Date }>,
+  lte: Date,
+): Date | null {
+  let last: Date | null = null;
+  for (const row of rows) {
+    if (row.at.getTime() > lte.getTime()) break;
+    last = row.at;
+  }
+  return last;
+}
+
+export function dayPulsesInRange(
+  rows: AgentPulseRow[],
+  dayStart: Date,
+  dayEnd: Date,
+): AgentPulseRow[] {
+  const startMs = dayStart.getTime();
+  const endMs = dayEnd.getTime();
+  return rows.filter((p) => p.at.getTime() >= startMs && p.at.getTime() <= endMs);
+}
+
+export function groupAgentPulseRowsByUserId<
+  T extends { userId: string; at: Date; ssid: string | null; inOffice: boolean },
+>(rows: T[]): Map<string, AgentPulseRow[]> {
+  const byUser = new Map<string, AgentPulseRow[]>();
+  for (const row of rows) {
+    const list = byUser.get(row.userId) ?? [];
+    list.push({ at: row.at, ssid: row.ssid, inOffice: row.inOffice });
+    byUser.set(row.userId, list);
+  }
+  return byUser;
 }
 
 /**
@@ -154,7 +201,10 @@ export function resolveInOfficeNow(params: {
   return params.pulseRecent && params.lastPulseInOffice;
 }
 
-export async function resolveAgentSignalMode(userId: string): Promise<{
+export async function resolveAgentSignalMode(
+  userId: string,
+  options?: { agentMode?: string },
+): Promise<{
   useActivity: boolean;
   lastActivity: { at: Date; inOffice: boolean; ssid: string | null } | null;
   lastHeartbeat: {
@@ -166,15 +216,30 @@ export async function resolveAgentSignalMode(userId: string): Promise<{
   } | null;
   activityCount24h: number;
 }> {
+  let agentMode = options?.agentMode;
+  if (agentMode === undefined) {
+    agentMode = (await getAppConfig()).agentMode ?? "events";
+  }
+  const useActivity = agentModeUsesActivityTicks(agentMode);
   const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const [activityCount24h, lastActivity, lastHeartbeat] = await Promise.all([
-    prisma.activityTick.count({
-      where: { userId, at: { gte: since24h } },
-    }),
-    prisma.activityTick.findFirst({
-      where: { userId },
-      orderBy: { at: "desc" },
-      select: { at: true, inOffice: true, ssid: true },
+
+  if (useActivity) {
+    const [activityCount24h, lastActivity] = await Promise.all([
+      prisma.activityTick.count({
+        where: { userId, at: { gte: since24h } },
+      }),
+      prisma.activityTick.findFirst({
+        where: { userId },
+        orderBy: { at: "desc" },
+        select: { at: true, inOffice: true, ssid: true },
+      }),
+    ]);
+    return { useActivity: true, lastActivity, lastHeartbeat: null, activityCount24h };
+  }
+
+  const [activityCount24h, lastHeartbeat] = await Promise.all([
+    prisma.heartbeat.count({
+      where: { userId, recordedAt: { gte: since24h } },
     }),
     prisma.heartbeat.findFirst({
       where: { userId },
@@ -189,19 +254,36 @@ export async function resolveAgentSignalMode(userId: string): Promise<{
     }),
   ]);
 
-  const useActivity = shouldUseActivityTicks(
-    activityCount24h,
-    lastActivity !== null,
-    lastHeartbeat !== null,
-  );
-
-  return { useActivity, lastActivity, lastHeartbeat, activityCount24h };
+  return { useActivity: false, lastActivity: null, lastHeartbeat, activityCount24h };
 }
 
 export async function getLastAgentSignalAt(userId: string): Promise<Date | null> {
   const { useActivity, lastActivity, lastHeartbeat } = await resolveAgentSignalMode(userId);
   if (useActivity) return lastActivity?.at ?? null;
   return lastHeartbeat?.recordedAt ?? null;
+}
+
+/** Last agent signal at or before `lte` (any prior day), for historical stale checks. */
+export async function getLastAgentSignalBefore(
+  userId: string,
+  lte: Date,
+  useActivity: boolean,
+): Promise<Date | null> {
+  if (useActivity) {
+    const tick = await prisma.activityTick.findFirst({
+      where: { userId, at: { lte } },
+      orderBy: { at: "desc" },
+      select: { at: true },
+    });
+    return tick?.at ?? null;
+  }
+
+  const heartbeat = await prisma.heartbeat.findFirst({
+    where: { userId, recordedAt: { lte } },
+    orderBy: { recordedAt: "desc" },
+    select: { recordedAt: true },
+  });
+  return heartbeat?.recordedAt ?? null;
 }
 
 export async function getLastAgentSignalOnDay(
