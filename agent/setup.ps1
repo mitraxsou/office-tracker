@@ -148,13 +148,66 @@ function Send-LifecycleUninstallFromConfig {
     }
 }
 
+function Stop-RunningAgentProcesses {
+    foreach ($taskName in @($TaskName) + $LegacyTaskNames) {
+        Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    }
+    Start-Sleep -Seconds 1
+
+    $needles = @("OfficeTracker", "PwCOfficePulse", "office-heartbeat", "run-heartbeat.vbs")
+    foreach ($procName in @("wscript", "powershell")) {
+        Get-Process -Name $procName -ErrorAction SilentlyContinue | ForEach-Object {
+            try {
+                $cmd = (Get-CimInstance Win32_Process -Filter "ProcessId = $($_.Id)" -ErrorAction Stop).CommandLine
+                if (-not $cmd) { return }
+                foreach ($needle in $needles) {
+                    if ($cmd -like "*$needle*") {
+                        Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+                        break
+                    }
+                }
+            } catch {
+                # ignore per-process query failures
+            }
+        }
+    }
+    Start-Sleep -Seconds 2
+}
+
+function Copy-AgentFileWithRetry {
+    param(
+        [string]$Source,
+        [string]$Destination,
+        [int]$MaxAttempts = 8
+    )
+    Remove-MarkOfWeb -Path $Source
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            $destDir = Split-Path -Parent $Destination
+            if ($destDir -and -not (Test-Path -LiteralPath $destDir)) {
+                New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+            }
+            Copy-Item -LiteralPath $Source -Destination $Destination -Force
+            Remove-MarkOfWeb -Path $Destination
+            return
+        } catch {
+            if ($attempt -ge $MaxAttempts) { throw }
+            Write-SetupLog "WARN copy retry $attempt/$MaxAttempts: $($_.Exception.Message)"
+            Stop-RunningAgentProcesses
+            Start-Sleep -Milliseconds 400
+        }
+    }
+}
+
 function Reset-LocalAgentInstall {
     Write-SetupLog "Force reinstall: clearing local agent (same as uninstall.ps1)"
     Send-LifecycleUninstallFromConfig
+    Stop-RunningAgentProcesses
 
     foreach ($legacy in $LegacyTaskNames) {
         Unregister-ScheduledTask -TaskName $legacy -Confirm:$false -ErrorAction SilentlyContinue
     }
+    Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
 
     $startupDir = [Environment]::GetFolderPath("Startup")
     foreach ($legacy in @("OfficeTrackerHeartbeat.lnk", "PwC Office Pulse.lnk", "My Office Pulse.lnk")) {
@@ -329,18 +382,14 @@ function Install-AgentScripts {
                 $libDir = Join-Path $TargetDir "lib"
                 New-Item -ItemType Directory -Path $libDir -Force | Out-Null
                 $destination = Join-Path $libDir $file
-                Remove-MarkOfWeb -Path $src
-                Copy-Item $src $destination -Force
-                Remove-MarkOfWeb -Path $destination
+                Copy-AgentFileWithRetry -Source $src -Destination $destination
             }
             continue
         }
         $src = Join-Path $SourceDir $file
         if (Test-Path $src) {
-            Remove-MarkOfWeb -Path $src
             $destination = Join-Path $TargetDir $file
-            Copy-Item $src $destination -Force
-            Remove-MarkOfWeb -Path $destination
+            Copy-AgentFileWithRetry -Source $src -Destination $destination
         }
     }
 }
@@ -420,12 +469,8 @@ function Complete-Install {
     Register-HiddenTask -VbsPath $vbsPath -InstallDir $InstallDir
     Remove-LegacyUpdateTask
 
-    if ($ScriptsUpdated) {
-        try {
-            Invoke-BlockedAgentScript -ScriptPath $heartbeatScript
-        } catch {
-            Write-SetupLog "WARN first heartbeat after setup failed: $($_.Exception.Message)"
-        }
+    if ($ScriptsUpdated -and -not $Force) {
+        Write-SetupLog "Skipping inline heartbeat after setup (task will sync). Run test-connection.ps1 to verify."
     }
 
     if ($Silent) { return }
@@ -600,7 +645,9 @@ try {
         }
     }
 
+    Write-SetupLog "Registering scheduled task and shortcuts..."
     Complete-Install -InstallDir $installDir -IsReinstall $isReinstallForComplete -ScriptsUpdated $shouldInstallScripts
+    Write-SetupLog "Verifying install layout..."
     Test-AgentInstallLayout -InstallDir $installDir
 
     if (Get-Command Invoke-AgentLogMaintenance -ErrorAction SilentlyContinue) {

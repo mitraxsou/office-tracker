@@ -80,18 +80,19 @@ describe("agent version", () => {
     ).toBe("not reported");
   });
 
-  it("builds an IEX-bypass install command for zip folder", () => {
+  it("builds a server-bootstrap install command", () => {
     const command = buildInstallCommand("https://office.example", "token-123");
     expect(command).toContain("Invoke-AgentScriptBypass");
-    expect(command).toContain("Force = $true");
+    expect(command).toContain("Force=$true");
+    expect(command).toContain("/api/agent/files/setup.ps1");
     expect(command).toContain("-Command '& {");
     expect(command).not.toMatch(/ -File /);
   });
 
-  it("builds an IEX-bypass update command for zip folder", () => {
+  it("builds a server-bootstrap update command", () => {
     const command = buildUpdateCommand("https://office.example", "token-123");
     expect(command).toContain("Invoke-AgentScriptBypass");
-    expect(command).toContain("Force = $true");
+    expect(command).toContain("Force=$true");
     expect(command).not.toMatch(/ -File /);
   });
 
@@ -155,7 +156,9 @@ describe("agent version", () => {
     expect(heartbeat).toContain("Invoke-Expression");
     expect(heartbeat).not.toContain('-File ""$SetupScript""');
 
-    expect(setup).toContain("Remove-MarkOfWeb -Path $destination");
+    expect(setup).toContain("Copy-AgentFileWithRetry");
+    expect(setup).toContain("Stop-RunningAgentProcesses");
+    expect(download).toContain("test-connection.ps1");
     expect(setup).toContain("Publish-AgentScriptTxt");
     expect(setup).toContain("Get-Command Publish-AgentScriptTxt");
     expect(setup).toContain("No script-level param()");

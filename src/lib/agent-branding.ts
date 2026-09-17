@@ -57,8 +57,13 @@ function trimTrailingSlash(url: string) {
 }
 
 /** Download setup.ps1 from server and run via IEX. Works without zip on PwC laptops. */
-function buildServerBootstrapCommand(appUrl: string, tokenSetup: string) {
+function buildServerBootstrapCommand(
+  appUrl: string,
+  tokenSetup: string,
+  options?: { force?: boolean },
+) {
   const base = escapePsSingleQuoted(trimTrailingSlash(appUrl));
+  const boundExtras = options?.force ? "; Force=$true; Verbose=$true" : "; Verbose=$true";
   // Outer -Command uses single quotes so pasted command never needs \" inside strings.
   return (
     `powershell -NoProfile -ExecutionPolicy Bypass -Command '& { $ErrorActionPreference=''Stop''; ` +
@@ -75,9 +80,15 @@ function buildServerBootstrapCommand(appUrl: string, tokenSetup: string) {
     `. (Join-Path $lib ''agent-storage.ps1''); ` +
     `Invoke-WebRequest -Uri ($ApiUrl+''/api/agent/files/setup.ps1'') -Headers $h -OutFile (Join-Path $d ''setup.ps1'') -UseBasicParsing; ` +
     `$PSScriptRoot=$d; ` +
-    `$code = Invoke-AgentScriptBypass -Ps1Path (Join-Path $d ''setup.ps1'') -BoundVars @{ ApiUrl=$ApiUrl; Token=$Token } -Wait; ` +
+    `$code = Invoke-AgentScriptBypass -Ps1Path (Join-Path $d ''setup.ps1'') -BoundVars @{ ApiUrl=$ApiUrl; Token=$Token${boundExtras} } -Wait; ` +
     `if ($code -ne 0) { exit $code } }'`
   );
+}
+
+function buildServerBootstrapCommandFromLocalConfig(appUrl: string, options?: { force?: boolean }) {
+  const tokenSetup =
+    `$cfg = Get-Content (Join-Path $env:LOCALAPPDATA ''${AGENT_INSTALL_FOLDER}\\config.json'') -Raw | ConvertFrom-Json; $Token = [string]$cfg.token`;
+  return buildServerBootstrapCommand(appUrl, tokenSetup, options);
 }
 
 /** Run setup from extracted zip via IEX bypass. Single-quoted -Command so paste into PowerShell is safe. */
@@ -116,17 +127,21 @@ export function buildZipReinstallCommandFromLocalConfig(appUrl: string) {
 }
 
 export function buildInstallCommand(appUrl: string, token: string) {
-  return buildZipReinstallCommand(appUrl, token);
+  return buildServerBootstrapCommand(
+    appUrl,
+    `$Token=''${escapePsSingleQuoted(token)}''`,
+    { force: true },
+  );
 }
 
-/** @deprecated Same as buildZipReinstallCommand. */
+/** @deprecated Same as buildInstallCommand (server bootstrap). */
 export function buildUpdateCommand(appUrl: string, token: string) {
-  return buildZipReinstallCommand(appUrl, token);
+  return buildInstallCommand(appUrl, token);
 }
 
-/** Primary copy-paste command: run from extracted zip folder; installs latest agent from server. */
+/** Primary copy-paste command: downloads setup from server (no zip). */
 export function buildSetupCommand(appUrl: string, token: string) {
-  return buildZipReinstallCommand(appUrl, token);
+  return buildInstallCommand(appUrl, token);
 }
 
 /** Download uninstall.ps1 from server and run (no zip). Auth uses Bearer token for /api/agent/files. */
@@ -156,9 +171,9 @@ export function buildBootstrapUninstallCommandFromLocalConfig(appUrl: string) {
   return buildServerBootstrapUninstallCommand(appUrl, tokenSetup);
 }
 
-/** Reinstall from zip when token is only in local config.json. */
+/** Reinstall when token is only in local config.json (server bootstrap). */
 export function buildSetupCommandFromLocalConfig(appUrl: string) {
-  return buildZipReinstallCommandFromLocalConfig(appUrl);
+  return buildServerBootstrapCommandFromLocalConfig(appUrl, { force: true });
 }
 
 const AGENT_LOCAL_CONFIG_PS = `$env:LOCALAPPDATA\\${AGENT_INSTALL_FOLDER}\\config.json`;

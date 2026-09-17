@@ -7,6 +7,7 @@ $script:AgentDownloadFiles = @(
     "install.ps1",
     "uninstall.ps1",
     "version.txt",
+    "test-connection.ps1",
     "agent-download.ps1",
     "agent-storage.ps1"
 )
