@@ -46,11 +46,13 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain("Start-LocalVisit -SyncState $syncState -Ssid $ssid");
   });
 
-  it("does not block sync when force update leaves version unchanged", () => {
-    expect(heartbeat).toContain("return (Compare-AgentVersion $after $before) -gt 0");
-    expect(heartbeat).toContain("if ($serverVersion -and (Compare-AgentVersion $localVersion $serverVersion) -ge 0)");
-    expect(heartbeat).toContain("Only exit for a re-run when scripts actually changed");
-    expect(heartbeat).not.toContain("return $Force -or ((Compare-AgentVersion $after $before) -gt 0)");
+  it("honors admin push update (forceAgentUpdate) before version compare", () => {
+    expect(heartbeat).toContain("function Test-ResponseForceAgentUpdate");
+    expect(heartbeat).toContain("if (Test-ResponseForceAgentUpdate -Response $Response) { return $true }");
+    expect(heartbeat).toContain("Admin push update: refreshing setup scripts from server before clean reinstall");
+    expect(heartbeat).toContain("OK admin push clean reinstall completed");
+    expect(heartbeat).toContain("if ($Force) {");
+    expect(heartbeat).toContain("if ($exitCode -eq 0) {");
   });
 
   it("polls agent config on an interval instead of every task run", () => {

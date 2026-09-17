@@ -91,6 +91,10 @@ type UserReport = {
     } | null;
   };
   serverAgentVersion: string;
+  agentTracking?: {
+    serverAgentMode: string;
+    signalSource: "activity_tick" | "heartbeat";
+  };
   devices: Array<{
     id: string;
     serialNumber: string;
@@ -515,6 +519,19 @@ export function AdminUserReport({
             <dt className="text-muted">Registered laptops</dt>
             <dd>{data.devices.length}</dd>
           </div>
+          {data.agentTracking && (
+            <div className="sm:col-span-2">
+              <dt className="text-muted">Tracking mode (this user)</dt>
+              <dd className="text-xs">
+                Server: <span className="font-mono">{data.agentTracking.serverAgentMode}</span>
+                {" · "}
+                Report pulses:{" "}
+                {data.agentTracking.signalSource === "activity_tick"
+                  ? "sync activity ticks (new agent)"
+                  : "legacy heartbeat rows"}
+              </dd>
+            </div>
+          )}
           {data.apiHits && (
             <div>
               <dt className="text-muted">Agent API hits (all laptops)</dt>
@@ -590,6 +607,7 @@ export function AdminUserReport({
                             {" "}
                             <button
                               type="button"
+                              title="Queues a one-shot clean reinstall on the laptop (reset local agent folder, reinstall from server). Agent 1.5.5+ required for push; older agents need zip reinstall once."
                               onClick={() => void pushDeviceAgentUpdate(device.id)}
                               disabled={
                                 pushingDeviceId === device.id || device.forceAgentUpdate
@@ -635,7 +653,18 @@ export function AdminUserReport({
       <AdminPresenceTimeline userId={userId} timezone={data.user.timezone} />
 
       <section className="card p-6">
-        <h3 className="mb-3 text-sm font-medium">Recent activity (retention window)</h3>
+        <h3 className="mb-3 text-sm font-medium">
+          Recent activity (retention window)
+          {data.agentTracking && (
+            <span className="ml-2 font-normal text-muted">
+              (
+              {data.agentTracking.signalSource === "activity_tick"
+                ? "activity ticks"
+                : "heartbeats"}
+              )
+            </span>
+          )}
+        </h3>
         {data.heartbeats.length === 0 ? (
           <p className="text-sm text-muted">No activity in range.</p>
         ) : (

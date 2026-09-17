@@ -252,8 +252,9 @@ export function InstallTokenCommands({
             <div className="mt-3 rounded border border-[var(--pwc-orange)]/40 bg-[var(--pwc-orange)]/5 p-3">
               <p className="text-sm font-medium text-[var(--pwc-orange)]">Reinstall command</p>
               <p className="mt-1 text-xs text-muted">
-                Run from the extracted zip folder in PowerShell. Installs the latest agent from
-                this server (first install, update, or repair).
+                Run from the extracted zip folder in PowerShell. Clears the local agent folder
+                (config, logs, queue), installs the latest scripts from this server, and verifies
+                required files (first install or full reinstall).
               </p>
               <pre className="mt-2 overflow-x-auto rounded border bg-[var(--background-elevated)] p-2 text-xs whitespace-pre-wrap">
                 {t.setupCommand}

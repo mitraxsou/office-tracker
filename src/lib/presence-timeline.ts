@@ -99,14 +99,23 @@ export function sortPresenceTimelineEntries(
   return [...entries].sort((a, b) => entrySortKey(b) - entrySortKey(a));
 }
 
+function timelineDedupeKey(entry: PresenceTimelineEntry): string {
+  const atKey = entry.at.slice(0, 19);
+  return `${entry.source}:${entry.kind}:${atKey}`;
+}
+
 export function mergePresenceTimelineEntries(
   ...groups: PresenceTimelineEntry[]
 ): PresenceTimelineEntry[] {
-  const seen = new Set<string>();
+  const seenIds = new Set<string>();
+  const seenLogical = new Set<string>();
   const merged: PresenceTimelineEntry[] = [];
   for (const entry of groups) {
-    if (seen.has(entry.id)) continue;
-    seen.add(entry.id);
+    if (seenIds.has(entry.id)) continue;
+    const logical = timelineDedupeKey(entry);
+    if (seenLogical.has(logical)) continue;
+    seenIds.add(entry.id);
+    seenLogical.add(logical);
     merged.push(entry);
   }
   return sortPresenceTimelineEntries(merged);
@@ -197,7 +206,7 @@ export async function getUserPresenceTimeline(
     prisma.activityTick.findMany({
       where: { userId, at: { gte: since } },
       orderBy: { at: "desc" },
-      take: 200,
+      take: 500,
       select: {
         id: true,
         at: true,
@@ -294,12 +303,12 @@ export async function getUserPresenceTimeline(
           kind: "visit_end",
           ssid,
           previousSsid: null,
-          inOffice,
+          inOffice: false,
           officeSsids,
         }),
         ssid,
         previousSsid: null,
-        inOffice,
+        inOffice: null,
         deviceId: visit.deviceId,
         source: "visit",
       });

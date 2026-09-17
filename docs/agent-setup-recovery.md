@@ -1,6 +1,6 @@
 # Agent setup / update recovery (corrupt version.txt)
 
-Standard flow: **download zip → extract → open PowerShell in that folder → Copy reinstall command** on Settings. That one command installs the latest agent from the server (with `-Force`). Optional: run `uninstall.ps1` from the zip folder first for a clean slate.
+Standard flow: **download zip → extract → open PowerShell in that folder → Copy reinstall command** on Settings. That command uses `-Force`: it reports uninstall to the server (if an old `config.json` exists), removes the local `%LOCALAPPDATA%\OfficeTracker` folder (logs, queue, config), reinstalls scripts from the server, verifies required files, and recreates the scheduled task. You do not need a separate `uninstall.ps1` step for a normal reinstall.
 
 
 If the pasted **setup/update** command fails with:

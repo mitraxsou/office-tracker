@@ -56,6 +56,34 @@ describe("presence timeline labels", () => {
   });
 });
 
+describe("presence timeline dedupe", () => {
+  it("drops duplicate rows with same source, kind, and second", () => {
+    const merged = mergePresenceTimelineEntries(
+      {
+        id: "presence-1",
+        at: "2026-09-17T07:02:09.000Z",
+        kind: "session_resume",
+        label: "Laptop woke / resumed",
+        ssid: "Abir_EXT",
+        previousSsid: null,
+        inOffice: false,
+        source: "presence",
+      },
+      {
+        id: "presence-2",
+        at: "2026-09-17T07:02:09.100Z",
+        kind: "session_resume",
+        label: "Laptop woke / resumed",
+        ssid: "Abir_EXT",
+        previousSsid: null,
+        inOffice: false,
+        source: "presence",
+      },
+    );
+    expect(merged).toHaveLength(1);
+  });
+});
+
 describe("presence timeline ordering", () => {
   const sample: PresenceTimelineEntry[] = [
     {

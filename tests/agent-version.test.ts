@@ -160,6 +160,21 @@ describe("agent version", () => {
     expect(installer).not.toContain("& $setupPath");
   });
 
+  it("setup.ps1 force reinstall resets local install like uninstall", () => {
+    const setup = readAgentFile("setup.ps1");
+    expect(setup).toContain("function Reset-LocalAgentInstall");
+    expect(setup).toContain("Force reinstall: clearing local agent");
+    expect(setup).toContain("if ($Force -and (Test-Path -LiteralPath (Get-ConfigPath)))");
+    expect(setup).toContain("Reset-LocalAgentInstall");
+  });
+
+  it("setup.ps1 verifies required files after install", () => {
+    const setup = readAgentFile("setup.ps1");
+    expect(setup).toContain("function Test-AgentInstallLayout");
+    expect(setup).toContain("Test-AgentInstallLayout -InstallDir");
+    expect(setup).toContain("lib\\agent-download.ps1");
+  });
+
   it("setup.ps1 refreshes config.json on reinstall when token, apiUrl, or Force changes", () => {
     const setup = readFileSync(path.join(process.cwd(), "agent", "setup.ps1"), "utf8");
     expect(setup).toContain("$shouldWriteAgentConfig");

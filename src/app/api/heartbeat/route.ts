@@ -108,6 +108,9 @@ export async function POST(request: Request) {
   }
 
   const globalConfig = await getAppConfig();
+  const ssid = sanitizeSsid(body.ssid);
+  const vpnGateway = sanitizeVpnGateway(body.vpnGateway);
+  const allowlist = globalConfig.officeSsids;
 
   try {
     await recordAgentApiHit({
@@ -135,10 +138,6 @@ export async function POST(request: Request) {
       tokenBound: bindResult.newlyBound,
     });
   }
-
-  const ssid = sanitizeSsid(body.ssid);
-  const vpnGateway = sanitizeVpnGateway(body.vpnGateway);
-  const allowlist = globalConfig.officeSsids;
 
   const result = await processHeartbeat({
     userId: user.id,

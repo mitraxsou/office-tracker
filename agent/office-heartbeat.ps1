@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 $ConfigFetchIntervalRuns = 60
 $ConfigCacheMaxAgeMinutes = 120
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.5.3"
+$AgentScriptVersion = "1.5.5"
 
 function Get-InstallDir {
     if ($env:OFFICETRACKER_INSTALL_DIR) {
@@ -782,19 +782,25 @@ function Get-ServerAgentVersionFromResponse {
     return $null
 }
 
+function Test-ResponseForceAgentUpdate {
+    param($Response)
+    if (-not $Response) { return $false }
+    if ($Response.forceAgentUpdate) { return $true }
+    if ($Response.config -and $Response.config.forceAgentUpdate) { return $true }
+    return $false
+}
+
 function Test-NeedsAgentUpdateFromResponse {
     param($Response)
     if (-not $Response) { return $false }
+    # Admin "Push update" must run even when version.txt already matches server (clean reinstall).
+    if (Test-ResponseForceAgentUpdate -Response $Response) { return $true }
     $localVersion = Get-LocalAgentVersion
     $serverVersion = Get-ServerAgentVersionFromResponse -Response $Response
     if ($serverVersion -and (Compare-AgentVersion $localVersion $serverVersion) -ge 0) {
-        # Local scripts are already current; let sync clear any pending force flag.
         return $false
     }
-    if ($Response.forceAgentUpdate) { return $true }
-    if ($Response.config -and $Response.config.forceAgentUpdate) { return $true }
     if (-not $serverVersion) { return $false }
-    # Only auto-update when the server bundle is newer than local scripts.
     return (Compare-AgentVersion $serverVersion $localVersion) -gt 0
 }
 
@@ -836,8 +842,9 @@ function Invoke-AgentSetupScript {
     if (Get-Command Invoke-AgentScriptBypass -ErrorAction SilentlyContinue) {
         $bound = @{ ApiUrl = $ApiUrl; Token = $Token; Silent = $true }
         if ($Force) { $bound.Force = $true }
-        Invoke-AgentScriptBypass -Ps1Path $SetupScript -BoundVars $bound -Hidden -Wait | Out-Null
-        return
+        $code = Invoke-AgentScriptBypass -Ps1Path $SetupScript -BoundVars $bound -Hidden -Wait
+        if ($null -eq $code) { return 0 }
+        return [int]$code
     }
 
     $txtPath = [System.IO.Path]::ChangeExtension($SetupScript, ".txt")
@@ -857,6 +864,49 @@ CreateObject("Wscript.Shell").Run "powershell.exe -NoProfile -NonInteractive -Ex
     $wscript = (Get-Command wscript.exe).Source
     Start-Process -FilePath $wscript -ArgumentList @("//B", "//Nologo", "`"$runnerPath`"") `
         -WindowStyle Hidden -Wait
+    return $LASTEXITCODE
+}
+
+function Download-AgentUpdateScriptsFromServer {
+    param(
+        [string]$ApiUrl,
+        [string]$Token
+    )
+    $installDir = Get-InstallDir
+    if (-not (Test-Path -LiteralPath $installDir)) {
+        New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+    }
+    $headers = @{ Authorization = "Bearer $Token" }
+    $filesBase = "$($ApiUrl.TrimEnd('/'))/api/agent/files"
+    try {
+        $cfgUri = "$ApiUrl/api/agent/config"
+        if ($serial = Get-LaptopSerial) {
+            $cfgUri = "${cfgUri}?serialNumber=$([Uri]::EscapeDataString($serial))"
+        }
+        $cfg = Invoke-RestMethod -Uri $cfgUri -Headers $headers -TimeoutSec 30
+        if ($cfg.agentScriptFilesBase) {
+            $filesBase = [string]$cfg.agentScriptFilesBase.TrimEnd("/")
+        }
+        if ($cfg.vercelProtectionBypass) {
+            $headers["x-vercel-protection-bypass"] = [string]$cfg.vercelProtectionBypass
+        }
+    } catch {
+        Write-Log "WARN update script fetch config failed: $($_.Exception.Message)"
+    }
+
+    $libDir = Join-Path $installDir "lib"
+    New-Item -ItemType Directory -Path $libDir -Force | Out-Null
+    foreach ($pair in @(
+            @{ url = "$filesBase/agent-download.ps1"; dest = Join-Path $libDir "agent-download.ps1" },
+            @{ url = "$filesBase/agent-storage.ps1"; dest = Join-Path $libDir "agent-storage.ps1" },
+            @{ url = "$filesBase/setup.ps1"; dest = Join-Path $installDir "setup.ps1" },
+            @{ url = "$filesBase/update.ps1"; dest = Join-Path $installDir "update.ps1" }
+        )) {
+        Invoke-WebRequest -Uri $pair.url -Headers $headers -OutFile $pair.dest `
+            -UseBasicParsing -TimeoutSec 120
+        Unblock-File -LiteralPath $pair.dest -ErrorAction SilentlyContinue
+    }
+    return [bool](Get-SetupScriptPath)
 }
 
 function Ensure-AgentUpdateScripts {
@@ -868,39 +918,7 @@ function Ensure-AgentUpdateScripts {
 
     Write-Log "Bootstrap: downloading setup scripts for auto-update"
     try {
-        $installDir = Get-InstallDir
-        $headers = @{ Authorization = "Bearer $Token" }
-        $filesBase = "$($ApiUrl.TrimEnd('/'))/api/agent/files"
-
-        try {
-            $cfgUri = "$ApiUrl/api/agent/config"
-            if ($serial = Get-LaptopSerial) {
-                $cfgUri = "${cfgUri}?serialNumber=$([Uri]::EscapeDataString($serial))"
-            }
-            $cfg = Invoke-RestMethod -Uri $cfgUri -Headers $headers -TimeoutSec 30
-            if ($cfg.agentScriptFilesBase) {
-                $filesBase = [string]$cfg.agentScriptFilesBase.TrimEnd("/")
-            }
-            if ($cfg.vercelProtectionBypass) {
-                $headers["x-vercel-protection-bypass"] = [string]$cfg.vercelProtectionBypass
-            }
-        } catch {
-            Write-Log "WARN bootstrap config fetch failed: $($_.Exception.Message)"
-        }
-
-        $libDir = Join-Path $installDir "lib"
-        New-Item -ItemType Directory -Path $libDir -Force | Out-Null
-        foreach ($pair in @(
-                @{ url = "$filesBase/agent-download.ps1"; dest = Join-Path $libDir "agent-download.ps1" },
-                @{ url = "$filesBase/agent-storage.ps1"; dest = Join-Path $libDir "agent-storage.ps1" },
-                @{ url = "$filesBase/setup.ps1"; dest = Join-Path $installDir "setup.ps1" },
-                @{ url = "$filesBase/update.ps1"; dest = Join-Path $installDir "update.ps1" }
-            )) {
-            Invoke-WebRequest -Uri $pair.url -Headers $headers -OutFile $pair.dest `
-                -UseBasicParsing -TimeoutSec 120
-            Unblock-File -LiteralPath $pair.dest -ErrorAction SilentlyContinue
-        }
-        return [bool](Get-SetupScriptPath)
+        return Download-AgentUpdateScriptsFromServer -ApiUrl $ApiUrl -Token $Token
     } catch {
         Write-Log "WARN bootstrap download failed: $($_.Exception.Message)"
         return $false
@@ -908,6 +926,12 @@ function Ensure-AgentUpdateScripts {
 }
 
 function Invoke-AgentSelfUpdate([string]$ApiUrl, [string]$Token, [bool]$Force) {
+    if ($Force) {
+        Write-Log "Admin push update: refreshing setup scripts from server before clean reinstall"
+        if (-not (Download-AgentUpdateScriptsFromServer -ApiUrl $ApiUrl -Token $Token)) {
+            Write-Log "WARN could not download latest setup.ps1 for force reinstall"
+        }
+    }
     if (-not (Ensure-AgentUpdateScripts -ApiUrl $ApiUrl -Token $Token)) {
         Write-Log "WARN setup.ps1 missing; cannot auto-update"
         return $false
@@ -922,11 +946,17 @@ function Invoke-AgentSelfUpdate([string]$ApiUrl, [string]$Token, [bool]$Force) {
     $before = Get-LocalAgentVersion
     try {
         Write-Log "Auto-update: local v$before (force=$Force)"
-        Invoke-AgentSetupScript -SetupScript $setupScript -ApiUrl $ApiUrl -Token $Token -Force:$Force
+        $exitCode = Invoke-AgentSetupScript -SetupScript $setupScript -ApiUrl $ApiUrl -Token $Token -Force:$Force
         $after = Get-LocalAgentVersion
-        Write-Log "Auto-update finished local v$after"
-        # Only exit for a re-run when scripts actually changed; force reinstall alone
-        # should not block sync when the version is already current.
+        Write-Log "Auto-update finished local v$after exit=$exitCode"
+        if ($Force) {
+            if ($exitCode -eq 0) {
+                Write-Log "OK admin push clean reinstall completed"
+                return $true
+            }
+            Write-Log "WARN force reinstall setup exited with code $exitCode"
+            return $false
+        }
         return (Compare-AgentVersion $after $before) -gt 0
     } catch {
         Write-Log "WARN auto-update failed: $($_.Exception.Message)"
@@ -949,15 +979,26 @@ function Set-LastUpdateCheckTime {
     Set-Content -Path (Get-LastUpdateCheckPath) -Value (Get-Date -Format "o") -Encoding UTF8
 }
 
-function Invoke-HourlyUpdateCheck([string]$ApiUrl, [string]$Token) {
+function Invoke-HourlyUpdateCheck([string]$ApiUrl, [string]$Token, [string]$SerialNumber) {
     $setupScript = Get-SetupScriptPath
     if (-not $setupScript) {
         Write-Log "WARN setup.ps1 missing; cannot run hourly update check"
         return
     }
     try {
-        Write-Log "Hourly update check"
-        Invoke-AgentSetupScript -SetupScript $setupScript -ApiUrl $ApiUrl -Token $Token
+        $force = $false
+        try {
+            $cfg = Get-ServerConfig -ApiUrl $ApiUrl -Token $Token -SerialNumber $SerialNumber -Force
+            $force = Test-ResponseForceAgentUpdate -Response $cfg
+        } catch {
+            Write-Log "WARN hourly update config fetch failed: $($_.Exception.Message)"
+        }
+        Write-Log "Hourly update check (force=$force)"
+        if ($force) {
+            Invoke-AgentSelfUpdate -ApiUrl $ApiUrl -Token $Token -Force $true | Out-Null
+            return
+        }
+        Invoke-AgentSetupScript -SetupScript $setupScript -ApiUrl $ApiUrl -Token $Token | Out-Null
     } catch {
         Write-Log "WARN hourly update check failed: $($_.Exception.Message)"
     }
@@ -1129,8 +1170,7 @@ function Invoke-FlushSync {
     $serverConfig = Apply-SyncConfig -Response $response -ApiUrl $ApiUrl
     $selfUpdated = $false
     if (Test-NeedsAgentUpdateFromResponse -Response $response) {
-        $force = [bool]$response.forceAgentUpdate
-        if ($response.config -and $response.config.forceAgentUpdate) { $force = $true }
+        $force = Test-ResponseForceAgentUpdate -Response $response
         $selfUpdated = Invoke-AgentSelfUpdate -ApiUrl $ApiUrl -Token $Token -Force $force
         Set-LastUpdateCheckTime
     }
@@ -1207,8 +1247,7 @@ try {
 }
 
 if (Test-NeedsAgentUpdateFromResponse -Response $serverConfig) {
-    $forceUpdate = [bool]$serverConfig.forceAgentUpdate
-    if ($serverConfig.config -and $serverConfig.config.forceAgentUpdate) { $forceUpdate = $true }
+    $forceUpdate = Test-ResponseForceAgentUpdate -Response $serverConfig
     if (Invoke-AgentSelfUpdate -ApiUrl $apiUrl -Token $token -Force $forceUpdate) {
         Set-LastUpdateCheckTime
         Write-Log "EXIT after self-update; next run uses refreshed scripts"
@@ -1216,7 +1255,7 @@ if (Test-NeedsAgentUpdateFromResponse -Response $serverConfig) {
     }
     Set-LastUpdateCheckTime
 } elseif ($hourlyUpdateCheck) {
-    Invoke-HourlyUpdateCheck -ApiUrl $apiUrl -Token $token
+    Invoke-HourlyUpdateCheck -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber
     Set-LastUpdateCheckTime
 }
 

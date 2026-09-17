@@ -72,7 +72,8 @@ export function AdminUserTable() {
   return (
     <div className="overflow-x-auto">
       <p className="mb-3 text-xs text-muted">
-        Server agent version: <code>{serverVersion}</code>. Push update queues install on next
+        Server agent version: <code>{serverVersion}</code>. Push update queues a one-shot clean
+        reinstall (local agent folder reset) on the next agent sync
         agent sync (within ~6 min by default).
       </p>
       <table className="w-full text-sm">

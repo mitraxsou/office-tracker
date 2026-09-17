@@ -117,6 +117,92 @@ function Get-LaptopSerial {
     return $null
 }
 
+function Send-LifecycleUninstallFromConfig {
+    $configPath = Get-ConfigPath
+    if (-not (Test-Path -LiteralPath $configPath)) { return }
+    try {
+        $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+        $apiUrl = [string]$config.apiUrl
+        $token = [string]$config.token
+        $serial = Get-LaptopSerial
+        if (-not $serial -and $config.serialNumber) { $serial = [string]$config.serialNumber }
+        if (-not $apiUrl -or -not $token -or -not $serial) {
+            Write-SetupLog "WARN lifecycle skip: missing apiUrl, token, or serial"
+            return
+        }
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $versionPath = Join-Path (Get-InstallDir) "version.txt"
+        $scriptVersion = if (Test-Path -LiteralPath $versionPath) { (Get-Content -LiteralPath $versionPath -Raw).Trim() } else { $null }
+        $payload = @{
+            token         = $token
+            serialNumber  = $serial
+            event         = "uninstall"
+            hostname      = $env:COMPUTERNAME
+            scriptVersion = $scriptVersion
+        } | ConvertTo-Json -Compress
+        Invoke-RestMethod -Uri "$($apiUrl.TrimEnd('/'))/api/agent/lifecycle" -Method POST `
+            -ContentType "application/json" -Body $payload -TimeoutSec 20 | Out-Null
+        Write-SetupLog "OK lifecycle uninstall reported before force reinstall"
+    } catch {
+        Write-SetupLog "WARN lifecycle POST failed: $($_.Exception.Message)"
+    }
+}
+
+function Reset-LocalAgentInstall {
+    Write-SetupLog "Force reinstall: clearing local agent (same as uninstall.ps1)"
+    Send-LifecycleUninstallFromConfig
+
+    foreach ($legacy in $LegacyTaskNames) {
+        Unregister-ScheduledTask -TaskName $legacy -Confirm:$false -ErrorAction SilentlyContinue
+    }
+
+    $startupDir = [Environment]::GetFolderPath("Startup")
+    foreach ($legacy in @("OfficeTrackerHeartbeat.lnk", "PwC Office Pulse.lnk", "My Office Pulse.lnk")) {
+        $legacyPath = Join-Path $startupDir $legacy
+        if (Test-Path -LiteralPath $legacyPath) {
+            Remove-Item -LiteralPath $legacyPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    $userDir = Get-InstallDir
+    if (Test-Path -LiteralPath $userDir) {
+        Remove-Item -LiteralPath $userDir -Recurse -Force -ErrorAction SilentlyContinue
+        Write-SetupLog "Removed $userDir"
+    }
+
+    $lockPath = Get-LockPath
+    if (Test-Path -LiteralPath $lockPath) {
+        Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Test-AgentInstallLayout {
+    param([string]$InstallDir)
+    $required = @(
+        "config.json",
+        "version.txt",
+        "office-heartbeat.ps1",
+        "setup.ps1",
+        "update.ps1",
+        "install.ps1",
+        "uninstall.ps1",
+        "run-heartbeat.vbs",
+        "lib\agent-download.ps1",
+        "lib\agent-storage.ps1"
+    )
+    $missing = @()
+    foreach ($rel in $required) {
+        $path = Join-Path $InstallDir $rel
+        if (-not (Test-Path -LiteralPath $path)) {
+            $missing += $rel
+        }
+    }
+    if ($missing.Count -gt 0) {
+        throw "Install incomplete. Missing under $InstallDir`: $($missing -join ', ')"
+    }
+    Write-SetupLog "OK install layout verified ($($required.Count) files)"
+}
+
 function Invoke-BlockedAgentScript {
     param(
         [string]$ScriptPath,
@@ -344,7 +430,7 @@ function Complete-Install {
     if ($Silent) { return }
 
     if ($IsReinstall) {
-        Write-Host "My Office Pulse refreshed (existing install updated)." -ForegroundColor Green
+        Write-Host "My Office Pulse reinstalled (local agent reset and scripts refreshed)." -ForegroundColor Green
         return
     }
 
@@ -355,8 +441,7 @@ function Complete-Install {
     Write-Host "Startup shortcut: My Office Pulse.lnk"
     Write-Host "Config:          $(Join-Path $InstallDir 'config.json')"
     Write-Host ""
-    Write-Host "The agent auto-updates silently when new versions are published."
-    Write-Host "Re-running this setup command is safe anytime."
+    Write-Host "When a new version is published, download the agent zip from Settings and run the reinstall command."
 }
 
 if (-not (Get-Command Publish-AgentScriptTxt -ErrorAction SilentlyContinue)) {
@@ -395,9 +480,15 @@ if (Test-Path -LiteralPath $forceMarkerPath) {
     Remove-Item -LiteralPath $forceMarkerPath -Force -ErrorAction SilentlyContinue
 }
 
+if ($Force -and (Test-Path -LiteralPath (Get-ConfigPath))) {
+    Reset-LocalAgentInstall
+}
+
 $configPath = Get-ConfigPath
 $isFreshInstall = -not (Test-Path $configPath)
 $shouldWriteAgentConfig = $false
+$tokenChanged = $false
+$apiChanged = $false
 
 if (-not $ApiUrl -and $env:OFFICEPULSE_SETUP_API_URL) {
     $ApiUrl = [string]$env:OFFICEPULSE_SETUP_API_URL
@@ -501,6 +592,7 @@ try {
     }
 
     Complete-Install -InstallDir $installDir -IsReinstall $isReinstall -ScriptsUpdated $shouldInstallScripts
+    Test-AgentInstallLayout -InstallDir $installDir
 
     if (Get-Command Invoke-AgentLogMaintenance -ErrorAction SilentlyContinue) {
         Invoke-AgentLogMaintenance -Log { param($m) Write-SetupLog $m }

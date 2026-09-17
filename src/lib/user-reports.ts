@@ -3,11 +3,15 @@ import { prisma } from "./db";
 import { getAppConfig, getUserHoursTarget, getEffectiveAgentStaleGraceHours } from "./app-config";
 import { aggregateHoursForDay, aggregateLaptopActiveForDay } from "./day-hours";
 import { getTodaySummary, getPulseStats } from "./heartbeat-service";
+import {
+  activityTickToSignal,
+  heartbeatToSignal,
+  resolveAgentSignalMode,
+} from "./activity-signal";
 import { summarizeAgentTokens } from "./auth";
 import { getLifecycleEventsForUser } from "./agent-lifecycle";
 import { revokeExpiredPendingTokens } from "./token-expiry";
 import { roundHoursToMinute } from "./visits";
-import { heartbeatInOffice } from "./heartbeat-office";
 import { getAgentVersion } from "./agent-version";
 import { isDeviceAgentVersionStale } from "./agent-update";
 import { getDeviceAgentApiHitTotals, getUserAgentApiHitTotals } from "./agent-api-hits";
@@ -82,14 +86,30 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
     orderBy: { startAt: "desc" },
   });
 
-  const heartbeats = await prisma.heartbeat.findMany({
-    where: {
-      userId,
-      recordedAt: { gte: from, lte: end },
-    },
-    orderBy: { recordedAt: "desc" },
-    take: 100,
-  });
+  const { useActivity } = await resolveAgentSignalMode(userId);
+  const recentSignals = useActivity
+    ? await prisma.activityTick.findMany({
+        where: { userId, at: { gte: from, lte: end } },
+        orderBy: { at: "desc" },
+        take: 100,
+        select: { id: true, at: true, inOffice: true, ssid: true },
+      })
+    : await prisma.heartbeat.findMany({
+        where: {
+          userId,
+          recordedAt: { gte: from, lte: end },
+        },
+        orderBy: { recordedAt: "desc" },
+        take: 100,
+        select: {
+          id: true,
+          recordedAt: true,
+          inOffice: true,
+          ssid: true,
+          vpnGateway: true,
+          source: true,
+        },
+      });
 
   const [apiHitTotals, deviceApiHits] = await Promise.all([
     getUserAgentApiHitTotals(userId, user.timezone),
@@ -127,14 +147,33 @@ export async function getUserReport(userId: string, from: Date, to: Date) {
       source: v.source,
       ssid: v.ssid,
     })),
-    heartbeats: heartbeats.map((h) => ({
-      id: h.id,
-      recordedAt: h.recordedAt.toISOString(),
-      inOffice: heartbeatInOffice(h, config.officeSsids),
-      ssid: h.ssid,
-      vpnGateway: h.vpnGateway,
-      source: h.source,
-    })),
+    heartbeats: useActivity
+      ? recentSignals.map((tick) => {
+          const signal = activityTickToSignal(tick);
+          return {
+            id: tick.id,
+            recordedAt: signal.recordedAt.toISOString(),
+            inOffice: signal.inOffice,
+            ssid: signal.ssid,
+            vpnGateway: signal.vpnGateway,
+            source: signal.source,
+          };
+        })
+      : recentSignals.map((h) => {
+          const signal = heartbeatToSignal(h, config.officeSsids);
+          return {
+            id: h.id,
+            recordedAt: signal.recordedAt.toISOString(),
+            inOffice: signal.inOffice,
+            ssid: signal.ssid,
+            vpnGateway: signal.vpnGateway,
+            source: signal.source,
+          };
+        }),
+    agentTracking: {
+      serverAgentMode: config.agentMode,
+      signalSource: useActivity ? "activity_tick" : "heartbeat",
+    },
     pulse,
     serverAgentVersion,
     devices: user.agentDevices.map((d) => ({
