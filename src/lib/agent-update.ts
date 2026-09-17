@@ -9,6 +9,49 @@ export function isDeviceAgentVersionStale(
   return compareAgentVersions(serverVersion, reportedVersion) !== 0;
 }
 
+export type UserAgentVersionDeviceRow = {
+  serialNumber: string;
+  reportedVersion: string | null;
+  stale: boolean;
+  updatePending: boolean;
+};
+
+export type UserAgentVersionSummary = {
+  serverVersion: string;
+  needsUpdate: boolean;
+  outdatedDeviceCount: number;
+  devices: UserAgentVersionDeviceRow[];
+};
+
+/** Active laptops that should run the server’s current agent bundle. */
+export function getUserAgentVersionSummary(
+  devices: Array<{
+    serialNumber: string;
+    agentScriptVersion: string | null;
+    forceAgentUpdate: boolean;
+    uninstalledAt: Date | null;
+  }>,
+): UserAgentVersionSummary {
+  const serverVersion = getAgentVersion();
+  const active = devices.filter((d) => d.uninstalledAt === null);
+  const rows: UserAgentVersionDeviceRow[] = active.map((d) => {
+    const stale = isDeviceAgentVersionStale(d.agentScriptVersion, serverVersion);
+    return {
+      serialNumber: d.serialNumber,
+      reportedVersion: d.agentScriptVersion,
+      stale,
+      updatePending: d.forceAgentUpdate,
+    };
+  });
+  const needsUpdate = rows.some((r) => r.stale || r.updatePending);
+  return {
+    serverVersion,
+    needsUpdate,
+    outdatedDeviceCount: rows.filter((r) => r.stale).length,
+    devices: rows,
+  };
+}
+
 export async function getDeviceForceAgentUpdate(
   userId: string,
   serialNumber: string | null,

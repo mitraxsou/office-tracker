@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { AgentHealthBanner } from "@/components/AgentHealthBanner";
+import { AgentVersionUpdateBanner } from "@/components/AgentVersionUpdateBanner";
+import type { UserAgentVersionSummary } from "@/lib/agent-update";
 
 type DashboardAlertsProps = {
   agentNeverConnected: boolean;
@@ -8,6 +10,7 @@ type DashboardAlertsProps = {
   agentStale: boolean;
   agentLowPulses: boolean;
   adminAccess: boolean;
+  agentVersionSummary: UserAgentVersionSummary;
   minutesSinceLastSync?: number | null;
   lastSyncedAt?: string | Date | null;
   timezone: string;
@@ -19,11 +22,18 @@ export function DashboardAlerts({
   agentStale,
   agentLowPulses,
   adminAccess,
+  agentVersionSummary,
   minutesSinceLastSync,
   lastSyncedAt,
   timezone,
 }: DashboardAlertsProps) {
   const alerts: ReactNode[] = [];
+
+  if (!agentNeverConnected && agentVersionSummary.needsUpdate) {
+    alerts.push(
+      <AgentVersionUpdateBanner key="agent-version" summary={agentVersionSummary} variant="compact" />,
+    );
+  }
 
   if (agentNeverConnected) {
     alerts.push(

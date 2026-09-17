@@ -3,7 +3,7 @@ import { execSync } from "child_process";
 import { readFileSync } from "fs";
 import path from "path";
 import { compareAgentVersions, getAgentVersion } from "@/lib/agent-version";
-import { isDeviceAgentVersionStale } from "@/lib/agent-update";
+import { getUserAgentVersionSummary, isDeviceAgentVersionStale } from "@/lib/agent-update";
 import {
   describeDeviceAgentVersion,
   summarizeDeviceAgentVersions,
@@ -186,5 +186,29 @@ describe("agent version", () => {
     expect(setup).toContain("if ($shouldWriteAgentConfig)");
     expect(setup).toContain("Updated config.json early");
     expect(setup).not.toMatch(/if \(\$isFreshInstall\) \{\s*\r?\n\s*Write-AgentConfig/s);
+  });
+
+  it("summarizes user agent versions for dashboard prompts", () => {
+    const server = getAgentVersion();
+    const current = getUserAgentVersionSummary([
+      {
+        serialNumber: "ABC",
+        agentScriptVersion: server,
+        forceAgentUpdate: false,
+        uninstalledAt: null,
+      },
+    ]);
+    expect(current.needsUpdate).toBe(false);
+
+    const stale = getUserAgentVersionSummary([
+      {
+        serialNumber: "ABC",
+        agentScriptVersion: "1.0.0",
+        forceAgentUpdate: false,
+        uninstalledAt: null,
+      },
+    ]);
+    expect(stale.needsUpdate).toBe(true);
+    expect(stale.outdatedDeviceCount).toBe(1);
   });
 });

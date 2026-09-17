@@ -1,5 +1,7 @@
 import { prisma } from "./db";
 import { getEffectiveAgentStaleGraceHours } from "./app-config";
+import { getAgentVersion } from "./agent-version";
+import { isDeviceAgentVersionStale } from "./agent-update";
 import {
   agentStatusClass,
   agentStatusLabel,
@@ -20,6 +22,10 @@ export type EnrichedDevice = {
   pendingRemoval: boolean;
   boundTokenLabel: string | null;
   isUninstalled: boolean;
+  agentScriptVersion: string | null;
+  serverAgentVersion: string;
+  agentVersionStale: boolean;
+  forceAgentUpdate: boolean;
 };
 
 export async function getEnrichedDevicesForUser(userId: string): Promise<EnrichedDevice[]> {
@@ -47,6 +53,7 @@ export async function getEnrichedDevicesForUser(userId: string): Promise<Enriche
     }),
   ]);
 
+  const serverAgentVersion = getAgentVersion();
   const pendingDeviceIds = new Set(openRequests.map((r) => r.deviceId));
   const tokenBySerial = new Map(
     boundTokens
@@ -72,6 +79,12 @@ export async function getEnrichedDevicesForUser(userId: string): Promise<Enriche
       pendingRemoval: pendingDeviceIds.has(d.id),
       boundTokenLabel: tokenBySerial.get(d.serialNumber) ?? null,
       isUninstalled,
+      agentScriptVersion: d.agentScriptVersion,
+      serverAgentVersion,
+      agentVersionStale: isUninstalled
+        ? false
+        : isDeviceAgentVersionStale(d.agentScriptVersion, serverAgentVersion),
+      forceAgentUpdate: d.forceAgentUpdate,
     };
   });
 }

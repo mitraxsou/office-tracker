@@ -18,6 +18,8 @@ import {
   InstallTokenCommands,
   needsRefreshInstallCommands,
 } from "@/components/InstallTokenCommands";
+import { AgentVersionUpdateBanner } from "@/components/AgentVersionUpdateBanner";
+import type { UserAgentVersionSummary } from "@/lib/agent-update";
 
 type AgentSetupPanelProps = {
   appUrl: string;
@@ -25,6 +27,7 @@ type AgentSetupPanelProps = {
   legacyBoundCount?: number;
   localDevAgentPath?: string | null;
   adminAccess?: boolean;
+  agentVersionSummary?: UserAgentVersionSummary | null;
 };
 
 export function AgentSetupPanel({
@@ -33,6 +36,7 @@ export function AgentSetupPanel({
   legacyBoundCount = 0,
   localDevAgentPath,
   adminAccess = false,
+  agentVersionSummary = null,
 }: AgentSetupPanelProps) {
   const [copyError, setCopyError] = useState<string | null>(null);
 
@@ -62,6 +66,12 @@ export function AgentSetupPanel({
           <strong>latest version from this server</strong>—first install, routine update, or fixing a
           corrupted agent. Use <strong>PowerShell</strong>, not Command Prompt. No admin required.
         </p>
+
+        {agentVersionSummary?.needsUpdate && (
+          <div className="mb-6">
+            <AgentVersionUpdateBanner summary={agentVersionSummary} variant="full" />
+          </div>
+        )}
 
         {showRefreshCallout && (
           <div className="mb-6 rounded-lg border border-[var(--pwc-orange)]/50 bg-[var(--pwc-orange)]/10 p-4 text-sm">

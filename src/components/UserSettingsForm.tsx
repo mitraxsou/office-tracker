@@ -273,6 +273,23 @@ export function UserSettingsForm({
                 {d.boundTokenLabel && (
                   <span className="text-xs text-muted">Token: {d.boundTokenLabel}</span>
                 )}
+                {!d.isUninstalled && (
+                  <span className="text-xs text-muted">
+                    Agent{" "}
+                    {d.agentScriptVersion ? `v${d.agentScriptVersion}` : "version unknown"}
+                    {d.agentVersionStale ? (
+                      <span className="text-[var(--pwc-orange)]">
+                        {" "}
+                        · update to v{d.serverAgentVersion} recommended
+                      </span>
+                    ) : (
+                      <span className="text-green-400/90"> · up to date</span>
+                    )}
+                    {d.forceAgentUpdate && (
+                      <span className="text-amber-300"> · update queued by admin</span>
+                    )}
+                  </span>
+                )}
               </div>
               {d.lastSeenAt && (
                 <p className="mt-1 text-xs text-muted">

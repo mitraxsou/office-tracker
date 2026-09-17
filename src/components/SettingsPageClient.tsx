@@ -14,6 +14,7 @@ import type { ProfileChangeRequestSummary } from "@/lib/profile-change-requests"
 import { ProfileChangeSection } from "@/components/ProfileChangeSection";
 import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 import { SettingsLayout } from "@/components/SettingsLayout";
+import type { UserAgentVersionSummary } from "@/lib/agent-update";
 
 type Device = EnrichedDevice;
 
@@ -35,6 +36,7 @@ type SettingsPageClientProps = {
   adminAccess?: boolean;
   isWelcome?: boolean;
   devices: Device[];
+  agentVersionSummary: UserAgentVersionSummary;
   installTokens: InstallTokenForUser[];
   legacyBoundCount: number;
   localDevAgentPath?: string | null;
@@ -58,6 +60,7 @@ export function SettingsPageClient({
   adminAccess = false,
   isWelcome,
   devices: initialDevices,
+  agentVersionSummary,
   installTokens,
   legacyBoundCount,
   localDevAgentPath,
@@ -139,6 +142,7 @@ export function SettingsPageClient({
                   legacyBoundCount={legacyBoundCount}
                   localDevAgentPath={localDevAgentPath}
                   adminAccess={adminAccess}
+                  agentVersionSummary={agentVersionSummary}
                 />
                 <UserSettingsForm
                   {...sharedFormProps}

@@ -26,6 +26,7 @@ import {
 } from "@/lib/activity-signal";
 import { formatLastHeartbeat } from "@/lib/visits";
 import { formatPulseAge } from "@/lib/pulse-age";
+import { getUserAgentVersionSummary } from "@/lib/agent-update";
 
 export default async function DashboardPage() {
   const user = await requireAuthenticatedUser();
@@ -80,6 +81,7 @@ export default async function DashboardPage() {
     expectedPulsesPerDay: pulse.expectedPulsesPerDay,
     deviceReferenceAt,
   });
+  const agentVersionSummary = getUserAgentVersionSummary(user.agentDevices);
   const agentNeverConnected = user.agentDevices.length === 0 || !lastSyncedAt;
   const agentStale =
     !isOutToday &&
@@ -137,6 +139,7 @@ export default async function DashboardPage() {
           agentStale={agentStale}
           agentLowPulses={agentLowPulses}
           adminAccess={adminAccess}
+          agentVersionSummary={agentVersionSummary}
           minutesSinceLastSync={minutesSinceLastSync}
           lastSyncedAt={lastSyncedAt}
           timezone={user.timezone}

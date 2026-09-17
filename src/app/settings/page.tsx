@@ -21,6 +21,7 @@ import { SettingsPageClient } from "@/components/SettingsPageClient";
 import { PriorComplianceSettings } from "@/components/PriorComplianceSettings";
 import { AGENT_PRODUCT_NAME } from "@/lib/agent-branding";
 import { needsPriorComplianceOnboarding } from "@/lib/prior-compliance";
+import { getUserAgentVersionSummary } from "@/lib/agent-update";
 
 export default async function SettingsPage({
   searchParams,
@@ -44,6 +45,7 @@ export default async function SettingsPage({
     sessionInstallToken,
   );
   const enrichedDevices = await getEnrichedDevicesForUser(user.id);
+  const agentVersionSummary = getUserAgentVersionSummary(user.agentDevices);
   const timezoneRequestState = await getUserTimezoneRequestState(user.id);
   const profileChangeState = await getUserProfileChangeRequestState(user.id);
   const isBreakglass = isBreakglassEmail(user.email);
@@ -93,6 +95,7 @@ export default async function SettingsPage({
           adminAccess={adminAccess}
           isWelcome={params.welcome === "1"}
           devices={enrichedDevices}
+          agentVersionSummary={agentVersionSummary}
           installTokens={installTokens}
           legacyBoundCount={legacyBoundCount}
           localDevAgentPath={localDevAgentPath}
