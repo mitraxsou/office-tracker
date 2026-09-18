@@ -117,6 +117,214 @@ function Get-LaptopSerial {
     return $null
 }
 
+function Send-LifecycleUninstallFromConfig {
+    $configPath = Get-ConfigPath
+    if (-not (Test-Path -LiteralPath $configPath)) { return }
+    try {
+        $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+        $apiUrl = [string]$config.apiUrl
+        $token = [string]$config.token
+        $serial = Get-LaptopSerial
+        if (-not $serial -and $config.serialNumber) { $serial = [string]$config.serialNumber }
+        if (-not $apiUrl -or -not $token -or -not $serial) {
+            Write-SetupLog "WARN lifecycle skip: missing apiUrl, token, or serial"
+            return
+        }
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $versionPath = Join-Path (Get-InstallDir) "version.txt"
+        $scriptVersion = if (Test-Path -LiteralPath $versionPath) { (Get-Content -LiteralPath $versionPath -Raw).Trim() } else { $null }
+        $payload = @{
+            token         = $token
+            serialNumber  = $serial
+            event         = "uninstall"
+            hostname      = $env:COMPUTERNAME
+            scriptVersion = $scriptVersion
+        } | ConvertTo-Json -Compress
+        Invoke-RestMethod -Uri "$($apiUrl.TrimEnd('/'))/api/agent/lifecycle" -Method POST `
+            -ContentType "application/json" -Body $payload -TimeoutSec 20 | Out-Null
+        Write-SetupLog "OK lifecycle uninstall reported before force reinstall"
+    } catch {
+        Write-SetupLog "WARN lifecycle POST failed: $($_.Exception.Message)"
+    }
+}
+
+function Stop-RunningAgentProcesses {
+    foreach ($taskName in @($TaskName) + $LegacyTaskNames) {
+        Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    }
+    Start-Sleep -Seconds 1
+
+    $needles = @("OfficeTracker", "PwCOfficePulse", "office-heartbeat", "run-heartbeat.vbs")
+    foreach ($procName in @("wscript", "powershell")) {
+        Get-Process -Name $procName -ErrorAction SilentlyContinue | ForEach-Object {
+            try {
+                $cmd = (Get-CimInstance Win32_Process -Filter "ProcessId = $($_.Id)" -ErrorAction Stop).CommandLine
+                if (-not $cmd) { return }
+                foreach ($needle in $needles) {
+                    if ($cmd -like "*$needle*") {
+                        Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+                        break
+                    }
+                }
+            } catch {
+                # ignore per-process query failures
+            }
+        }
+    }
+    Start-Sleep -Seconds 2
+}
+
+function Copy-AgentFileWithRetry {
+    param(
+        [string]$Source,
+        [string]$Destination,
+        [int]$MaxAttempts = 8
+    )
+    Remove-MarkOfWeb -Path $Source
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            $destDir = Split-Path -Parent $Destination
+            if ($destDir -and -not (Test-Path -LiteralPath $destDir)) {
+                New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+            }
+            Copy-Item -LiteralPath $Source -Destination $Destination -Force
+            Remove-MarkOfWeb -Path $Destination
+            return
+        } catch {
+            if ($attempt -ge $MaxAttempts) { throw }
+            Write-SetupLog "WARN copy retry $attempt/$MaxAttempts: $($_.Exception.Message)"
+            Stop-RunningAgentProcesses
+            Start-Sleep -Milliseconds 400
+        }
+    }
+}
+
+function Reset-LocalAgentInstall {
+    Write-SetupLog "Force reinstall: clearing local agent (same as uninstall.ps1)"
+    Send-LifecycleUninstallFromConfig
+    Stop-RunningAgentProcesses
+
+    foreach ($legacy in $LegacyTaskNames) {
+        Unregister-ScheduledTask -TaskName $legacy -Confirm:$false -ErrorAction SilentlyContinue
+    }
+    Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
+
+    $startupDir = [Environment]::GetFolderPath("Startup")
+    foreach ($legacy in @("OfficeTrackerHeartbeat.lnk", "PwC Office Pulse.lnk", "My Office Pulse.lnk")) {
+        $legacyPath = Join-Path $startupDir $legacy
+        if (Test-Path -LiteralPath $legacyPath) {
+            Remove-Item -LiteralPath $legacyPath -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    $userDir = Get-InstallDir
+    if (Test-Path -LiteralPath $userDir) {
+        Remove-Item -LiteralPath $userDir -Recurse -Force -ErrorAction SilentlyContinue
+        Write-SetupLog "Removed $userDir"
+    }
+
+    $lockPath = Get-LockPath
+    if (Test-Path -LiteralPath $lockPath) {
+        Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Get-AgentLayoutScriptFiles {
+    @(
+        "version.txt",
+        "office-heartbeat.ps1",
+        "setup.ps1",
+        "update.ps1",
+        "install.ps1",
+        "uninstall.ps1",
+        "lib\agent-download.ps1",
+        "lib\agent-storage.ps1",
+        "test-connection.ps1"
+    )
+}
+
+function Get-MissingAgentLayoutFiles {
+    param(
+        [string]$InstallDir,
+        [switch]$IncludeGenerated,
+        [switch]$IncludeConfig
+    )
+    $required = @()
+    if ($IncludeConfig) { $required += "config.json" }
+    $required += Get-AgentLayoutScriptFiles
+    if ($IncludeGenerated) { $required += "run-heartbeat.vbs" }
+    $missing = @()
+    foreach ($rel in $required) {
+        $path = Join-Path $InstallDir $rel
+        if (-not (Test-Path -LiteralPath $path)) {
+            $missing += $rel
+        }
+    }
+    return @($missing)
+}
+
+function Get-AgentDownloadDestPath {
+    param([string]$DestDir, [string]$File)
+    if ($File -eq "agent-download.ps1" -or $File -eq "agent-storage.ps1") {
+        $libDir = Join-Path $DestDir "lib"
+        New-Item -ItemType Directory -Path $libDir -Force | Out-Null
+        return Join-Path $libDir $File
+    }
+    return Join-Path $DestDir $File
+}
+
+function Complete-DownloadedAgentScripts {
+    param(
+        [string]$FilesBase,
+        [string]$Token,
+        [string]$BypassSecret,
+        [string]$DestDir
+    )
+    $refreshedLib = Join-Path $DestDir "lib\agent-download.ps1"
+    if (Test-Path -LiteralPath $refreshedLib) {
+        . $refreshedLib
+    }
+
+    $files = @()
+    if ($script:AgentDownloadFiles) {
+        $files += @($script:AgentDownloadFiles)
+    }
+    foreach ($extra in @(
+        "office-heartbeat.ps1",
+        "setup.ps1",
+        "update.ps1",
+        "install.ps1",
+        "uninstall.ps1",
+        "version.txt",
+        "test-connection.ps1",
+        "agent-download.ps1",
+        "agent-storage.ps1"
+    )) {
+        if ($files -notcontains $extra) { $files += $extra }
+    }
+
+    $headers = New-AgentDownloadHeaders -Token $Token -BypassSecret $BypassSecret
+    foreach ($file in $files) {
+        $dest = Get-AgentDownloadDestPath -DestDir $DestDir -File $file
+        if (Test-Path -LiteralPath $dest) { continue }
+        $url = "$FilesBase/$file"
+        Write-SetupLog "Downloading missing $url"
+        Invoke-WebRequest -Uri $url -Headers $headers -OutFile $dest -UseBasicParsing -TimeoutSec 120
+        if (Get-Command Remove-MarkOfWeb -ErrorAction SilentlyContinue) {
+            Remove-MarkOfWeb -Path $dest
+        }
+    }
+}
+
+function Test-AgentInstallLayout {
+    param([string]$InstallDir)
+    $missing = Get-MissingAgentLayoutFiles -InstallDir $InstallDir -IncludeGenerated -IncludeConfig
+    if ($missing.Count -gt 0) {
+        throw "Install incomplete. Missing under $InstallDir`: $($missing -join ', ')"
+    }
+    Write-SetupLog "OK install layout verified"
+}
+
 function Invoke-BlockedAgentScript {
     param(
         [string]$ScriptPath,
@@ -242,18 +450,22 @@ function Install-AgentScripts {
                 $libDir = Join-Path $TargetDir "lib"
                 New-Item -ItemType Directory -Path $libDir -Force | Out-Null
                 $destination = Join-Path $libDir $file
-                Remove-MarkOfWeb -Path $src
-                Copy-Item $src $destination -Force
-                Remove-MarkOfWeb -Path $destination
+                Copy-AgentFileWithRetry -Source $src -Destination $destination
             }
             continue
         }
         $src = Join-Path $SourceDir $file
         if (Test-Path $src) {
-            Remove-MarkOfWeb -Path $src
             $destination = Join-Path $TargetDir $file
-            Copy-Item $src $destination -Force
-            Remove-MarkOfWeb -Path $destination
+            Copy-AgentFileWithRetry -Source $src -Destination $destination
+        }
+    }
+    foreach ($rel in (Get-AgentLayoutScriptFiles)) {
+        $src = Join-Path $SourceDir $rel
+        if (-not (Test-Path -LiteralPath $src)) { continue }
+        $destination = Join-Path $TargetDir $rel
+        if (-not (Test-Path -LiteralPath $destination)) {
+            Copy-AgentFileWithRetry -Source $src -Destination $destination
         }
     }
 }
@@ -333,18 +545,14 @@ function Complete-Install {
     Register-HiddenTask -VbsPath $vbsPath -InstallDir $InstallDir
     Remove-LegacyUpdateTask
 
-    if ($ScriptsUpdated) {
-        try {
-            Invoke-BlockedAgentScript -ScriptPath $heartbeatScript
-        } catch {
-            Write-SetupLog "WARN first heartbeat after setup failed: $($_.Exception.Message)"
-        }
+    if ($ScriptsUpdated -and -not $Force) {
+        Write-SetupLog "Skipping inline heartbeat after setup (task will sync). Run test-connection.ps1 to verify."
     }
 
     if ($Silent) { return }
 
     if ($IsReinstall) {
-        Write-Host "My Office Pulse refreshed (existing install updated)." -ForegroundColor Green
+        Write-Host "My Office Pulse reinstalled (local agent reset and scripts refreshed)." -ForegroundColor Green
         return
     }
 
@@ -355,8 +563,7 @@ function Complete-Install {
     Write-Host "Startup shortcut: My Office Pulse.lnk"
     Write-Host "Config:          $(Join-Path $InstallDir 'config.json')"
     Write-Host ""
-    Write-Host "The agent auto-updates silently when new versions are published."
-    Write-Host "Re-running this setup command is safe anytime."
+    Write-Host "When a new version is published, download the agent zip from Settings and run the reinstall command."
 }
 
 if (-not (Get-Command Publish-AgentScriptTxt -ErrorAction SilentlyContinue)) {
@@ -398,6 +605,8 @@ if (Test-Path -LiteralPath $forceMarkerPath) {
 $configPath = Get-ConfigPath
 $isFreshInstall = -not (Test-Path $configPath)
 $shouldWriteAgentConfig = $false
+$tokenChanged = $false
+$apiChanged = $false
 
 if (-not $ApiUrl -and $env:OFFICEPULSE_SETUP_API_URL) {
     $ApiUrl = [string]$env:OFFICEPULSE_SETUP_API_URL
@@ -445,12 +654,17 @@ if (Test-Path $lockPath) {
 
 Set-Content -Path $lockPath -Value (Get-Date -Format "o") -Encoding UTF8
 
+$pendingForceReset = $Force -and (
+    (Test-Path -LiteralPath (Get-ConfigPath)) -or (Test-ExistingInstall)
+)
+$isReinstallForComplete = Test-ExistingInstall
+
 $tempDir = $null
 try {
     if (-not (Test-AgentBearerToken -ApiUrl $ApiUrl -Token $Token)) {
         throw "Agent install token was rejected by the server. In Settings, refresh or regenerate your install token, then run the new reinstall command."
     }
-    if ($shouldWriteAgentConfig) {
+    if ($shouldWriteAgentConfig -and -not $pendingForceReset) {
         Write-AgentConfig -InstallDir $installDir -ApiUrlValue $ApiUrl -TokenValue $Token
         if (-not $isFreshInstall) {
             $cfgReasonEarly = if ($Force) { "force" } elseif ($tokenChanged) { "token" } else { "apiUrl" }
@@ -462,6 +676,16 @@ try {
     Download-AgentScriptsFromApp -FilesBase $downloadCfg.FilesBase -Token $Token `
         -BypassSecret $downloadCfg.BypassSecret -DestDir $tempDir `
         -Log { param($m) Write-SetupLog $m }
+    Complete-DownloadedAgentScripts -FilesBase $downloadCfg.FilesBase -Token $Token `
+        -BypassSecret $downloadCfg.BypassSecret -DestDir $tempDir
+
+    if ($pendingForceReset) {
+        Reset-LocalAgentInstall
+        if (-not (Test-Path -LiteralPath $installDir)) {
+            New-Item -ItemType Directory -Path $installDir -Force | Out-Null
+        }
+        $isReinstallForComplete = $true
+    }
 
     $newVersion = "0.0.0"
     $versionFile = Join-Path $tempDir "version.txt"
@@ -481,11 +705,11 @@ try {
     }
 
     $localVersion = Get-LocalAgentVersion
-    $isReinstall = Test-ExistingInstall
-    $shouldInstallScripts = $isFreshInstall -or $Force -or (Compare-AgentVersion $newVersion $localVersion) -ne 0
+    $missingScripts = Get-MissingAgentLayoutFiles -InstallDir $installDir
+    $shouldInstallScripts = $isFreshInstall -or $Force -or $pendingForceReset -or ((Compare-AgentVersion $newVersion $localVersion) -ne 0) -or ($missingScripts.Count -gt 0)
 
     if ($shouldInstallScripts) {
-        $reason = if ($isFreshInstall) { "fresh install" } elseif ($Force) { "force" } else { "version $localVersion -> $newVersion" }
+        $reason = if ($isFreshInstall) { "fresh install" } elseif ($Force) { "force" } elseif ($missingScripts.Count -gt 0) { "repair missing $($missingScripts -join ', ')" } else { "version $localVersion -> $newVersion" }
         Write-SetupLog "Installing scripts ($reason)"
         Install-AgentScripts -SourceDir $tempDir -TargetDir $installDir
     } else {
@@ -500,14 +724,22 @@ try {
         }
     }
 
-    Complete-Install -InstallDir $installDir -IsReinstall $isReinstall -ScriptsUpdated $shouldInstallScripts
+    Write-SetupLog "Registering scheduled task and shortcuts..."
+    Complete-Install -InstallDir $installDir -IsReinstall $isReinstallForComplete -ScriptsUpdated $shouldInstallScripts
+    Write-SetupLog "Verifying install layout..."
+    Test-AgentInstallLayout -InstallDir $installDir
 
     if (Get-Command Invoke-AgentLogMaintenance -ErrorAction SilentlyContinue) {
         Invoke-AgentLogMaintenance -Log { param($m) Write-SetupLog $m }
     }
 
-    if ($shouldInstallScripts -and -not $Silent -and -not $isFreshInstall) {
-        Write-Host "My Office Pulse updated to v$newVersion." -ForegroundColor Green
+    $installedVersion = Get-LocalAgentVersion
+    if (-not $Silent) {
+        Write-Host ""
+        Write-Host "SUCCESS: My Office Pulse agent v$installedVersion is installed." -ForegroundColor Green
+        Write-Host "  Folder: $installDir" -ForegroundColor Gray
+        Write-Host "  Log:    $(Join-Path $installDir 'logs\setup.log')" -ForegroundColor Gray
+        Write-Host "  Test:   powershell -NoProfile -ExecutionPolicy Bypass -File `"$(Join-Path $installDir 'test-connection.ps1')`"" -ForegroundColor Cyan
     }
 } catch {
     Write-SetupLog "ERROR $($_.Exception.Message)"

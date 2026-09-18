@@ -53,6 +53,7 @@ describe("agent version", () => {
     expect(heartbeat).toContain("$forceConfigFetch = $isResumeRun -or $hourlyUpdateCheck");
     expect(heartbeat).not.toContain("Get-FreshVersionCheckConfig");
     expect(heartbeat).toContain("Ensure-AgentUpdateScripts");
+    expect(heartbeat).toContain("$filesBase/test-connection.ps1");
     expect(heartbeat).toContain("Get-ServerAgentVersionFromResponse");
     expect(heartbeat).toContain("(Compare-AgentVersion $serverVersion $localVersion) -gt 0");
     expect(heartbeat).toContain("EXIT after self-update");
@@ -196,6 +197,10 @@ describe("agent version", () => {
     expect(setup).toContain("function Test-AgentInstallLayout");
     expect(setup).toContain("Test-AgentInstallLayout -InstallDir");
     expect(setup).toContain("lib\\agent-download.ps1");
+    expect(setup).toContain("function Complete-DownloadedAgentScripts");
+    expect(setup).toContain("repair missing");
+    expect(setup).toContain("Downloading missing");
+    expect(setup).toContain('Get-MissingAgentLayoutFiles -InstallDir $installDir');
   });
 
   it("setup.ps1 refreshes config.json on reinstall when token, apiUrl, or Force changes", () => {

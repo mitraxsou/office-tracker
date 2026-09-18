@@ -90,7 +90,7 @@ function Write-SetupLog([string]$Message) {
     if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
     $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message"
     Add-Content -Path (Join-Path $logDir "setup.log") -Value $line -ErrorAction SilentlyContinue
-    if (-not $Silent) { Write-Host $Message }
+    if ($Verbose -and -not $Silent) { Write-Host $Message }
 }
 
 function Test-IsAdmin {
@@ -229,21 +229,30 @@ function Reset-LocalAgentInstall {
     }
 }
 
-function Test-AgentInstallLayout {
-    param([string]$InstallDir)
-    $required = @(
-        "config.json",
+function Get-AgentLayoutScriptFiles {
+    @(
         "version.txt",
         "office-heartbeat.ps1",
         "setup.ps1",
         "update.ps1",
         "install.ps1",
         "uninstall.ps1",
-        "run-heartbeat.vbs",
         "lib\agent-download.ps1",
         "lib\agent-storage.ps1",
         "test-connection.ps1"
     )
+}
+
+function Get-MissingAgentLayoutFiles {
+    param(
+        [string]$InstallDir,
+        [switch]$IncludeGenerated,
+        [switch]$IncludeConfig
+    )
+    $required = @()
+    if ($IncludeConfig) { $required += "config.json" }
+    $required += Get-AgentLayoutScriptFiles
+    if ($IncludeGenerated) { $required += "run-heartbeat.vbs" }
     $missing = @()
     foreach ($rel in $required) {
         $path = Join-Path $InstallDir $rel
@@ -251,10 +260,69 @@ function Test-AgentInstallLayout {
             $missing += $rel
         }
     }
+    return @($missing)
+}
+
+function Get-AgentDownloadDestPath {
+    param([string]$DestDir, [string]$File)
+    if ($File -eq "agent-download.ps1" -or $File -eq "agent-storage.ps1") {
+        $libDir = Join-Path $DestDir "lib"
+        New-Item -ItemType Directory -Path $libDir -Force | Out-Null
+        return Join-Path $libDir $File
+    }
+    return Join-Path $DestDir $File
+}
+
+function Complete-DownloadedAgentScripts {
+    param(
+        [string]$FilesBase,
+        [string]$Token,
+        [string]$BypassSecret,
+        [string]$DestDir
+    )
+    $refreshedLib = Join-Path $DestDir "lib\agent-download.ps1"
+    if (Test-Path -LiteralPath $refreshedLib) {
+        . $refreshedLib
+    }
+
+    $files = @()
+    if ($script:AgentDownloadFiles) {
+        $files += @($script:AgentDownloadFiles)
+    }
+    foreach ($extra in @(
+        "office-heartbeat.ps1",
+        "setup.ps1",
+        "update.ps1",
+        "install.ps1",
+        "uninstall.ps1",
+        "version.txt",
+        "test-connection.ps1",
+        "agent-download.ps1",
+        "agent-storage.ps1"
+    )) {
+        if ($files -notcontains $extra) { $files += $extra }
+    }
+
+    $headers = New-AgentDownloadHeaders -Token $Token -BypassSecret $BypassSecret
+    foreach ($file in $files) {
+        $dest = Get-AgentDownloadDestPath -DestDir $DestDir -File $file
+        if (Test-Path -LiteralPath $dest) { continue }
+        $url = "$FilesBase/$file"
+        Write-SetupLog "Downloading missing $url"
+        Invoke-WebRequest -Uri $url -Headers $headers -OutFile $dest -UseBasicParsing -TimeoutSec 120
+        if (Get-Command Remove-MarkOfWeb -ErrorAction SilentlyContinue) {
+            Remove-MarkOfWeb -Path $dest
+        }
+    }
+}
+
+function Test-AgentInstallLayout {
+    param([string]$InstallDir)
+    $missing = Get-MissingAgentLayoutFiles -InstallDir $InstallDir -IncludeGenerated -IncludeConfig
     if ($missing.Count -gt 0) {
         throw "Install incomplete. Missing under $InstallDir`: $($missing -join ', ')"
     }
-    Write-SetupLog "OK install layout verified ($($required.Count) files)"
+    Write-SetupLog "OK install layout verified"
 }
 
 function Invoke-BlockedAgentScript {
@@ -389,6 +457,14 @@ function Install-AgentScripts {
         $src = Join-Path $SourceDir $file
         if (Test-Path $src) {
             $destination = Join-Path $TargetDir $file
+            Copy-AgentFileWithRetry -Source $src -Destination $destination
+        }
+    }
+    foreach ($rel in (Get-AgentLayoutScriptFiles)) {
+        $src = Join-Path $SourceDir $rel
+        if (-not (Test-Path -LiteralPath $src)) { continue }
+        $destination = Join-Path $TargetDir $rel
+        if (-not (Test-Path -LiteralPath $destination)) {
             Copy-AgentFileWithRetry -Source $src -Destination $destination
         }
     }
@@ -600,6 +676,8 @@ try {
     Download-AgentScriptsFromApp -FilesBase $downloadCfg.FilesBase -Token $Token `
         -BypassSecret $downloadCfg.BypassSecret -DestDir $tempDir `
         -Log { param($m) Write-SetupLog $m }
+    Complete-DownloadedAgentScripts -FilesBase $downloadCfg.FilesBase -Token $Token `
+        -BypassSecret $downloadCfg.BypassSecret -DestDir $tempDir
 
     if ($pendingForceReset) {
         Reset-LocalAgentInstall
@@ -627,10 +705,11 @@ try {
     }
 
     $localVersion = Get-LocalAgentVersion
-    $shouldInstallScripts = $isFreshInstall -or $Force -or $pendingForceReset -or (Compare-AgentVersion $newVersion $localVersion) -ne 0
+    $missingScripts = Get-MissingAgentLayoutFiles -InstallDir $installDir
+    $shouldInstallScripts = $isFreshInstall -or $Force -or $pendingForceReset -or ((Compare-AgentVersion $newVersion $localVersion) -ne 0) -or ($missingScripts.Count -gt 0)
 
     if ($shouldInstallScripts) {
-        $reason = if ($isFreshInstall) { "fresh install" } elseif ($Force) { "force" } else { "version $localVersion -> $newVersion" }
+        $reason = if ($isFreshInstall) { "fresh install" } elseif ($Force) { "force" } elseif ($missingScripts.Count -gt 0) { "repair missing $($missingScripts -join ', ')" } else { "version $localVersion -> $newVersion" }
         Write-SetupLog "Installing scripts ($reason)"
         Install-AgentScripts -SourceDir $tempDir -TargetDir $installDir
     } else {

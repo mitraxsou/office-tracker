@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 $ConfigFetchIntervalRuns = 60
 $ConfigCacheMaxAgeMinutes = 120
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.5.9"
+$AgentScriptVersion = "1.5.10"
 
 function Get-InstallDir {
     if ($env:OFFICETRACKER_INSTALL_DIR) {
@@ -973,7 +973,8 @@ function Download-AgentUpdateScriptsFromServer {
             @{ url = "$filesBase/agent-download.ps1"; dest = Join-Path $libDir "agent-download.ps1" },
             @{ url = "$filesBase/agent-storage.ps1"; dest = Join-Path $libDir "agent-storage.ps1" },
             @{ url = "$filesBase/setup.ps1"; dest = Join-Path $installDir "setup.ps1" },
-            @{ url = "$filesBase/update.ps1"; dest = Join-Path $installDir "update.ps1" }
+            @{ url = "$filesBase/update.ps1"; dest = Join-Path $installDir "update.ps1" },
+            @{ url = "$filesBase/test-connection.ps1"; dest = Join-Path $installDir "test-connection.ps1" }
         )) {
         Invoke-WebRequest -Uri $pair.url -Headers $headers -OutFile $pair.dest `
             -UseBasicParsing -TimeoutSec 120
