@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
+import { buildAdminUserReportHref } from "@/lib/admin-user-report-date";
 
 type SearchResult = {
   id: string;
@@ -11,7 +12,15 @@ type SearchResult = {
 
 const SEARCH_DELAY_MS = 250;
 
-export function AdminUserReportSearch({ currentUserId }: { currentUserId: string }) {
+export function AdminUserReportSearch({
+  currentUserId,
+  preserveMonth,
+  preserveDate,
+}: {
+  currentUserId: string;
+  preserveMonth?: string | null;
+  preserveDate?: string | null;
+}) {
   const router = useRouter();
   const listId = useId();
   const [query, setQuery] = useState("");
@@ -70,7 +79,12 @@ export function AdminUserReportSearch({ currentUserId }: { currentUserId: string
   function selectUser(user: SearchResult) {
     setQuery("");
     setOpen(false);
-    router.push(`/admin/reports/users/${user.id}`);
+    router.push(
+      buildAdminUserReportHref(user.id, {
+        month: preserveMonth,
+        date: preserveDate,
+      }),
+    );
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -95,7 +109,7 @@ export function AdminUserReportSearch({ currentUserId }: { currentUserId: string
   return (
     <div className="relative w-full sm:max-w-sm">
       <label htmlFor={`${listId}-input`} className="mb-1 block text-xs text-muted">
-        Search another user
+        Switch user
       </label>
       <input
         id={`${listId}-input`}

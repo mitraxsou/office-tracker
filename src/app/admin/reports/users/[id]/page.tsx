@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { enforcePasswordChangeIfRequired, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
@@ -37,14 +38,16 @@ export default async function AdminUserReportPage({
       <AppNav />
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-8">
         <AdminSubNav active="reports" />
-        <AdminUserReport
-          userId={id}
-          profileChangeBlocked={!!profileChangeBlockedMessage}
-          profileChangeBlockedMessage={profileChangeBlockedMessage}
-          profileChangeOpenRequest={profileChangeState?.openRequest ?? null}
-          fiscalYearStartMonth={config.fiscalYearStartMonth}
-          fiscalYearEndMonth={config.fiscalYearEndMonth}
-        />
+        <Suspense fallback={<p className="text-muted">Loading user report...</p>}>
+          <AdminUserReport
+            userId={id}
+            profileChangeBlocked={!!profileChangeBlockedMessage}
+            profileChangeBlockedMessage={profileChangeBlockedMessage}
+            profileChangeOpenRequest={profileChangeState?.openRequest ?? null}
+            fiscalYearStartMonth={config.fiscalYearStartMonth}
+            fiscalYearEndMonth={config.fiscalYearEndMonth}
+          />
+        </Suspense>
       </main>
     </>
   );

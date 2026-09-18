@@ -65,6 +65,9 @@ export type MonthlyReportSectionProps = {
   onSelectDate: (date: string | null) => void;
   agentHealthLabel?: string;
   agentHealthDetail?: string;
+  /** When false, calendar keeps selection on re-click and hides inline day detail. */
+  dayWorkspaceMode?: boolean;
+  todayKey?: string | null;
 };
 
 function progressStateToTone(state: MonthlyProgressState): KpiTone {
@@ -85,6 +88,8 @@ export function MonthlyReportSection({
   onSelectDate,
   agentHealthLabel,
   agentHealthDetail,
+  dayWorkspaceMode = false,
+  todayKey = null,
 }: MonthlyReportSectionProps) {
   const chartData: DailyHoursPoint[] = useMemo(
     () =>
@@ -108,7 +113,7 @@ export function MonthlyReportSection({
   const agentLabel = agentHealthLabel ?? (pulse.agentHealthy ? "Healthy" : "Stale");
 
   return (
-    <div className="space-y-4">
+    <div id="month-overview" className="scroll-mt-20 space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label="Days met target"
@@ -158,12 +163,20 @@ export function MonthlyReportSection({
               targetHours={hoursTarget}
               title="Daily office hours"
               selectedDate={selectedDate}
-              onBarClick={(date) => onSelectDate(selectedDate === date ? null : date)}
+              onBarClick={(date) =>
+                onSelectDate(
+                  dayWorkspaceMode
+                    ? date
+                    : selectedDate === date
+                      ? null
+                      : date,
+                )
+              }
               height={220}
             />
             <p className="mt-2 text-[11px] text-muted">
-              Orange bars meet the daily target. Amber bars are below target. Click a bar to filter
-              visits.
+              Orange bars meet the daily target. Amber bars are below target. Click a bar to
+              {dayWorkspaceMode ? " open that day." : " filter visits."}
             </p>
           </div>
           <div className="min-w-0">
@@ -177,11 +190,14 @@ export function MonthlyReportSection({
               selectedDate={selectedDate}
               onSelectDate={onSelectDate}
               compact
+              allowDeselect={!dayWorkspaceMode}
+              showInlineDayDetail={!dayWorkspaceMode}
+              todayKey={todayKey}
             />
           </div>
         </div>
 
-        {selectedDate && (
+        {selectedDate && !dayWorkspaceMode && (
           <p className="mt-3 text-xs text-muted">
             Showing visits for <strong className="text-accent">{selectedDate}</strong>.{" "}
             <button
@@ -191,6 +207,12 @@ export function MonthlyReportSection({
             >
               Clear filter
             </button>
+          </p>
+        )}
+        {selectedDate && dayWorkspaceMode && (
+          <p className="mt-3 text-xs text-muted">
+            Selected day: <strong className="text-accent">{selectedDate}</strong>. Day details are
+            above; visit corrections are below.
           </p>
         )}
       </section>

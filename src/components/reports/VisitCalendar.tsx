@@ -31,6 +31,12 @@ type VisitCalendarProps = {
   selectedDate: string | null;
   onSelectDate: (date: string | null) => void;
   compact?: boolean;
+  /** When false, clicking the selected day keeps it selected instead of clearing. */
+  allowDeselect?: boolean;
+  /** Hide the inline day detail panel (useful when a parent owns the day workspace). */
+  showInlineDayDetail?: boolean;
+  /** YYYY-MM-DD for "today" styling in the user's timezone. */
+  todayKey?: string | null;
 };
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -54,6 +60,9 @@ export function VisitCalendar({
   selectedDate,
   onSelectDate,
   compact = false,
+  allowDeselect = true,
+  showInlineDayDetail = true,
+  todayKey = null,
 }: VisitCalendarProps) {
   const cellHeight = compact ? "h-14" : "h-20";
   const emptyCellHeight = compact ? "h-14" : "h-20";
@@ -102,6 +111,7 @@ export function VisitCalendar({
                   const hours = summary?.totalHours ?? 0;
                   const met = summary?.metTarget ?? false;
                   const isSelected = selectedDate === cell.dayKey;
+                  const isToday = todayKey === cell.dayKey;
                   const hasVisits = hours > 0;
 
                   return (
@@ -109,8 +119,11 @@ export function VisitCalendar({
                       <button
                         type="button"
                         onClick={() =>
-                          onSelectDate(isSelected ? null : cell.dayKey)
+                          onSelectDate(isSelected && allowDeselect ? null : cell.dayKey)
                         }
+                        aria-pressed={isSelected}
+                        aria-current={isToday ? "date" : undefined}
+                        aria-label={`${cell.dayKey}${hasVisits ? `, ${roundHours(hours)} hours` : ", no visits"}${met ? ", target met" : ""}${isToday ? ", today" : ""}${isSelected ? ", selected" : ""}`}
                         className={`flex h-full w-full flex-col rounded-md text-left transition-colors ${compact ? "p-1" : "p-1.5"} ${
                           isSelected
                             ? "bg-[var(--pwc-orange)]/20 ring-2 ring-[var(--pwc-orange)]"
@@ -119,9 +132,13 @@ export function VisitCalendar({
                                 ? "bg-green-500/10 hover:bg-green-500/15"
                                 : "bg-[var(--pwc-orange)]/5 hover:bg-[var(--pwc-orange)]/10"
                               : "hover:bg-[var(--border)]/40"
-                        }`}
+                        } ${isToday && !isSelected ? "ring-1 ring-[var(--pwc-orange)]/50" : ""}`}
                       >
-                        <span className={compact ? "text-[10px] font-medium" : "text-xs font-medium"}>
+                        <span
+                          className={`${compact ? "text-[10px] font-medium" : "text-xs font-medium"} ${
+                            isToday ? "text-accent" : ""
+                          }`}
+                        >
                           {cell.dayOfMonth}
                         </span>
                         {hasVisits ? (
@@ -164,7 +181,7 @@ export function VisitCalendar({
         </p>
       )}
 
-      {selectedDate && (
+      {showInlineDayDetail && selectedDate && (
         <VisitDayDetail
           dayKey={selectedDate}
           timezone={timezone}

@@ -23,6 +23,8 @@ type Props = {
   officeSsids: string[];
   timezone: string;
   onChanged?: () => void;
+  /** Prefill day filter and add-visit date when set. */
+  focusDay?: string | null;
 };
 
 const NO_SSID = "__none__";
@@ -63,7 +65,13 @@ function visitHours(visit: Visit): number | null {
   return Math.max(0, ms) / (1000 * 60 * 60);
 }
 
-export function AdminVisitManager({ userId, officeSsids, timezone, onChanged }: Props) {
+export function AdminVisitManager({
+  userId,
+  officeSsids,
+  timezone,
+  onChanged,
+  focusDay = null,
+}: Props) {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -99,6 +107,15 @@ export function AdminVisitManager({ userId, officeSsids, timezone, onChanged }: 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!focusDay) return;
+    setFilterDay(focusDay);
+    setAddStart((current) => {
+      if (current && current.startsWith(focusDay)) return current;
+      return `${focusDay}T09:00`;
+    });
+  }, [focusDay]);
 
   const ssidOptions = useMemo(() => {
     const seen = new Map<string, string>();
@@ -233,11 +250,17 @@ export function AdminVisitManager({ userId, officeSsids, timezone, onChanged }: 
   }
 
   return (
-    <section className="card p-6">
+    <section id="visit-data" className="card scroll-mt-20 p-6">
       <h2 className="mb-1 text-lg font-medium">Visit data</h2>
       <p className="mb-5 text-sm text-muted">
         Add a visit when the agent missed one, correct times on an existing entry, or delete
         incorrect records. Times use the calendar pickers and are saved in {timezone}.
+        {focusDay ? (
+          <>
+            {" "}
+            Showing and adding for <span className="text-accent">{focusDay}</span>.
+          </>
+        ) : null}
       </p>
 
       <form onSubmit={handleAdd} className="mb-6 space-y-4">

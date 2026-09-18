@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AdminVisitManager } from "./AdminVisitManager";
 import { ComplianceExportButton } from "@/components/reports/ComplianceExportButton";
 import { NotificationPrefsForm } from "./NotificationPrefsForm";
@@ -11,7 +11,14 @@ import { MonthlyReportSection } from "./reports/MonthlyReportSection";
 import { exportDailyTrendCsv, MonthReportToolbar } from "./reports/ReportToolbar";
 import type { MonthlyProgressState } from "@/lib/monthly-progress";
 import { currentMonthKey } from "@/lib/month-range";
-import { dayKeyInTimezone, formatHours, formatTime } from "@/lib/visits";
+import { dayKeyInTimezone } from "@/lib/visits";
+import {
+  buildAdminUserReportHref,
+  monthKeyFromDayKey,
+  parseAdminUserReportQuery,
+  resolveDefaultSelectedDate,
+  summarizeSelectedDay,
+} from "@/lib/admin-user-report-date";
 import {
   describeResetRange,
   resetRangeFromPeriod,
@@ -23,6 +30,8 @@ import { AdminUserProfileChangeForm } from "./AdminUserProfileChangeForm";
 import { AdminGrantComplianceExemption } from "./AdminGrantComplianceExemption";
 import type { ProfileChangeRequestSummary } from "@/lib/profile-change-requests";
 import { AdminUserReportSearch } from "./AdminUserReportSearch";
+import { AdminUserReportSectionNav } from "./AdminUserReportSectionNav";
+import { AdminSelectedDayWorkspace } from "./AdminSelectedDayWorkspace";
 import {
   describeDeviceAgentVersion,
   summarizeDeviceAgentVersions,
@@ -161,13 +170,15 @@ export function AdminUserReport({
   fiscalYearEndMonth: number;
 }) {
   const router = useRouter();
-  const [monthKey, setMonthKey] = useState(() => currentMonthKey("Asia/Kolkata"));
-  const [fromKey, setFromKey] = useState("");
-  const [toKey, setToKey] = useState("");
+  const searchParams = useSearchParams();
+  const queryState = useMemo(() => parseAdminUserReportQuery(searchParams), [searchParams]);
+  const [monthKey, setMonthKey] = useState(
+    () => queryState.month ?? currentMonthKey("Asia/Kolkata"),
+  );
   const [data, setData] = useState<UserReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(queryState.date);
   const [officeSsids, setOfficeSsids] = useState<string[]>([]);
   const [resetConfirm, setResetConfirm] = useState("");
   const [resetScope, setResetScope] = useState<"tracking" | "all">("tracking");
@@ -183,25 +194,43 @@ export function AdminUserReport({
   const [pushingDeviceId, setPushingDeviceId] = useState<string | null>(null);
   const [deregistering, setDeregistering] = useState(false);
 
-  const load = useCallback(async (month: string) => {
-    setLoading(true);
-    const qs = new URLSearchParams();
-    if (month) qs.set("month", month);
-    const res = await fetch(`/api/admin/users/${userId}/reports?${qs}`);
-    setLoading(false);
-    if (!res.ok) {
-      setError("Failed to load user report");
-      return;
-    }
-    const json = await res.json();
-    setData(json);
-    setMonthKey(json.range.month);
-    setFromKey(json.range.from);
-    setToKey(json.range.to);
-    setSelectedDate(null);
-    setError(null);
-  }, [userId]);
+  const syncUrlState = useCallback(
+    (nextMonth: string, nextDate: string | null) => {
+      const href = buildAdminUserReportHref(userId, {
+        month: nextMonth,
+        date: nextDate,
+      });
+      router.replace(href, { scroll: false });
+    },
+    [router, userId],
+  );
 
+  const load = useCallback(
+    async (month: string, preferredDate?: string | null) => {
+      setLoading(true);
+      const qs = new URLSearchParams();
+      if (month) qs.set("month", month);
+      const res = await fetch(`/api/admin/users/${userId}/reports?${qs}`);
+      setLoading(false);
+      if (!res.ok) {
+        setError("Failed to load user report");
+        return;
+      }
+      const json = (await res.json()) as UserReport;
+      setData(json);
+      setMonthKey(json.range.month);
+      const nextDate = resolveDefaultSelectedDate({
+        monthKey: json.range.month,
+        timezone: json.user.timezone,
+        dailyTrend: json.dailyTrend,
+        preferredDate: preferredDate ?? null,
+      });
+      setSelectedDate(nextDate);
+      syncUrlState(json.range.month, nextDate);
+      setError(null);
+    },
+    [userId, syncUrlState],
+  );
   async function pushDeviceAgentUpdate(deviceId: string) {
     setPushingDeviceId(deviceId);
     setActionError(null);
@@ -243,7 +272,7 @@ export function AdminUserReport({
       setActionError("Failed to deregister agent");
       return;
     }
-    await load(monthKey);
+    await load(monthKey, selectedDate);
   }
 
   useEffect(() => {
@@ -254,17 +283,46 @@ export function AdminUserReport({
   }, []);
 
   useEffect(() => {
-    void load("");
+    void load(queryState.month ?? "", queryState.date);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  const filteredVisits = useMemo(() => {
-    if (!data) return [];
-    if (!selectedDate) return data.visits;
-    return data.visits.filter(
-      (v) => dayKeyInTimezone(new Date(v.startAt), data.user.timezone) === selectedDate,
-    );
+  const todayKey = useMemo(() => {
+    if (!data) return dayKeyInTimezone(new Date(), "Asia/Kolkata");
+    return dayKeyInTimezone(new Date(), data.user.timezone);
+  }, [data]);
+
+  const selectedDaySummary = useMemo(() => {
+    if (!data || !selectedDate) return null;
+    return summarizeSelectedDay({
+      dayKey: selectedDate,
+      timezone: data.user.timezone,
+      hoursTarget: data.user.hoursTarget,
+      dailyTrend: data.dailyTrend,
+      visits: data.visits,
+    });
   }, [data, selectedDate]);
+
+  function selectDate(nextDate: string) {
+    const nextMonth = monthKeyFromDayKey(nextDate);
+    if (nextMonth !== monthKey) {
+      void load(nextMonth, nextDate);
+      return;
+    }
+    setSelectedDate(nextDate);
+    syncUrlState(monthKey, nextDate);
+  }
+
+  function jumpToToday() {
+    const tz = data?.user.timezone ?? "Asia/Kolkata";
+    const key = dayKeyInTimezone(new Date(), tz);
+    selectDate(key);
+    document.getElementById("day-details")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function scrollToVisitData() {
+    document.getElementById("visit-data")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   const resetRange = useMemo(
     () =>
@@ -310,7 +368,7 @@ export function AdminUserReport({
     setResetMessage(
       `Cleared ${body.visitsDeleted ?? 0} visits and ${body.heartbeatsDeleted ?? 0} activity records for ${describeResetRange(resetRange)}.`,
     );
-    load(monthKey);
+    load(monthKey, selectedDate);
   }
 
   async function handleDeleteUser() {
@@ -351,15 +409,24 @@ export function AdminUserReport({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-56">
           <Link href="/admin" className="text-sm text-accent hover:underline">
             ← Back to reports
           </Link>
           <h2 className="mt-1 text-xl font-medium">{data.user.email}</h2>
           {data.user.name && <p className="text-sm text-muted">{data.user.name}</p>}
+          <p className="mt-1 text-xs text-muted">
+            Agent {agentHealthLabel}
+            {data.today.inOfficeNow ? " · In office now" : ""}
+            {` · ${data.user.timezone}`}
+          </p>
         </div>
-        <AdminUserReportSearch currentUserId={data.user.id} />
+        <AdminUserReportSearch
+          currentUserId={data.user.id}
+          preserveMonth={monthKey}
+          preserveDate={selectedDate}
+        />
         <button
           type="button"
           onClick={() => void handleViewAsUser()}
@@ -370,10 +437,12 @@ export function AdminUserReport({
         </button>
       </div>
 
+      <AdminUserReportSectionNav onJumpToday={jumpToToday} />
+
       <MonthReportToolbar
         monthKey={monthKey}
         timezone={data.user.timezone}
-        onMonthChange={(m) => load(m)}
+        onMonthChange={(m) => void load(m)}
         onExport={() =>
           exportDailyTrendCsv(
             `user-${data.user.email}-${monthKey}.csv`,
@@ -385,10 +454,26 @@ export function AdminUserReport({
           )
         }
       >
-        <button type="button" onClick={() => load(monthKey)} className="btn-secondary px-3 py-1 text-xs">
+        <button
+          type="button"
+          onClick={() => void load(monthKey, selectedDate)}
+          className="btn-secondary px-3 py-1 text-xs"
+        >
           Refresh
         </button>
       </MonthReportToolbar>
+
+      {selectedDaySummary && (
+        <AdminSelectedDayWorkspace
+          summary={selectedDaySummary}
+          timezone={data.user.timezone}
+          hoursTarget={data.user.hoursTarget}
+          todayKey={todayKey}
+          inOfficeNow={data.today.inOfficeNow}
+          onSelectDate={selectDate}
+          onCorrect={scrollToVisitData}
+        />
+      )}
 
       <MonthlyReportSection
         monthKey={monthKey}
@@ -399,59 +484,43 @@ export function AdminUserReport({
         visits={data.visits}
         pulse={data.pulse}
         selectedDate={selectedDate}
-        onSelectDate={setSelectedDate}
+        onSelectDate={(date) => {
+          if (date) selectDate(date);
+        }}
         agentHealthLabel={agentHealthLabel}
         agentHealthDetail={`Expected agent ${data.serverAgentVersion}. Installed: ${installedVersionSummary}. ${data.pulse.pulsesLast24h} activity ticks in the last 24h (expected ~${data.pulse.expectedPulsesPerDay}).`}
+        dayWorkspaceMode
+        todayKey={todayKey}
       />
 
-      <section className="card p-4">
-        <h3 className="mb-3 text-sm font-medium">
-          {selectedDate ? `Visits on ${selectedDate}` : `Visits in ${monthKey}`}
-        </h3>
-        {filteredVisits.length === 0 ? (
-          <p className="text-sm text-muted">No visits in this period.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-left text-muted">
-                  <th className="py-2 pr-4">Date</th>
-                  <th className="py-2 pr-4">Start</th>
-                  <th className="py-2 pr-4">End</th>
-                  <th className="py-2 pr-4">Duration</th>
-                  <th className="py-2 pr-4">Source</th>
-                  <th className="py-2">SSID</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredVisits.map((v) => {
-                  const start = new Date(v.startAt);
-                  const end = v.endAt ? new Date(v.endAt) : null;
-                  const durationMs = end ? end.getTime() - start.getTime() : 0;
-                  return (
-                    <tr key={v.id} className="border-b border-[var(--border)]">
-                      <td className="py-2 pr-4">
-                        {dayKeyInTimezone(start, data.user.timezone)}
-                      </td>
-                      <td className="py-2 pr-4">{formatTime(start, data.user.timezone)}</td>
-                      <td className="py-2 pr-4">
-                        {end ? formatTime(end, data.user.timezone) : "open"}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {end ? formatHours(durationMs / (1000 * 60 * 60)) : "-"}
-                      </td>
-                      <td className="py-2 pr-4">{v.source}</td>
-                      <td className="py-2">{v.ssid ?? "-"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-medium">Visit corrections</h3>
+            <p className="mt-1 text-sm text-muted">
+              Edit or add visits for the selected day. Changes refresh the day and month
+              summaries.
+            </p>
           </div>
-        )}
-      </section>
+          <ComplianceExportButton
+            hrefBase={`/api/admin/users/${userId}/reports/export`}
+            monthKey={monthKey}
+            timezone={data.user.timezone}
+            label="Download user report"
+            fiscalYearStartMonth={fiscalYearStartMonth}
+            fiscalYearEndMonth={fiscalYearEndMonth}
+          />
+        </div>
+        <AdminVisitManager
+          userId={userId}
+          officeSsids={officeSsids}
+          timezone={data.user.timezone}
+          focusDay={selectedDate}
+          onChanged={() => void load(monthKey, selectedDate)}
+        />
+      </div>
 
-      <section className="card p-6">
+      <section id="agent-activity" className="card scroll-mt-20 p-6">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-medium">Agent activity</h3>
           <div className="flex flex-wrap items-center gap-3">
@@ -485,8 +554,7 @@ export function AdminUserReport({
                 ? new Date(data.pulse.lastHeartbeat).toLocaleString("en-IN")
                 : "None"}
             </dd>
-          </div>
-          <div>
+          </div>          <div>
             <dt className="text-muted">Time since last activity</dt>
             <dd>
               {formatPulseAge({
@@ -731,7 +799,7 @@ export function AdminUserReport({
         </section>
       )}
 
-      <section className="card p-6">
+      <section id="account" className="card scroll-mt-20 p-6">
         <h3 className="mb-2 text-sm font-medium">Account</h3>
         <p className="mb-3 text-sm text-muted">
           Issue a temporary password if the user cannot sign in. Share it once; it is not stored in
@@ -761,29 +829,6 @@ export function AdminUserReport({
         <OutOfOfficeSection adminUserId={userId} />
         <NotificationPrefsForm adminUserId={userId} />
       </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-medium">Visit data</h3>
-          <p className="mt-1 text-sm text-muted">
-            Add, correct, or delete visit entries for this user in Visit data below.
-          </p>
-        </div>
-        <ComplianceExportButton
-          hrefBase={`/api/admin/users/${userId}/reports/export`}
-          monthKey={monthKey}
-          timezone={data.user.timezone}
-          label="Download user report"
-          fiscalYearStartMonth={fiscalYearStartMonth}
-          fiscalYearEndMonth={fiscalYearEndMonth}
-        />
-      </div>
-      <AdminVisitManager
-        userId={userId}
-        officeSsids={officeSsids}
-        timezone={data.user.timezone}
-        onChanged={() => load(monthKey)}
-      />
 
       <section className="card border-red-500/30 p-6">
         <h3 className="mb-2 text-lg font-medium text-red-400">Clear tracking data</h3>
