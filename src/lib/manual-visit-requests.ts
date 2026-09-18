@@ -1,8 +1,28 @@
 import { prisma } from "./db";
 import { logAuditEvent } from "./audit-log";
+import { DEFAULT_HOURS_TARGET } from "./constants";
 import { createManualVisit } from "./heartbeat-service";
 import { handleOfficePresenceDetected } from "./ooo-presence";
 import { validateVisitTimestamps } from "./visit-validation";
+
+/** When the user omits check-out, credit a closed visit of this many hours after check-in. */
+export function defaultManualVisitEndAt(
+  startAt: Date,
+  hours: number = DEFAULT_HOURS_TARGET,
+): Date {
+  const safeHours = hours > 0 ? hours : DEFAULT_HOURS_TARGET;
+  return new Date(startAt.getTime() + safeHours * 60 * 60 * 1000);
+}
+
+/** Resolve end time: explicit check-out, or check-in + daily hours target. */
+export function resolveManualVisitEndAt(
+  startAt: Date,
+  endAt: Date | null | undefined,
+  hours: number = DEFAULT_HOURS_TARGET,
+): Date {
+  if (endAt) return endAt;
+  return defaultManualVisitEndAt(startAt, hours);
+}
 
 export const MANUAL_VISIT_REQUEST_STATUSES = ["open", "approved", "rejected"] as const;
 export type ManualVisitRequestStatus = (typeof MANUAL_VISIT_REQUEST_STATUSES)[number];
@@ -54,13 +74,23 @@ export function validateManualVisitSubmission(params: {
   startAt: Date;
   endAt: Date | null;
   hasDuplicateOpen: boolean;
+  now?: Date;
 }): string | null {
-  if (params.endAt && params.endAt <= params.startAt) {
+  const now = params.now ?? new Date();
+  if (!params.endAt) {
+    return "Check-out is required";
+  }
+  if (params.endAt <= params.startAt) {
     return "Check-out must be after check-in";
   }
-  const timestampError = validateVisitTimestamps(params.startAt, params.endAt);
-  if (timestampError) {
-    return timestampError;
+  const startError = validateVisitTimestamps(params.startAt, null, now);
+  if (startError) {
+    return startError;
+  }
+  const durationMs = params.endAt.getTime() - params.startAt.getTime();
+  const maxVisitMs = 16 * 60 * 60 * 1000;
+  if (durationMs > maxVisitMs) {
+    return "Check-out cannot be more than 16 hours after check-in";
   }
   if (params.hasDuplicateOpen) {
     return "You already have a pending manual visit request for this check-in time";
@@ -96,7 +126,7 @@ export async function createManualVisitRequest(params: {
   ssid?: string | null;
   message?: string | null;
 }) {
-  const endAt = params.endAt ?? null;
+  const endAt = resolveManualVisitEndAt(params.startAt, params.endAt ?? null);
   const ssid = typeof params.ssid === "string" && params.ssid.trim() ? params.ssid.trim() : "manual";
 
   const duplicate = await prisma.manualVisitRequest.findFirst({
@@ -139,6 +169,7 @@ export async function createManualVisitRequest(params: {
       startAt: request.startAt.toISOString(),
       endAt: request.endAt?.toISOString() ?? null,
       ssid,
+      defaultedEndAt: !params.endAt,
     },
   });
 

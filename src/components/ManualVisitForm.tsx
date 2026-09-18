@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DateTimeField, dateTimeLocalToIso } from "@/components/DateTimeField";
+import { DEFAULT_HOURS_TARGET } from "@/lib/constants";
 
 function CheckInIcon() {
   return (
@@ -34,6 +35,25 @@ function CheckOutIcon() {
   );
 }
 
+/** Format a datetime-local value as check-in + hours for the default checkout hint. */
+function addHoursToDateTimeLocal(value: string, hours: number): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(date.getHours() + hours);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatHint(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
 export function ManualVisitForm({
   timezone,
   embedded = false,
@@ -49,6 +69,11 @@ export function ManualVisitForm({
   const [endAt, setEndAt] = useState("");
   const [includeCheckout, setIncludeCheckout] = useState(false);
 
+  const defaultEndAt = useMemo(
+    () => addHoursToDateTimeLocal(startAt, DEFAULT_HOURS_TARGET),
+    [startAt],
+  );
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
@@ -60,7 +85,12 @@ export function ManualVisitForm({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         startAt: dateTimeLocalToIso(startAt),
-        endAt: includeCheckout && endAt ? dateTimeLocalToIso(endAt) : null,
+        endAt:
+          includeCheckout && endAt
+            ? dateTimeLocalToIso(endAt)
+            : defaultEndAt
+              ? dateTimeLocalToIso(defaultEndAt)
+              : null,
       }),
     });
 
@@ -85,7 +115,8 @@ export function ManualVisitForm({
         {!embedded && <h2 className="text-lg font-medium">Manual visit</h2>}
         <p className={`text-sm text-muted ${embedded ? "" : "mt-1"}`}>
           Log a past office session when the agent missed it, or for guest Wi-Fi and Ethernet.
-          Submissions go to admin for approval before they count toward compliance.
+          Enter check-in. If you skip check-out, it defaults to {DEFAULT_HOURS_TARGET} hours after
+          check-in. Submissions go to admin for approval before they count toward compliance.
         </p>
       </div>
 
@@ -123,10 +154,10 @@ export function ManualVisitForm({
             className="mt-0.5"
           />
           <span>
-            <span className="font-medium">Add check-out time</span>
+            <span className="font-medium">Set a different check-out time</span>
             <span className="mt-0.5 block text-xs text-muted">
-              Leave unchecked for an open visit. The agent or a manual check-out can close it
-              later.
+              Leave unchecked to use check-in + {DEFAULT_HOURS_TARGET} hours
+              {defaultEndAt ? ` (${formatHint(defaultEndAt)})` : ""}.
             </span>
           </span>
         </label>
@@ -136,11 +167,8 @@ export function ManualVisitForm({
             <div className="mb-3 flex items-center gap-2">
               <CheckOutIcon />
               <p className="text-sm font-medium">Check-out</p>
-              <span className="rounded bg-[var(--pwc-orange-muted)] px-2 py-0.5 text-xs text-accent">
-                Optional
-              </span>
             </div>
-            <DateTimeField label="When you left" value={endAt} onChange={setEndAt} />
+            <DateTimeField label="When you left" value={endAt} onChange={setEndAt} required />
           </div>
         )}
 

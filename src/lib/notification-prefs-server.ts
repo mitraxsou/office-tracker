@@ -17,6 +17,17 @@ export async function getNotificationPrefs(userId: string): Promise<Notification
       data: {
         userId,
         workDays: JSON.stringify(DEFAULT_WORK_DAYS),
+        channelHoursStarted: "both",
+        channelHoursMet: "both",
+      },
+    });
+  } else if (row.channelHoursStarted === "teams" || row.channelHoursMet === "teams") {
+    // Legacy Teams-only hours alerts skipped in-app when the webhook was missing.
+    row = await prisma.userNotificationPrefs.update({
+      where: { userId },
+      data: {
+        ...(row.channelHoursStarted === "teams" ? { channelHoursStarted: "both" } : {}),
+        ...(row.channelHoursMet === "teams" ? { channelHoursMet: "both" } : {}),
       },
     });
   }
@@ -74,10 +85,10 @@ export async function updateNotificationPrefs(
     update.channelBehindHours = parseAlertDeliveryChannel(data.channelBehindHours, "app");
   }
   if (data.channelHoursStarted !== undefined) {
-    update.channelHoursStarted = parseAlertDeliveryChannel(data.channelHoursStarted, "teams");
+    update.channelHoursStarted = parseAlertDeliveryChannel(data.channelHoursStarted, "both");
   }
   if (data.channelHoursMet !== undefined) {
-    update.channelHoursMet = parseAlertDeliveryChannel(data.channelHoursMet, "teams");
+    update.channelHoursMet = parseAlertDeliveryChannel(data.channelHoursMet, "both");
   }
   if (data.behindHoursCheckTime !== undefined) {
     if (!isValidTime(data.behindHoursCheckTime)) throw new Error("Invalid behind-hours check time");

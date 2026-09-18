@@ -127,13 +127,13 @@ describe("presence reminder rules", () => {
 });
 
 describe("alert delivery channels", () => {
-  it("defaults reminder alerts to the app and hours alerts to Teams", () => {
+  it("defaults reminder alerts to the app and hours alerts to app plus Teams", () => {
     expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "absent")).toBe("app");
     expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "stale")).toBe("app");
     expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "behind")).toBe("app");
-    expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "hours_started")).toBe("teams");
-    expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "ooo_cleared")).toBe("teams");
-    expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "hours_met")).toBe("teams");
+    expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "hours_started")).toBe("both");
+    expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "ooo_cleared")).toBe("both");
+    expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "hours_met")).toBe("both");
     expect(DEFAULT_NOTIFICATION_PREFS.alertIfHoursStarted).toBe(true);
     expect(DEFAULT_NOTIFICATION_PREFS.alertIfHoursMet).toBe(true);
     expect(DEFAULT_NOTIFICATION_PREFS.alertIfNotInOffice).toBe(false);

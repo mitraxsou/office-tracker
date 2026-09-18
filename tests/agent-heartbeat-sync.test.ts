@@ -91,5 +91,8 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain("hoursMetSentDayKey");
     expect(heartbeat).toContain('return "hours_target_met"');
     expect(heartbeat).toContain("function Get-CurrentDayOfficeMs");
+    expect(heartbeat).toContain("function Show-OfficePulseToast");
+    expect(heartbeat).toContain("You completed your");
+    expect(heartbeat).toContain("Time monitoring is on");
   });
 });

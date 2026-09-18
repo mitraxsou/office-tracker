@@ -234,6 +234,14 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           <p className="text-sm text-muted">
             When office Wi-Fi is wrong or missing, tap <strong>Check in</strong> on arrival and{" "}
             <strong>Check out</strong> when you leave. GlobalProtect and other VPN paths do not count as in-office.
+            For a past missed day, use <strong>Manual visit</strong>: enter check-in; if you skip check-out, it
+            defaults to 5 hours after check-in (admin approval required).
+          </p>
+
+          <h3 className="text-sm font-medium">Laptop notifications</h3>
+          <p className="text-sm text-muted">
+            When the agent detects office Wi-Fi, Windows shows a toast that monitoring is on. Another toast appears
+            when you complete your daily hours target. You can also get in-app and Teams alerts from Settings.
           </p>
 
           <h3 className="text-sm font-medium">Reports</h3>

@@ -41,8 +41,8 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefsData = {
   channelNotInOffice: "app",
   channelAgentStale: "app",
   channelBehindHours: "app",
-  channelHoursStarted: "teams",
-  channelHoursMet: "teams",
+  channelHoursStarted: "both",
+  channelHoursMet: "both",
   behindHoursCheckTime: "15:00",
   behindHoursMinExpected: 2.5,
 };

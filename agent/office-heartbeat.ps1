@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 $ConfigFetchIntervalRuns = 60
 $ConfigCacheMaxAgeMinutes = 120
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.5.8"
+$AgentScriptVersion = "1.5.9"
 
 function Get-InstallDir {
     if ($env:OFFICETRACKER_INSTALL_DIR) {
@@ -447,10 +447,44 @@ function Get-OpenVisitFromState($SyncState) {
     return $null
 }
 
+function Show-OfficePulseToast {
+    param(
+        [Parameter(Mandatory)][string]$Title,
+        [Parameter(Mandatory)][string]$Body
+    )
+    if ($DryRun) { return }
+    try {
+        $escapedTitle = [System.Security.SecurityElement]::Escape($Title)
+        $escapedBody = [System.Security.SecurityElement]::Escape($Body)
+        $template = @"
+<toast>
+  <visual>
+    <binding template="ToastGeneric">
+      <text>$escapedTitle</text>
+      <text>$escapedBody</text>
+    </binding>
+  </visual>
+</toast>
+"@
+        [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
+        [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null
+        $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
+        $xml.LoadXml($template)
+        $toast = [Windows.UI.Notifications.ToastNotification]::new($xml)
+        # PowerShell host AppUserModelID so toasts show without a packaged app identity.
+        $appId = "{1AC14E77-02E7-4E5D-B744-00EE7948A4F7}\WindowsPowerShell\v1.0\powershell.exe"
+        [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($appId).Show($toast)
+        Write-Log "toast: $Title"
+    } catch {
+        Write-Log "WARN toast failed: $($_.Exception.Message)"
+    }
+}
+
 function Start-LocalVisit {
     param(
         $SyncState,
-        [string]$Ssid
+        [string]$Ssid,
+        [double]$HoursTarget = 5
     )
     $visitId = New-EventId
     $startAt = Get-NowIso
@@ -465,6 +499,9 @@ function Start-LocalVisit {
         localVisitId = $visitId
         ssid = $Ssid
     }
+    $targetLabel = if ($HoursTarget -gt 0) { "$HoursTarget" } else { "5" }
+    Show-OfficePulseToast -Title "My Office Pulse" `
+        -Body "You are in the office. Time monitoring is on. Daily target: ${targetLabel}h."
     return $SyncState
 }
 
@@ -553,7 +590,11 @@ function Update-VisitBoundaries {
         $SyncState = End-LocalVisit -SyncState $SyncState -EndAt $disconnectAt -PreviousSsid $PreviousSsid
     }
     if (-not $wasOffice -and $isOffice) {
-        $SyncState = Start-LocalVisit -SyncState $SyncState -Ssid $CurrentSsid
+        $hoursTarget = 5
+        if ($ServerConfig -and $null -ne $ServerConfig.hoursTarget) {
+            $hoursTarget = [double]$ServerConfig.hoursTarget
+        }
+        $SyncState = Start-LocalVisit -SyncState $SyncState -Ssid $CurrentSsid -HoursTarget $hoursTarget
     }
     return $SyncState
 }
@@ -730,6 +771,13 @@ function Maybe-EnqueueHoursTargetMet {
     }
     $SyncState.hoursMetSentDayKey = $DayKey
     Write-Log "hours_target_met officeMs=$officeMs targetMs=$targetMs"
+    $hoursLabel = if ($ServerConfig -and $null -ne $ServerConfig.hoursTarget) {
+        [string]$ServerConfig.hoursTarget
+    } else {
+        "5"
+    }
+    Show-OfficePulseToast -Title "My Office Pulse" `
+        -Body "You completed your ${hoursLabel}h office target for today. Great work."
     return $SyncState
 }
 
@@ -1308,7 +1356,11 @@ if ($dayRolledOver) {
     $isOfficeNow = Test-IsOfficeSsid -Ssid $ssid -ServerConfig $serverConfig
     $hasOpenVisit = [bool](Get-OpenVisitFromState $syncState)
     if ($isOfficeNow -and -not $hasOpenVisit) {
-        $syncState = Start-LocalVisit -SyncState $syncState -Ssid $ssid
+        $hoursTarget = 5
+        if ($serverConfig -and $null -ne $serverConfig.hoursTarget) {
+            $hoursTarget = [double]$serverConfig.hoursTarget
+        }
+        $syncState = Start-LocalVisit -SyncState $syncState -Ssid $ssid -HoursTarget $hoursTarget
         Write-Log "NEW_DAY visit_start on office Wi-Fi"
     }
 }
