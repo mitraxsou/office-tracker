@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin";
 import {
+  clearForceAgentUpdateForAllDevices,
   requestAgentUpdateForAllDevices,
   requestAgentUpdateForUsers,
 } from "@/lib/agent-update";
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  let body: { userIds?: string[] } = {};
+  let body: { userIds?: string[]; clear?: boolean } = {};
   try {
     const text = await request.text();
     if (text.trim()) {
@@ -20,6 +21,18 @@ export async function POST(request: Request) {
     }
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  if (body.clear === true) {
+    const count = await clearForceAgentUpdateForAllDevices();
+
+    await logAuditEvent({
+      actorId: admin.id,
+      action: "agent_update_clear",
+      details: { scope: "all", deviceCount: count },
+    });
+
+    return NextResponse.json({ ok: true, cleared: true, deviceCount: count });
   }
 
   if (Array.isArray(body.userIds) && body.userIds.length > 0) {

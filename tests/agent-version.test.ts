@@ -158,6 +158,7 @@ describe("agent version", () => {
     expect(heartbeat).not.toContain('-File ""$SetupScript""');
 
     expect(setup).toContain("Copy-AgentFileWithRetry");
+    expect(setup).toContain('Write-SetupLog "WARN copy retry $attempt/${MaxAttempts}:');
     expect(setup).toContain("Stop-RunningAgentProcesses");
     expect(download).toContain("test-connection.ps1");
     expect(setup).toContain("Publish-AgentScriptTxt");

@@ -8,7 +8,7 @@
 #   .\setup.ps1 -Silent
 #   .\setup.ps1 -Force
 #
-# No script-level param() — IEX from bootstrap leaves $ApiUrl/$Token in caller scope;
+# No script-level param() - IEX from bootstrap leaves $ApiUrl/$Token in caller scope;
 # param() would shadow them and break fresh install. -File switches are parsed from $args.
 
 $ErrorActionPreference = "Stop"
@@ -192,7 +192,7 @@ function Copy-AgentFileWithRetry {
             return
         } catch {
             if ($attempt -ge $MaxAttempts) { throw }
-            Write-SetupLog "WARN copy retry $attempt/$MaxAttempts: $($_.Exception.Message)"
+            Write-SetupLog "WARN copy retry $attempt/${MaxAttempts}: $($_.Exception.Message)"
             Stop-RunningAgentProcesses
             Start-Sleep -Milliseconds 400
         }

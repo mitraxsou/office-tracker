@@ -43,6 +43,7 @@ export type AuditAction =
   | "profile_change_reject"
   | "password_reset"
   | "agent_update_push"
+  | "agent_update_clear"
   | "agent_deregister"
   | "admin_agent_grace_update"
   | "admin_profile_edit"

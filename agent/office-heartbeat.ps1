@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 $ConfigFetchIntervalRuns = 60
 $ConfigCacheMaxAgeMinutes = 120
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.5.10"
+$AgentScriptVersion = "1.5.11"
 
 function Get-InstallDir {
     if ($env:OFFICETRACKER_INSTALL_DIR) {
@@ -866,13 +866,14 @@ function Test-ResponseForceAgentUpdate {
 function Test-NeedsAgentUpdateFromResponse {
     param($Response)
     if (-not $Response) { return $false }
-    # Admin "Push update" must run even when version.txt already matches server (clean reinstall).
-    if (Test-ResponseForceAgentUpdate -Response $Response) { return $true }
     $localVersion = Get-LocalAgentVersion
     $serverVersion = Get-ServerAgentVersionFromResponse -Response $Response
+    # When local already matches server, skip force reinstall so sync can clear
+    # forceAgentUpdate (admin Push update ack) without EXIT-before-sync loops.
     if ($serverVersion -and (Compare-AgentVersion $localVersion $serverVersion) -ge 0) {
         return $false
     }
+    if (Test-ResponseForceAgentUpdate -Response $Response) { return $true }
     if (-not $serverVersion) { return $false }
     return (Compare-AgentVersion $serverVersion $localVersion) -gt 0
 }
@@ -1061,15 +1062,17 @@ function Invoke-HourlyUpdateCheck([string]$ApiUrl, [string]$Token, [string]$Seri
     }
     try {
         $force = $false
+        $needsUpdate = $false
         try {
             $cfg = Get-ServerConfig -ApiUrl $ApiUrl -Token $Token -SerialNumber $SerialNumber -Force
             $force = Test-ResponseForceAgentUpdate -Response $cfg
+            $needsUpdate = Test-NeedsAgentUpdateFromResponse -Response $cfg
         } catch {
             Write-Log "WARN hourly update config fetch failed: $($_.Exception.Message)"
         }
-        Write-Log "Hourly update check (force=$force)"
-        if ($force) {
-            Invoke-AgentSelfUpdate -ApiUrl $ApiUrl -Token $Token -Force $true | Out-Null
+        Write-Log "Hourly update check (force=$force needsUpdate=$needsUpdate)"
+        if ($needsUpdate) {
+            Invoke-AgentSelfUpdate -ApiUrl $ApiUrl -Token $Token -Force $force | Out-Null
             return
         }
         Invoke-AgentSetupScript -SetupScript $setupScript -ApiUrl $ApiUrl -Token $Token | Out-Null

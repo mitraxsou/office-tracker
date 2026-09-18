@@ -52,6 +52,11 @@ export function getUserAgentVersionSummary(
   };
 }
 
+/**
+ * Admin "Push update" flag only. Do not OR in version mismatch: agents already
+ * soft-update from agentScriptVersion, and mapping stale reported versions to
+ * forceAgentUpdate caused wipe+EXIT-before-sync loops after every server bump.
+ */
 export async function getDeviceForceAgentUpdate(
   userId: string,
   serialNumber: string | null,
@@ -60,18 +65,10 @@ export async function getDeviceForceAgentUpdate(
 
   const device = await prisma.agentDevice.findUnique({
     where: { userId_serialNumber: { userId, serialNumber } },
-    select: { forceAgentUpdate: true, agentScriptVersion: true },
+    select: { forceAgentUpdate: true },
   });
 
-  if (!device) return false;
-
-  // Config polling is also the recovery path for agents that predate heartbeat version
-  // reporting or have a stale script beside a current version.txt. Force a bundle refresh
-  // until a subsequent heartbeat reports the expected version.
-  return (
-    device.forceAgentUpdate ||
-    isDeviceAgentVersionStale(device.agentScriptVersion, getAgentVersion())
-  );
+  return device?.forceAgentUpdate ?? false;
 }
 
 export async function recordDeviceScriptVersion(
@@ -111,6 +108,15 @@ export async function requestAgentUpdateForAllDevices() {
   const result = await prisma.agentDevice.updateMany({
     where: { uninstalledAt: null },
     data: { forceAgentUpdate: true },
+  });
+  return result.count;
+}
+
+/** Clears admin Push update flags so agents stop force-reinstall loops. */
+export async function clearForceAgentUpdateForAllDevices() {
+  const result = await prisma.agentDevice.updateMany({
+    where: { forceAgentUpdate: true },
+    data: { forceAgentUpdate: false },
   });
   return result.count;
 }
