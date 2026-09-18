@@ -185,7 +185,9 @@ async function evaluateUserAlerts(
   const pulse = await getPulseStats(user.id, graceHours);
 
   const dayKey = dayKeyInTimezone(now, user.timezone);
-  if (await isUserOutOfOffice(user.id, dayKey)) return [];
+  // Manual OOO (and compliance weekends) must not block office check-in / hours-met alerts.
+  // OOO only suppresses schedule reminders: absent, stale, behind.
+  const oooToday = await isUserOutOfOffice(user.id, dayKey);
 
   const { start: dayStart, end: dayEnd } = dayBoundsFromKey(dayKey, user.timezone);
   const nowMinutes = getMinutesInTimezone(now, user.timezone);
@@ -230,6 +232,7 @@ async function evaluateUserAlerts(
     types.has("stale") &&
     prefs.alertIfAgentStale &&
     workDay &&
+    !oooToday &&
     presenceReminder === "stale"
   ) {
     const hasDevice = await userHasActiveInstalledDevice(user.id);
@@ -245,7 +248,7 @@ async function evaluateUserAlerts(
     }
   }
 
-  if (types.has("absent") && prefs.alertIfNotInOffice && workDay) {
+  if (types.has("absent") && prefs.alertIfNotInOffice && workDay && !oooToday) {
     const startMinutes = parseTimeToMinutes(prefs.officeStartTime) + prefs.graceMinutes;
     if (nowMinutes >= startMinutes && presenceReminder === "absent") {
       if (
@@ -263,7 +266,7 @@ async function evaluateUserAlerts(
     }
   }
 
-  if (types.has("behind") && prefs.alertIfBehindHours && workDay) {
+  if (types.has("behind") && prefs.alertIfBehindHours && workDay && !oooToday) {
     const checkMinutes = parseTimeToMinutes(prefs.behindHoursCheckTime);
     if (
       nowMinutes >= checkMinutes &&

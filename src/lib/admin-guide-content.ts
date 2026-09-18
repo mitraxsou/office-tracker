@@ -653,7 +653,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         items: [
           "On Users & tokens, expand Notifications and out of office on a user card.",
           "Set channel per alert type: app only, Teams, both, or off.",
-          "Office schedule and OOO affect whether not_in_office alerts fire.",
+          "Office schedule and OOO affect whether not_in_office, behind, and stale alerts fire. OOO does not block hours_started or hours_met (office check-in / target) notifications.",
           "Agent grace extension can suppress stale alerts for travel.",
         ],
       },

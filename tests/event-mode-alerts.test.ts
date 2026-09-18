@@ -128,4 +128,35 @@ describe("evaluateUserAlerts in events mode", () => {
     expect(alerts).toHaveLength(1);
     expect(alerts[0]?.type).toBe("hours_met");
   });
+
+  it("still queues hours_started and hours_met while user is marked OOO", async () => {
+    isUserOutOfOfficeMock.mockResolvedValue(true);
+    getTodaySummaryMock.mockResolvedValue({
+      dayKey: "2026-09-13",
+      totalHours: 5.2,
+      laptopActiveHours: 6,
+      hoursTarget: 5,
+      metTarget: true,
+      remainingHours: 0,
+      inOfficeNow: true,
+      visits: [{ id: "visit-1", endAt: null }],
+      lastHeartbeat: { ssid: "OfficeConnect", inOffice: true },
+      agentHealthy: true,
+    });
+
+    const alerts = await evaluateUserAlerts(
+      {
+        id: "user-1",
+        email: "user@example.com",
+        name: "User",
+        timezone: "Asia/Kolkata",
+        hoursTarget: 5,
+        agentStaleGraceHours: null,
+      },
+      new Set(["hours_started", "hours_met", "absent"]),
+      new Date("2026-09-13T10:00:00+05:30"),
+    );
+
+    expect(alerts.map((a) => a.type).sort()).toEqual(["hours_met", "hours_started"]);
+  });
 });
