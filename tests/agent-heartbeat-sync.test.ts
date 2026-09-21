@@ -58,11 +58,31 @@ describe("office-heartbeat wake and sync behavior", () => {
       "if ($serverVersion -and (Compare-AgentVersion $localVersion $serverVersion) -ge 0) {",
     );
     expect(heartbeat).toContain("if (Test-ResponseForceAgentUpdate -Response $Response) { return $true }");
-    expect(heartbeat).toContain("Admin push update: refreshing setup scripts from server before clean reinstall");
+    expect(heartbeat).toContain("Refreshing setup scripts from server before");
     expect(heartbeat).toContain("OK admin push clean reinstall completed");
     expect(heartbeat).toContain("if ($Force) {");
     expect(heartbeat).toContain("if ($exitCode -eq 0) {");
     expect(heartbeat).toContain("Hourly update check (force=$force needsUpdate=$needsUpdate)");
+  });
+
+  it("sleep checkout uses UTC and skips end-before-start", () => {
+    expect(heartbeat).toContain("$SuspendAt.ToUniversalTime().ToString(\"o\")");
+    expect(heartbeat).toContain("SKIP sleep checkout: suspendAt before open visit start");
+    expect(heartbeat).toContain("SKIP visit_end: end before start");
+    expect(heartbeat).toContain("RESUME visit_start on office Wi-Fi after sleep checkout");
+  });
+
+  it("soft auto-update refreshes setup scripts before invoking setup", () => {
+    expect(heartbeat).toContain("Refreshing setup scripts from server before $label");
+    expect(heartbeat).toContain('soft auto-update');
+    const selfUpdateIdx = heartbeat.indexOf("function Invoke-AgentSelfUpdate");
+    const downloadIdx = heartbeat.indexOf(
+      "Download-AgentUpdateScriptsFromServer -ApiUrl $ApiUrl -Token $Token",
+      selfUpdateIdx,
+    );
+    const ensureIdx = heartbeat.indexOf("Ensure-AgentUpdateScripts", selfUpdateIdx);
+    expect(downloadIdx).toBeGreaterThan(selfUpdateIdx);
+    expect(ensureIdx).toBeGreaterThan(downloadIdx);
   });
 
   it("polls agent config on an interval instead of every task run", () => {

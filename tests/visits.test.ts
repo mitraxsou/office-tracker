@@ -6,6 +6,7 @@ import {
   effectiveVisitEnd,
   formatHours,
   formatLastHeartbeat,
+  formatVisitDurationLabel,
   mergeHeartbeatsIntoVisits,
   meetsHoursTarget,
   remainingHours,
@@ -13,6 +14,7 @@ import {
   roundHoursToMinute,
   totalHoursFromVisits,
   visitDurationMs,
+  visitHasInvalidTimestamps,
   visitsForDay,
 } from "../src/lib/visits";
 
@@ -531,6 +533,19 @@ describe("roundHoursToMinute", () => {
   it("leaves whole minutes untouched", () => {
     expect(roundHoursToMinute(5)).toBe(5);
     expect(roundHoursToMinute(2.5)).toBe(2.5);
+  });
+
+  it("does not print negative durations", () => {
+    expect(formatHours(-1.433)).toBe("0h 0m");
+  });
+
+  it("flags end-before-start visits instead of 0h 0m", () => {
+    const visit = {
+      startAt: new Date("2026-09-21T09:04:09.625Z"),
+      endAt: new Date("2026-09-21T07:18:04.147Z"),
+    };
+    expect(visitHasInvalidTimestamps(visit)).toBe(true);
+    expect(formatVisitDurationLabel(visit)).toBe("Invalid times");
   });
 });
 

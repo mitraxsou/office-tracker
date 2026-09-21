@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 $ConfigFetchIntervalRuns = 60
 $ConfigCacheMaxAgeMinutes = 120
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.5.11"
+$AgentScriptVersion = "1.5.12"
 
 function Get-InstallDir {
     if ($env:OFFICETRACKER_INSTALL_DIR) {
@@ -514,8 +514,12 @@ function End-LocalVisit {
     $open = Get-OpenVisitFromState $SyncState
     if (-not $open) { return $SyncState }
     $disconnectAt = if ($EndAt) { $EndAt } else { Get-NowIso }
-    $start = [DateTime]::Parse($open.startAt)
-    $end = [DateTime]::Parse($disconnectAt)
+    $start = [DateTime]::Parse($open.startAt).ToUniversalTime()
+    $end = [DateTime]::Parse($disconnectAt).ToUniversalTime()
+    if ($end -lt $start) {
+        Write-Log "SKIP visit_end: end before start (end=$disconnectAt start=$($open.startAt))"
+        return $SyncState
+    }
     $durationMs = [Math]::Max(0, [int](($end - $start).TotalMilliseconds))
     if ($null -eq $SyncState.dayOfficeMs) { $SyncState.dayOfficeMs = 0 }
     $SyncState.dayOfficeMs = [int]$SyncState.dayOfficeMs + $durationMs
@@ -524,7 +528,7 @@ function End-LocalVisit {
         officeMs = $durationMs
     }
     if ($PreviousSsid) { $fields.previousSsid = $PreviousSsid }
-    Add-QueuedEvent -Type "visit_end" -Fields $fields -At $disconnectAt
+    Add-QueuedEvent -Type "visit_end" -Fields $fields -At $end.ToString("o")
     $SyncState.openVisit = $null
     return $SyncState
 }
@@ -562,10 +566,24 @@ function Invoke-ResumeOfficeSleepCheckout {
     if (-not (Test-IsOfficeSsid -Ssid $LastKnownSsid -ServerConfig $ServerConfig)) {
         return @{ syncState = $SyncState; handled = $false }
     }
-    $suspendAtIso = $SuspendAt.ToString("o")
+    # Always UTC (Z) so visit_end is comparable to Get-NowIso visit_start timestamps.
+    $suspendAtIso = $SuspendAt.ToUniversalTime().ToString("o")
     $open = Get-OpenVisitFromState $SyncState
     if ($open) {
-        $SyncState = End-LocalVisit -SyncState $SyncState -EndAt $suspendAtIso -PreviousSsid $LastKnownSsid
+        $skipEnd = $false
+        try {
+            $visitStartUtc = [DateTime]::Parse([string]$open.startAt).ToUniversalTime()
+            $suspendUtc = $SuspendAt.ToUniversalTime()
+            if ($suspendUtc -lt $visitStartUtc) {
+                Write-Log "SKIP sleep checkout: suspendAt before open visit start"
+                $skipEnd = $true
+            }
+        } catch {
+            Write-Log "WARN sleep checkout parse failed: $($_.Exception.Message)"
+        }
+        if (-not $skipEnd) {
+            $SyncState = End-LocalVisit -SyncState $SyncState -EndAt $suspendAtIso -PreviousSsid $LastKnownSsid
+        }
     }
     Add-QueuedEvent -Type "session_suspend" -Fields @{
         ssid = $LastKnownSsid
@@ -1001,11 +1019,12 @@ function Ensure-AgentUpdateScripts {
 }
 
 function Invoke-AgentSelfUpdate([string]$ApiUrl, [string]$Token, [bool]$Force) {
-    if ($Force) {
-        Write-Log "Admin push update: refreshing setup scripts from server before clean reinstall"
-        if (-not (Download-AgentUpdateScriptsFromServer -ApiUrl $ApiUrl -Token $Token)) {
-            Write-Log "WARN could not download latest setup.ps1 for force reinstall"
-        }
+    # Always refresh setup from the server first. Soft updates that reuse a broken
+    # local setup.ps1 (e.g. 1.5.7 $MaxAttempts: parse) never reach newer bundles.
+    $label = if ($Force) { "force reinstall" } else { "soft auto-update" }
+    Write-Log "Refreshing setup scripts from server before $label"
+    if (-not (Download-AgentUpdateScriptsFromServer -ApiUrl $ApiUrl -Token $Token)) {
+        Write-Log "WARN could not download latest setup.ps1 for $label"
     }
     if (-not (Ensure-AgentUpdateScripts -ApiUrl $ApiUrl -Token $Token)) {
         Write-Log "WARN setup.ps1 missing; cannot auto-update"
@@ -1356,23 +1375,29 @@ $syncState = Get-SyncState
 $previousDayKey = if ($syncState.dayKey) { [string]$syncState.dayKey } else { $null }
 $syncState = Maybe-EnqueueDailySummary -SyncState $syncState -DayKey $dayKey
 $dayRolledOver = $previousDayKey -and $previousDayKey -ne $dayKey
-if ($dayRolledOver) {
-    $isOfficeNow = Test-IsOfficeSsid -Ssid $ssid -ServerConfig $serverConfig
-    $hasOpenVisit = [bool](Get-OpenVisitFromState $syncState)
-    if ($isOfficeNow -and -not $hasOpenVisit) {
-        $hoursTarget = 5
-        if ($serverConfig -and $null -ne $serverConfig.hoursTarget) {
-            $hoursTarget = [double]$serverConfig.hoursTarget
-        }
-        $syncState = Start-LocalVisit -SyncState $syncState -Ssid $ssid -HoursTarget $hoursTarget
-        Write-Log "NEW_DAY visit_start on office Wi-Fi"
-    }
-}
 
+# Sleep checkout must run before starting a new visit. Otherwise day-rollover /
+# resume can open a visit at "now" and then close it with an older suspendAt
+# (endAt before startAt).
 if ($isResumeRun -and $suspendAtTime) {
     $sleepCheckout = Invoke-ResumeOfficeSleepCheckout -SyncState $syncState -ServerConfig $serverConfig `
         -LastKnownSsid $previousSsid -SuspendAt $suspendAtTime -ResumeGapMin $resumeGapMin
     $syncState = $sleepCheckout.syncState
+}
+
+$isOfficeNow = Test-IsOfficeSsid -Ssid $ssid -ServerConfig $serverConfig
+$hasOpenVisit = [bool](Get-OpenVisitFromState $syncState)
+if ($isOfficeNow -and -not $hasOpenVisit -and ($dayRolledOver -or $isResumeRun)) {
+    $hoursTarget = 5
+    if ($serverConfig -and $null -ne $serverConfig.hoursTarget) {
+        $hoursTarget = [double]$serverConfig.hoursTarget
+    }
+    $syncState = Start-LocalVisit -SyncState $syncState -Ssid $ssid -HoursTarget $hoursTarget
+    if ($dayRolledOver) {
+        Write-Log "NEW_DAY visit_start on office Wi-Fi"
+    } else {
+        Write-Log "RESUME visit_start on office Wi-Fi after sleep checkout"
+    }
 }
 
 $ssidChanged = ($previousSsid -ne $ssid)

@@ -281,6 +281,7 @@ async function closeOpenVisit(userId: string, at: Date) {
     orderBy: { startAt: "desc" },
   });
   if (!open) return;
+  if (at.getTime() < open.startAt.getTime()) return;
 
   await prisma.visit.update({
     where: { id: open.id },

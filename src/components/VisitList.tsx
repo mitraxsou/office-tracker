@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatHours, formatTime } from "@/lib/visits";
+import { formatTime, formatVisitDurationLabel, visitHasInvalidTimestamps } from "@/lib/visits";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
 
 type Visit = {
@@ -96,9 +96,8 @@ export function VisitList({
       )}
       <ul className="divide-y divide-[var(--border)]">
         {visits.map((visit) => {
-          const end = visit.endAt ?? new Date();
-          const durationMs = Math.max(0, end.getTime() - visit.startAt.getTime());
-          const hours = durationMs / (1000 * 60 * 60);
+          const invalid = visitHasInvalidTimestamps(visit);
+          const hoursLabel = formatVisitDurationLabel(visit);
           const isManual = visit.source === "manual";
           const isReporting = reportingId === visit.id;
 
@@ -113,10 +112,15 @@ export function VisitList({
                   <p className="text-sm text-muted">
                     {isManual ? "Manual" : "Wi-Fi"}
                     {visit.ssid ? ` · ${visit.ssid}` : ""}
+                    {invalid ? " · end before start" : ""}
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">
-                  <span className="text-sm font-medium text-accent">{formatHours(hours)}</span>
+                  <span
+                    className={`text-sm font-medium ${invalid ? "text-red-400" : "text-accent"}`}
+                  >
+                    {hoursLabel}
+                  </span>
                   {showActions && (
                     <div className="flex flex-wrap justify-end gap-2">
                       {isManual && (

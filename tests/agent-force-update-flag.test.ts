@@ -9,7 +9,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 vi.mock("@/lib/agent-version", () => ({
-  getAgentVersion: () => "1.5.10",
+  getAgentVersion: () => "1.5.12",
   compareAgentVersions: (a: string, b: string) => {
     const parse = (v: string) => v.split(".").map((p) => parseInt(p, 10) || 0);
     const av = parse(a);
@@ -34,25 +34,31 @@ describe("getDeviceForceAgentUpdate", () => {
     expect(findUniqueMock).not.toHaveBeenCalled();
   });
 
-  it("returns only the admin Push flag, not version mismatch", async () => {
-    findUniqueMock.mockResolvedValue({ forceAgentUpdate: false });
-
-    await expect(getDeviceForceAgentUpdate("user-1", "SERIAL-1")).resolves.toBe(false);
-
-    findUniqueMock.mockResolvedValue({ forceAgentUpdate: true });
+  it("returns true for admin Push even when version is current", async () => {
+    findUniqueMock.mockResolvedValue({
+      forceAgentUpdate: true,
+      agentScriptVersion: "1.5.12",
+    });
     await expect(getDeviceForceAgentUpdate("user-1", "SERIAL-1")).resolves.toBe(true);
+  });
 
+  it("returns true when reported version is stale so old agents refresh setup.ps1", async () => {
+    findUniqueMock.mockResolvedValue({
+      forceAgentUpdate: false,
+      agentScriptVersion: "1.5.7",
+    });
+    await expect(getDeviceForceAgentUpdate("user-1", "SERIAL-1")).resolves.toBe(true);
     expect(findUniqueMock).toHaveBeenCalledWith({
       where: { userId_serialNumber: { userId: "user-1", serialNumber: "SERIAL-1" } },
-      select: { forceAgentUpdate: true },
+      select: { forceAgentUpdate: true, agentScriptVersion: true },
     });
   });
 
-  it("does not read agentScriptVersion for the force flag", async () => {
-    findUniqueMock.mockResolvedValue({ forceAgentUpdate: false });
-    await getDeviceForceAgentUpdate("user-1", "SERIAL-1");
-    const arg = findUniqueMock.mock.calls[0][0];
-    expect(arg.select).toEqual({ forceAgentUpdate: true });
-    expect(arg.select).not.toHaveProperty("agentScriptVersion");
+  it("returns false when version is current and admin did not push", async () => {
+    findUniqueMock.mockResolvedValue({
+      forceAgentUpdate: false,
+      agentScriptVersion: "1.5.12",
+    });
+    await expect(getDeviceForceAgentUpdate("user-1", "SERIAL-1")).resolves.toBe(false);
   });
 });

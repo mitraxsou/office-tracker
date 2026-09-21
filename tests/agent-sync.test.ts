@@ -79,7 +79,7 @@ describe("parseAgentSyncEvents", () => {
       {
         id: "evt-1",
         type: "ssid_changed",
-        at: "2026-09-12T10:00:00.000Z",
+        at: "2026-09-20T10:00:00.000Z",
         ssid: "OfficeConnect",
         previousSsid: "HomeWiFi",
       },
@@ -101,18 +101,18 @@ describe("parseAgentSyncOpenVisit", () => {
   it("parses open visit payload", () => {
     const open = parseAgentSyncOpenVisit({
       localVisitId: "lv-1",
-      startAt: "2026-09-12T09:00:00.000Z",
+      startAt: "2026-09-20T09:00:00.000Z",
       ssid: "OfficeConnect",
     });
     expect(open).toEqual({
       localVisitId: "lv-1",
-      startAt: "2026-09-12T09:00:00.000Z",
+      startAt: "2026-09-20T09:00:00.000Z",
       ssid: "OfficeConnect",
     });
   });
 
   it("returns null when required fields missing", () => {
-    expect(parseAgentSyncOpenVisit({ startAt: "2026-09-12T09:00:00.000Z" })).toBeNull();
+    expect(parseAgentSyncOpenVisit({ startAt: "2026-09-20T09:00:00.000Z" })).toBeNull();
     expect(parseAgentSyncOpenVisit(null)).toBeNull();
   });
 });
@@ -120,9 +120,9 @@ describe("parseAgentSyncOpenVisit", () => {
 describe("sortAgentSyncEventsForProcessing", () => {
   it("processes visit_end before daily_summary and session_resume", () => {
     const sorted = sortAgentSyncEventsForProcessing([
-      { id: "3", type: "daily_summary", at: "2026-09-13T03:30:00.000Z", dayKey: "2026-09-12" },
-      { id: "1", type: "visit_end", at: "2026-09-12T14:00:00.000Z", localVisitId: "lv-1" },
-      { id: "2", type: "session_resume", at: "2026-09-13T03:30:00.000Z" },
+      { id: "3", type: "daily_summary", at: "2026-09-20T03:30:00.000Z", dayKey: "2026-09-19" },
+      { id: "1", type: "visit_end", at: "2026-09-19T14:00:00.000Z", localVisitId: "lv-1" },
+      { id: "2", type: "session_resume", at: "2026-09-20T03:30:00.000Z" },
     ]);
     expect(sorted.map((event) => event.type)).toEqual([
       "visit_end",
@@ -160,7 +160,7 @@ describe("processAgentSync session_resume", () => {
       {
         id: "evt-resume",
         type: "session_resume",
-        at: "2026-09-13T08:00:00.000Z",
+        at: "2026-09-20T08:00:00.000Z",
         ssid: "HomeWiFi",
         gapMinutes: 480,
       },
@@ -178,7 +178,7 @@ describe("processAgentSync session_resume", () => {
         {
           id: "evt-resume",
           type: "session_resume",
-          at: "2026-09-13T08:00:00.000Z",
+          at: "2026-09-20T08:00:00.000Z",
           ssid: "OfficeConnect",
           gapMinutes: 12,
         },
@@ -204,12 +204,12 @@ describe("processAgentSync session_resume", () => {
   });
 
   it("processes visit_end before daily_summary in the same batch", async () => {
-    const disconnectAt = new Date("2026-09-12T18:00:00.000Z");
+    const disconnectAt = new Date("2026-09-19T18:00:00.000Z");
     const openVisit = {
       id: "visit-1",
       userId: "user-1",
       localVisitId: "lv-1",
-      startAt: new Date("2026-09-12T04:00:00.000Z"),
+      startAt: new Date("2026-09-19T04:00:00.000Z"),
       endAt: null,
     };
     const callOrder: string[] = [];
@@ -227,13 +227,13 @@ describe("processAgentSync session_resume", () => {
     });
     const closedVisit = { ...openVisit, endAt: disconnectAt };
     visitFindManyMock.mockResolvedValue([closedVisit]);
-    const { start: dayStart, end: dayEnd } = dayBoundsFromKey("2026-09-12", "Asia/Kolkata");
+    const { start: dayStart, end: dayEnd } = dayBoundsFromKey("2026-09-19", "Asia/Kolkata");
     loadDaySpanContextMock.mockResolvedValue({
       visits: [closedVisit],
       params: {
         dayStart,
         dayEnd,
-        now: new Date("2026-09-13T00:05:00.000Z"),
+        now: new Date("2026-09-20T00:05:00.000Z"),
       },
       lastHeartbeat: null,
       laptopActiveParams: {},
@@ -249,8 +249,8 @@ describe("processAgentSync session_resume", () => {
         {
           id: "evt-summary",
           type: "daily_summary",
-          at: "2026-09-13T00:05:00.000Z",
-          dayKey: "2026-09-12",
+          at: "2026-09-20T00:05:00.000Z",
+          dayKey: "2026-09-19",
           officeMs: 5 * 60 * 60 * 1000,
           visitCount: 1,
         },
@@ -278,7 +278,7 @@ describe("processAgentSync session_resume", () => {
         {
           id: "evt-tick",
           type: "activity_tick",
-          at: "2026-09-13T08:00:00.000Z",
+          at: "2026-09-20T08:00:00.000Z",
           ssid: "HomeWiFi",
         },
       ],
@@ -292,8 +292,85 @@ describe("processAgentSync session_resume", () => {
       }),
     });
     expect(visitUpdateMock).not.toHaveBeenCalled();
+    expect(visitCreateMock).not.toHaveBeenCalled();
     expect(result.rejected).toEqual([]);
     expect(result.serverState.inOfficeNow).toBe(false);
+  });
+
+  it("reopens invalid closed visit when office activity continues", async () => {
+    const invalidVisit = {
+      id: "visit-bad",
+      userId: "user-1",
+      deviceId: "device-1",
+      startAt: new Date("2026-09-21T09:04:09.625Z"),
+      endAt: new Date("2026-09-21T07:18:04.147Z"),
+      source: "wifi",
+      ssid: "OfficeConnect",
+    };
+    visitFindFirstMock.mockImplementation(async (args: {
+      where?: { endAt?: null | { not: null }; deviceId?: string };
+    }) => {
+      if (args?.where?.endAt === null) return null;
+      if (args?.where?.endAt && typeof args.where.endAt === "object") return invalidVisit;
+      return null;
+    });
+
+    const result = await processAgentSync({
+      userId: "user-1",
+      userTimezone: "Asia/Kolkata",
+      deviceId: "device-1",
+      serialNumber: "SERIAL-1",
+      events: [
+        {
+          id: "evt-tick",
+          type: "activity_tick",
+          at: "2026-09-21T12:40:00.000Z",
+          ssid: "OfficeConnect",
+        },
+      ],
+      appUrl: "https://office.example",
+    });
+
+    expect(visitUpdateMock).toHaveBeenCalledWith({
+      where: { id: "visit-bad" },
+      data: expect.objectContaining({ endAt: null }),
+    });
+    expect(result.rejected).toEqual([]);
+  });
+
+  it("creates a visit when office activity continues with no open visit", async () => {
+    visitFindFirstMock.mockResolvedValue(null);
+    visitCreateMock.mockResolvedValue({
+      id: "visit-new",
+      endAt: null,
+      startAt: new Date("2026-09-21T12:40:00.000Z"),
+    });
+
+    await processAgentSync({
+      userId: "user-1",
+      userTimezone: "Asia/Kolkata",
+      deviceId: "device-1",
+      serialNumber: "SERIAL-1",
+      events: [
+        {
+          id: "evt-tick",
+          type: "activity_tick",
+          at: "2026-09-21T12:40:00.000Z",
+          ssid: "OfficeConnect",
+        },
+      ],
+      appUrl: "https://office.example",
+    });
+
+    expect(visitCreateMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: "user-1",
+        deviceId: "device-1",
+        source: "wifi",
+        ssid: "OfficeConnect",
+        startAt: new Date("2026-09-21T12:40:00.000Z"),
+      }),
+    });
   });
 
   it("records sync_batch when syncTrigger is provided", async () => {
@@ -306,7 +383,7 @@ describe("processAgentSync session_resume", () => {
         {
           id: "evt-tick",
           type: "activity_tick",
-          at: "2026-09-13T08:00:00.000Z",
+          at: "2026-09-20T08:00:00.000Z",
           ssid: "HomeWiFi",
         },
       ],
@@ -336,7 +413,7 @@ describe("processAgentSync session_resume", () => {
         {
           id: "evt-start",
           type: "visit_start",
-          at: "2026-09-13T09:00:00.000Z",
+          at: "2026-09-20T09:00:00.000Z",
           localVisitId: "lv-home",
           ssid: "HomeWiFi",
         },
@@ -347,13 +424,48 @@ describe("processAgentSync session_resume", () => {
     expect(result.rejected).toEqual([{ id: "evt-start", reason: "ssid_not_allowed" }]);
   });
 
-  it("applies visit_end before running maintenance on wake batches", async () => {
-    const disconnectAt = new Date("2026-09-12T14:00:00.000Z");
+  it("rejects visit_end when checkout is before check-in", async () => {
     const openVisit = {
       id: "visit-1",
       userId: "user-1",
       localVisitId: "lv-1",
-      startAt: new Date("2026-09-12T04:00:00.000Z"),
+      startAt: new Date("2026-09-20T08:38:00.000Z"),
+      endAt: null,
+    };
+    visitFindFirstMock.mockImplementation(async (args: { where?: { localVisitId?: string } }) => {
+      if (args?.where?.localVisitId) return openVisit;
+      return null;
+    });
+
+    const result = await processAgentSync({
+      userId: "user-1",
+      userTimezone: "Asia/Kolkata",
+      deviceId: "device-1",
+      serialNumber: "SERIAL-1",
+      events: [
+        {
+          id: "evt-end",
+          type: "visit_end",
+          at: "2026-09-20T08:04:00.000Z",
+          localVisitId: "lv-1",
+        },
+      ],
+      appUrl: "https://office.example",
+    });
+
+    expect(result.rejected).toEqual([
+      { id: "evt-end", reason: "Check-out time cannot be before check-in" },
+    ]);
+    expect(visitUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it("applies visit_end before running maintenance on wake batches", async () => {
+    const disconnectAt = new Date("2026-09-20T14:00:00.000Z");
+    const openVisit = {
+      id: "visit-1",
+      userId: "user-1",
+      localVisitId: "lv-1",
+      startAt: new Date("2026-09-20T04:00:00.000Z"),
       endAt: null,
     };
     visitFindFirstMock.mockImplementation(async (args: { where?: { localVisitId?: string } }) => {
@@ -378,7 +490,7 @@ describe("processAgentSync session_resume", () => {
         {
           id: "evt-resume",
           type: "session_resume",
-          at: "2026-09-13T03:30:00.000Z",
+          at: "2026-09-21T03:30:00.000Z",
           ssid: "HomeWiFi",
         },
       ],
@@ -394,10 +506,12 @@ describe("processAgentSync session_resume", () => {
   });
 
   it("dispatches heartbeat alerts after visit_start on office Wi-Fi", async () => {
-    const startAt = "2026-09-13T09:00:00.000Z";
+    const startAt = "2026-09-20T09:00:00.000Z";
     visitFindFirstMock.mockImplementation(async (args: { where?: { localVisitId?: string; endAt?: null } }) => {
       if (args?.where?.localVisitId) return null;
-      if (args?.where?.endAt === null) return { id: "visit-1", endAt: null };
+      if (args?.where?.endAt === null) {
+        return { id: "visit-1", endAt: null, startAt: new Date("2026-09-20T08:00:00.000Z") };
+      }
       return null;
     });
     visitCreateMock.mockResolvedValue({
@@ -444,7 +558,7 @@ describe("processAgentSync session_resume", () => {
         {
           id: "evt-tick",
           type: "activity_tick",
-          at: "2026-09-13T08:00:00.000Z",
+          at: "2026-09-20T08:00:00.000Z",
           ssid: "HomeWiFi",
         },
       ],
@@ -455,7 +569,7 @@ describe("processAgentSync session_resume", () => {
   });
 
   it("accepts hours_target_met and evaluates alerts", async () => {
-    const metAt = "2026-09-13T14:05:00.000Z";
+    const metAt = "2026-09-20T14:05:00.000Z";
     await processAgentSync({
       userId: "user-1",
       userTimezone: "Asia/Kolkata",
@@ -466,7 +580,7 @@ describe("processAgentSync session_resume", () => {
           id: "evt-met",
           type: "hours_target_met",
           at: metAt,
-          dayKey: "2026-09-13",
+          dayKey: "2026-09-20",
           officeMs: 5 * 60 * 60 * 1000,
         },
       ],
@@ -487,7 +601,7 @@ describe("processAgentSync session_resume", () => {
     visitFindFirstMock.mockResolvedValue({
       id: "visit-open",
       endAt: null,
-      startAt: new Date("2026-09-13T09:00:00.000Z"),
+      startAt: new Date("2026-09-20T09:00:00.000Z"),
     });
 
     await processAgentSync({
@@ -499,7 +613,7 @@ describe("processAgentSync session_resume", () => {
         {
           id: "evt-dup",
           type: "activity_tick",
-          at: "2026-09-13T08:00:00.000Z",
+          at: "2026-09-20T08:00:00.000Z",
           ssid: "OfficeConnect",
         },
       ],
@@ -523,7 +637,7 @@ describe("syncBatchNeedsVisitMaintenance", () => {
       syncBatchNeedsVisitMaintenance([{ id: "1", type: "session_resume" }]),
     ).toBe(true);
     expect(
-      syncBatchNeedsVisitMaintenance([{ id: "2", type: "daily_summary", dayKey: "2026-09-12" }]),
+      syncBatchNeedsVisitMaintenance([{ id: "2", type: "daily_summary", dayKey: "2026-09-20" }]),
     ).toBe(true);
   });
 

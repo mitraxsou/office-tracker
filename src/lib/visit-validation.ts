@@ -13,5 +13,8 @@ export function validateVisitTimestamps(
   if (endAt && endAt.getTime() > maxAllowed) {
     return "Check-out time cannot be in the future";
   }
+  if (endAt && endAt.getTime() < startAt.getTime()) {
+    return "Check-out time cannot be before check-in";
+  }
   return null;
 }

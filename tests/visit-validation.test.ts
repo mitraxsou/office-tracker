@@ -5,9 +5,17 @@ describe("validateVisitTimestamps", () => {
   const now = new Date("2026-09-08T12:00:00+05:30");
 
   it("accepts start and end within clock skew grace", () => {
-    const start = new Date(now.getTime() + CLOCK_SKEW_GRACE_MS - 1000);
-    const end = new Date(now.getTime() + CLOCK_SKEW_GRACE_MS - 2000);
+    const start = new Date(now.getTime() + CLOCK_SKEW_GRACE_MS - 2000);
+    const end = new Date(now.getTime() + CLOCK_SKEW_GRACE_MS - 1000);
     expect(validateVisitTimestamps(start, end, now)).toBeNull();
+  });
+
+  it("rejects endAt before startAt", () => {
+    const start = new Date(now.getTime() - 60 * 60 * 1000);
+    const end = new Date(now.getTime() - 90 * 60 * 1000);
+    expect(validateVisitTimestamps(start, end, now)).toBe(
+      "Check-out time cannot be before check-in",
+    );
   });
 
   it("rejects startAt in the future beyond grace", () => {

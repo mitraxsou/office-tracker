@@ -182,10 +182,10 @@ export async function processAgentSync(params: {
           }
 
           const openOther = await prisma.visit.findFirst({
-            where: { userId: params.userId, endAt: null },
+            where: { userId: params.userId, endAt: null, deviceId: params.deviceId },
             orderBy: { startAt: "desc" },
           });
-          if (openOther) {
+          if (openOther && eventAt.getTime() >= openOther.startAt.getTime()) {
             await prisma.visit.update({
               where: { id: openOther.id },
               data: { endAt: eventAt },
@@ -268,6 +268,15 @@ export async function processAgentSync(params: {
             laptopActiveMs: event.laptopActiveMs,
             firstAgentOnAt: parseFirstAgentOnAt(event.firstAgentOnAt),
           });
+          if (inOffice) {
+            await ensureOpenOfficeVisitFromActivity({
+              userId: params.userId,
+              deviceId: params.deviceId,
+              eventAt,
+              ssid,
+              localVisitId: event.localVisitId?.trim() || null,
+            });
+          }
           lastEventAt = eventAt;
           lastInOffice = inOffice;
           await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
@@ -410,6 +419,13 @@ export async function processAgentSync(params: {
     await maybeRunVisitMaintenance(params.userId, params.userTimezone, undefined, { force: true });
   }
 
+  await reconcileAgentOpenVisit({
+    userId: params.userId,
+    deviceId: params.deviceId,
+    openVisit: params.openVisit ?? null,
+    allowlist,
+  });
+
   const openVisitRow = await prisma.visit.findFirst({
     where: { userId: params.userId, endAt: null },
     orderBy: { startAt: "desc" },
@@ -472,6 +488,124 @@ export async function processAgentSync(params: {
       vercelProtectionBypass: vercelProtectionBypassSecret(),
     },
   };
+}
+
+async function ensureOpenOfficeVisitFromActivity(params: {
+  userId: string;
+  deviceId: string;
+  eventAt: Date;
+  ssid: string | null;
+  localVisitId?: string | null;
+}) {
+  const open = await prisma.visit.findFirst({
+    where: { userId: params.userId, endAt: null, deviceId: params.deviceId },
+    orderBy: { startAt: "desc" },
+  });
+  if (open) {
+    await prisma.visit.update({
+      where: { id: open.id },
+      data: { updatedAt: params.eventAt, ...(params.ssid ? { ssid: params.ssid } : {}) },
+    });
+    return;
+  }
+
+  // Repair same-day wifi visits that were closed with endAt before startAt.
+  const recent = await prisma.visit.findFirst({
+    where: {
+      userId: params.userId,
+      deviceId: params.deviceId,
+      source: "wifi",
+      startAt: { lte: params.eventAt },
+      endAt: { not: null },
+    },
+    orderBy: { startAt: "desc" },
+  });
+  if (recent?.endAt && recent.endAt.getTime() < recent.startAt.getTime()) {
+    await prisma.visit.update({
+      where: { id: recent.id },
+      data: {
+        endAt: null,
+        updatedAt: params.eventAt,
+        ...(params.ssid ? { ssid: params.ssid } : {}),
+      },
+    });
+    return;
+  }
+
+  if (params.localVisitId) {
+    const byLocal = await prisma.visit.findFirst({
+      where: { userId: params.userId, localVisitId: params.localVisitId },
+    });
+    if (byLocal) {
+      if (byLocal.endAt && byLocal.endAt.getTime() < byLocal.startAt.getTime()) {
+        await prisma.visit.update({
+          where: { id: byLocal.id },
+          data: { endAt: null, updatedAt: params.eventAt },
+        });
+      }
+      return;
+    }
+  }
+
+  await prisma.visit.create({
+    data: {
+      userId: params.userId,
+      deviceId: params.deviceId,
+      startAt: params.eventAt,
+      source: "wifi",
+      ssid: params.ssid,
+      localVisitId: params.localVisitId || `recover-${randomUUID().replace(/-/g, "")}`,
+    },
+  });
+}
+
+async function reconcileAgentOpenVisit(params: {
+  userId: string;
+  deviceId: string;
+  openVisit: AgentSyncOpenVisit | null;
+  allowlist: string[];
+}) {
+  if (!params.openVisit) return;
+
+  const startAt = parseAgentEventTimestamp(params.openVisit.startAt);
+  if (!startAt) return;
+  const ssid = params.openVisit.ssid
+    ? normalizeSsid(sanitizeSsid(params.openVisit.ssid) ?? params.openVisit.ssid)
+    : null;
+  if (ssid && !isOfficeSsid(ssid, params.allowlist)) return;
+
+  const timestampError = validateVisitTimestamps(startAt, null);
+  if (timestampError) return;
+
+  const existing = await prisma.visit.findFirst({
+    where: { userId: params.userId, localVisitId: params.openVisit.localVisitId },
+  });
+  if (existing) {
+    if (existing.endAt && existing.endAt.getTime() < existing.startAt.getTime()) {
+      await prisma.visit.update({
+        where: { id: existing.id },
+        data: { endAt: null, updatedAt: new Date() },
+      });
+    }
+    return;
+  }
+
+  const openOther = await prisma.visit.findFirst({
+    where: { userId: params.userId, endAt: null, deviceId: params.deviceId },
+    orderBy: { startAt: "desc" },
+  });
+  if (openOther) return;
+
+  await prisma.visit.create({
+    data: {
+      userId: params.userId,
+      deviceId: params.deviceId,
+      startAt,
+      source: "wifi",
+      ssid,
+      localVisitId: params.openVisit.localVisitId,
+    },
+  });
 }
 
 async function recordAgentEvent(

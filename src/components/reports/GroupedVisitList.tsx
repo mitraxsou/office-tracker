@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { dayKeyInTimezone } from "@/lib/visits";
-import { formatHours, formatTime } from "@/lib/visits";
+import { dayKeyInTimezone, formatHours, formatTime, formatVisitDurationLabel, visitHasInvalidTimestamps } from "@/lib/visits";
 
 type VisitRow = {
   id: string;
@@ -186,10 +185,9 @@ export function GroupedVisitList({
                   {group.visits.map((visit) => {
                     const start = new Date(visit.startAt);
                     const end = visit.endAt ? new Date(visit.endAt) : null;
-                    const durationMs = end
-                      ? Math.max(0, end.getTime() - start.getTime())
-                      : Math.max(0, Date.now() - start.getTime());
-                    const hours = durationMs / (1000 * 60 * 60);
+                    const row = { startAt: start, endAt: end };
+                    const invalid = visitHasInvalidTimestamps(row);
+                    const hoursLabel = formatVisitDurationLabel(row);
 
                     return (
                       <li
@@ -204,9 +202,14 @@ export function GroupedVisitList({
                           <p className="text-xs text-muted">
                             {visit.source === "manual" ? "Manual" : "Wi-Fi"}
                             {visit.ssid ? ` · ${visit.ssid}` : ""}
+                            {invalid ? " · end before start" : ""}
                           </p>
                         </div>
-                        <span className="text-sm font-medium text-muted">{formatHours(hours)}</span>
+                        <span
+                          className={`text-sm font-medium ${invalid ? "text-red-400" : "text-muted"}`}
+                        >
+                          {hoursLabel}
+                        </span>
                       </li>
                     );
                   })}

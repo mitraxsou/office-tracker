@@ -53,9 +53,14 @@ export function getUserAgentVersionSummary(
 }
 
 /**
- * Admin "Push update" flag only. Do not OR in version mismatch: agents already
- * soft-update from agentScriptVersion, and mapping stale reported versions to
- * forceAgentUpdate caused wipe+EXIT-before-sync loops after every server bump.
+ * Force reinstall signal for agents.
+ *
+ * - Admin "Push update" sets forceAgentUpdate in DB.
+ * - Also true when the device still reports a stale agentScriptVersion: agents
+ *   before 1.5.12 only refresh setup.ps1 from the server when Force=true, so a
+ *   soft version mismatch alone left broken local setup.ps1 stuck forever.
+ * - Current agents (1.5.11+) skip force when local version already matches
+ *   server, so sync can clear the flag without EXIT-before-sync loops.
  */
 export async function getDeviceForceAgentUpdate(
   userId: string,
@@ -65,10 +70,12 @@ export async function getDeviceForceAgentUpdate(
 
   const device = await prisma.agentDevice.findUnique({
     where: { userId_serialNumber: { userId, serialNumber } },
-    select: { forceAgentUpdate: true },
+    select: { forceAgentUpdate: true, agentScriptVersion: true },
   });
 
-  return device?.forceAgentUpdate ?? false;
+  if (!device) return false;
+  if (device.forceAgentUpdate) return true;
+  return isDeviceAgentVersionStale(device.agentScriptVersion);
 }
 
 export async function recordDeviceScriptVersion(

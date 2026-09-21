@@ -303,9 +303,29 @@ export function roundHoursToMinute(hours: number): number {
 }
 
 export function formatHours(hours: number): string {
-  const h = Math.floor(hours);
-  const m = Math.round((hours - h) * 60);
+  const safe = Number.isFinite(hours) ? Math.max(0, hours) : 0;
+  const h = Math.floor(safe);
+  const m = Math.round((safe - h) * 60);
   return `${h}h ${m}m`;
+}
+
+/** True when a closed visit has endAt strictly before startAt. */
+export function visitHasInvalidTimestamps(visit: {
+  startAt: Date;
+  endAt: Date | null;
+}): boolean {
+  return Boolean(visit.endAt && visit.endAt.getTime() < visit.startAt.getTime());
+}
+
+/** Duration label that surfaces corrupted end-before-start rows instead of 0h 0m. */
+export function formatVisitDurationLabel(
+  visit: { startAt: Date; endAt: Date | null },
+  now = new Date(),
+): string {
+  if (visitHasInvalidTimestamps(visit)) return "Invalid times";
+  const end = visit.endAt ?? now;
+  const hours = Math.max(0, end.getTime() - visit.startAt.getTime()) / (1000 * 60 * 60);
+  return formatHours(hours);
 }
 
 export function formatTime(date: Date, timezone = DEFAULT_TIMEZONE): string {

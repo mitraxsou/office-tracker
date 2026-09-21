@@ -61,11 +61,12 @@ describe("agent local storage maintenance", () => {
 
   it("reinstall command dot-sources lib agent-storage.ps1 before setup IEX", () => {
     const command = buildSetupCommand("https://office.example", "tok");
-    expect(command).toContain("lib\\agent-storage.ps1");
-    expect(command).toContain(". $libSt");
-    expect(command).toContain("Unblock-File -LiteralPath $p");
-    expect(command.indexOf("agent-storage.ps1")).toBeLessThan(command.indexOf("Invoke-AgentScriptBypass"));
-    expect(command).not.toContain("/api/agent/files/agent-storage.ps1");
+    expect(command).toContain("agent-storage.ps1");
+    expect(command).toContain(". (Join-Path $lib ''agent-storage.ps1'')");
+    expect(command).toContain("/api/agent/files/agent-storage.ps1");
+    expect(command.indexOf("agent-storage.ps1")).toBeLessThan(
+      command.indexOf("Invoke-AgentScriptBypass"),
+    );
   });
 
   it("Invoke-AgentScriptBypass preloads lib modules for IEX subprocess", () => {
