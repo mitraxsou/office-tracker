@@ -44,6 +44,14 @@ describe("PowerShell 5.1 compatibility patterns", () => {
     );
   });
 
+  it("setup.ps1 never kills its own process tree during force reinstall", () => {
+    const setup = readAgent("setup.ps1");
+    expect(setup).toContain("function Get-AgentProtectedProcessIds");
+    expect(setup).toContain("$protected = Get-AgentProtectedProcessIds");
+    expect(setup).toContain("if ($protected.ContainsKey([int]$_.Id)) { return }");
+    expect(setup).toContain("$installerMarkers");
+  });
+
   it("agent-storage exposes maintenance without nested import helpers", () => {
     const storage = readAgent("lib/agent-storage.ps1");
     expect(storage).toContain("function Invoke-AgentStorageMaintenance");

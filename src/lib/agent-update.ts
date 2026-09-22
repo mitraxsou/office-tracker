@@ -55,12 +55,10 @@ export function getUserAgentVersionSummary(
 /**
  * Force reinstall signal for agents.
  *
- * - Admin "Push update" sets forceAgentUpdate in DB.
- * - Also true when the device still reports a stale agentScriptVersion: agents
- *   before 1.5.12 only refresh setup.ps1 from the server when Force=true, so a
- *   soft version mismatch alone left broken local setup.ps1 stuck forever.
- * - Current agents (1.5.11+) skip force when local version already matches
- *   server, so sync can clear the flag without EXIT-before-sync loops.
+ * Admin "Push update" only. A stale agentScriptVersion must stay a soft update:
+ * force wipes the install folder first, so any failure there strands the laptop
+ * and stops presence sync. Agents on 1.5.12+ refresh setup.ps1 from the server
+ * on the soft path too, so routine version bumps never need force.
  */
 export async function getDeviceForceAgentUpdate(
   userId: string,
@@ -74,8 +72,7 @@ export async function getDeviceForceAgentUpdate(
   });
 
   if (!device) return false;
-  if (device.forceAgentUpdate) return true;
-  return isDeviceAgentVersionStale(device.agentScriptVersion);
+  return device.forceAgentUpdate;
 }
 
 export async function recordDeviceScriptVersion(

@@ -42,12 +42,12 @@ describe("getDeviceForceAgentUpdate", () => {
     await expect(getDeviceForceAgentUpdate("user-1", "SERIAL-1")).resolves.toBe(true);
   });
 
-  it("returns true when reported version is stale so old agents refresh setup.ps1", async () => {
+  it("keeps a stale version on the soft update path instead of force", async () => {
     findUniqueMock.mockResolvedValue({
       forceAgentUpdate: false,
       agentScriptVersion: "1.5.7",
     });
-    await expect(getDeviceForceAgentUpdate("user-1", "SERIAL-1")).resolves.toBe(true);
+    await expect(getDeviceForceAgentUpdate("user-1", "SERIAL-1")).resolves.toBe(false);
     expect(findUniqueMock).toHaveBeenCalledWith({
       where: { userId_serialNumber: { userId: "user-1", serialNumber: "SERIAL-1" } },
       select: { forceAgentUpdate: true, agentScriptVersion: true },

@@ -148,18 +148,44 @@ function Send-LifecycleUninstallFromConfig {
     }
 }
 
+function Get-AgentProtectedProcessIds {
+    # Setup itself runs from the install folder, so its own command line matches
+    # the needles below. Killing self or the caller aborts the reinstall and
+    # leaves .setup.lock behind, which blocks later runs for 10 minutes.
+    $protected = @{}
+    $current = [int]$PID
+    for ($depth = 0; $depth -lt 8; $depth++) {
+        if ($current -le 0 -or $protected.ContainsKey($current)) { break }
+        $protected[$current] = $true
+        $parent = 0
+        try {
+            $parent = [int](Get-CimInstance Win32_Process -Filter "ProcessId = $current" -ErrorAction Stop).ParentProcessId
+        } catch {
+            break
+        }
+        $current = $parent
+    }
+    return $protected
+}
+
 function Stop-RunningAgentProcesses {
     foreach ($taskName in @($TaskName) + $LegacyTaskNames) {
         Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     }
     Start-Sleep -Seconds 1
 
+    $protected = Get-AgentProtectedProcessIds
     $needles = @("OfficeTracker", "PwCOfficePulse", "office-heartbeat", "run-heartbeat.vbs")
+    $installerMarkers = @("setup.ps1", "setup.txt", "update.ps1", "update.txt", "run-update.vbs")
     foreach ($procName in @("wscript", "powershell")) {
         Get-Process -Name $procName -ErrorAction SilentlyContinue | ForEach-Object {
+            if ($protected.ContainsKey([int]$_.Id)) { return }
             try {
                 $cmd = (Get-CimInstance Win32_Process -Filter "ProcessId = $($_.Id)" -ErrorAction Stop).CommandLine
                 if (-not $cmd) { return }
+                foreach ($marker in $installerMarkers) {
+                    if ($cmd -like "*$marker*") { return }
+                }
                 foreach ($needle in $needles) {
                     if ($cmd -like "*$needle*") {
                         Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
