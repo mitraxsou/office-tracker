@@ -1,0 +1,19 @@
+{
+  "incident": "BUG-001",
+  "note": "Sanitized incomplete install at matching version (1.5.7-era shape)",
+  "localVersion": "1.5.7",
+  "serverVersion": "1.5.7",
+  "installDirFilesPresent": [
+    "version.txt",
+    "office-heartbeat.ps1",
+    "setup.ps1",
+    "update.ps1",
+    "config.json"
+  ],
+  "installDirFilesMissing": [
+    "test-connection.ps1",
+    "lib\\agent-download.ps1",
+    "lib\\agent-storage.ps1"
+  ],
+  "expectedRepair": true
+}

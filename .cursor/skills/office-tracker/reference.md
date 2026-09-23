@@ -65,6 +65,13 @@
 
 Opt-in only. Colleagues on PwC laptops. Collect SSID + timestamps + serial only. Not HR/badge integration.
 
+## Regression catalog
+
+- Index: `tests/bugs/catalog.json`
+- How to add: `tests/bugs/README.md`
+- Run: `npm run test:bugs` (also pulled in by `npm test`)
+- Agent laptop matrix (separate): `docs/agent-regression-matrix.md`
+
 ## Git commits / deploy
 
 Vercel blocks commits not authored by **mitraxsou**. Always commit with:

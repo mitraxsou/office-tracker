@@ -1,0 +1,8 @@
+{
+  "incident": "BUG-007",
+  "userId": "user-a",
+  "dayKey": "2026-09-09",
+  "alreadyDispatched": ["hours_met", "monthly_snapshot"],
+  "candidateTypes": ["hours_started", "hours_met", "monthly_snapshot"],
+  "expectedPending": ["hours_started"]
+}

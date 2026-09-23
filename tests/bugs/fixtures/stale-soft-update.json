@@ -1,0 +1,12 @@
+{
+  "incident": "BUG-003",
+  "userId": "user-a",
+  "serialNumber": "SN-DEMO-001",
+  "serverVersion": "1.5.12",
+  "device": {
+    "forceAgentUpdate": false,
+    "agentScriptVersion": "1.5.7"
+  },
+  "expectedForce": false,
+  "note": "Stale version must stay on soft update path"
+}

@@ -1,0 +1,8 @@
+{
+  "incident": "BUG-002",
+  "note": "Force wipe must not kill the running setup process tree",
+  "protectedMarkers": ["setup.ps1", "setup.txt", "update.ps1", "update.txt", "run-update.vbs"],
+  "killNeedles": ["OfficeTracker", "PwCOfficePulse", "office-heartbeat", "run-heartbeat.vbs"],
+  "lockFile": ".setup.lock",
+  "lockBlocksMinutes": 10
+}

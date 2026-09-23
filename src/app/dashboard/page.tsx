@@ -27,6 +27,7 @@ import {
 import { formatLastHeartbeat } from "@/lib/visits";
 import { formatPulseAge } from "@/lib/pulse-age";
 import { getUserAgentVersionSummary } from "@/lib/agent-update";
+import { firstNameFromSession } from "@/lib/welcome-greeting";
 
 export default async function DashboardPage() {
   const user = await requireAuthenticatedUser();
@@ -128,6 +129,7 @@ export default async function DashboardPage() {
     ? formatLastHeartbeat(lastOfficeActivityAt, summary.dayKey, user.timezone)
     : "None";
   const lastOfficeActivityTone: StatusTone = lastOfficeActivityAt ? "success" : "muted";
+  const firstName = firstNameFromSession(user.name, user.email);
 
   return (
     <>
@@ -147,6 +149,7 @@ export default async function DashboardPage() {
 
         <DeskClockPanel
           timezone={user.timezone}
+          firstName={firstName}
           dayKey={summary.dayKey}
           monthKey={monthlyProgress.monthKey}
           monthDays={monthlyProgress.days}

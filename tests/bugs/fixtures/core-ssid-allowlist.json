@@ -1,0 +1,13 @@
+{
+  "incident": "CORE-001",
+  "allowlist": ["OfficeConnect", "ExternalConnect", "pwcglb.com"],
+  "inOfficeSamples": [
+    { "ssid": "OfficeConnect", "expected": true },
+    { "ssid": "ExternalConnect", "expected": true },
+    { "ssid": "pwcglb.com 2 (Unauthenticated)", "expected": true }
+  ],
+  "outOfOfficeSamples": [
+    { "ssid": "UserA-Hotspot", "inOfficeFlag": true, "expected": false },
+    { "ssid": null, "inOfficeFlag": false, "expected": false }
+  ]
+}

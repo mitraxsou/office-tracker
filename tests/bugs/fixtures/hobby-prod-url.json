@@ -1,0 +1,6 @@
+{
+  "incident": "BUG-008",
+  "hobbyProdUrl": "https://office-tracker-theta.vercel.app",
+  "devUrl": "https://office-tracker-dev.vercel.app",
+  "note": "Hobby production is the live pilot agent URL"
+}

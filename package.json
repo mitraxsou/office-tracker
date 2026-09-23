@@ -13,6 +13,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:bugs": "vitest run tests/bugs",
     "test:regression": "vitest run tests/agent-heartbeat-sync.test.ts tests/agent-storage.test.ts tests/agent-version.test.ts tests/agent-sync.test.ts tests/agent-ps51-compat.test.ts tests/heartbeat-eod.test.ts tests/activity-signal.test.ts tests/agent-api-hits.test.ts",
     "regression:create-prod": "node scripts/regression/create-regression-user-prod.mjs",
     "seed:demo": "node scripts/ensure-postgres-env.mjs -- tsx scripts/regression/seed-demo-users.ts",

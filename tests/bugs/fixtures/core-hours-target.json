@@ -1,0 +1,6 @@
+{
+  "incident": "CORE-002",
+  "defaultHoursTarget": 5,
+  "qualifyingHours": 5,
+  "belowTargetHours": 4.99
+}

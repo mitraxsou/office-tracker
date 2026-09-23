@@ -116,17 +116,27 @@ See [reference.md](reference.md) for env vars and API routes.
 | Agent branding | `src/lib/agent-branding.ts` |
 | Schema | `prisma/schema.prisma` |
 | Tests | `tests/visits.test.ts`, `tests/ssid.test.ts` |
+| Bug / regression catalog | `tests/bugs/catalog.json` (`npm run test:bugs`) |
 
 ## Development checklist
 
 Before calling work done:
 
-1. `npm test` (8+ tests)
-2. `npm run build`
-3. Agent `-DryRun` shows SSID via NetConnectionProfile on PwC laptop
-4. No PowerShell window flash (VBS task verified)
-5. User vs admin permissions unchanged unless requested
-6. Copy/install commands use `NEXT_PUBLIC_APP_URL`
+1. `npm test` (includes `tests/bugs/`)
+2. `npm run test:bugs` (regression catalog - run even if the change seems unrelated)
+3. `npm run build`
+4. Agent `-DryRun` shows SSID via NetConnectionProfile on PwC laptop
+5. No PowerShell window flash (VBS task verified)
+6. User vs admin permissions unchanged unless requested
+7. Copy/install commands use `NEXT_PUBLIC_APP_URL`
+
+## Regression catalog
+
+Past incidents and core guards live under `tests/bugs/` (`catalog.json` + fixtures + Vitest).
+
+- **When making any change** (related or not): run `npm run test:bugs` before calling work done.
+- **Add a case:** see `tests/bugs/README.md` (catalog entry + failing-then-passing test + sanitized fixture).
+- Agent laptop matrix (separate harness): `docs/agent-regression-matrix.md` / `npm run test:regression`.
 
 ## Git commits
 

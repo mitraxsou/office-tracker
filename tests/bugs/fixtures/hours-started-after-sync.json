@@ -1,0 +1,15 @@
+{
+  "incident": "BUG-005",
+  "userLabel": "UserA",
+  "dayKey": "2026-09-10",
+  "scenario": "events-mode sync already created today's office visit before alert eval",
+  "heartbeat": {
+    "inOffice": true,
+    "oooCleared": false,
+    "metTarget": false,
+    "hoursStartedSent": false,
+    "hoursMetSent": false,
+    "monthlySnapshotSent": true
+  },
+  "expectedTypes": ["hours_started"]
+}

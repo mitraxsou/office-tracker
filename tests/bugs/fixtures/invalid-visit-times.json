@@ -1,0 +1,20 @@
+{
+  "incident": "BUG-004",
+  "userLabel": "UserA",
+  "timezone": "Asia/Kolkata",
+  "openVisit": {
+    "startAt": "2026-09-10T09:30:00.000+05:30",
+    "endAt": null,
+    "ssid": "OfficeConnect",
+    "source": "wifi"
+  },
+  "badSleepCheckout": {
+    "suspendAt": "2026-09-10T09:15:00.000+05:30",
+    "note": "suspendAt before startAt must be skipped, not written as endAt"
+  },
+  "invertedClosedVisit": {
+    "startAt": "2026-09-10T09:30:00.000+05:30",
+    "endAt": "2026-09-10T09:15:00.000+05:30",
+    "source": "wifi"
+  }
+}

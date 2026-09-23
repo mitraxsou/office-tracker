@@ -1,0 +1,21 @@
+{
+  "incident": "BUG-006",
+  "userLabel": "UserA",
+  "webhookUrl": null,
+  "bothChannelAlert": {
+    "type": "hours_started",
+    "deliveryChannel": "both",
+    "notifyTeams": true,
+    "dayKey": "2026-09-07"
+  },
+  "teamsOnlyAlert": {
+    "type": "hours_met",
+    "deliveryChannel": "teams",
+    "notifyTeams": true,
+    "dayKey": "2026-09-07"
+  },
+  "expected": {
+    "bothAcknowledgesInApp": true,
+    "teamsOnlyStaysPending": true
+  }
+}
