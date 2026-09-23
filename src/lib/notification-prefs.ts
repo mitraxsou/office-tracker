@@ -95,7 +95,14 @@ export function toggleDeliveryChannel(
 
 export function channelForAlert(
   prefs: NotificationPrefsData,
-  type: "absent" | "stale" | "behind" | "hours_started" | "hours_met" | "ooo_cleared",
+  type:
+    | "absent"
+    | "stale"
+    | "behind"
+    | "hours_started"
+    | "hours_met"
+    | "monthly_snapshot"
+    | "ooo_cleared",
 ): AlertDeliveryChannel {
   switch (type) {
     case "absent":
@@ -105,6 +112,7 @@ export function channelForAlert(
     case "behind":
       return prefs.channelBehindHours;
     case "hours_started":
+    case "monthly_snapshot":
     case "ooo_cleared":
       return prefs.channelHoursStarted;
     case "hours_met":

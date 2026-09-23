@@ -11,7 +11,11 @@ export async function handleOfficePresenceDetected(
 ) {
   const dayKey = dayKeyInTimezone(at, timezone);
   const { cleared } = await maybeClearOutOfOfficeOnOfficePresence(userId, timezone, at);
-  const candidateTypes: IntegrationAlertType[] = ["hours_started", "hours_met"];
+  const candidateTypes: IntegrationAlertType[] = [
+    "hours_started",
+    "monthly_snapshot",
+    "hours_met",
+  ];
   if (cleared) {
     candidateTypes.unshift("ooo_cleared");
   }

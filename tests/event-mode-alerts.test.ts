@@ -9,6 +9,7 @@ const getTodaySummaryMock = vi.hoisted(() => vi.fn());
 const getPulseStatsMock = vi.hoisted(() => vi.fn());
 const isUserOutOfOfficeMock = vi.hoisted(() => vi.fn());
 const buildOutOfOfficeLinkUrlMock = vi.hoisted(() => vi.fn());
+const getMonthlyProgressMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../src/lib/db", () => ({
   prisma: {
@@ -28,6 +29,7 @@ vi.mock("../src/lib/app-config", () => ({
     officeSsids: ["OfficeConnect"],
     agentStaleGraceHours: 24,
     agentMode: "events",
+    monthlyDaysTarget: 8,
   }),
   getUserHoursTarget: vi.fn().mockResolvedValue(5),
   getEffectiveAgentStaleGraceHours: vi.fn().mockResolvedValue(24),
@@ -45,6 +47,14 @@ vi.mock("../src/lib/out-of-office", () => ({
 
 vi.mock("../src/lib/notification-prefs-server", () => ({
   getNotificationPrefs: getNotificationPrefsMock,
+}));
+
+vi.mock("../src/lib/compliance-exemptions", () => ({
+  getApprovedExemptionsForUser: vi.fn().mockResolvedValue({ monthKeys: [], dayKeys: [] }),
+}));
+
+vi.mock("../src/lib/monthly-progress-server", () => ({
+  getMonthlyProgress: getMonthlyProgressMock,
 }));
 
 import { evaluateUserAlerts } from "../src/lib/integration-alerts";
@@ -75,6 +85,13 @@ describe("evaluateUserAlerts in events mode", () => {
     getPulseStatsMock.mockResolvedValue({
       agentHealthy: true,
       minutesSinceLastPulse: 2,
+    });
+    getMonthlyProgressMock.mockResolvedValue({
+      monthKey: "2026-09",
+      qualifyingDays: 5,
+      monthlyDaysTarget: 8,
+      remainingDays: 3,
+      days: [{ dayKey: "2026-09-13", hours: 0.5, metTarget: false }],
     });
   });
 
@@ -127,6 +144,29 @@ describe("evaluateUserAlerts in events mode", () => {
 
     expect(alerts).toHaveLength(1);
     expect(alerts[0]?.type).toBe("hours_met");
+  });
+
+  it("queues a monthly snapshot with dashboard progress while in office", async () => {
+    const alerts = await evaluateUserAlerts(
+      {
+        id: "user-1",
+        email: "user@example.com",
+        name: "User",
+        timezone: "Asia/Kolkata",
+        hoursTarget: 5,
+        agentStaleGraceHours: null,
+      },
+      new Set(["monthly_snapshot"]),
+      new Date("2026-09-13T09:30:00+05:30"),
+    );
+
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({
+      type: "monthly_snapshot",
+      deliveryChannel: "both",
+    });
+    expect(alerts[0]?.message).toContain("5 of 8 days completed");
+    expect(alerts[0]?.message).toContain("you will be at 6 of 8");
   });
 
   it("still queues hours_started and hours_met while user is marked OOO", async () => {

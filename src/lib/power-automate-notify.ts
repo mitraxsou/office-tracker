@@ -156,7 +156,10 @@ async function dispatchAlerts(
 
     if (needsTeams) {
       if (!config) {
-        teamsDelivered = false;
+        // No webhook configured, so Teams cannot land today. Acknowledge when the
+        // in-app copy went out, otherwise the alert is re-evaluated on every sync
+        // and never clears. Teams-only alerts stay pending until it is set up.
+        teamsDelivered = needsApp;
       } else {
         const result = await postWebhookPayload(toWebhookPayload(alert), dependencies);
         if (result.ok) {
@@ -201,7 +204,7 @@ async function dispatchAlerts(
 }
 
 export async function dispatchPendingAlerts(dependencies: DispatchDependencies = {}) {
-  const pending = await getIntegrationAlerts("hours_started,hours_met");
+  const pending = await getIntegrationAlerts("hours_started,hours_met,monthly_snapshot");
   return dispatchAlerts(pending.alerts, dependencies);
 }
 

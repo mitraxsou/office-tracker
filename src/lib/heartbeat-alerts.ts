@@ -1,58 +1,39 @@
 import { wasAlertDispatchedToday } from "./alert-dispatch";
-import { prisma } from "./db";
 import { getQuickMetTarget } from "./heartbeat-service";
 import type { IntegrationAlertType } from "./integration-alerts";
 import { maybeClearOutOfOfficeOnOfficePresence } from "./out-of-office";
 import { dispatchUserAlerts } from "./power-automate-notify";
-import { dayBoundsFromKey, dayKeyInTimezone } from "./timezone-dates";
+import { dayKeyInTimezone } from "./timezone-dates";
 
-/** Pure selection logic for heartbeat-triggered alerts (unit tested). */
+/**
+ * Pure selection logic for heartbeat-triggered alerts (unit tested).
+ *
+ * Once-per-day is enforced by the AlertDispatch row, not by "is this the first
+ * presence today". Sync writes the visit before alerts are evaluated, so any
+ * prior-presence test always sees today's own visit and never fires.
+ */
 export function selectHeartbeatAlertTypes(input: {
   inOffice: boolean;
-  firstInOfficeToday: boolean;
   oooCleared: boolean;
   metTarget: boolean;
   hoursStartedSent: boolean;
   hoursMetSent: boolean;
+  monthlySnapshotSent: boolean;
 }): IntegrationAlertType[] {
   const types: IntegrationAlertType[] = [];
   if (input.oooCleared) {
     types.push("ooo_cleared");
   }
-  if (input.inOffice && input.firstInOfficeToday && !input.hoursStartedSent) {
+  if (input.inOffice && !input.hoursStartedSent) {
     types.push("hours_started");
+  }
+  if (input.inOffice && !input.monthlySnapshotSent) {
+    types.push("monthly_snapshot");
   }
   if (!input.hoursMetSent && input.metTarget) {
     types.push("hours_met");
   }
   return types;
-}
-
-async function isFirstInOfficePresenceToday(
-  userId: string,
-  timezone: string,
-  recordedAt: Date,
-  inOffice: boolean,
-): Promise<boolean> {
-  if (!inOffice) return false;
-  const dayKey = dayKeyInTimezone(recordedAt, timezone);
-  const { start: dayStart } = dayBoundsFromKey(dayKey, timezone);
-  const [priorHeartbeats, priorVisits] = await Promise.all([
-    prisma.heartbeat.count({
-      where: {
-        userId,
-        inOffice: true,
-        recordedAt: { gte: dayStart, lt: recordedAt },
-      },
-    }),
-    prisma.visit.count({
-      where: {
-        userId,
-        startAt: { gte: dayStart, lt: recordedAt },
-      },
-    }),
-  ]);
-  return priorHeartbeats === 0 && priorVisits === 0;
 }
 
 /**
@@ -75,10 +56,10 @@ export async function maybeDispatchHeartbeatAlerts(params: {
     oooCleared = result.cleared;
   }
 
-  const [firstInOfficeToday, hoursStartedSent, hoursMetSent] = await Promise.all([
-    isFirstInOfficePresenceToday(userId, timezone, recordedAt, inOffice),
+  const [hoursStartedSent, hoursMetSent, monthlySnapshotSent] = await Promise.all([
     wasAlertDispatchedToday(userId, "hours_started", dayKey),
     wasAlertDispatchedToday(userId, "hours_met", dayKey),
+    wasAlertDispatchedToday(userId, "monthly_snapshot", dayKey),
   ]);
 
   let metTarget = false;
@@ -88,11 +69,11 @@ export async function maybeDispatchHeartbeatAlerts(params: {
 
   const types = selectHeartbeatAlertTypes({
     inOffice,
-    firstInOfficeToday,
     oooCleared,
     metTarget,
     hoursStartedSent,
     hoursMetSent,
+    monthlySnapshotSent,
   });
 
   if (types.length > 0) {

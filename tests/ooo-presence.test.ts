@@ -48,6 +48,7 @@ describe("handleOfficePresenceDetected", () => {
     expect(dispatchUserAlerts).toHaveBeenCalledWith("user-1", [
       "ooo_cleared",
       "hours_started",
+      "monthly_snapshot",
       "hours_met",
     ]);
   });
@@ -62,6 +63,7 @@ describe("handleOfficePresenceDetected", () => {
 
     expect(dispatchUserAlerts).toHaveBeenCalledWith("user-1", [
       "hours_started",
+      "monthly_snapshot",
       "hours_met",
     ]);
   });

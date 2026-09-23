@@ -18,6 +18,9 @@ import { buildOutOfOfficeLinkUrl, isUserOutOfOffice } from "./out-of-office";
 import { agentModeUsesActivityTicks } from "./activity-signal";
 import { userHasActiveInstalledDevice } from "./agent-lifecycle";
 import { heartbeatInOffice } from "./heartbeat-office";
+import { getApprovedExemptionsForUser } from "./compliance-exemptions";
+import { getMonthlyProgress } from "./monthly-progress-server";
+import { formatMonthLabel } from "./month-range";
 
 export type IntegrationAlertType =
   | "absent"
@@ -25,6 +28,7 @@ export type IntegrationAlertType =
   | "behind"
   | "hours_started"
   | "hours_met"
+  | "monthly_snapshot"
   | "ooo_cleared"
   | "custom";
 
@@ -141,6 +145,34 @@ function buildHoursStartedMessage(hoursTarget: number): string {
 
 function buildHoursMetMessage(hoursToday: number, hoursTarget: number): string {
   return `You have completed your ${hoursTarget}h office target for today. My Office Pulse has counted ${hoursToday.toFixed(1)}h.`;
+}
+
+function buildMonthlySnapshotMessage(input: {
+  monthKey: string;
+  timezone: string;
+  qualifyingDays: number;
+  monthlyDaysTarget: number;
+  remainingDays: number;
+  todayMetTarget: boolean;
+  hoursTarget: number;
+}): string {
+  const completed = Math.min(input.qualifyingDays, input.monthlyDaysTarget);
+  const remaining = Math.max(0, input.remainingDays);
+  const monthLabel = formatMonthLabel(input.monthKey, input.timezone);
+
+  if (remaining === 0) {
+    return `Monthly office snapshot for ${monthLabel}: ${completed} of ${input.monthlyDaysTarget} days completed. Your monthly target is complete.`;
+  }
+
+  if (input.todayMetTarget) {
+    const noun = remaining === 1 ? "day" : "days";
+    return `Monthly office snapshot for ${monthLabel}: ${completed} of ${input.monthlyDaysTarget} days completed, including today. You have ${remaining} more office ${noun} to go this month.`;
+  }
+
+  const projected = Math.min(input.monthlyDaysTarget, completed + 1);
+  const remainingAfterToday = Math.max(0, input.monthlyDaysTarget - projected);
+  const noun = remainingAfterToday === 1 ? "day" : "days";
+  return `Monthly office snapshot for ${monthLabel}: ${completed} of ${input.monthlyDaysTarget} days completed. If you complete today's ${input.hoursTarget}h target, you will be at ${projected} of ${input.monthlyDaysTarget}, with ${remainingAfterToday} more office ${noun} to go this month.`;
 }
 
 function buildOooClearedMessage(): string {
@@ -325,6 +357,42 @@ async function evaluateUserAlerts(
   }
 
   if (
+    types.has("monthly_snapshot") &&
+    prefs.alertIfHoursStarted &&
+    inOfficeToday &&
+    !(await wasAlertDispatchedToday(user.id, "monthly_snapshot", dayKey))
+  ) {
+    const approvedExemptions = await getApprovedExemptionsForUser(user.id);
+    const monthlyProgress = await getMonthlyProgress(
+      user.id,
+      user.timezone,
+      hoursTarget,
+      config.monthlyDaysTarget,
+      now,
+      undefined,
+      approvedExemptions,
+    );
+    const todayMetTarget =
+      monthlyProgress.days.find((day) => day.dayKey === dayKey)?.metTarget ?? false;
+    const deliveryChannel = channelForAlert(prefs, "monthly_snapshot");
+    alerts.push({
+      ...base,
+      type: "monthly_snapshot",
+      message: buildMonthlySnapshotMessage({
+        monthKey: monthlyProgress.monthKey,
+        timezone: user.timezone,
+        qualifyingDays: monthlyProgress.qualifyingDays,
+        monthlyDaysTarget: monthlyProgress.monthlyDaysTarget,
+        remainingDays: monthlyProgress.remainingDays,
+        todayMetTarget,
+        hoursTarget,
+      }),
+      deliveryChannel,
+      notifyTeams: deliversToTeams(deliveryChannel),
+    });
+  }
+
+  if (
     types.has("ooo_cleared") &&
     !(await wasAlertDispatchedToday(user.id, "ooo_cleared", dayKey))
   ) {
@@ -351,6 +419,7 @@ export async function getIntegrationAlerts(typesParam?: string | null): Promise<
     "behind",
     "hours_started",
     "hours_met",
+    "monthly_snapshot",
   ];
   const types = new Set<IntegrationAlertType>(
     typesParam
@@ -422,5 +491,6 @@ export {
   buildBehindMessage,
   buildHoursStartedMessage,
   buildHoursMetMessage,
+  buildMonthlySnapshotMessage,
   buildOooClearedMessage,
 };

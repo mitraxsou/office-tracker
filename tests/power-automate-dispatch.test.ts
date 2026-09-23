@@ -46,10 +46,12 @@ describe("dispatchPendingAlerts", () => {
     getIntegrationAlerts.mockResolvedValue({ generatedAt: new Date().toISOString(), alerts: [] });
   });
 
-  it("evaluates only hours_started and hours_met on the daily cron", async () => {
+  it("evaluates positive office alerts on the daily cron", async () => {
     await dispatchPendingAlerts({ webhookUrl: null });
 
-    expect(getIntegrationAlerts).toHaveBeenCalledWith("hours_started,hours_met");
+    expect(getIntegrationAlerts).toHaveBeenCalledWith(
+      "hours_started,hours_met,monthly_snapshot",
+    );
   });
 });
 
@@ -138,5 +140,51 @@ describe("dispatchUserAlerts delivery channels", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(acknowledgeIntegrationAlerts).not.toHaveBeenCalled();
     expect(result).toMatchObject({ configured: true, sent: 0, failed: 1, inApp: 1 });
+  });
+
+  it("acknowledges the in-app copy when no webhook is configured", async () => {
+    getIntegrationAlertsForUser.mockResolvedValue([
+      {
+        ...baseAlert,
+        type: "hours_started",
+        message: "Hours started",
+        deliveryChannel: "both",
+        notifyTeams: true,
+      },
+    ]);
+
+    const fetcher = vi.fn();
+    const result = await dispatchUserAlerts("user-1", ["hours_started"], {
+      webhookUrl: null,
+      fetcher,
+    });
+
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(persistInAppAlerts).toHaveBeenCalledTimes(1);
+    expect(acknowledgeIntegrationAlerts).toHaveBeenCalledWith("user-1", [
+      expect.objectContaining({ userId: "user-1", type: "hours_started", dayKey: "2026-09-07" }),
+    ]);
+    expect(result).toMatchObject({ configured: false, sent: 0, inApp: 1 });
+  });
+
+  it("leaves a teams-only alert pending when no webhook is configured", async () => {
+    getIntegrationAlertsForUser.mockResolvedValue([
+      {
+        ...baseAlert,
+        type: "hours_met",
+        message: "Hours met",
+        deliveryChannel: "teams",
+        notifyTeams: true,
+      },
+    ]);
+
+    const result = await dispatchUserAlerts("user-1", ["hours_met"], {
+      webhookUrl: null,
+      fetcher: vi.fn(),
+    });
+
+    expect(persistInAppAlerts).not.toHaveBeenCalled();
+    expect(acknowledgeIntegrationAlerts).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ configured: false, sent: 0, inApp: 0 });
   });
 });

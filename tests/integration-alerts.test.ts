@@ -4,6 +4,7 @@ import {
   buildBehindMessage,
   buildHoursMetMessage,
   buildHoursStartedMessage,
+  buildMonthlySnapshotMessage,
   buildOooClearedMessage,
   buildStaleMessage,
   classifyPresenceReminder,
@@ -78,6 +79,63 @@ describe("integration alert messages", () => {
     expect(msg).toContain("out of office");
     expect(msg).toContain("cleared");
   });
+
+  it("builds a projected monthly snapshot before today qualifies", () => {
+    const msg = buildMonthlySnapshotMessage({
+      monthKey: "2026-09",
+      timezone: "Asia/Kolkata",
+      qualifyingDays: 5,
+      monthlyDaysTarget: 8,
+      remainingDays: 3,
+      todayMetTarget: false,
+      hoursTarget: 5,
+    });
+    expect(msg).toContain("5 of 8 days completed");
+    expect(msg).toContain("you will be at 6 of 8");
+    expect(msg).toContain("2 more office days");
+  });
+
+  it("builds a completed monthly snapshot without projecting another day", () => {
+    const msg = buildMonthlySnapshotMessage({
+      monthKey: "2026-09",
+      timezone: "Asia/Kolkata",
+      qualifyingDays: 8,
+      monthlyDaysTarget: 8,
+      remainingDays: 0,
+      todayMetTarget: true,
+      hoursTarget: 5,
+    });
+    expect(msg).toContain("8 of 8 days completed");
+    expect(msg).toContain("monthly target is complete");
+  });
+
+  it("treats a month exemption as complete even if fewer days have qualified", () => {
+    const msg = buildMonthlySnapshotMessage({
+      monthKey: "2026-09",
+      timezone: "Asia/Kolkata",
+      qualifyingDays: 2,
+      monthlyDaysTarget: 8,
+      remainingDays: 0,
+      todayMetTarget: false,
+      hoursTarget: 5,
+    });
+    expect(msg).toContain("2 of 8 days completed");
+    expect(msg).toContain("monthly target is complete");
+  });
+
+  it("counts remaining days after today already qualifies", () => {
+    const msg = buildMonthlySnapshotMessage({
+      monthKey: "2026-09",
+      timezone: "Asia/Kolkata",
+      qualifyingDays: 6,
+      monthlyDaysTarget: 8,
+      remainingDays: 2,
+      todayMetTarget: true,
+      hoursTarget: 5,
+    });
+    expect(msg).toContain("including today");
+    expect(msg).toContain("2 more office days");
+  });
 });
 
 describe("presence reminder rules", () => {
@@ -132,6 +190,7 @@ describe("alert delivery channels", () => {
     expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "stale")).toBe("app");
     expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "behind")).toBe("app");
     expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "hours_started")).toBe("both");
+    expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "monthly_snapshot")).toBe("both");
     expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "ooo_cleared")).toBe("both");
     expect(channelForAlert(DEFAULT_NOTIFICATION_PREFS, "hours_met")).toBe("both");
     expect(DEFAULT_NOTIFICATION_PREFS.alertIfHoursStarted).toBe(true);
