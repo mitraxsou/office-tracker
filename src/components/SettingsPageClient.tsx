@@ -12,6 +12,7 @@ import type { InstallTokenForUser } from "@/lib/install-token-types";
 import type { TimezoneRequestSummary } from "@/lib/timezone-requests";
 import type { ProfileChangeRequestSummary } from "@/lib/profile-change-requests";
 import { ProfileChangeSection } from "@/components/ProfileChangeSection";
+import { PreferredNameSection } from "@/components/PreferredNameSection";
 import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 import { SettingsLayout } from "@/components/SettingsLayout";
 import { AgentActivityPanel } from "@/components/AgentActivityPanel";
@@ -44,6 +45,7 @@ type SettingsPageClientProps = {
   timezoneRequestState: TimezoneRequestState;
   profileChangeState: ProfileChangeState;
   currentName: string | null;
+  preferredName: string | null;
   currentEmail: string;
   profileChangeBlocked?: boolean;
   profileChangeBlockedMessage?: string | null;
@@ -68,6 +70,7 @@ export function SettingsPageClient({
   timezoneRequestState,
   profileChangeState,
   currentName,
+  preferredName,
   currentEmail,
   profileChangeBlocked,
   profileChangeBlockedMessage,
@@ -116,6 +119,7 @@ export function SettingsPageClient({
             isWelcome={false}
             sections={{ org: true, timezone: true, devices: false }}
           />
+          <PreferredNameSection preferredName={preferredName} legalName={currentName} />
           <ProfileChangeSection
             currentName={currentName}
             currentEmail={currentEmail}

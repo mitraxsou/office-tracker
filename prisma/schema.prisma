@@ -33,6 +33,7 @@ model User {
   email              String        @unique
   passwordHash       String
   name               String?
+  preferredName      String?
   registrationSource String        @default("admin")
   role               String        @default("user")
   timezone           String        @default("Asia/Kolkata")

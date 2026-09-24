@@ -15,6 +15,7 @@ import { AppNav } from "@/components/AppNav";
 import { MonthlyProgressMeter } from "@/components/MonthlyProgressMeter";
 import { YearComplianceMeter } from "@/components/YearComplianceMeter";
 import { DeskClockPanel } from "@/components/dashboard/DeskClockPanel";
+import { WelcomeBanner } from "@/components/dashboard/WelcomeBanner";
 import { DashboardHeroSummary } from "@/components/dashboard/DashboardHeroSummary";
 import { DashboardAlerts } from "@/components/dashboard/DashboardAlerts";
 import { DashboardDetailsPanel } from "@/components/dashboard/DashboardDetailsPanel";
@@ -27,7 +28,13 @@ import {
 import { formatLastHeartbeat } from "@/lib/visits";
 import { formatPulseAge } from "@/lib/pulse-age";
 import { getUserAgentVersionSummary } from "@/lib/agent-update";
-import { firstNameFromSession } from "@/lib/welcome-greeting";
+import {
+  firstNameFromSession,
+  greetingPeriodForHour,
+  hourInTimezone,
+  welcomeGreetingForDate,
+  welcomeStatusLine,
+} from "@/lib/welcome-greeting";
 
 export default async function DashboardPage() {
   const user = await requireAuthenticatedUser();
@@ -129,7 +136,30 @@ export default async function DashboardPage() {
     ? formatLastHeartbeat(lastOfficeActivityAt, summary.dayKey, user.timezone)
     : "None";
   const lastOfficeActivityTone: StatusTone = lastOfficeActivityAt ? "success" : "muted";
-  const firstName = firstNameFromSession(user.name, user.email);
+  const firstName = firstNameFromSession(
+    user.preferredName ?? user.name,
+    user.email,
+  );
+  const greetingNow = new Date();
+  const greetingPeriod = greetingPeriodForHour(
+    hourInTimezone(greetingNow, user.timezone),
+  );
+  const statusInput = {
+    totalHours: summary.totalHours,
+    targetHours: summary.hoursTarget,
+    metTarget: summary.metTarget,
+    inOfficeNow: summary.inOfficeNow,
+    outOfOfficeToday: isOutToday,
+  };
+  const initialGreeting = welcomeGreetingForDate(
+    greetingNow,
+    user.timezone,
+    firstName,
+  );
+  const initialStatus = welcomeStatusLine({
+    ...statusInput,
+    period: greetingPeriod,
+  });
 
   return (
     <>
@@ -147,9 +177,18 @@ export default async function DashboardPage() {
           timezone={user.timezone}
         />
 
+        <WelcomeBanner
+          firstName={firstName}
+          timezone={user.timezone}
+          initialGreeting={initialGreeting}
+          initialStatus={initialStatus}
+          statusInput={statusInput}
+          qualifyingDays={monthlyProgress.qualifyingDays}
+          monthlyDaysTarget={monthlyProgress.monthlyDaysTarget}
+        />
+
         <DeskClockPanel
           timezone={user.timezone}
-          firstName={firstName}
           dayKey={summary.dayKey}
           monthKey={monthlyProgress.monthKey}
           monthDays={monthlyProgress.days}

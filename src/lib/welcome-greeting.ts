@@ -85,3 +85,60 @@ export function welcomeGreetingForDate(
   const period = greetingPeriodForHour(hourInTimezone(date, timezone));
   return formatWelcomeGreeting(period, firstName);
 }
+
+export type WelcomeStatusInput = {
+  period: GreetingPeriod;
+  totalHours: number;
+  targetHours: number;
+  metTarget: boolean;
+  inOfficeNow: boolean;
+  outOfOfficeToday: boolean;
+};
+
+function formatStatusHours(hours: number): string {
+  return `${hours.toFixed(1)}h`;
+}
+
+/**
+ * Casual status line under the time-of-day greeting.
+ * Deterministic (no randomness) so SSR and client stay in sync.
+ */
+export function welcomeStatusLine(input: WelcomeStatusInput): string {
+  const {
+    period,
+    totalHours,
+    targetHours,
+    metTarget,
+    inOfficeNow,
+    outOfOfficeToday,
+  } = input;
+  const remaining = Math.max(0, targetHours - totalHours);
+  const nightOwl = period === "night_owl";
+
+  if (outOfOfficeToday) {
+    return "Marked out of office today.";
+  }
+
+  if (metTarget) {
+    if (nightOwl) {
+      return "Still going. Target met.";
+    }
+    return `${formatStatusHours(totalHours)} logged today. Target met.`;
+  }
+
+  if (totalHours <= 0) {
+    return "No office time logged yet today.";
+  }
+
+  if (inOfficeNow) {
+    if (nightOwl) {
+      return `Still going. ${formatStatusHours(remaining)} to go.`;
+    }
+    return `${formatStatusHours(totalHours)} so far. ${formatStatusHours(remaining)} to go.`;
+  }
+
+  if (nightOwl) {
+    return `Still going. ${formatStatusHours(remaining)} short.`;
+  }
+  return `${formatStatusHours(totalHours)} logged today. ${formatStatusHours(remaining)} short.`;
+}

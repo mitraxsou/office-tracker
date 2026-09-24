@@ -102,6 +102,7 @@ export default async function SettingsPage({
           timezoneRequestState={timezoneRequestState}
           profileChangeState={profileChangeState}
           currentName={user.name}
+          preferredName={user.preferredName}
           currentEmail={user.email}
           profileChangeBlocked={!!profileChangeBlockedMessage}
           profileChangeBlockedMessage={profileChangeBlockedMessage}

@@ -6,6 +6,7 @@ import {
   greetingPhraseForPeriod,
   hourInTimezone,
   welcomeGreetingForDate,
+  welcomeStatusLine,
 } from "@/lib/welcome-greeting";
 
 describe("greetingPeriodForHour", () => {
@@ -66,6 +67,18 @@ describe("firstNameFromSession", () => {
   it("falls back when name equals email", () => {
     expect(firstNameFromSession("soumitro@pwc.com", "soumitro@pwc.com")).toBe("Soumitro");
   });
+
+  it("prefers preferredName over legal account name", () => {
+    const preferred = "Soumitra";
+    const legal = "Soumitro Mandal";
+    expect(firstNameFromSession(preferred ?? legal, "soumitro@pwc.com")).toBe("Soumitra");
+  });
+
+  it("uses legal name when preferredName is null", () => {
+    const preferred: string | null = null;
+    const legal = "Soumitro Mandal";
+    expect(firstNameFromSession(preferred ?? legal, "soumitro@pwc.com")).toBe("Soumitro");
+  });
 });
 
 describe("formatWelcomeGreeting", () => {
@@ -93,5 +106,91 @@ describe("hourInTimezone + welcomeGreetingForDate", () => {
   it("uses morning after 5am", () => {
     const morning = new Date("2026-09-23T07:15:00+05:30");
     expect(welcomeGreetingForDate(morning, tz, "Soumitra")).toBe("Good morning, Soumitra");
+  });
+});
+
+describe("welcomeStatusLine", () => {
+  const base = {
+    period: "morning" as const,
+    totalHours: 0,
+    targetHours: 5,
+    metTarget: false,
+    inOfficeNow: false,
+    outOfOfficeToday: false,
+  };
+
+  it("marks out of office today", () => {
+    expect(
+      welcomeStatusLine({ ...base, outOfOfficeToday: true, totalHours: 2 }),
+    ).toBe("Marked out of office today.");
+  });
+
+  it("reports target met", () => {
+    expect(
+      welcomeStatusLine({
+        ...base,
+        totalHours: 8,
+        targetHours: 5,
+        metTarget: true,
+      }),
+    ).toBe("8.0h logged today. Target met.");
+  });
+
+  it("reports in-office progress", () => {
+    expect(
+      welcomeStatusLine({
+        ...base,
+        totalHours: 2.1,
+        targetHours: 5,
+        inOfficeNow: true,
+      }),
+    ).toBe("2.1h so far. 2.9h to go.");
+  });
+
+  it("reports partial hours when not in office", () => {
+    expect(
+      welcomeStatusLine({
+        ...base,
+        totalHours: 2.1,
+        targetHours: 5,
+        inOfficeNow: false,
+      }),
+    ).toBe("2.1h logged today. 2.9h short.");
+  });
+
+  it("reports zero hours", () => {
+    expect(welcomeStatusLine(base)).toBe("No office time logged yet today.");
+  });
+
+  it("overrides lead-in with Still going for night owl", () => {
+    expect(
+      welcomeStatusLine({
+        ...base,
+        period: "night_owl",
+        totalHours: 2.1,
+        targetHours: 5,
+        inOfficeNow: true,
+      }),
+    ).toBe("Still going. 2.9h to go.");
+
+    expect(
+      welcomeStatusLine({
+        ...base,
+        period: "night_owl",
+        totalHours: 2.1,
+        targetHours: 5,
+        inOfficeNow: false,
+      }),
+    ).toBe("Still going. 2.9h short.");
+
+    expect(
+      welcomeStatusLine({
+        ...base,
+        period: "night_owl",
+        totalHours: 8,
+        targetHours: 5,
+        metTarget: true,
+      }),
+    ).toBe("Still going. Target met.");
   });
 });

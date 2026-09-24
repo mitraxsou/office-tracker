@@ -22,7 +22,6 @@ import type { MonthlyProgressDay } from "@/lib/monthly-progress";
 import { DashboardRefreshButton } from "@/components/DashboardRefreshButton";
 import { DeskClockCalendar } from "./DeskClockCalendar";
 import { DashboardMiniStat, type StatusTone } from "@/components/dashboard/DashboardMiniStat";
-import { WelcomeGreeting } from "@/components/dashboard/WelcomeGreeting";
 import { formatTime } from "@/lib/visits";
 
 const LAPTOP_TOOLTIP =
@@ -44,7 +43,6 @@ export type DeskClockTodayStats = {
 
 type DeskClockPanelProps = {
   timezone: string;
-  firstName: string;
   dayKey: string;
   monthKey: string;
   monthDays: MonthlyProgressDay[];
@@ -53,27 +51,20 @@ type DeskClockPanelProps = {
 
 function DeskClockTodayHeader({
   dayKey,
-  firstName,
-  timezone,
   settingsControl,
 }: {
   dayKey: string;
-  firstName: string;
-  timezone: string;
   settingsControl?: ReactNode;
 }) {
   return (
-    <div>
-      <WelcomeGreeting firstName={firstName} timezone={timezone} />
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-3 pt-1.5">
-        <div>
-          <h1 className="text-xl font-semibold sm:text-2xl">Today</h1>
-          <p className="text-xs text-muted sm:text-sm">{dayKey} · Your hours only</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <DashboardRefreshButton />
-          {settingsControl}
-        </div>
+    <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-3 pt-3">
+      <div>
+        <h1 className="text-xl font-semibold sm:text-2xl">Today</h1>
+        <p className="text-xs text-muted sm:text-sm">{dayKey} · Your hours only</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <DashboardRefreshButton />
+        {settingsControl}
       </div>
     </div>
   );
@@ -102,7 +93,6 @@ function GearIcon() {
 
 export function DeskClockPanel({
   timezone,
-  firstName,
   dayKey,
   monthKey,
   monthDays,
@@ -157,7 +147,7 @@ export function DeskClockPanel({
     return (
       <section className="card overflow-hidden p-0" aria-hidden>
         <div className="border-b border-[var(--border)]">
-          <DeskClockTodayHeader dayKey={dayKey} firstName={firstName} timezone={timezone} />
+          <DeskClockTodayHeader dayKey={dayKey} />
         </div>
         <div className="p-4 sm:p-5">
           <div className="h-32 animate-pulse rounded-lg bg-[var(--border)]/30" />
@@ -169,7 +159,7 @@ export function DeskClockPanel({
   if (settings.hidden) {
     return (
       <div className="space-y-3">
-        <DeskClockTodayHeader dayKey={dayKey} firstName={firstName} timezone={timezone} />
+        <DeskClockTodayHeader dayKey={dayKey} />
         <p className="text-sm">
           <button
             type="button"
@@ -194,8 +184,6 @@ export function DeskClockPanel({
       <div ref={settingsRegionRef} className="border-b border-[var(--border)]">
         <DeskClockTodayHeader
           dayKey={dayKey}
-          firstName={firstName}
-          timezone={timezone}
           settingsControl={
             <button
               type="button"
