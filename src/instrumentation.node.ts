@@ -516,6 +516,9 @@ export async function registerNode() {
       'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "termsAcceptedVersion" INTEGER;'
     );
     await prisma.$executeRawUnsafe(
+      'ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "preferredName" TEXT;'
+    );
+    await prisma.$executeRawUnsafe(
       `UPDATE "User" SET "termsAcceptedVersion" = 1 WHERE "termsAcceptedAt" IS NOT NULL AND "termsAcceptedVersion" IS NULL;`
     );
     await prisma.$executeRawUnsafe(`
