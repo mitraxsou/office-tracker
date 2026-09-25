@@ -22,14 +22,14 @@ export default async function AdminVisitReportsPage() {
     <>
       <AppNav />
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-8">
-        <div>
+        <header className="page-hero">
           <h1 className="text-2xl font-semibold">User requests</h1>
-          <p className="text-sm text-muted">
+          <p className="mt-1 text-sm text-muted">
             Manual visit requests, visit corrections, timezone changes, profile changes, prior
             compliance declarations, HR exemption notifications, laptop removal requests, and
             reach-out-to-admin messages.
           </p>
-        </div>
+        </header>
         <AdminSubNav active="corrections" />
         <div id="admin_contact" className="scroll-mt-header"><AdminContactSubmissions /></div>
         <div id="manual_visit" className="scroll-mt-header"><AdminManualVisitRequests /></div>

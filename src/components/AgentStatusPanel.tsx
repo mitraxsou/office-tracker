@@ -70,7 +70,7 @@ const STATUS_LABELS = {
 
       "Install may have finished. The agent syncs about every 5 minutes by default. Use Refresh status below.",
 
-    color: "text-blue-300",
+    color: "text-accent",
 
   },
 

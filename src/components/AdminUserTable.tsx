@@ -124,7 +124,7 @@ export function AdminUserTable() {
                           type="button"
                           onClick={() => pushAgentUpdate("device", d.id)}
                           disabled={pushing === `device:${d.id}` || d.forceAgentUpdate}
-                          className="text-xs text-blue-400 hover:underline disabled:opacity-50"
+                          className="text-xs text-accent hover:underline disabled:opacity-50"
                         >
                           {pushing === `device:${d.id}`
                             ? "Pushing..."
@@ -147,7 +147,7 @@ export function AdminUserTable() {
                           type="button"
                           onClick={() => pushAgentUpdate("user", u.id)}
                           disabled={pushing === `user:${u.id}`}
-                          className="text-xs text-blue-400 hover:underline disabled:opacity-50"
+                          className="text-xs text-accent hover:underline disabled:opacity-50"
                         >
                           {pushing === `user:${u.id}` ? "Pushing..." : "Push update to all devices"}
                         </button>

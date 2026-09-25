@@ -66,12 +66,12 @@ export default async function SettingsPage({
     <>
       <AppNav />
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-8">
-        <div>
+        <header className="page-hero">
           <h1 className="text-2xl font-semibold">Settings</h1>
-          <p className="text-sm text-muted">
+          <p className="mt-1 text-sm text-muted">
             {AGENT_PRODUCT_NAME} agent, timezone, and your laptops.
           </p>
-        </div>
+        </header>
 
         {showOnboarding && (
           <OnboardingForm

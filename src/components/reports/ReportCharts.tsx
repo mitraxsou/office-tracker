@@ -119,7 +119,7 @@ export function HoursTrendChart({
                   selectedDate === entry.date
                     ? "var(--foreground)"
                     : entry.metTarget === false
-                      ? "#c2410c"
+                      ? "var(--pwc-orange-hover)"
                       : "var(--pwc-orange)"
                 }
                 opacity={selectedDate && selectedDate !== entry.date ? 0.45 : 1}
@@ -179,9 +179,9 @@ export function ComplianceTrendChart({ data, title, height = 240 }: ComplianceTr
           <Line
             type="monotone"
             dataKey="compliancePct"
-            stroke="#2ecc71"
+            stroke="var(--success)"
             strokeWidth={2}
-            dot={{ fill: "#2ecc71", r: 3 }}
+            dot={{ fill: "var(--success)", r: 3 }}
             activeDot={{ r: 5 }}
           />
         </ComposedChart>
@@ -234,9 +234,9 @@ export function StatusDonutChart({
   title: string;
 }) {
   const segments = [
-    { name: "In office", value: breakdown.inOffice, color: "#2ecc71" },
-    { name: "Not in office", value: breakdown.notInOffice, color: "#3b82f6" },
-    { name: "No agent", value: breakdown.noAgent, color: "#6b7280" },
+    { name: "In office", value: breakdown.inOffice, color: "var(--success)" },
+    { name: "Not in office", value: breakdown.notInOffice, color: "var(--pwc-tangerine)" },
+    { name: "No agent", value: breakdown.noAgent, color: "var(--muted)" },
   ].filter((s) => s.value > 0);
 
   if (segments.length === 0) {

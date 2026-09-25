@@ -29,7 +29,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
       resolveHash={resolveHelpHash}
     >
       <div className="space-y-12">
-        <section id="whats-new" className="card scroll-mt-header space-y-3 p-6">
+        <section id="whats-new" className="card card-brand card-wash scroll-mt-header space-y-3 p-6">
           <h2 className="text-lg font-medium">What&apos;s new in v{APP_VERSION}</h2>
           <p className="text-xs text-muted">Released {getCurrentRelease().date}</p>
           <ul className="list-disc space-y-1 pl-5 text-sm text-muted">

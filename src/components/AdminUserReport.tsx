@@ -680,7 +680,7 @@ export function AdminUserReport({
                               disabled={
                                 pushingDeviceId === device.id || device.forceAgentUpdate
                               }
-                              className="text-xs text-blue-400 hover:underline disabled:opacity-50"
+                              className="text-xs text-accent hover:underline disabled:opacity-50"
                             >
                               {pushingDeviceId === device.id
                                 ? "Pushing..."

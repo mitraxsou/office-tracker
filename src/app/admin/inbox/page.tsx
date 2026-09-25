@@ -17,10 +17,10 @@ export default async function AdminInboxPage() {
     <>
       <AppNav />
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-8">
-        <div>
+        <header className="page-hero">
           <h1 className="text-2xl font-semibold">Admin inbox</h1>
-          <p className="text-sm text-muted">{inbox.total} open user requests across all review queues</p>
-        </div>
+          <p className="mt-1 text-sm text-muted">{inbox.total} open user requests across all review queues</p>
+        </header>
         <AdminSubNav active="inbox" />
         <section className="card overflow-hidden">
           {inbox.items.length === 0 ? (

@@ -80,10 +80,7 @@ export function WelcomeBanner({
 
   return (
     <section
-      className="card relative overflow-hidden border-l-4 border-l-[var(--pwc-orange)] p-0"
-      style={{
-        background: `linear-gradient(105deg, var(--pwc-orange-muted) 0%, transparent 55%)`,
-      }}
+      className="card card-brand card-wash relative overflow-hidden p-0"
       aria-live="polite"
     >
       <div className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5 sm:py-4">

@@ -73,7 +73,7 @@ export function OnboardingForm({
   }
 
   return (
-    <section className="card border border-[var(--pwc-orange)]/40 p-6">
+    <section className="card card-brand card-wash border border-[var(--pwc-orange)]/40 p-6">
       <h2 className="text-lg font-semibold">Welcome to {APP_NAME}</h2>
       <p className="mt-2 text-sm text-muted">
         Your account is ready. Add a display name and optional password, then install the{" "}

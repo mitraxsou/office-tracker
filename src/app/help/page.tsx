@@ -19,7 +19,7 @@ export default async function HelpPage() {
     <>
       <AppNav />
       <main className="mx-auto max-w-5xl space-y-6 px-4 py-8">
-        <div>
+        <header className="page-hero">
           <h1 className="text-2xl font-semibold">How to use {APP_NAME}</h1>
           <p className="mt-2 text-sm text-muted">
             Internal pilot: track at least <strong>5 hours per day in the office</strong> on your PwC laptop.
@@ -36,7 +36,7 @@ export default async function HelpPage() {
               </Link>
             </p>
           )}
-        </div>
+        </header>
 
         <HelpGuide isLoggedIn={isLoggedIn} isAdmin={user ? isAdmin(user) : false} />
         <LegalFooter className="mt-8" />

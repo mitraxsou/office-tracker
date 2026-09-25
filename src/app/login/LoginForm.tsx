@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { OfficePulseLogo } from "@/components/OfficePulseLogo";
+import { APP_NAME } from "@/lib/agent-branding";
 import { OTP_RESEND_COOLDOWN_MS } from "@/lib/auth-rate-limit-constants";
 
 type LoginFormProps = {
@@ -158,10 +160,10 @@ export function LoginForm({
   }
 
   return (
-    <div className="card w-full max-w-md p-8 shadow-xl">
+    <div className="card card-brand card-wash w-full max-w-md p-8 shadow-xl">
       <div className="mb-6 flex items-center gap-2">
-        <span className="inline-block h-3 w-3 rounded-full bg-[var(--pwc-orange)]" />
-        <h1 className="text-2xl font-semibold">Office Tracker</h1>
+        <OfficePulseLogo />
+        <h1 className="text-2xl font-semibold">{APP_NAME}</h1>
       </div>
       <p className="text-sm text-muted">
         Sign in with your PwC email. We send a one-time code to Microsoft Teams.

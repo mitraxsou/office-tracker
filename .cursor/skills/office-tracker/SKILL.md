@@ -99,7 +99,7 @@ See [reference.md](reference.md) for env vars and API routes.
 
 ## UI / copy / code style
 
-- PwC colors: orange `#FD5108`, dark `#1A1A1A` / `#2D2D2D`
+- PwC colors: orange `#FD5108`, dark `#1A1A1A` / `#2D2D2D`. For muted washes, accent rails, chips, buttons, light/dark alphas, and when not to invent hues, use the **pwc-colors** skill (`.cursor/skills/pwc-colors/SKILL.md`)
 - **No em dashes (—) anywhere** in the repo: user-facing copy, comments, commit messages, error strings, docs, or UI labels. Use a hyphen (`-`), comma, colon, or parentheses instead.
 - No ChatGPT tone ("seamlessly", "leverage", "robust")
 - Direct internal IT voice; verb-first buttons ("Copy install command", "Check in")

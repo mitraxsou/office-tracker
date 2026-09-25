@@ -29,7 +29,7 @@ export default async function TermsAcceptPage({
     <>
       <AppNav />
       <main className="mx-auto max-w-lg px-4 py-8">
-        <div className="card space-y-6 p-8 shadow-xl">
+        <div className="card card-brand card-wash space-y-6 p-8 shadow-xl">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-accent">
               Version {legal.legalVersion}

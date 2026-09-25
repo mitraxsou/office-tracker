@@ -35,10 +35,10 @@ export default async function AdminSettingsPage() {
     <>
       <AppNav />
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-8">
-        <div>
+        <header className="page-hero">
           <h1 className="text-2xl font-semibold">Global settings</h1>
-          <p className="text-sm text-muted">Hours and monthly days targets, office SSIDs for all users</p>
-        </div>
+          <p className="mt-1 text-sm text-muted">Hours and monthly days targets, office SSIDs for all users</p>
+        </header>
         <AdminSubNav active="settings" />
         <AdminSettingsForm
           hoursTarget={config.hoursTarget}

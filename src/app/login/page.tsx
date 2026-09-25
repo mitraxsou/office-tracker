@@ -68,7 +68,7 @@ async function LoginPageContent({
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4 py-8">
+    <div className="auth-shell flex min-h-screen flex-col items-center justify-center px-4 py-8">
       <div className="fixed right-4 top-4 z-50">
         <ThemeToggle />
       </div>

@@ -32,7 +32,7 @@ export function ReportsPageClient({
   return (
     <div className="space-y-6">
       <nav
-        className="flex flex-wrap gap-1 rounded-lg border border-[var(--border)] bg-[var(--background-elevated)] p-1"
+        className="card-wash flex flex-wrap gap-1 rounded-lg border border-[var(--border)] p-1"
         aria-label="Reports sections"
       >
         {TABS.map((item) => {

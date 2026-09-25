@@ -562,7 +562,7 @@ export function AdminUsersDashboard() {
               <span
                 className={`rounded px-2 py-0.5 text-xs ${
                   u.registrationSource === "otp_self"
-                    ? "bg-blue-500/20 text-blue-300"
+                    ? "bg-[var(--pwc-orange-muted)] text-accent"
                     : "bg-[var(--border)] text-muted"
                 }`}
               >
@@ -724,7 +724,7 @@ export function AdminUsersDashboard() {
                       type="button"
                       onClick={() => pushDeviceAgentUpdate(d.id)}
                       disabled={busyDeviceId === d.id || d.forceAgentUpdate}
-                      className="text-xs text-blue-400 hover:underline disabled:opacity-50"
+                      className="text-xs text-accent hover:underline disabled:opacity-50"
                     >
                       {busyDeviceId === d.id
                         ? "Pushing..."

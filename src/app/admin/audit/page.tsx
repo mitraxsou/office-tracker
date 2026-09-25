@@ -29,10 +29,10 @@ export default async function AdminAuditPage({
     <>
       <AppNav />
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-8">
-        <div>
+        <header className="page-hero">
           <h1 className="text-2xl font-semibold">Audit</h1>
-          <p className="text-sm text-muted">Search admin and system actions across global and per-user changes.</p>
-        </div>
+          <p className="mt-1 text-sm text-muted">Search admin and system actions across global and per-user changes.</p>
+        </header>
         <AdminSubNav active="audit" />
         <form className="card grid gap-3 p-4 md:grid-cols-5">
           <input name="target" defaultValue={result.filters.target} placeholder="Target user" className="rounded-lg border px-3 py-2 text-sm" />

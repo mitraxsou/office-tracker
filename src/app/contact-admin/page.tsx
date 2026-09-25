@@ -32,12 +32,12 @@ export default async function ContactAdminPage({
     <>
       <AppNav />
       <main className="mx-auto max-w-3xl space-y-6 px-4 py-8">
-        <div>
+        <header className="page-hero">
           <h1 className="text-2xl font-semibold">Reach out to admin</h1>
-          <p className="text-sm text-muted">
+          <p className="mt-1 text-sm text-muted">
             Share issues, concerns, or feedback with the pilot admins.
           </p>
-        </div>
+        </header>
         <ContactAdminForm
           initialThreads={threads}
           initialCategory={initialCategory}

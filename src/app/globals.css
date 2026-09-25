@@ -4,6 +4,12 @@
   --pwc-orange: #fd5108;
   --pwc-orange-hover: #e04a07;
   --pwc-orange-muted: rgba(253, 81, 8, 0.15);
+  /* Warm multi-color family (2025 identity + legacy VI). Charts / rare accents only.
+     Brand chrome stays --pwc-orange. Do not use these for purple/indigo AI themes. */
+  --pwc-yellow: #ffb600;
+  --pwc-tangerine: #eb8c00;
+  --pwc-rose: #db536a;
+  --pwc-red: #e0301e;
   --success: #2ecc71;
   --warning: #fd5108;
   /* Sticky AppNav height (py-3 / md:py-4 row). Side navs and hash anchors use offsets below it. */
@@ -21,6 +27,16 @@
 
 .app-site-header:has(.banner-viewas) {
   --app-viewas-banner-height: 2.75rem;
+}
+
+.app-site-header {
+  box-shadow: inset 0 2px 0 var(--pwc-orange);
+}
+
+.auth-shell {
+  background:
+    linear-gradient(165deg, var(--pwc-orange-muted) 0%, transparent 40%),
+    var(--background);
 }
 
 html[data-theme="dark"],
@@ -68,6 +84,36 @@ textarea:focus {
   background: var(--background-elevated);
   border: 1px solid var(--border);
   border-radius: 0.75rem;
+}
+
+/* Soft peach/orange left fade over elevated fill (WelcomeBanner recipe). */
+.card-wash {
+  background:
+    linear-gradient(105deg, var(--pwc-orange-muted) 0%, transparent 55%),
+    var(--background-elevated);
+}
+
+.card-brand {
+  border-left: 4px solid var(--pwc-orange);
+}
+
+/* Page intro strip: wash + left rail on elevated card. Use once per page, not on KPI tiles. */
+.page-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--pwc-orange);
+  background:
+    linear-gradient(105deg, var(--pwc-orange-muted) 0%, transparent 55%),
+    var(--background-elevated);
+  padding: 0.875rem 1rem;
+}
+
+@media (min-width: 640px) {
+  .page-hero {
+    padding: 1rem 1.25rem;
+  }
 }
 
 .btn-primary {

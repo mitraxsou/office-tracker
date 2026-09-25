@@ -18,13 +18,13 @@ export default async function AdminPage() {
     <>
       <AppNav />
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-8">
-        <div>
+        <header className="page-hero">
           <h1 className="text-2xl font-semibold">Admin reports</h1>
-          <p className="text-sm text-muted">
+          <p className="mt-1 text-sm text-muted">
             Interactive charts, date filters, and drill-down. Hover for tooltips, click bars to
             filter by day.
           </p>
-        </div>
+        </header>
         <AdminSubNav active="reports" />
         <AdminDashboard
           fiscalYearStartMonth={config.fiscalYearStartMonth}
