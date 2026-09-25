@@ -1,6 +1,8 @@
 export const DEFAULT_TIMEZONE = "Asia/Kolkata";
 export const DEFAULT_HOURS_TARGET = 5;
 export const DEFAULT_MONTHLY_DAYS_TARGET = 8;
+/** When manual visit check-out is omitted, close the visit this many minutes after check-in. */
+export const DEFAULT_MANUAL_VISIT_DURATION_MINUTES = 5;
 export const HEARTBEAT_INTERVAL_MS = 5 * 60 * 1000;
 export const VISIT_GAP_MS = 15 * 60 * 1000;
 

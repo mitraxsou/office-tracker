@@ -1,27 +1,27 @@
 import { prisma } from "./db";
 import { logAuditEvent } from "./audit-log";
-import { DEFAULT_HOURS_TARGET } from "./constants";
+import { DEFAULT_MANUAL_VISIT_DURATION_MINUTES } from "./constants";
 import { createManualVisit } from "./heartbeat-service";
 import { handleOfficePresenceDetected } from "./ooo-presence";
 import { validateVisitTimestamps } from "./visit-validation";
 
-/** When the user omits check-out, credit a closed visit of this many hours after check-in. */
+/** When the user omits check-out, close the visit this many minutes after check-in. */
 export function defaultManualVisitEndAt(
   startAt: Date,
-  hours: number = DEFAULT_HOURS_TARGET,
+  minutes: number = DEFAULT_MANUAL_VISIT_DURATION_MINUTES,
 ): Date {
-  const safeHours = hours > 0 ? hours : DEFAULT_HOURS_TARGET;
-  return new Date(startAt.getTime() + safeHours * 60 * 60 * 1000);
+  const safeMinutes = minutes > 0 ? minutes : DEFAULT_MANUAL_VISIT_DURATION_MINUTES;
+  return new Date(startAt.getTime() + safeMinutes * 60 * 1000);
 }
 
-/** Resolve end time: explicit check-out, or check-in + daily hours target. */
+/** Resolve end time: explicit check-out, or check-in + default duration. */
 export function resolveManualVisitEndAt(
   startAt: Date,
   endAt: Date | null | undefined,
-  hours: number = DEFAULT_HOURS_TARGET,
+  minutes: number = DEFAULT_MANUAL_VISIT_DURATION_MINUTES,
 ): Date {
   if (endAt) return endAt;
-  return defaultManualVisitEndAt(startAt, hours);
+  return defaultManualVisitEndAt(startAt, minutes);
 }
 
 export const MANUAL_VISIT_REQUEST_STATUSES = ["open", "approved", "rejected"] as const;

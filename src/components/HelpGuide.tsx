@@ -235,7 +235,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             When office Wi-Fi is wrong or missing, tap <strong>Check in</strong> on arrival and{" "}
             <strong>Check out</strong> when you leave. GlobalProtect and other VPN paths do not count as in-office.
             For a past missed day, use <strong>Manual visit</strong>: enter check-in; if you skip check-out, it
-            defaults to 5 hours after check-in (admin approval required).
+            defaults to 5 minutes after check-in (admin approval required).
           </p>
 
           <h3 className="text-sm font-medium">Laptop notifications</h3>

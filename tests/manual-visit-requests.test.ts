@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_MANUAL_VISIT_DURATION_MINUTES } from "../src/lib/constants";
 import {
   defaultManualVisitEndAt,
   isValidManualVisitRequestStatus,
@@ -21,10 +22,21 @@ describe("isValidManualVisitRequestStatus", () => {
 });
 
 describe("defaultManualVisitEndAt", () => {
-  it("adds 5 hours when check-out is omitted", () => {
+  it("adds 5 minutes when check-out is omitted", () => {
+    expect(DEFAULT_MANUAL_VISIT_DURATION_MINUTES).toBe(5);
     const startAt = new Date("2026-09-10T09:00:00+05:30");
     expect(defaultManualVisitEndAt(startAt).toISOString()).toBe(
-      new Date("2026-09-10T14:00:00+05:30").toISOString(),
+      new Date("2026-09-10T09:05:00+05:30").toISOString(),
+    );
+  });
+
+  it("never leaves the visit open when check-out is omitted", () => {
+    const startAt = new Date("2026-09-10T09:00:00+05:30");
+    const endAt = resolveManualVisitEndAt(startAt, null);
+    expect(endAt).not.toBeNull();
+    expect(endAt.getTime()).toBeGreaterThan(startAt.getTime());
+    expect(endAt.getTime() - startAt.getTime()).toBe(
+      DEFAULT_MANUAL_VISIT_DURATION_MINUTES * 60 * 1000,
     );
   });
 
@@ -73,10 +85,11 @@ describe("validateManualVisitSubmission", () => {
     ).toBe("Check-in time cannot be in the future");
   });
 
-  it("allows projected check-out at check-in plus 5 hours even if slightly in the future", () => {
-    const now = new Date("2026-09-10T10:00:00+05:30");
+  it("allows projected check-out at check-in plus 5 minutes even if slightly in the future", () => {
+    const now = new Date("2026-09-10T09:02:00+05:30");
     const startAt = new Date("2026-09-10T09:00:00+05:30");
     const endAt = defaultManualVisitEndAt(startAt);
+    expect(endAt.toISOString()).toBe(new Date("2026-09-10T09:05:00+05:30").toISOString());
     expect(
       validateManualVisitSubmission({
         startAt,

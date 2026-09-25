@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DateTimeField, dateTimeLocalToIso } from "@/components/DateTimeField";
-import { DEFAULT_HOURS_TARGET } from "@/lib/constants";
+import { DEFAULT_MANUAL_VISIT_DURATION_MINUTES } from "@/lib/constants";
 
 function CheckInIcon() {
   return (
@@ -35,12 +35,12 @@ function CheckOutIcon() {
   );
 }
 
-/** Format a datetime-local value as check-in + hours for the default checkout hint. */
-function addHoursToDateTimeLocal(value: string, hours: number): string | null {
+/** Format a datetime-local value as check-in + minutes for the default checkout hint. */
+function addMinutesToDateTimeLocal(value: string, minutes: number): string | null {
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  date.setHours(date.getHours() + hours);
+  date.setMinutes(date.getMinutes() + minutes);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
@@ -70,7 +70,7 @@ export function ManualVisitForm({
   const [includeCheckout, setIncludeCheckout] = useState(false);
 
   const defaultEndAt = useMemo(
-    () => addHoursToDateTimeLocal(startAt, DEFAULT_HOURS_TARGET),
+    () => addMinutesToDateTimeLocal(startAt, DEFAULT_MANUAL_VISIT_DURATION_MINUTES),
     [startAt],
   );
 
@@ -115,8 +115,9 @@ export function ManualVisitForm({
         {!embedded && <h2 className="text-lg font-medium">Manual visit</h2>}
         <p className={`text-sm text-muted ${embedded ? "" : "mt-1"}`}>
           Log a past office session when the agent missed it, or for guest Wi-Fi and Ethernet.
-          Enter check-in. If you skip check-out, it defaults to {DEFAULT_HOURS_TARGET} hours after
-          check-in. Submissions go to admin for approval before they count toward compliance.
+          Enter check-in. If you skip check-out, it defaults to{" "}
+          {DEFAULT_MANUAL_VISIT_DURATION_MINUTES} minutes after check-in. Submissions go to admin for
+          approval before they count toward compliance.
         </p>
       </div>
 
@@ -156,7 +157,7 @@ export function ManualVisitForm({
           <span>
             <span className="font-medium">Set a different check-out time</span>
             <span className="mt-0.5 block text-xs text-muted">
-              Leave unchecked to use check-in + {DEFAULT_HOURS_TARGET} hours
+              Leave unchecked to use check-in + {DEFAULT_MANUAL_VISIT_DURATION_MINUTES} minutes
               {defaultEndAt ? ` (${formatHint(defaultEndAt)})` : ""}.
             </span>
           </span>
