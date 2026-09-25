@@ -46,7 +46,7 @@ describe("greetingPhraseForPeriod", () => {
     expect(greetingPhraseForPeriod("morning")).toBe("Good morning");
     expect(greetingPhraseForPeriod("afternoon")).toBe("Good afternoon");
     expect(greetingPhraseForPeriod("evening")).toBe("Good evening");
-    expect(greetingPhraseForPeriod("night_owl")).toBe("Night owl");
+    expect(greetingPhraseForPeriod("night_owl")).toBe("Hello Night owl");
   });
 });
 
@@ -84,7 +84,7 @@ describe("firstNameFromSession", () => {
 describe("formatWelcomeGreeting", () => {
   it("joins phrase and name", () => {
     expect(formatWelcomeGreeting("evening", "Soumitra")).toBe("Good evening, Soumitra");
-    expect(formatWelcomeGreeting("night_owl", "Soumitra")).toBe("Night owl, Soumitra");
+    expect(formatWelcomeGreeting("night_owl", "Soumitra")).toBe("Hello Night owl, Soumitra");
   });
 });
 
@@ -100,7 +100,7 @@ describe("hourInTimezone + welcomeGreetingForDate", () => {
 
   it("uses night owl late at night", () => {
     const late = new Date("2026-09-23T23:30:00+05:30");
-    expect(welcomeGreetingForDate(late, tz, "Soumitra")).toBe("Night owl, Soumitra");
+    expect(welcomeGreetingForDate(late, tz, "Soumitra")).toBe("Hello Night owl, Soumitra");
   });
 
   it("uses morning after 5am", () => {

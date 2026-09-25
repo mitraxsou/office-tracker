@@ -23,7 +23,7 @@ export function greetingPhraseForPeriod(period: GreetingPeriod): string {
     case "evening":
       return "Good evening";
     case "night_owl":
-      return "Night owl";
+      return "Hello Night owl";
   }
 }
 
