@@ -32,10 +32,14 @@ describe("BUG-009 office exit after laptop sleep", () => {
     expect(heartbeat).toContain("return $lastTick.ToUniversalTime().ToString(\"o\")");
   });
 
-  it("records local pulses frequently but uploads routine detail hourly", () => {
+  it("records local pulses frequently and uploads health hourly with EOD ticks", () => {
     expect(heartbeat).toContain("$LocalPulseIntervalMinutes = 2");
-    expect(heartbeat).toContain("$RoutineSyncIntervalMinutes = 60");
+    expect(heartbeat).toContain("$HealthSyncIntervalMinutes = 60");
     expect(heartbeat).toContain("function Test-HasCriticalQueuedEvents");
-    expect(heartbeat).toContain("$shouldSync = $criticalSyncDue -or $routineSyncDue");
+    expect(heartbeat).toContain("function New-HealthSnapshotEvent");
+    expect(heartbeat).toContain(
+      "$shouldSync = $criticalSyncDue -or $healthSyncDue -or $endOfDaySyncDue",
+    );
+    expect(heartbeat).toContain('$EndOfDayEventTypes = @("daily_summary", "activity_tick")');
   });
 });

@@ -196,9 +196,23 @@ export async function getRecentLifecycleEvents(limit = 50) {
   }));
 }
 
-export async function getLifecycleEventsForUser(userId: string, limit = 20) {
+export async function getLifecycleEventsForUser(
+  userId: string,
+  limit = 20,
+  options?: { from?: Date; to?: Date },
+) {
   const events = await prisma.agentLifecycleEvent.findMany({
-    where: { userId },
+    where: {
+      userId,
+      ...(options?.from || options?.to
+        ? {
+            createdAt: {
+              ...(options.from ? { gte: options.from } : {}),
+              ...(options.to ? { lte: options.to } : {}),
+            },
+          }
+        : {}),
+    },
     take: limit,
     orderBy: { createdAt: "desc" },
   });

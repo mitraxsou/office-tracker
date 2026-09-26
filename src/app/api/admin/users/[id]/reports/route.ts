@@ -23,11 +23,15 @@ export async function GET(
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const range = parseReportRange(new URL(request.url).searchParams, user.timezone);
+  const searchParams = new URL(request.url).searchParams;
+  const range = parseReportRange(searchParams, user.timezone);
+  const selectedDayKey = searchParams.get("date");
   const config = await getAppConfig();
   const hoursTarget = await getUserHoursTarget(user);
 
-  const report = await getUserReport(id, range.from, range.to);
+  const report = await getUserReport(id, range.from, range.to, {
+    selectedDayKey,
+  });
   if (!report) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }

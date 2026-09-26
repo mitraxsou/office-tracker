@@ -1,8 +1,9 @@
 import { prisma } from "./db";
 import { DEFAULT_OFFICE_SSIDS, isOfficeSsid, normalizeSsid } from "./constants";
-import { getAppConfig, getAgentStaleMs, agentHealthGraceMs } from "./app-config";
+import { getAppConfig, getAgentStaleMs, getEventModeAgentStaleMs, agentHealthGraceMs } from "./app-config";
 import {
   activityTickToSignal,
+  agentModeUsesActivityTicks,
   expectedTicksPerDay,
   getLastAgentSignalAt,
   getLastAgentSignalOnDay,
@@ -290,8 +291,16 @@ async function closeOpenVisit(userId: string, at: Date) {
 }
 
 /** Close visits left open when the agent stopped sending heartbeats. */
-export async function closeStaleOpenVisits(userId: string, staleMs?: number) {
-  const gap = staleMs ?? (await getAgentStaleMs());
+export async function closeStaleOpenVisits(
+  userId: string,
+  staleMs?: number,
+  options?: { lastConfirmedPulseAt?: Date | null },
+) {
+  const config = await getAppConfig();
+  const useActivity = agentModeUsesActivityTicks(config.agentMode);
+  const gap =
+    staleMs ??
+    (useActivity ? await getEventModeAgentStaleMs() : await getAgentStaleMs());
   const now = new Date();
 
   const open = await prisma.visit.findFirst({
@@ -307,20 +316,58 @@ export async function closeStaleOpenVisits(userId: string, staleMs?: number) {
 
   if (!agentStale) return false;
 
-  const endAt = effectiveVisitEnd({
-    endAt: null,
-    updatedAt: open.updatedAt,
-    startAt: open.startAt,
-    now,
-    staleMs: gap,
-    lastHeartbeatAt: lastSignalAt,
-  });
+  // Prefer the agent's last confirmed local pulse for checkout, not detection time.
+  let checkoutAt =
+    options?.lastConfirmedPulseAt ??
+    (await getLastConfirmedLocalPulseAt(userId)) ??
+    lastSignalAt;
+
+  if (checkoutAt && checkoutAt.getTime() < open.startAt.getTime()) {
+    checkoutAt = open.startAt;
+  }
+  if (checkoutAt && checkoutAt.getTime() > now.getTime()) {
+    checkoutAt = now;
+  }
+
+  const endAt =
+    checkoutAt ??
+    effectiveVisitEnd({
+      endAt: null,
+      updatedAt: open.updatedAt,
+      startAt: open.startAt,
+      now,
+      staleMs: gap,
+      lastHeartbeatAt: lastSignalAt,
+    });
 
   await prisma.visit.update({
     where: { id: open.id },
     data: { endAt },
   });
   return true;
+}
+
+async function getLastConfirmedLocalPulseAt(userId: string): Promise<Date | null> {
+  const healthEvent = await prisma.agentEvent.findFirst({
+    where: { userId, type: "health_ping", status: "accepted" },
+    orderBy: { createdAt: "desc" },
+    select: { payload: true },
+  });
+  if (healthEvent?.payload && typeof healthEvent.payload === "object") {
+    const payload = healthEvent.payload as Record<string, unknown>;
+    const raw = payload.lastLocalPulseAt;
+    if (typeof raw === "string") {
+      const parsed = Date.parse(raw);
+      if (!Number.isNaN(parsed)) return new Date(parsed);
+    }
+  }
+
+  const tick = await prisma.activityTick.findFirst({
+    where: { userId },
+    orderBy: { at: "desc" },
+    select: { at: true },
+  });
+  return tick?.at ?? null;
 }
 
 /**
@@ -372,17 +419,25 @@ export async function runVisitMaintenance(
   userId: string,
   timezone: string,
   staleMs?: number,
+  options?: { lastConfirmedPulseAt?: Date | null },
 ) {
   await closeEndOfDayOpenVisits(userId, timezone);
-  const gapMs = staleMs ?? (await getAppConfig()).agentStaleMinutes * 60 * 1000;
-  await closeStaleOpenVisits(userId, gapMs);
+  const config = await getAppConfig();
+  const gapMs =
+    staleMs ??
+    (agentModeUsesActivityTicks(config.agentMode)
+      ? await getEventModeAgentStaleMs()
+      : config.agentStaleMinutes * 60 * 1000);
+  await closeStaleOpenVisits(userId, gapMs, {
+    lastConfirmedPulseAt: options?.lastConfirmedPulseAt,
+  });
 }
 
 export async function maybeRunVisitMaintenance(
   userId: string,
   timezone: string,
   staleMs?: number,
-  options?: { force?: boolean },
+  options?: { force?: boolean; lastConfirmedPulseAt?: Date | null },
 ) {
   if (!options?.force) {
     const lastAt = lastMaintenanceAtByUser.get(userId) ?? 0;
@@ -391,7 +446,9 @@ export async function maybeRunVisitMaintenance(
     }
   }
 
-  await runVisitMaintenance(userId, timezone, staleMs);
+  await runVisitMaintenance(userId, timezone, staleMs, {
+    lastConfirmedPulseAt: options?.lastConfirmedPulseAt,
+  });
   lastMaintenanceAtByUser.set(userId, Date.now());
   return true;
 }

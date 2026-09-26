@@ -34,7 +34,11 @@ const AGENT_SYNC_EVENT_PRIORITY: Record<string, number> = {
   health_ping: 7,
 };
 
-const VISIT_MAINTENANCE_EVENT_TYPES = new Set(["session_resume", "daily_summary"]);
+const VISIT_MAINTENANCE_EVENT_TYPES = new Set([
+  "session_resume",
+  "daily_summary",
+  "health_ping",
+]);
 
 export function syncBatchNeedsVisitMaintenance(events: AgentSyncEvent[]): boolean {
   return events.some((event) => VISIT_MAINTENANCE_EVENT_TYPES.has(event.type));
@@ -65,6 +69,10 @@ export type AgentSyncEvent = {
   firstAgentOnAt?: string;
   gapMinutes?: number;
   lastSsidBeforeGap?: string | null;
+  inOffice?: boolean;
+  lastLocalPulseAt?: string;
+  lastLocalPulseSsid?: string | null;
+  openVisitStartAt?: string;
 };
 
 export type AgentSyncOpenVisit = {
@@ -93,6 +101,18 @@ export async function processAgentSync(params: {
 
   let lastEventAt: Date | null = null;
   let lastInOffice = false;
+  let lastConfirmedPulseAt: Date | null = null;
+  const pendingActivityTicks: Array<{
+    id: string;
+    at: Date;
+    dayKey: string;
+    ssid: string | null;
+    inOffice: boolean;
+    laptopActiveMs?: number;
+    firstAgentOnAt?: Date | null;
+    localVisitId?: string | null;
+    event: AgentSyncEvent;
+  }> = [];
 
   const sortedEvents = sortAgentSyncEventsForProcessing(params.events);
 
@@ -255,32 +275,20 @@ export async function processAgentSync(params: {
         case "activity_tick": {
           const ssid = event.ssid ? normalizeSsid(sanitizeSsid(event.ssid) ?? event.ssid) : null;
           const inOffice = isOfficeSsid(ssid, allowlist);
-          await prisma.activityTick.create({
-            data: {
-              userId: params.userId,
-              deviceId: params.deviceId,
-              at: eventAt,
-              ssid,
-              inOffice,
-            },
-          });
-          await upsertAgentDailyUptime(params.userId, dayKey, {
+          pendingActivityTicks.push({
+            id: event.id,
+            at: eventAt,
+            dayKey,
+            ssid,
+            inOffice,
             laptopActiveMs: event.laptopActiveMs,
             firstAgentOnAt: parseFirstAgentOnAt(event.firstAgentOnAt),
+            localVisitId: event.localVisitId?.trim() || null,
+            event,
           });
-          if (inOffice) {
-            await ensureOpenOfficeVisitFromActivity({
-              userId: params.userId,
-              deviceId: params.deviceId,
-              eventAt,
-              ssid,
-              localVisitId: event.localVisitId?.trim() || null,
-            });
-          }
           lastEventAt = eventAt;
           lastInOffice = inOffice;
-          await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
-          ackedEventIds.push(event.id);
+          if (inOffice) lastConfirmedPulseAt = eventAt;
           break;
         }
         case "daily_summary": {
@@ -349,12 +357,61 @@ export async function processAgentSync(params: {
             await recordAgentEvent(params.userId, params.deviceId, event, "rejected");
             break;
           }
+          const officeMs = typeof event.officeMs === "number" ? event.officeMs : null;
+          if (officeMs != null && officeMs < 0) {
+            rejected.push({ id: event.id, reason: "invalid_office_ms" });
+            ackedEventIds.push(event.id);
+            await recordAgentEvent(params.userId, params.deviceId, event, "rejected");
+            break;
+          }
+          if (officeMs != null) {
+            const openVisit = await prisma.visit.findFirst({
+              where: { userId: params.userId, endAt: null },
+              orderBy: { startAt: "desc" },
+            });
+            if (openVisit) {
+              const elapsed = Math.max(0, eventAt.getTime() - openVisit.startAt.getTime());
+              if (officeMs > elapsed + SUMMARY_MISMATCH_MS) {
+                rejected.push({ id: event.id, reason: "office_ms_exceeds_elapsed" });
+                ackedEventIds.push(event.id);
+                await recordAgentEvent(params.userId, params.deviceId, event, "rejected");
+                break;
+              }
+            }
+          }
           lastEventAt = eventAt;
           await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
           ackedEventIds.push(event.id);
           break;
         }
         case "health_ping": {
+          const ssid = event.ssid ? normalizeSsid(sanitizeSsid(event.ssid) ?? event.ssid) : null;
+          const inOffice =
+            typeof event.inOffice === "boolean"
+              ? event.inOffice
+              : isOfficeSsid(ssid, allowlist);
+          await prisma.presenceTransition.create({
+            data: {
+              userId: params.userId,
+              deviceId: params.deviceId,
+              type: "health_ping",
+              at: eventAt,
+              dayKey,
+              ssid,
+              previousSsid: null,
+              inOffice,
+            },
+          });
+          await upsertAgentDailyUptime(params.userId, dayKey, {
+            laptopActiveMs: event.laptopActiveMs,
+            firstAgentOnAt: parseFirstAgentOnAt(event.firstAgentOnAt),
+          });
+          const pulseAt = event.lastLocalPulseAt
+            ? parseAgentEventTimestamp(event.lastLocalPulseAt)
+            : null;
+          if (pulseAt) lastConfirmedPulseAt = pulseAt;
+          lastEventAt = eventAt;
+          lastInOffice = inOffice;
           await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
           ackedEventIds.push(event.id);
           break;
@@ -415,8 +472,20 @@ export async function processAgentSync(params: {
     }
   }
 
+  if (pendingActivityTicks.length > 0) {
+    await flushPendingActivityTicks({
+      userId: params.userId,
+      deviceId: params.deviceId,
+      ticks: pendingActivityTicks,
+      ackedEventIds,
+    });
+  }
+
   if (syncBatchNeedsVisitMaintenance(params.events)) {
-    await maybeRunVisitMaintenance(params.userId, params.userTimezone, undefined, { force: true });
+    await maybeRunVisitMaintenance(params.userId, params.userTimezone, undefined, {
+      force: true,
+      lastConfirmedPulseAt,
+    });
   }
 
   await reconcileAgentOpenVisit({
@@ -653,6 +722,68 @@ async function recordSyncBatch(params: {
   });
 }
 
+async function flushPendingActivityTicks(params: {
+  userId: string;
+  deviceId: string;
+  ticks: Array<{
+    id: string;
+    at: Date;
+    dayKey: string;
+    ssid: string | null;
+    inOffice: boolean;
+    laptopActiveMs?: number;
+    firstAgentOnAt?: Date | null;
+    localVisitId?: string | null;
+    event: AgentSyncEvent;
+  }>;
+  ackedEventIds: string[];
+}) {
+  const CHUNK = 200;
+  for (let i = 0; i < params.ticks.length; i += CHUNK) {
+    const chunk = params.ticks.slice(i, i + CHUNK);
+    await prisma.activityTick.createMany({
+      data: chunk.map((tick) => ({
+        userId: params.userId,
+        deviceId: params.deviceId,
+        at: tick.at,
+        ssid: tick.ssid,
+        inOffice: tick.inOffice,
+      })),
+    });
+  }
+
+  // Uptime and open-visit repair use the latest tick only (monotonic day totals).
+  const latestByDay = new Map<string, (typeof params.ticks)[number]>();
+  for (const tick of params.ticks) {
+    const existing = latestByDay.get(tick.dayKey);
+    if (!existing || tick.at.getTime() >= existing.at.getTime()) {
+      latestByDay.set(tick.dayKey, tick);
+    }
+  }
+  for (const tick of latestByDay.values()) {
+    await upsertAgentDailyUptime(params.userId, tick.dayKey, {
+      laptopActiveMs: tick.laptopActiveMs,
+      firstAgentOnAt: tick.firstAgentOnAt,
+    });
+  }
+
+  const latestOffice = [...params.ticks].reverse().find((tick) => tick.inOffice);
+  if (latestOffice) {
+    await ensureOpenOfficeVisitFromActivity({
+      userId: params.userId,
+      deviceId: params.deviceId,
+      eventAt: latestOffice.at,
+      ssid: latestOffice.ssid,
+      localVisitId: latestOffice.localVisitId ?? null,
+    });
+  }
+
+  for (const tick of params.ticks) {
+    await recordAgentEvent(params.userId, params.deviceId, tick.event, "accepted");
+    params.ackedEventIds.push(tick.id);
+  }
+}
+
 async function upsertAgentDailyUptime(
   userId: string,
   dayKey: string,
@@ -734,6 +865,15 @@ export function parseAgentSyncEvents(raw: unknown): AgentSyncEvent[] {
       firstAgentOnAt:
         typeof record.firstAgentOnAt === "string" ? record.firstAgentOnAt : undefined,
       gapMinutes: typeof record.gapMinutes === "number" ? record.gapMinutes : undefined,
+      lastSsidBeforeGap:
+        typeof record.lastSsidBeforeGap === "string" ? record.lastSsidBeforeGap : null,
+      inOffice: typeof record.inOffice === "boolean" ? record.inOffice : undefined,
+      lastLocalPulseAt:
+        typeof record.lastLocalPulseAt === "string" ? record.lastLocalPulseAt : undefined,
+      lastLocalPulseSsid:
+        typeof record.lastLocalPulseSsid === "string" ? record.lastLocalPulseSsid : null,
+      openVisitStartAt:
+        typeof record.openVisitStartAt === "string" ? record.openVisitStartAt : undefined,
     });
   }
   return events;

@@ -16,6 +16,7 @@ import {
   AGENT_API_ROUTES,
   getDeviceAgentApiHitTotals,
   getUserAgentApiHitTotals,
+  getUserAgentApiHitsForDay,
   recordAgentApiHit,
 } from "../src/lib/agent-api-hits";
 
@@ -129,5 +130,62 @@ describe("getDeviceAgentApiHitTotals", () => {
     expect(totals.day).toBe(3);
     expect(totals.month).toBe(3);
     expect(totals.year).toBe(3);
+  });
+});
+
+describe("getUserAgentApiHitsForDay", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns route and device breakdown for a selected day", async () => {
+    agentApiHitDailyFindManyMock.mockResolvedValue([
+      { deviceId: "device-1", route: AGENT_API_ROUTES.SYNC, hitCount: 4 },
+      { deviceId: "device-1", route: AGENT_API_ROUTES.CONFIG, hitCount: 1 },
+      { deviceId: "device-2", route: AGENT_API_ROUTES.SYNC, hitCount: 2 },
+    ]);
+
+    const breakdown = await getUserAgentApiHitsForDay("user-1", "2026-09-19");
+
+    expect(agentApiHitDailyFindManyMock).toHaveBeenCalledWith({
+      where: { userId: "user-1", dayKey: "2026-09-19" },
+      select: { deviceId: true, route: true, hitCount: true },
+    });
+    expect(breakdown).toEqual({
+      dayKey: "2026-09-19",
+      total: 7,
+      byRoute: {
+        [AGENT_API_ROUTES.SYNC]: 6,
+        [AGENT_API_ROUTES.CONFIG]: 1,
+      },
+      byDevice: [
+        {
+          deviceId: "device-1",
+          total: 5,
+          byRoute: {
+            [AGENT_API_ROUTES.SYNC]: 4,
+            [AGENT_API_ROUTES.CONFIG]: 1,
+          },
+        },
+        {
+          deviceId: "device-2",
+          total: 2,
+          byRoute: {
+            [AGENT_API_ROUTES.SYNC]: 2,
+          },
+        },
+      ],
+    });
+  });
+
+  it("returns empty totals when the selected day has no hits", async () => {
+    agentApiHitDailyFindManyMock.mockResolvedValue([]);
+    const breakdown = await getUserAgentApiHitsForDay("user-1", "2026-09-19");
+    expect(breakdown).toEqual({
+      dayKey: "2026-09-19",
+      total: 0,
+      byRoute: {},
+      byDevice: [],
+    });
   });
 });

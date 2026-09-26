@@ -16,6 +16,8 @@ describe("presence timeline labels", () => {
     expect(syncTriggerLabel("resume_wake")).toBe("Sync: wake/resume");
     expect(syncTriggerLabel("ssid_change")).toBe("Sync: Wi-Fi change");
     expect(syncTriggerLabel("activity_tick")).toBe("Sync: activity tick");
+    expect(syncTriggerLabel("health_ping")).toBe("Sync: health ping");
+    expect(syncTriggerLabel("end_of_day")).toBe("Sync: end-of-day diagnostics");
   });
 
   it("labels office Wi-Fi transitions", () => {

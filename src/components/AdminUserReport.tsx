@@ -142,6 +142,22 @@ type UserReport = {
       totals: { day: number; month: number; year: number };
     }>;
   };
+  dayDiagnostics?: {
+    dayKey: string;
+    apiHits: {
+      dayKey: string;
+      total: number;
+      byRoute: Record<string, number>;
+      byDevice: Array<{ deviceId: string; total: number; byRoute: Record<string, number> }>;
+    };
+    pulseCount: number;
+    firstSignalAt: string | null;
+    lastSignalAt: string | null;
+    largestGapMinutes: number | null;
+    laptopActiveHours: number;
+    officeHours: number;
+    officeTransitions: number;
+  } | null;
   monthlyDaysTarget: number;
   monthlyProgress: {
     monthKey: string;
@@ -208,26 +224,39 @@ export function AdminUserReport({
   const load = useCallback(
     async (month: string, preferredDate?: string | null) => {
       setLoading(true);
-      const qs = new URLSearchParams();
-      if (month) qs.set("month", month);
-      const res = await fetch(`/api/admin/users/${userId}/reports?${qs}`);
-      setLoading(false);
-      if (!res.ok) {
-        setError("Failed to load user report");
-        return;
-      }
-      const json = (await res.json()) as UserReport;
-      setData(json);
-      setMonthKey(json.range.month);
-      const nextDate = resolveDefaultSelectedDate({
-        monthKey: json.range.month,
-        timezone: json.user.timezone,
-        dailyTrend: json.dailyTrend,
-        preferredDate: preferredDate ?? null,
-      });
-      setSelectedDate(nextDate);
-      syncUrlState(json.range.month, nextDate);
       setError(null);
+      try {
+        const qs = new URLSearchParams();
+        if (month) qs.set("month", month);
+        if (preferredDate) qs.set("date", preferredDate);
+        const res = await fetch(`/api/admin/users/${userId}/reports?${qs}`);
+        if (!res.ok) {
+          setError("Failed to load user report");
+          return;
+        }
+        let json = (await res.json()) as UserReport;
+        const nextDate = resolveDefaultSelectedDate({
+          monthKey: json.range.month,
+          timezone: json.user.timezone,
+          dailyTrend: json.dailyTrend,
+          preferredDate: preferredDate ?? null,
+        });
+        if (nextDate && nextDate !== preferredDate) {
+          const dayQs = new URLSearchParams();
+          dayQs.set("month", json.range.month);
+          dayQs.set("date", nextDate);
+          const dayRes = await fetch(`/api/admin/users/${userId}/reports?${dayQs}`);
+          if (dayRes.ok) {
+            json = (await dayRes.json()) as UserReport;
+          }
+        }
+        setData(json);
+        setMonthKey(json.range.month);
+        setSelectedDate(nextDate);
+        syncUrlState(json.range.month, nextDate);
+      } finally {
+        setLoading(false);
+      }
     },
     [userId, syncUrlState],
   );
@@ -305,12 +334,7 @@ export function AdminUserReport({
 
   function selectDate(nextDate: string) {
     const nextMonth = monthKeyFromDayKey(nextDate);
-    if (nextMonth !== monthKey) {
-      void load(nextMonth, nextDate);
-      return;
-    }
-    setSelectedDate(nextDate);
-    syncUrlState(monthKey, nextDate);
+    void load(nextMonth !== monthKey ? nextMonth : monthKey, nextDate);
   }
 
   function jumpToToday() {
@@ -609,6 +633,44 @@ export function AdminUserReport({
               </dd>
             </div>
           )}
+          {data.dayDiagnostics && (
+            <div className="sm:col-span-2">
+              <dt className="text-muted">Selected day diagnostics ({data.dayDiagnostics.dayKey})</dt>
+              <dd className="text-xs space-y-1">
+                <div>
+                  First signal{" "}
+                  {data.dayDiagnostics.firstSignalAt
+                    ? new Date(data.dayDiagnostics.firstSignalAt).toLocaleString("en-IN", {
+                        timeZone: data.user.timezone,
+                      })
+                    : "—"}{" "}
+                  · Last{" "}
+                  {data.dayDiagnostics.lastSignalAt
+                    ? new Date(data.dayDiagnostics.lastSignalAt).toLocaleString("en-IN", {
+                        timeZone: data.user.timezone,
+                      })
+                    : "—"}
+                </div>
+                <div>
+                  Pulses {data.dayDiagnostics.pulseCount}
+                  {data.dayDiagnostics.largestGapMinutes != null
+                    ? ` · Largest gap ${data.dayDiagnostics.largestGapMinutes} min`
+                    : ""}
+                  {" · "}Office {data.dayDiagnostics.officeHours}h · Laptop active{" "}
+                  {data.dayDiagnostics.laptopActiveHours}h · Transitions{" "}
+                  {data.dayDiagnostics.officeTransitions}
+                </div>
+                <div>
+                  API hits that day: {data.dayDiagnostics.apiHits.total}
+                  {Object.keys(data.dayDiagnostics.apiHits.byRoute).length > 0
+                    ? ` (${Object.entries(data.dayDiagnostics.apiHits.byRoute)
+                        .map(([route, count]) => `${route} ${count}`)
+                        .join(", ")})`
+                    : ""}
+                </div>
+              </dd>
+            </div>
+          )}
           {data.serverAppUrl && (
             <div className="sm:col-span-2">
               <dt className="text-muted">Expected app URL (this deployment)</dt>
@@ -718,11 +780,15 @@ export function AdminUserReport({
         )}
       </section>
 
-      <AdminPresenceTimeline userId={userId} timezone={data.user.timezone} />
+      <AdminPresenceTimeline
+        userId={userId}
+        timezone={data.user.timezone}
+        selectedDate={selectedDate}
+      />
 
       <section className="card p-6">
         <h3 className="mb-3 text-sm font-medium">
-          Recent activity (retention window)
+          {selectedDate ? `Activity on ${selectedDate}` : "Recent activity (retention window)"}
           {data.agentTracking && (
             <span className="ml-2 font-normal text-muted">
               (
@@ -734,7 +800,9 @@ export function AdminUserReport({
           )}
         </h3>
         {data.heartbeats.length === 0 ? (
-          <p className="text-sm text-muted">No activity in range.</p>
+          <p className="text-sm text-muted">
+            {selectedDate ? `No activity on ${selectedDate}.` : "No activity in range."}
+          </p>
         ) : (
           <div className="max-h-48 overflow-y-auto">
             <table className="w-full text-xs">
@@ -761,9 +829,19 @@ export function AdminUserReport({
         )}
       </section>
 
-      {data.lifecycleEvents && data.lifecycleEvents.length > 0 && (
+      {data.lifecycleEvents && (
         <section className="card p-6">
-          <h3 className="mb-3 text-sm font-medium">Agent install / uninstall history</h3>
+          <h3 className="mb-3 text-sm font-medium">
+            Agent install / uninstall history
+            {selectedDate ? ` (${selectedDate})` : ""}
+          </h3>
+          {data.lifecycleEvents.length === 0 ? (
+            <p className="text-sm text-muted">
+              {selectedDate
+                ? `No install or uninstall events on ${selectedDate}.`
+                : "No install or uninstall events."}
+            </p>
+          ) : (
           <div className="max-h-48 overflow-y-auto">
             <table className="w-full text-xs">
               <thead>
@@ -796,6 +874,7 @@ export function AdminUserReport({
               </tbody>
             </table>
           </div>
+          )}
         </section>
       )}
 

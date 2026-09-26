@@ -424,7 +424,7 @@ model AppConfig {
   allowRegistration         Boolean  @default(false)
   allowOtpSelfRegistration  Boolean  @default(true)
   pendingTokenTtlDays   Int      @default(7)
-  heartbeatRetentionDays Int     @default(1)
+  heartbeatRetentionDays Int     @default(7)
   heartbeatIntervalMinutes Int   @default(5)
   agentStaleMinutes     Int      @default(15)
   agentStaleGraceHours  Int      @default(24)

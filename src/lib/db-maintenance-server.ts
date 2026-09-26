@@ -11,6 +11,8 @@ export async function countRowsForPurge(table: MaintenanceTable, cutoff: Date): 
   switch (table) {
     case "heartbeats":
       return prisma.heartbeat.count({ where: { recordedAt: { lt: cutoff } } });
+    case "activity_ticks":
+      return prisma.activityTick.count({ where: { at: { lt: cutoff } } });
     case "audit_logs":
       return prisma.auditLog.count({ where: { createdAt: { lt: cutoff } } });
     case "resolved_corrections":
@@ -46,6 +48,12 @@ export async function purgeTableRows(
     case "heartbeats": {
       const result = await prisma.heartbeat.deleteMany({
         where: { recordedAt: { lt: cutoff } },
+      });
+      return { deleted: result.count };
+    }
+    case "activity_ticks": {
+      const result = await prisma.activityTick.deleteMany({
+        where: { at: { lt: cutoff } },
       });
       return { deleted: result.count };
     }

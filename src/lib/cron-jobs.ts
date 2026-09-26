@@ -25,7 +25,7 @@ export const CRON_JOBS = [
     schedule: "15 0 * * *",
     scheduleUtc: "Daily at 00:15 UTC",
     scheduleIst: "Daily at 05:45 IST",
-    purpose: "Deletes raw heartbeats older than the configured retention window. Visits are kept.",
+    purpose: "Deletes raw legacy heartbeats and activity ticks older than the configured retention window. Visits and API-hit day totals are kept.",
     expectedIntervalMs: 24 * 60 * 60 * 1000,
     healthyWithinMs: 2 * 24 * 60 * 60 * 1000,
   },
@@ -54,7 +54,11 @@ async function runJobLogic(jobName: CronJobName): Promise<CronResult> {
       await logAuditEvent({
         actorId: breakglass.id,
         action: "heartbeat_purge",
-        details: { deleted: result.deleted, retentionDays: config.heartbeatRetentionDays },
+        details: {
+          deleted: result.deleted,
+          activityTicksDeleted: result.activityTicksDeleted,
+          retentionDays: config.heartbeatRetentionDays,
+        },
       });
     }
     return { ok: true, ...result, rateLimitPurged };

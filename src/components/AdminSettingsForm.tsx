@@ -284,7 +284,7 @@ export function AdminSettingsForm({
               </span>
             </label>
             <label className="block text-sm">
-              <span className="text-muted">Legacy heartbeat retention (days)</span>
+              <span className="text-muted">Diagnostic retention (days)</span>
               <input
                 type="number"
                 min={1}
@@ -294,8 +294,9 @@ export function AdminSettingsForm({
                 className="mt-1 w-full max-w-xs rounded-lg border px-3 py-2"
               />
               <span className="mt-1 block text-xs text-muted">
-                How long raw legacy heartbeats are kept on the server. Activity ticks and visits are
-                not affected. Purge runs via maintenance cron.
+                How long raw diagnostic rows (legacy heartbeats and activity ticks) are kept.
+                Visits, daily summaries, and API-hit day totals are kept. Purge runs via
+                maintenance cron. Default 7 days.
               </span>
             </label>
           </div>

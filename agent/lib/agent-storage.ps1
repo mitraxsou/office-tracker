@@ -5,19 +5,25 @@ $script:AgentLogMaxTotalBytes = 10 * 1024 * 1024
 $script:AgentLogTrimTargetBytes = 7 * 1024 * 1024
 $script:AgentLogFileTrimBytes = 2 * 1024 * 1024
 
-$script:AgentEventQueueMaxCount = 400
-$script:AgentEventQueueMaxBytes = 512 * 1024
-$script:AgentStaleEventDays = 14
+# Bound for ~7 days of 2-minute ticks plus critical events before overflow prune.
+$script:AgentEventQueueMaxCount = 5500
+$script:AgentEventQueueMaxBytes = 4 * 1024 * 1024
+$script:AgentStaleEventDays = 7
 
-$script:AgentCriticalEventTypes = @("visit_start", "visit_end", "daily_summary")
-$script:AgentExpendableEventTypes = @(
-    "health_ping",
-    "activity_tick",
-    "session_resume",
+$script:AgentCriticalEventTypes = @(
+    "visit_start",
+    "visit_end",
+    "daily_summary",
+    "hours_target_met",
     "session_suspend",
+    "session_resume",
     "wifi_connected",
     "wifi_disconnected",
     "ssid_changed"
+)
+$script:AgentExpendableEventTypes = @(
+    "health_ping",
+    "activity_tick"
 )
 
 function Get-AgentInstallDir {

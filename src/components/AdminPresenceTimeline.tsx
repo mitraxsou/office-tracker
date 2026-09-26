@@ -28,10 +28,12 @@ export function AdminPresenceTimeline({
   userId,
   timezone,
   compact = false,
+  selectedDate = null,
 }: {
   userId: string;
   timezone: string;
   compact?: boolean;
+  selectedDate?: string | null;
 }) {
   const [days, setDays] = useState(7);
   const [data, setData] = useState<TimelineData | null>(null);
@@ -42,7 +44,13 @@ export function AdminPresenceTimeline({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/users/${userId}/presence-timeline?days=${days}`);
+      const qs = new URLSearchParams();
+      if (selectedDate) {
+        qs.set("date", selectedDate);
+      } else {
+        qs.set("days", String(days));
+      }
+      const res = await fetch(`/api/admin/users/${userId}/presence-timeline?${qs}`);
       if (!res.ok) {
         setError("Failed to load Wi-Fi activity");
         return;
@@ -55,7 +63,7 @@ export function AdminPresenceTimeline({
     } finally {
       setLoading(false);
     }
-  }, [userId, days]);
+  }, [userId, days, selectedDate]);
 
   useEffect(() => {
     void load();
@@ -76,23 +84,27 @@ export function AdminPresenceTimeline({
           <h3 className="text-sm font-medium">Wi-Fi and sync activity</h3>
           {!compact && (
             <p className="mt-1 text-xs text-muted">
-              Office entry/exit, Wi-Fi changes, laptop wake, and why the agent synced.
+              {selectedDate
+                ? `Office entry/exit, Wi-Fi changes, and sync events for ${selectedDate}.`
+                : "Office entry/exit, Wi-Fi changes, laptop wake, and why the agent synced."}
             </p>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={days}
-            onChange={(e) => setDays(Number(e.target.value))}
-            className="rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-xs"
-            aria-label="Days to show"
-          >
-            {DAY_OPTIONS.map((d) => (
-              <option key={d} value={d}>
-                Last {d} day{d === 1 ? "" : "s"}
-              </option>
-            ))}
-          </select>
+          {!selectedDate && (
+            <select
+              value={days}
+              onChange={(e) => setDays(Number(e.target.value))}
+              className="rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1 text-xs"
+              aria-label="Days to show"
+            >
+              {DAY_OPTIONS.map((d) => (
+                <option key={d} value={d}>
+                  Last {d} day{d === 1 ? "" : "s"}
+                </option>
+              ))}
+            </select>
+          )}
           <label className="flex items-center gap-1 text-xs text-muted">
             <input
               type="checkbox"

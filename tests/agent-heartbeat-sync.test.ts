@@ -43,7 +43,9 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain('Add-QueuedEvent -Type "activity_tick"');
     expect(heartbeat).toContain("laptopActiveMs");
     expect(heartbeat).toContain('"session_resume"');
-    expect(heartbeat).toContain("$shouldSync = $criticalSyncDue -or $routineSyncDue");
+    expect(heartbeat).toContain(
+      "$shouldSync = $criticalSyncDue -or $healthSyncDue -or $endOfDaySyncDue",
+    );
   });
 
   it("persists local activity pulses before a network sync", () => {
@@ -98,28 +100,34 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(ensureIdx).toBeGreaterThan(downloadIdx);
   });
 
-  it("polls agent config on an interval instead of every task run", () => {
+  it("uses config GET only for bootstrap or stale cache, not every hour", () => {
     expect(heartbeat).toContain("$ConfigFetchIntervalRuns = 60");
     expect(heartbeat).toContain("$ConfigCacheMaxAgeMinutes = 120");
     expect(heartbeat).toContain("function Test-ConfigCacheFresh");
-    expect(heartbeat).toContain(
+    expect(heartbeat).toContain("$forceConfigFetch = -not (Test-ConfigCacheFresh $cachePath)");
+    expect(heartbeat).toContain("Prefer sync-response config / update metadata");
+    expect(heartbeat).not.toContain("Get-FreshVersionCheckConfig");
+    expect(heartbeat).not.toContain(
       "$hourlyUpdateCheck = (Test-ShouldRunHourlyUpdateCheck) -and -not $isResumeRun",
     );
-    expect(heartbeat).toContain("-Force:$forceConfigFetch");
-    expect(heartbeat).not.toContain("Get-FreshVersionCheckConfig");
   });
 
-  it("syncs on home Wi-Fi via activity ticks without visit_start", () => {
-    expect(heartbeat).toContain("$RoutineSyncIntervalMinutes = 60");
-    expect(heartbeat).toContain("function Test-RoutineSyncDue");
-    expect(heartbeat).toContain("$shouldSync = $criticalSyncDue -or $routineSyncDue");
-    expect(heartbeat).toContain('Add-QueuedEvent -Type "activity_tick"');
-    expect(heartbeat).not.toMatch(
-      /if \(\$activityDue\)[\s\S]*?Start-LocalVisit/,
+  it("keeps 2-minute pulses local and syncs health hourly plus end-of-day ticks", () => {
+    expect(heartbeat).toContain("$LocalPulseIntervalMinutes = 2");
+    expect(heartbeat).toContain("$HealthSyncIntervalMinutes = 60");
+    expect(heartbeat).toContain("function Test-HealthSyncDue");
+    expect(heartbeat).toContain("function Select-EventsForSync");
+    expect(heartbeat).toContain("function New-HealthSnapshotEvent");
+    expect(heartbeat).toContain('type = "health_ping"');
+    expect(heartbeat).toContain("lastLocalPulseAt");
+    expect(heartbeat).toContain('$EndOfDayEventTypes = @("daily_summary", "activity_tick")');
+    expect(heartbeat).toContain(
+      "$shouldSync = $criticalSyncDue -or $healthSyncDue -or $endOfDaySyncDue",
     );
+    expect(heartbeat).not.toContain("$RoutineSyncIntervalMinutes");
   });
 
-  it("syncs critical presence events promptly while batching routine pulses", () => {
+  it("syncs critical presence events promptly while excluding activity ticks", () => {
     expect(heartbeat).toContain("function Test-HasCriticalQueuedEvents");
     for (const type of [
       "ssid_changed",
@@ -127,12 +135,27 @@ describe("office-heartbeat wake and sync behavior", () => {
       "visit_end",
       "session_suspend",
       "session_resume",
+      "hours_target_met",
     ]) {
       expect(heartbeat).toContain(`"${type}"`);
     }
-    const criticalStart = heartbeat.indexOf("function Test-HasCriticalQueuedEvents");
-    const criticalEnd = heartbeat.indexOf("\nfunction ", criticalStart + 1);
-    expect(heartbeat.slice(criticalStart, criticalEnd)).not.toContain('"activity_tick"');
+    const criticalStart = heartbeat.indexOf("$CriticalEventTypes = @(");
+    const criticalEnd = heartbeat.indexOf(")", criticalStart);
+    const criticalBlock = heartbeat.slice(criticalStart, criticalEnd);
+    expect(criticalBlock).not.toContain("activity_tick");
+    const selectStart = heartbeat.indexOf("function Select-EventsForSync");
+    const selectEnd = heartbeat.indexOf("\nfunction ", selectStart + 1);
+    expect(heartbeat.slice(selectStart, selectEnd)).toContain("Test-IsEndOfDayEventType");
+  });
+
+  it("applies sync-response updates after acknowledging presence events", () => {
+    const flushStart = heartbeat.indexOf("function Invoke-FlushSync");
+    const flushEnd = heartbeat.indexOf("\nfunction ", flushStart + 1);
+    const flush = heartbeat.slice(flushStart, flushEnd);
+    const ackIdx = flush.indexOf("Remove-AckedEvents");
+    const updateIdx = flush.indexOf("Test-NeedsAgentUpdateFromResponse");
+    expect(ackIdx).toBeGreaterThan(0);
+    expect(updateIdx).toBeGreaterThan(ackIdx);
   });
 
   it("honors OFFICETRACKER_INSTALL_DIR for isolated regression installs", () => {
@@ -143,6 +166,8 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain('if ($SyncTrigger) { $body.syncTrigger = $SyncTrigger }');
     expect(heartbeat).toContain("function Get-SyncTrigger");
     expect(heartbeat).toContain('return "resume_wake"');
+    expect(heartbeat).toContain('return "health_ping"');
+    expect(heartbeat).toContain('return "end_of_day"');
     expect(heartbeat).toContain('-SyncTrigger $syncTrigger');
   });
 

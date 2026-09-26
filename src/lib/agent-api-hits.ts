@@ -131,3 +131,44 @@ export async function getDeviceAgentApiHitTotals(
 
   return rollupHitRows(rows, timezone);
 }
+
+export type AgentApiHitDayBreakdown = {
+  dayKey: string;
+  total: number;
+  byRoute: Record<string, number>;
+  byDevice: Array<{ deviceId: string; total: number; byRoute: Record<string, number> }>;
+};
+
+export async function getUserAgentApiHitsForDay(
+  userId: string,
+  dayKey: string,
+): Promise<AgentApiHitDayBreakdown> {
+  const rows = await prisma.agentApiHitDaily.findMany({
+    where: { userId, dayKey },
+    select: { deviceId: true, route: true, hitCount: true },
+  });
+
+  const byRoute: Record<string, number> = {};
+  const byDeviceMap = new Map<string, { total: number; byRoute: Record<string, number> }>();
+  let total = 0;
+
+  for (const row of rows) {
+    total += row.hitCount;
+    byRoute[row.route] = (byRoute[row.route] ?? 0) + row.hitCount;
+    const device = byDeviceMap.get(row.deviceId) ?? { total: 0, byRoute: {} };
+    device.total += row.hitCount;
+    device.byRoute[row.route] = (device.byRoute[row.route] ?? 0) + row.hitCount;
+    byDeviceMap.set(row.deviceId, device);
+  }
+
+  return {
+    dayKey,
+    total,
+    byRoute,
+    byDevice: [...byDeviceMap.entries()].map(([deviceId, value]) => ({
+      deviceId,
+      total: value.total,
+      byRoute: value.byRoute,
+    })),
+  };
+}

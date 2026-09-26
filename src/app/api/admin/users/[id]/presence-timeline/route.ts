@@ -22,10 +22,9 @@ export async function GET(
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const daysParam = Number.parseInt(
-    new URL(request.url).searchParams.get("days") ?? "7",
-    10,
-  );
+  const search = new URL(request.url).searchParams;
+  const dayKey = search.get("date");
+  const daysParam = Number.parseInt(search.get("days") ?? "7", 10);
   const days = Number.isFinite(daysParam) ? daysParam : 7;
 
   const config = await getAppConfig();
@@ -34,6 +33,7 @@ export async function GET(
     days,
     user.timezone,
     config.officeSsids,
+    { dayKey },
   );
 
   return NextResponse.json(timeline);

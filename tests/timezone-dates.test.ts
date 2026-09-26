@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getDayBounds, isFutureDayKey, isCurrentCalendarDay } from "../src/lib/timezone-dates";
-import { dayKeyInTimezone, effectiveVisitEnd } from "../src/lib/visits";
+import { dayBoundsFromKey, dayKeyInTimezone, getDayBounds, isFutureDayKey, isCurrentCalendarDay } from "../src/lib/timezone-dates";
+import { effectiveVisitEnd } from "../src/lib/visits";
 import { VISIT_GAP_MS } from "../src/lib/constants";
 
 describe("visit date labels (Asia/Kolkata)", () => {
@@ -55,5 +55,21 @@ describe("isCurrentCalendarDay and isFutureDayKey", () => {
     expect(isFutureDayKey("2026-09-12", "Asia/Kolkata", now)).toBe(true);
     expect(isFutureDayKey("2026-09-08", "Asia/Kolkata", now)).toBe(false);
     expect(isFutureDayKey("2026-09-07", "Asia/Kolkata", now)).toBe(false);
+  });
+});
+
+describe("selected-day diagnostics bounds", () => {
+  it("keeps Friday 2026-09-25 fully inside Asia/Kolkata day bounds", () => {
+    const { start, end } = dayBoundsFromKey("2026-09-25", "Asia/Kolkata");
+    expect(dayKeyInTimezone(start, "Asia/Kolkata")).toBe("2026-09-25");
+    expect(start.toISOString()).toBe("2026-09-24T18:30:00.000Z");
+    const midDay = new Date("2026-09-25T12:00:00+05:30");
+    const lateDay = new Date("2026-09-25T23:59:00+05:30");
+    expect(midDay.getTime()).toBeGreaterThanOrEqual(start.getTime());
+    expect(midDay.getTime()).toBeLessThanOrEqual(end.getTime());
+    expect(lateDay.getTime()).toBeGreaterThanOrEqual(start.getTime());
+    expect(lateDay.getTime()).toBeLessThanOrEqual(end.getTime());
+    expect(dayKeyInTimezone(midDay, "Asia/Kolkata")).toBe("2026-09-25");
+    expect(dayKeyInTimezone(lateDay, "Asia/Kolkata")).toBe("2026-09-25");
   });
 });

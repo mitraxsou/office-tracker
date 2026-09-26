@@ -5,6 +5,7 @@ const agentEventUpsertMock = vi.hoisted(() => vi.fn());
 const agentEventCreateMock = vi.hoisted(() => vi.fn());
 const presenceTransitionCreateMock = vi.hoisted(() => vi.fn());
 const activityTickCreateMock = vi.hoisted(() => vi.fn());
+const activityTickCreateManyMock = vi.hoisted(() => vi.fn());
 const visitFindFirstMock = vi.hoisted(() => vi.fn());
 const visitFindManyMock = vi.hoisted(() => vi.fn());
 const visitCreateMock = vi.hoisted(() => vi.fn());
@@ -24,7 +25,10 @@ vi.mock("@/lib/db", () => ({
       create: agentEventCreateMock,
     },
     presenceTransition: { create: presenceTransitionCreateMock },
-    activityTick: { create: activityTickCreateMock },
+    activityTick: {
+      create: activityTickCreateMock,
+      createMany: activityTickCreateManyMock,
+    },
     visit: {
       findFirst: visitFindFirstMock,
       findMany: visitFindManyMock,
@@ -140,6 +144,7 @@ describe("processAgentSync session_resume", () => {
     agentEventCreateMock.mockResolvedValue({});
     presenceTransitionCreateMock.mockResolvedValue({});
     activityTickCreateMock.mockResolvedValue({});
+    activityTickCreateManyMock.mockResolvedValue({ count: 0 });
     visitFindFirstMock.mockResolvedValue(null);
     visitFindManyMock.mockResolvedValue([]);
     dailySummaryUpsertMock.mockResolvedValue({});
@@ -191,7 +196,7 @@ describe("processAgentSync session_resume", () => {
       "user-1",
       "Asia/Kolkata",
       undefined,
-      { force: true },
+      { force: true, lastConfirmedPulseAt: null },
     );
     expect(presenceTransitionCreateMock).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -285,12 +290,15 @@ describe("processAgentSync session_resume", () => {
       appUrl: "https://office.example",
     });
 
-    expect(activityTickCreateMock).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        inOffice: false,
-        ssid: "HomeWiFi",
-      }),
+    expect(activityTickCreateManyMock).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          inOffice: false,
+          ssid: "HomeWiFi",
+        }),
+      ],
     });
+    expect(activityTickCreateMock).not.toHaveBeenCalled();
     expect(visitUpdateMock).not.toHaveBeenCalled();
     expect(visitCreateMock).not.toHaveBeenCalled();
     expect(result.rejected).toEqual([]);
@@ -641,12 +649,160 @@ describe("syncBatchNeedsVisitMaintenance", () => {
     ).toBe(true);
   });
 
-  it("returns false for activity_tick and health_ping only", () => {
+  it("returns true for health_ping so stale visits can close at last pulse", () => {
     expect(
-      syncBatchNeedsVisitMaintenance([
-        { id: "1", type: "activity_tick" },
-        { id: "2", type: "health_ping" },
-      ]),
+      syncBatchNeedsVisitMaintenance([{ id: "1", type: "health_ping" }]),
+    ).toBe(true);
+  });
+
+  it("returns false for activity_tick only", () => {
+    expect(
+      syncBatchNeedsVisitMaintenance([{ id: "1", type: "activity_tick" }]),
     ).toBe(false);
+  });
+});
+
+describe("processAgentSync health_ping", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    agentEventFindUniqueMock.mockResolvedValue(null);
+    agentEventUpsertMock.mockResolvedValue({});
+    agentEventCreateMock.mockResolvedValue({});
+    presenceTransitionCreateMock.mockResolvedValue({});
+    activityTickCreateMock.mockResolvedValue({});
+    activityTickCreateManyMock.mockResolvedValue({ count: 0 });
+    visitFindFirstMock.mockResolvedValue(null);
+    visitFindManyMock.mockResolvedValue([]);
+    dailySummaryUpsertMock.mockResolvedValue({});
+    dailySummaryFindUniqueMock.mockResolvedValue(null);
+    userFindUniqueMock.mockResolvedValue({ hoursTarget: 5 });
+    loadDaySpanContextMock.mockResolvedValue({
+      visits: [],
+      params: {},
+      lastHeartbeat: null,
+      laptopActiveParams: {},
+      firstAgentOnAt: null,
+    });
+    maybeRunVisitMaintenanceMock.mockResolvedValue(true);
+  });
+
+  it("parses lastLocalPulseAt on health_ping events", () => {
+    const events = parseAgentSyncEvents([
+      {
+        id: "evt-health",
+        type: "health_ping",
+        at: "2026-09-25T10:00:00.000Z",
+        ssid: "OfficeConnect",
+        inOffice: true,
+        lastLocalPulseAt: "2026-09-25T09:58:00.000Z",
+        laptopActiveMs: 3_600_000,
+      },
+    ]);
+    expect(events[0].lastLocalPulseAt).toBe("2026-09-25T09:58:00.000Z");
+    expect(events[0].inOffice).toBe(true);
+  });
+
+  it("accepts health snapshot, skips tick insert, and passes last pulse to maintenance", async () => {
+    const result = await processAgentSync({
+      userId: "user-1",
+      userTimezone: "Asia/Kolkata",
+      deviceId: "device-1",
+      serialNumber: "SERIAL-1",
+      events: [
+        {
+          id: "evt-health",
+          type: "health_ping",
+          at: "2026-09-25T10:00:00.000Z",
+          ssid: "OfficeConnect",
+          inOffice: true,
+          lastLocalPulseAt: "2026-09-25T09:58:00.000Z",
+          laptopActiveMs: 3_600_000,
+        },
+      ],
+      appUrl: "https://office.example",
+      syncTrigger: "health_ping",
+    });
+
+    expect(result.ackedEventIds).toContain("evt-health");
+    expect(activityTickCreateMock).not.toHaveBeenCalled();
+    expect(activityTickCreateManyMock).not.toHaveBeenCalled();
+    expect(presenceTransitionCreateMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        type: "health_ping",
+        inOffice: true,
+        ssid: "OfficeConnect",
+      }),
+    });
+    expect(maybeRunVisitMaintenanceMock).toHaveBeenCalledWith(
+      "user-1",
+      "Asia/Kolkata",
+      undefined,
+      {
+        force: true,
+        lastConfirmedPulseAt: new Date("2026-09-25T09:58:00.000Z"),
+      },
+    );
+    expect(result.config?.agentScriptVersion).toBeTruthy();
+    expect(result.config?.ssids).toContain("OfficeConnect");
+  });
+
+  it("bulk-inserts a large activity_tick batch with createMany", async () => {
+    const ticks = Array.from({ length: 250 }, (_, index) => ({
+      id: `tick-${index}`,
+      type: "activity_tick",
+      at: new Date(Date.parse("2026-09-25T04:00:00.000Z") + index * 120_000).toISOString(),
+      ssid: "HomeWiFi",
+      laptopActiveMs: 120_000,
+    }));
+
+    const result = await processAgentSync({
+      userId: "user-1",
+      userTimezone: "Asia/Kolkata",
+      deviceId: "device-1",
+      serialNumber: "SERIAL-1",
+      events: ticks,
+      appUrl: "https://office.example",
+      syncTrigger: "end_of_day",
+    });
+
+    expect(result.ackedEventIds).toHaveLength(250);
+    expect(activityTickCreateManyMock).toHaveBeenCalled();
+    const inserted = activityTickCreateManyMock.mock.calls.reduce(
+      (sum, call) => sum + (call[0]?.data?.length ?? 0),
+      0,
+    );
+    expect(inserted).toBe(250);
+    expect(activityTickCreateMock).not.toHaveBeenCalled();
+    expect(maybeRunVisitMaintenanceMock).not.toHaveBeenCalled();
+  });
+
+  it("still accepts legacy 1.5.13-style activity_tick payloads", async () => {
+    await processAgentSync({
+      userId: "user-1",
+      userTimezone: "Asia/Kolkata",
+      deviceId: "device-1",
+      serialNumber: "SERIAL-1",
+      events: [
+        {
+          id: "evt-tick",
+          type: "activity_tick",
+          at: "2026-09-25T10:00:00.000Z",
+          ssid: "OfficeConnect",
+          laptopActiveMs: 120_000,
+        },
+      ],
+      appUrl: "https://office.example",
+    });
+
+    expect(activityTickCreateManyMock).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          userId: "user-1",
+          deviceId: "device-1",
+          ssid: "OfficeConnect",
+          inOffice: true,
+        }),
+      ],
+    });
   });
 });

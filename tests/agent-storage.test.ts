@@ -33,11 +33,14 @@ describe("agent local storage maintenance", () => {
   });
 
   it("never prunes visit sync events from the queue", () => {
-    expect(storage).toContain('"visit_start", "visit_end", "daily_summary"');
+    expect(storage).toContain('"visit_start"');
+    expect(storage).toContain('"visit_end"');
+    expect(storage).toContain('"daily_summary"');
     expect(storage).toContain("Test-AgentEventIsCritical");
     expect(storage).toContain("AgentExpendableEventTypes");
-    expect(storage).toContain("$script:AgentStaleEventDays = 14");
-    expect(storage).toContain("$script:AgentEventQueueMaxCount = 400");
+    expect(storage).toContain("$script:AgentStaleEventDays = 7");
+    expect(storage).toContain("$script:AgentEventQueueMaxCount = 5500");
+    expect(storage).toContain('"health_ping"');
   });
 
   it("runs maintenance on each heartbeat and setup", () => {

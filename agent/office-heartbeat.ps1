@@ -13,8 +13,19 @@ $ConfigFetchIntervalRuns = 60
 $ConfigCacheMaxAgeMinutes = 120
 $UpdateCheckIntervalMinutes = 60
 $LocalPulseIntervalMinutes = 2
-$RoutineSyncIntervalMinutes = 60
-$AgentScriptVersion = "1.5.15"
+$HealthSyncIntervalMinutes = 60
+$AgentScriptVersion = "1.5.16"
+$CriticalEventTypes = @(
+    "wifi_connected",
+    "wifi_disconnected",
+    "ssid_changed",
+    "visit_start",
+    "visit_end",
+    "session_suspend",
+    "session_resume",
+    "hours_target_met"
+)
+$EndOfDayEventTypes = @("daily_summary", "activity_tick")
 
 function Get-InstallDir {
     if ($env:OFFICETRACKER_INSTALL_DIR) {
@@ -757,32 +768,90 @@ function Test-ActivityTickDue {
     }
 }
 
-function Test-RoutineSyncDue {
+function Test-HealthSyncDue {
     param($SyncState)
     if (-not $SyncState.lastSyncAt) { return $true }
     try {
         $last = [DateTime]::Parse([string]$SyncState.lastSyncAt)
-        return ((Get-Date) - $last).TotalMinutes -ge $RoutineSyncIntervalMinutes
+        return ((Get-Date) - $last).TotalMinutes -ge $HealthSyncIntervalMinutes
     } catch {
         return $true
     }
 }
 
+function Test-IsCriticalEventType([string]$Type) {
+    return $CriticalEventTypes -contains $Type
+}
+
+function Test-IsEndOfDayEventType([string]$Type) {
+    return $EndOfDayEventTypes -contains $Type
+}
+
 function Test-HasCriticalQueuedEvents {
-    $criticalTypes = @(
-        "wifi_connected",
-        "wifi_disconnected",
-        "ssid_changed",
-        "visit_start",
-        "visit_end",
-        "session_suspend",
-        "session_resume",
-        "hours_target_met"
-    )
     foreach ($event in @(Get-EventQueue)) {
-        if ($criticalTypes -contains [string]$event.type) { return $true }
+        if (Test-IsCriticalEventType -Type ([string]$event.type)) { return $true }
     }
     return $false
+}
+
+function Test-HasEndOfDayQueuedEvents {
+    foreach ($event in @(Get-EventQueue)) {
+        if (Test-IsEndOfDayEventType -Type ([string]$event.type)) { return $true }
+    }
+    return $false
+}
+
+function Select-EventsForSync {
+    param(
+        [array]$Queue,
+        [bool]$CriticalDue,
+        [bool]$HealthDue,
+        [bool]$EndOfDayDue
+    )
+    $selected = @()
+    foreach ($event in $Queue) {
+        $type = [string]$event.type
+        if ($CriticalDue -and (Test-IsCriticalEventType -Type $type)) {
+            $selected += $event
+            continue
+        }
+        if ($EndOfDayDue -and (Test-IsEndOfDayEventType -Type $type)) {
+            $selected += $event
+            continue
+        }
+    }
+    return $selected
+}
+
+function New-HealthSnapshotEvent {
+    param(
+        $SyncState,
+        [string]$Ssid,
+        [bool]$InOffice
+    )
+    $evt = @{
+        id = New-EventId
+        type = "health_ping"
+        at = Get-NowIso
+        ssid = $Ssid
+        inOffice = $InOffice
+        laptopActiveMs = (Get-LaptopActiveMsSnapshot -SyncState $SyncState)
+    }
+    if ($SyncState.lastActivityTickAt) {
+        $evt.lastLocalPulseAt = [string]$SyncState.lastActivityTickAt
+    }
+    if ($SyncState.lastActivityTickSsid) {
+        $evt.lastLocalPulseSsid = [string]$SyncState.lastActivityTickSsid
+    }
+    if ($SyncState.firstAgentOnAt) {
+        $evt.firstAgentOnAt = [string]$SyncState.firstAgentOnAt
+    }
+    $open = Get-OpenVisitFromState $SyncState
+    if ($open) {
+        $evt.localVisitId = [string]$open.localVisitId
+        $evt.openVisitStartAt = [string]$open.startAt
+    }
+    return $evt
 }
 
 function Maybe-EnqueueDailySummary {
@@ -1266,13 +1335,17 @@ function Get-SyncTrigger {
         [bool]$IsResumeRun,
         [bool]$SsidChanged,
         [bool]$HoursTargetMetQueued,
-        [bool]$ActivityDue,
+        [bool]$EndOfDayDue,
+        [bool]$HealthDue,
+        [bool]$CriticalDue,
         [int]$QueuedEventCount
     )
     if ($IsResumeRun) { return "resume_wake" }
     if ($SsidChanged) { return "ssid_change" }
     if ($HoursTargetMetQueued) { return "hours_target_met" }
-    if ($ActivityDue) { return "activity_tick" }
+    if ($EndOfDayDue) { return "end_of_day" }
+    if ($CriticalDue) { return "critical_events" }
+    if ($HealthDue) { return "health_ping" }
     if ($QueuedEventCount -gt 0) { return "queued_events" }
     return "health_ping"
 }
@@ -1286,20 +1359,21 @@ function Invoke-FlushSync {
         $SyncState,
         [bool]$AllowHealthPing,
         [string]$FallbackSsid,
+        [bool]$FallbackInOffice,
         [string]$VpnGateway,
-        [string]$SyncTrigger
+        [string]$SyncTrigger,
+        [bool]$CriticalDue,
+        [bool]$HealthDue,
+        [bool]$EndOfDayDue
     )
 
     $queue = @(Get-EventQueue)
-    $eventsToSend = @()
-    foreach ($evt in $queue) { $eventsToSend += $evt }
+    $eventsToSend = @(Select-EventsForSync -Queue $queue -CriticalDue:$CriticalDue `
+        -HealthDue:$HealthDue -EndOfDayDue:$EndOfDayDue)
 
-    if ($eventsToSend.Count -eq 0 -and $AllowHealthPing) {
-        $eventsToSend += @{
-            id = New-EventId
-            type = "health_ping"
-            at = Get-NowIso
-        }
+    if ($eventsToSend.Count -eq 0 -and $AllowHealthPing -and $HealthDue) {
+        $eventsToSend += ,(New-HealthSnapshotEvent -SyncState $SyncState `
+            -Ssid $FallbackSsid -InOffice $FallbackInOffice)
     }
 
     if ($eventsToSend.Count -eq 0) {
@@ -1402,8 +1476,9 @@ if (Test-Path $cachePath) {
     try { $cachedServerConfig = Get-Content $cachePath -Raw | ConvertFrom-Json } catch {}
 }
 
-$hourlyUpdateCheck = (Test-ShouldRunHourlyUpdateCheck) -and -not $isResumeRun
-$forceConfigFetch = $hourlyUpdateCheck
+# Prefer sync-response config / update metadata. Config GET is for bootstrap or
+# a stale cache only (not every hour).
+$forceConfigFetch = -not (Test-ConfigCacheFresh $cachePath)
 
 try {
     $serverConfig = Get-ServerConfig -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber `
@@ -1414,16 +1489,15 @@ try {
     exit 1
 }
 
-if (Test-NeedsAgentUpdateFromResponse -Response $serverConfig) {
+# Soft/force update checks run after a successful sync so presence events are not delayed.
+# Bootstrap-only: if local is clearly behind and we have no recent sync, attempt once.
+if ($forceConfigFetch -and (Test-NeedsAgentUpdateFromResponse -Response $serverConfig)) {
     $forceUpdate = Test-ResponseForceAgentUpdate -Response $serverConfig
     if (Invoke-AgentSelfUpdate -ApiUrl $apiUrl -Token $token -Force $forceUpdate) {
         Set-LastUpdateCheckTime
-        Write-Log "EXIT after self-update; next run uses refreshed scripts"
+        Write-Log "EXIT after bootstrap self-update; next run uses refreshed scripts"
         exit 0
     }
-    Set-LastUpdateCheckTime
-} elseif ($hourlyUpdateCheck) {
-    Invoke-HourlyUpdateCheck -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber
     Set-LastUpdateCheckTime
 }
 
@@ -1549,17 +1623,22 @@ if ($DryRun) {
 # remains queued on disk when the server is unavailable.
 Set-SyncState $syncState
 
-$routineSyncDue = Test-RoutineSyncDue -SyncState $syncState
+$healthSyncDue = Test-HealthSyncDue -SyncState $syncState
 $criticalSyncDue = Test-HasCriticalQueuedEvents
-$shouldSync = $criticalSyncDue -or $routineSyncDue
+$endOfDaySyncDue = $dayRolledOver -or (Test-HasEndOfDayQueuedEvents)
+$shouldSync = $criticalSyncDue -or $healthSyncDue -or $endOfDaySyncDue
 if ($shouldSync) {
     $hoursTargetMetQueued = @((Get-EventQueue) | Where-Object { $_.type -eq "hours_target_met" }).Count -gt 0
     $syncTrigger = Get-SyncTrigger -IsResumeRun $isResumeRun -SsidChanged $ssidChanged `
-        -HoursTargetMetQueued $hoursTargetMetQueued -ActivityDue $activityDue `
+        -HoursTargetMetQueued $hoursTargetMetQueued -EndOfDayDue $endOfDaySyncDue `
+        -HealthDue $healthSyncDue -CriticalDue $criticalSyncDue `
         -QueuedEventCount (@(Get-EventQueue).Count)
     $flush = Invoke-FlushSync -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber `
-        -ScriptVersion $scriptVersion -SyncState $syncState -AllowHealthPing:(-not $ssidChanged) `
-        -FallbackSsid $ssid -VpnGateway $vpnGateway -SyncTrigger $syncTrigger
+        -ScriptVersion $scriptVersion -SyncState $syncState `
+        -AllowHealthPing:($healthSyncDue -and -not $ssidChanged) `
+        -FallbackSsid $ssid -FallbackInOffice $isOfficeNow `
+        -VpnGateway $vpnGateway -SyncTrigger $syncTrigger `
+        -CriticalDue:$criticalSyncDue -HealthDue:$healthSyncDue -EndOfDayDue:$endOfDaySyncDue
     $syncState = $flush.syncState
     if (-not $flush.synced) {
         if ($flush.error) { Write-Log "ERROR sync failed: $($flush.error)"; exit 1 }
@@ -1576,7 +1655,7 @@ if ($shouldSync) {
         }
     }
 } else {
-    Write-Log "BATCH local pulse queued; routine sync not due"
+    Write-Log "BATCH local pulse queued; health sync not due"
 }
 
 Set-SyncState $syncState

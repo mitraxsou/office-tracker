@@ -7,6 +7,9 @@ export const VALID_SYNC_TRIGGERS = new Set([
   "activity_tick",
   "queued_events",
   "health_ping",
+  "end_of_day",
+  "hours_target_met",
+  "critical_events",
   "manual",
 ]);
 
@@ -43,6 +46,12 @@ export function syncTriggerLabel(trigger: string): string {
       return "Sync: queued events";
     case "health_ping":
       return "Sync: health ping";
+    case "end_of_day":
+      return "Sync: end-of-day diagnostics";
+    case "hours_target_met":
+      return "Sync: hours target met";
+    case "critical_events":
+      return "Sync: critical events";
     case "manual":
       return "Sync: manual";
     default:
@@ -84,6 +93,8 @@ export function presenceEventLabel(params: {
       return "Laptop woke / resumed";
     case "activity_tick":
       return inOffice ? "Activity tick (in office)" : "Activity tick";
+    case "health_ping":
+      return inOffice ? "Health snapshot (in office)" : "Health snapshot";
     case "sync_batch":
       return "Agent sync";
     default:
@@ -215,18 +226,36 @@ export async function getUserPresenceTimeline(
   days: number,
   timezone: string,
   officeSsids: string[],
+  options?: { dayKey?: string | null },
 ): Promise<{
   entries: PresenceTimelineEntry[];
   days: number;
   timezone: string;
+  dayKey: string | null;
   lastWifiAtClose: string | null;
 }> {
-  const clampedDays = Math.min(30, Math.max(1, days));
-  const since = new Date(Date.now() - clampedDays * 24 * 60 * 60 * 1000);
+  const dayKey = options?.dayKey?.trim() || null;
+  let since: Date;
+  let until: Date | null = null;
+  let clampedDays = Math.min(30, Math.max(1, days));
+
+  if (dayKey && /^\d{4}-\d{2}-\d{2}$/.test(dayKey)) {
+    const { dayBoundsFromKey } = await import("./timezone-dates");
+    const bounds = dayBoundsFromKey(dayKey, timezone);
+    since = bounds.start;
+    until = bounds.end;
+    clampedDays = 1;
+  } else {
+    since = new Date(Date.now() - clampedDays * 24 * 60 * 60 * 1000);
+  }
+
+  const atFilter = until
+    ? { gte: since, lte: until }
+    : { gte: since };
 
   const [transitions, visits, syncEvents, activityTicks, resumeAgentEvents] = await Promise.all([
     prisma.presenceTransition.findMany({
-      where: { userId, at: { gte: since } },
+      where: { userId, at: atFilter },
       orderBy: { at: "desc" },
       select: {
         id: true,
@@ -241,7 +270,7 @@ export async function getUserPresenceTimeline(
     prisma.visit.findMany({
       where: {
         userId,
-        startAt: { gte: since },
+        startAt: atFilter,
         source: "wifi",
       },
       orderBy: { startAt: "desc" },
@@ -257,20 +286,21 @@ export async function getUserPresenceTimeline(
       where: {
         userId,
         type: "sync_batch",
-        createdAt: { gte: since },
+        createdAt: atFilter,
       },
       orderBy: { createdAt: "desc" },
+      take: 200,
       select: {
         id: true,
         createdAt: true,
-        deviceId: true,
         payload: true,
+        deviceId: true,
       },
     }),
     prisma.activityTick.findMany({
-      where: { userId, at: { gte: since } },
+      where: { userId, at: atFilter },
       orderBy: { at: "desc" },
-      take: 500,
+      take: dayKey ? 800 : 200,
       select: {
         id: true,
         at: true,
@@ -280,8 +310,19 @@ export async function getUserPresenceTimeline(
       },
     }),
     prisma.agentEvent.findMany({
-      where: { userId, type: "session_resume", createdAt: { gte: since } },
-      select: { createdAt: true, payload: true },
+      where: {
+        userId,
+        type: "session_resume",
+        createdAt: atFilter,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        createdAt: true,
+        payload: true,
+        deviceId: true,
+      },
     }),
   ]);
 
@@ -454,6 +495,7 @@ export async function getUserPresenceTimeline(
     entries,
     days: clampedDays,
     timezone,
+    dayKey,
     lastWifiAtClose,
   };
 }

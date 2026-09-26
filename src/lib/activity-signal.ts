@@ -259,8 +259,21 @@ export async function resolveAgentSignalMode(
 
 export async function getLastAgentSignalAt(userId: string): Promise<Date | null> {
   const { useActivity, lastActivity, lastHeartbeat } = await resolveAgentSignalMode(userId);
-  if (useActivity) return lastActivity?.at ?? null;
-  return lastHeartbeat?.recordedAt ?? null;
+  const fromPulse = useActivity
+    ? (lastActivity?.at ?? null)
+    : (lastHeartbeat?.recordedAt ?? null);
+
+  const device = await prisma.agentDevice.findFirst({
+    where: { userId },
+    orderBy: { lastSeenAt: "desc" },
+    select: { lastSeenAt: true },
+  });
+
+  const candidates = [fromPulse, device?.lastSeenAt].filter(
+    (value): value is Date => value instanceof Date,
+  );
+  if (candidates.length === 0) return null;
+  return new Date(Math.max(...candidates.map((value) => value.getTime())));
 }
 
 /** Last agent signal at or before `lte` (any prior day), for historical stale checks. */

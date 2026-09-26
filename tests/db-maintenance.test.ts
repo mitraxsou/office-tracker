@@ -26,6 +26,7 @@ describe("db-maintenance retention", () => {
   it("lists all purgeable tables for the admin UI", () => {
     expect(Object.keys(MAINTENANCE_TABLE_LABELS)).toEqual([
       "heartbeats",
+      "activity_ticks",
       "agent_lifecycle_events",
       "audit_logs",
       "resolved_corrections",
@@ -35,6 +36,7 @@ describe("db-maintenance retention", () => {
       "resolved_compliance_exemptions",
       "past_out_of_office",
     ]);
+    expect(isMaintenanceTable("activity_ticks")).toBe(true);
   });
 
   it("formats day keys for out-of-office purge cutoff", () => {

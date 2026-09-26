@@ -20,6 +20,8 @@ export const DEFAULT_PENDING_TOKEN_TTL_DAYS = 7;
 export const DEFAULT_HEARTBEAT_RETENTION_DAYS = 7;
 export const DEFAULT_HEARTBEAT_INTERVAL_MINUTES = 5;
 export const DEFAULT_AGENT_STALE_MINUTES = 15;
+/** Event-mode agents send an hourly health snapshot; allow slightly over one hour. */
+export const DEFAULT_EVENT_MODE_STALE_MINUTES = 70;
 export const DEFAULT_AGENT_STALE_GRACE_HOURS = 24;
 export const DEFAULT_PILOT_START_MONTH_KEY = "2026-09";
 
@@ -194,6 +196,11 @@ export async function getUserHoursTarget(user: { hoursTarget: number | null }) {
 export async function getAgentStaleMs() {
   const config = await getAppConfig();
   return config.agentStaleMinutes * 60 * 1000;
+}
+
+/** Stale window for event-mode agents that only send hourly health snapshots. */
+export async function getEventModeAgentStaleMs() {
+  return DEFAULT_EVENT_MODE_STALE_MINUTES * 60 * 1000;
 }
 
 export async function getEffectiveAgentStaleGraceHours(user: {

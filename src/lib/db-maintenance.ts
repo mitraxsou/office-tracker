@@ -1,5 +1,6 @@
 export type MaintenanceTable =
   | "heartbeats"
+  | "activity_ticks"
   | "agent_lifecycle_events"
   | "audit_logs"
   | "resolved_corrections"
@@ -24,7 +25,8 @@ export const NEVER_PURGED_TABLES = [
 ] as const;
 
 export const MAINTENANCE_TABLE_LABELS: Record<MaintenanceTable, string> = {
-  heartbeats: "Heartbeats",
+  heartbeats: "Legacy heartbeats",
+  activity_ticks: "Activity ticks",
   agent_lifecycle_events: "Agent lifecycle events",
   audit_logs: "Audit logs",
   resolved_corrections: "Resolved correction requests",
