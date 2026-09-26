@@ -1,0 +1,8 @@
+{
+  "user": "UserA",
+  "officeSsid": "pwcglb.com",
+  "homeSsid": "HomeWiFi",
+  "lastOfficePulseAt": "2026-09-25T10:34:06.000Z",
+  "homeWifiObservedAt": "2026-09-25T13:09:05.000Z",
+  "expectedVisitEndAt": "2026-09-25T10:34:06.000Z"
+}

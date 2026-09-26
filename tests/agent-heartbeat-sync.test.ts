@@ -21,8 +21,20 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain("End-LocalVisit -SyncState $SyncState -EndAt $suspendAtIso -PreviousSsid $LastKnownSsid");
     expect(heartbeat).toContain("$suspendAtTime = $last");
     expect(heartbeat).toContain("lastSsidBeforeGap = [string]$previousSsid");
-    expect(heartbeat).toContain("$transitionAt = Get-NowIso");
+    expect(heartbeat).toContain("$transitionAt = Get-WifiTransitionAt");
     expect(heartbeat).toContain("Add-WifiChangeEvents -PreviousSsid $fromSsid -CurrentSsid $ssid -At $transitionAt");
+  });
+
+  it("uses the last confirmed office pulse after a long office-to-home gap", () => {
+    expect(heartbeat).toContain("function Get-WifiTransitionAt");
+    expect(heartbeat).toContain("$gapThreshold = [Math]::Max(10, $HeartbeatIntervalMinutes * 2)");
+    expect(heartbeat).toContain("using last confirmed office pulse");
+    expect(heartbeat).toContain("$syncState.lastActivityTickSsid = $ssid");
+  });
+
+  it("prevents overlapping startup and scheduled heartbeat runs", () => {
+    expect(heartbeat).toContain('"Local\\PwCOfficePulseHeartbeat"');
+    expect(heartbeat).toContain("if (-not $agentMutex.WaitOne(0))");
   });
 
   it("queues session_resume and activity_tick on resume runs", () => {
@@ -30,17 +42,18 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain("if ($isResumeRun -or $activityDue)");
     expect(heartbeat).toContain('Add-QueuedEvent -Type "activity_tick"');
     expect(heartbeat).toContain("laptopActiveMs");
-    expect(heartbeat).toContain("$shouldSync = $isResumeRun -or $ssidChanged");
+    expect(heartbeat).toContain('"session_resume"');
+    expect(heartbeat).toContain("$shouldSync = $criticalSyncDue -or $routineSyncDue");
   });
 
-  it("advances lastActivityTickAt only after successful sync", () => {
+  it("persists local activity pulses before a network sync", () => {
     const tickAdvanceIndex = heartbeat.indexOf("$syncState.lastActivityTickAt = Get-NowIso");
-    const flushSyncIndex = heartbeat.indexOf("Invoke-FlushSync");
-    expect(tickAdvanceIndex).toBeGreaterThan(flushSyncIndex);
-    expect(heartbeat).toContain("if ($activityTickQueued)");
-    expect(heartbeat).not.toMatch(
-      /if \(\$activityDue\)[\s\S]*?\$syncState\.lastActivityTickAt = Get-NowIso/,
-    );
+    const statePersistIndex = heartbeat.indexOf("Set-SyncState $syncState", tickAdvanceIndex);
+    const flushSyncIndex = heartbeat.indexOf("Invoke-FlushSync", statePersistIndex);
+    expect(tickAdvanceIndex).toBeGreaterThan(0);
+    expect(statePersistIndex).toBeGreaterThan(tickAdvanceIndex);
+    expect(flushSyncIndex).toBeGreaterThan(statePersistIndex);
+    expect(heartbeat).toContain("$LocalPulseIntervalMinutes = 2");
   });
 
   it("queues visit_start on new calendar day when still on office Wi-Fi", () => {
@@ -89,16 +102,37 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain("$ConfigFetchIntervalRuns = 60");
     expect(heartbeat).toContain("$ConfigCacheMaxAgeMinutes = 120");
     expect(heartbeat).toContain("function Test-ConfigCacheFresh");
+    expect(heartbeat).toContain(
+      "$hourlyUpdateCheck = (Test-ShouldRunHourlyUpdateCheck) -and -not $isResumeRun",
+    );
     expect(heartbeat).toContain("-Force:$forceConfigFetch");
     expect(heartbeat).not.toContain("Get-FreshVersionCheckConfig");
   });
 
   it("syncs on home Wi-Fi via activity ticks without visit_start", () => {
-    expect(heartbeat).toContain("$shouldSync = $isResumeRun -or $ssidChanged -or $activityDue");
+    expect(heartbeat).toContain("$RoutineSyncIntervalMinutes = 60");
+    expect(heartbeat).toContain("function Test-RoutineSyncDue");
+    expect(heartbeat).toContain("$shouldSync = $criticalSyncDue -or $routineSyncDue");
     expect(heartbeat).toContain('Add-QueuedEvent -Type "activity_tick"');
     expect(heartbeat).not.toMatch(
       /if \(\$activityDue\)[\s\S]*?Start-LocalVisit/,
     );
+  });
+
+  it("syncs critical presence events promptly while batching routine pulses", () => {
+    expect(heartbeat).toContain("function Test-HasCriticalQueuedEvents");
+    for (const type of [
+      "ssid_changed",
+      "visit_start",
+      "visit_end",
+      "session_suspend",
+      "session_resume",
+    ]) {
+      expect(heartbeat).toContain(`"${type}"`);
+    }
+    const criticalStart = heartbeat.indexOf("function Test-HasCriticalQueuedEvents");
+    const criticalEnd = heartbeat.indexOf("\nfunction ", criticalStart + 1);
+    expect(heartbeat.slice(criticalStart, criticalEnd)).not.toContain('"activity_tick"');
   });
 
   it("honors OFFICETRACKER_INSTALL_DIR for isolated regression installs", () => {

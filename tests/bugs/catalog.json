@@ -119,6 +119,20 @@
       "skipReason": null
     },
     {
+      "id": "BUG-009",
+      "title": "Office visit ended when home Wi-Fi was observed after sleep",
+      "date": "2026-09",
+      "severity": "critical",
+      "area": "visits",
+      "reproSummary": "The last office activity pulse was hours before the first home Wi-Fi pulse, but overlapping wake runs closed the visit at home Wi-Fi detection time and counted travel as office time.",
+      "assertion": "Only one heartbeat process runs at once; after a long office-to-home gap, visit_end and Wi-Fi transition timestamps use the last confirmed office pulse.",
+      "fixture": "fixtures/office-exit-after-sleep.json",
+      "testFile": "tests/bugs/BUG-009-office-exit-after-sleep.test.ts",
+      "relatedTests": ["tests/agent-heartbeat-sync.test.ts"],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
       "id": "CORE-001",
       "title": "Heartbeat in-office uses SSID allowlist",
       "date": "2026-01",

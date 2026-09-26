@@ -12,13 +12,20 @@ $ErrorActionPreference = "Stop"
 $ConfigFetchIntervalRuns = 60
 $ConfigCacheMaxAgeMinutes = 120
 $UpdateCheckIntervalMinutes = 60
-$AgentScriptVersion = "1.5.13"
+$LocalPulseIntervalMinutes = 2
+$RoutineSyncIntervalMinutes = 60
+$AgentScriptVersion = "1.5.15"
 
 function Get-InstallDir {
     if ($env:OFFICETRACKER_INSTALL_DIR) {
         return [string]$env:OFFICETRACKER_INSTALL_DIR
     }
     Join-Path $env:LOCALAPPDATA "OfficeTracker"
+}
+
+$agentMutex = New-Object System.Threading.Mutex($false, "Local\PwCOfficePulseHeartbeat")
+if (-not $agentMutex.WaitOne(0)) {
+    exit 0
 }
 
 function Write-Log([string]$Message) {
@@ -394,6 +401,7 @@ function Get-SyncState {
         pendingSsid = $null
         pendingPreviousSsid = $null
         hoursMetSentDayKey = $null
+        lastActivityTickSsid = $null
     }
     $data = Read-JsonFile (Get-SyncStatePath) $default
     if ($data -is [hashtable]) { return $data }
@@ -617,6 +625,41 @@ function Update-VisitBoundaries {
     return $SyncState
 }
 
+function Get-WifiTransitionAt {
+    param(
+        $SyncState,
+        [string]$PreviousSsid,
+        [string]$CurrentSsid,
+        $ServerConfig,
+        [int]$HeartbeatIntervalMinutes
+    )
+    $now = Get-Date
+    $wasOffice = Test-IsOfficeSsid -Ssid $PreviousSsid -ServerConfig $ServerConfig
+    $isOffice = Test-IsOfficeSsid -Ssid $CurrentSsid -ServerConfig $ServerConfig
+    if (-not $wasOffice -or $isOffice -or -not $SyncState.lastActivityTickAt) {
+        return $now.ToUniversalTime().ToString("o")
+    }
+
+    $lastTickWasOffice = -not $SyncState.lastActivityTickSsid -or
+        (Test-IsOfficeSsid -Ssid ([string]$SyncState.lastActivityTickSsid) -ServerConfig $ServerConfig)
+    if (-not $lastTickWasOffice) {
+        return $now.ToUniversalTime().ToString("o")
+    }
+
+    try {
+        $lastTick = [DateTime]::Parse([string]$SyncState.lastActivityTickAt)
+        $gapMinutes = ($now - $lastTick).TotalMinutes
+        $gapThreshold = [Math]::Max(10, $HeartbeatIntervalMinutes * 2)
+        if ($gapMinutes -gt $gapThreshold) {
+            Write-Log "OFFICE exit after ${gapMinutes}m gap; using last confirmed office pulse"
+            return $lastTick.ToUniversalTime().ToString("o")
+        }
+    } catch {
+        Write-Log "WARN last office pulse parse failed: $($_.Exception.Message)"
+    }
+    return $now.ToUniversalTime().ToString("o")
+}
+
 function Get-UptimeSessionEndTime {
     param($SyncState)
     if ($SyncState.lastActivityTickAt) {
@@ -703,16 +746,43 @@ function Reset-UptimeDayFields {
 
 function Test-ActivityTickDue {
     param(
-        $SyncState,
-        [int]$IntervalMinutes
+        $SyncState
     )
     if (-not $SyncState.lastActivityTickAt) { return $true }
     try {
         $last = [DateTime]::Parse([string]$SyncState.lastActivityTickAt)
-        return ((Get-Date) - $last).TotalMinutes -ge $IntervalMinutes
+        return ((Get-Date) - $last).TotalMinutes -ge $LocalPulseIntervalMinutes
     } catch {
         return $true
     }
+}
+
+function Test-RoutineSyncDue {
+    param($SyncState)
+    if (-not $SyncState.lastSyncAt) { return $true }
+    try {
+        $last = [DateTime]::Parse([string]$SyncState.lastSyncAt)
+        return ((Get-Date) - $last).TotalMinutes -ge $RoutineSyncIntervalMinutes
+    } catch {
+        return $true
+    }
+}
+
+function Test-HasCriticalQueuedEvents {
+    $criticalTypes = @(
+        "wifi_connected",
+        "wifi_disconnected",
+        "ssid_changed",
+        "visit_start",
+        "visit_end",
+        "session_suspend",
+        "session_resume",
+        "hours_target_met"
+    )
+    foreach ($event in @(Get-EventQueue)) {
+        if ($criticalTypes -contains [string]$event.type) { return $true }
+    }
+    return $false
 }
 
 function Maybe-EnqueueDailySummary {
@@ -1332,8 +1402,8 @@ if (Test-Path $cachePath) {
     try { $cachedServerConfig = Get-Content $cachePath -Raw | ConvertFrom-Json } catch {}
 }
 
-$hourlyUpdateCheck = Test-ShouldRunHourlyUpdateCheck
-$forceConfigFetch = $isResumeRun -or $hourlyUpdateCheck
+$hourlyUpdateCheck = (Test-ShouldRunHourlyUpdateCheck) -and -not $isResumeRun
+$forceConfigFetch = $hourlyUpdateCheck
 
 try {
     $serverConfig = Get-ServerConfig -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber `
@@ -1407,7 +1477,9 @@ if ($ssidChanged) {
     $alreadyQueued = $syncState.pendingSsid -and [string]$syncState.pendingSsid -eq $ssid
     if (-not $alreadyQueued) {
         $fromSsid = if ($syncState.pendingPreviousSsid) { [string]$syncState.pendingPreviousSsid } else { $previousSsid }
-        $transitionAt = Get-NowIso
+        $transitionAt = Get-WifiTransitionAt -SyncState $syncState -PreviousSsid $fromSsid `
+            -CurrentSsid $ssid -ServerConfig $serverConfig `
+            -HeartbeatIntervalMinutes $heartbeatInterval
         Add-WifiChangeEvents -PreviousSsid $fromSsid -CurrentSsid $ssid -At $transitionAt
         $syncState = Update-VisitBoundaries -SyncState $syncState -PreviousSsid $fromSsid `
             -CurrentSsid $ssid -ServerConfig $serverConfig -TransitionAt $transitionAt
@@ -1422,7 +1494,7 @@ if ($ssidChanged) {
 }
 
 $activityTickQueued = $false
-$activityDue = Test-ActivityTickDue -SyncState $syncState -IntervalMinutes $heartbeatInterval
+$activityDue = Test-ActivityTickDue -SyncState $syncState
 if ($isResumeRun) {
     $resumeFields = @{
         gapMinutes = $resumeGapMin
@@ -1440,6 +1512,8 @@ if ($isResumeRun -or $activityDue) {
     }
     Add-QueuedEvent -Type "activity_tick" -Fields $tickFields
     $activityTickQueued = $true
+    $syncState.lastActivityTickAt = Get-NowIso
+    $syncState.lastActivityTickSsid = $ssid
     $pendingEvents = @(Get-EventQueue)
 }
 
@@ -1471,7 +1545,13 @@ if ($DryRun) {
     exit 0
 }
 
-$shouldSync = $isResumeRun -or $ssidChanged -or $activityDue -or (@(Get-EventQueue).Count -gt 0)
+# Persist local pulse and visit state before any network attempt. Routine data
+# remains queued on disk when the server is unavailable.
+Set-SyncState $syncState
+
+$routineSyncDue = Test-RoutineSyncDue -SyncState $syncState
+$criticalSyncDue = Test-HasCriticalQueuedEvents
+$shouldSync = $criticalSyncDue -or $routineSyncDue
 if ($shouldSync) {
     $hoursTargetMetQueued = @((Get-EventQueue) | Where-Object { $_.type -eq "hours_target_met" }).Count -gt 0
     $syncTrigger = Get-SyncTrigger -IsResumeRun $isResumeRun -SsidChanged $ssidChanged `
@@ -1489,9 +1569,6 @@ if ($shouldSync) {
             Write-Log "EXIT after sync self-update; next run uses refreshed scripts"
             exit 0
         }
-        if ($activityTickQueued) {
-            $syncState.lastActivityTickAt = Get-NowIso
-        }
         if ($ssidChanged) {
             Set-PresenceState -Ssid $ssid
             $syncState.pendingSsid = $null
@@ -1499,7 +1576,7 @@ if ($shouldSync) {
         }
     }
 } else {
-    Write-Log "SKIP no events to sync"
+    Write-Log "BATCH local pulse queued; routine sync not due"
 }
 
 Set-SyncState $syncState
