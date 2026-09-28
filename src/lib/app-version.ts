@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.4";
+export const APP_VERSION = "1.5.16";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,21 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-09-28",
+    userBullets: [
+      "Windows agent 1.5.16 keeps 2-minute pulses on the laptop, syncs critical office in/out immediately, and sends a compact hourly health check.",
+      "Detailed activity ticks upload at end of day (or on first wake), so fewer server requests while Status stays Healthy.",
+      "Working from home is normal: Today no longer warns about missing Wi-Fi name or “low office activity” when the agent is healthy and you are not in office.",
+      "Office hours still count only on approved office Wi-Fi; VPN and home networks never qualify.",
+    ],
+    adminBullets: [
+      "Admin user reports support selected-day diagnostics (API hits, timeline, activity, install history).",
+      "Diagnostic retention (default 7 days) purges legacy heartbeats and activity ticks together; visits and daily API-hit rollups are kept.",
+      "Stale office visits close at the agent’s last confirmed local pulse, not at detection time.",
+    ],
+  },
+  {
+    version: "1.5.4",
     date: "2026-09-09",
     userBullets: [
       "Redesigned the Today dashboard with a compact hero summary and less scrolling.",

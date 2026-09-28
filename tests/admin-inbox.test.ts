@@ -13,7 +13,8 @@ describe("admin inbox count", () => {
         device_removal: 2,
         admin_contact: 1,
         prior_compliance: 2,
+        account_access: 3,
       }),
-    ).toBe(16);
+    ).toBe(19);
   });
 });

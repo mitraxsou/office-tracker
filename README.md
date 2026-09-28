@@ -29,10 +29,10 @@ Release workflow: PR to `dev` (auto-deploy dev) → PR `dev` → `production` (a
 
 | Area | What it does |
 |---|---|
-| **Sign-in** | OTP via Microsoft Teams (Power Automate); password fallback for admin-issued accounts |
+| **Sign-in** | OTP via Microsoft Teams (Power Automate); password fallback for admin-issued accounts; when OTP self-registration is off, `/request-account` lets people ask for access (admin approve/reject) |
 | **Terms** | First sign-in (or next sign-in for existing users) requires accepting Terms and Privacy |
 | **Dashboard** | Today hours, monthly progress, year compliance calendar, manual check-in/out |
-| **Agent** | Windows background agent (5 min heartbeats by default); user-level install, no admin rights |
+| **Agent** | Windows agent (2 min local pulses; immediate critical sync; hourly health; EOD tick upload); user-level install, no admin rights |
 | **Notifications** | Per-alert channel: in-app, Teams, or both; out-of-office and schedule prefs |
 | **Admin** | User/token management, org calendar, visit corrections, compliance exemptions, audit log |
 | **Integrations** | Power Automate webhook for OTP and Teams alerts ([docs/power-automate.md](docs/power-automate.md)) |
@@ -81,7 +81,7 @@ OTP request responses do not reveal whether an email is registered (anti-enumera
 
 User identity is **email + userId** in the database. Visit history lives in Postgres, not on the laptop.
 
-**Collected data (summary):** email, visit times, Wi-Fi SSID, agent tokens (hashed), laptop serial, heartbeats, notification prefs. No browsing history or screenshots. See the in-app Privacy Policy at `/privacy`.
+**Collected data (summary):** email, visit times, Wi-Fi SSID, agent tokens (hashed), laptop serial, activity ticks / health sync events, notification prefs. No browsing history or screenshots. See the in-app Privacy Policy at `/privacy`.
 
 ---
 
@@ -253,6 +253,11 @@ npm run build
 | Install folder | `%LOCALAPPDATA%\OfficeTracker\` |
 | Scheduled task | `PwCOfficePulse` (hidden via VBS wrapper) |
 | Startup shortcut | `PwC Office Pulse.lnk` |
+| Current agent | `1.5.16` (`agent/version.txt`) |
+
+**Sync shape (1.5.16+):** local pulse every ~2 minutes on disk; immediate sync for office enter/exit, Wi-Fi changes, sleep/wake, and hours-target met; one compact `health_ping` per hour (keeps `lastSeen` / Healthy status); activity ticks + daily summary at end of day (or first wake). Working from home is fine — office hours only accrue on allowlisted office SSIDs.
+
+Help / release notes in the app: `/help#whats-new`.
 
 ---
 

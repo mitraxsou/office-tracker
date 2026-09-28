@@ -239,6 +239,15 @@ export const GLOBAL_SEARCH_INDEX: GlobalSearchEntry[] = [
     adminOnly: true,
   },
   {
+    id: "admin-account-requests",
+    label: "Account requests",
+    description: "Approve or reject new account access requests",
+    href: "/admin/account-requests",
+    keywords: ["admin", "account", "access", "signup", "registration", "request"],
+    group: "admin",
+    adminOnly: true,
+  },
+  {
     id: "admin-corrections",
     label: "Visit corrections",
     description: "Review and approve visit edits",

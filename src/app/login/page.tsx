@@ -17,6 +17,7 @@ import {
 } from "@/lib/auth-rate-limit";
 import { getCurrentLegalVersion } from "@/lib/legal-config";
 import { getPostLoginRedirect } from "@/lib/terms-acceptance";
+import { isOtpSelfRegistrationAllowed } from "@/lib/otp-auth";
 import { LoginForm } from "./LoginForm";
 
 const LOCKOUT_MESSAGE =
@@ -40,6 +41,7 @@ async function LoginPageContent({
   const params = await searchParams;
   const attemptCount = await getLoginAttemptCount();
   const lockedOut = attemptCount >= MAX_LOGIN_ATTEMPTS;
+  const otpSelfRegistration = await isOtpSelfRegistrationAllowed();
 
   async function login(formData: FormData) {
     "use server";
@@ -77,6 +79,7 @@ async function LoginPageContent({
         lockedOut={lockedOut}
         lockoutMessage={LOCKOUT_MESSAGE}
         passwordLogin={login}
+        otpSelfRegistration={otpSelfRegistration}
       />
       <LegalFooter className="mt-6" />
     </div>

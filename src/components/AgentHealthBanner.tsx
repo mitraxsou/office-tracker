@@ -31,11 +31,11 @@ export function AgentHealthBanner({
   if (variant === "low_pulses") {
     return (
       <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-4">
-        <p className="font-medium text-amber-400">Agent is syncing but office activity is low</p>
+        <p className="font-medium text-amber-400">Agent sync looks incomplete</p>
         <p className="mt-1 text-sm text-muted">
-          Your laptop is syncing with the server, but few in-office ticks were recorded in the last
-          24 hours. You may be working from home, or the laptop was asleep most of the day. Office
-          hours only count on office Wi-Fi.
+          Your laptop has not sent enough activity recently for a healthy sync check. This is not
+          about working from home — office days are optional. If Status still says Healthy, you can
+          ignore this. Otherwise update the agent from Settings.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link href="/settings#install" className="btn-primary px-4 py-2 text-sm">

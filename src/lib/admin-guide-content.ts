@@ -219,6 +219,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         items: [
           "Create user: email, optional name, role (user or admin). Admin-created users appear as Admin-created in the list.",
           "OTP self-registration: on by default in Global settings. First OTP verify creates the account and issues an install token.",
+          "When OTP self-registration is off, colleagues use Request an account on the login page; approve under Admin → Account requests.",
           "Search and paginate the user list. Filter to OTP self-registered only.",
           "Bulk actions: select users for bulk token issue or other batch operations where available.",
           "Edit user: open the edit modal to change name, email, role, or per-user hours override.",

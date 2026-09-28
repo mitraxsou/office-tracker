@@ -95,14 +95,16 @@ export default async function DashboardPage() {
     !isOutToday &&
     user.agentDevices.length > 0 &&
     syncHealth.showStaleWarning;
-  const agentLowPulses =
-    !isOutToday &&
-    user.agentDevices.length > 0 &&
-    pulse.agentHealthy &&
-    syncHealth.lowActivity;
+  // Tick volume is no longer a health signal for event-mode agents (hourly health +
+  // end-of-day ticks). Do not warn healthy WFH users about "low office activity".
+  const agentLowPulses = false;
   const minutesSinceLastSync = syncHealth.minutesSinceLastSync;
+  // Missing SSID while out of office is normal (home / Ethernet). Only warn when
+  // the agent claims office presence without a Wi-Fi name.
   const ssidMissing =
-    !!summary.lastHeartbeat && !summary.lastHeartbeat.ssid && summary.lastHeartbeat.inOffice === false;
+    !!summary.lastHeartbeat &&
+    !summary.lastHeartbeat.ssid &&
+    (summary.lastHeartbeat.inOffice === true || summary.inOfficeNow);
   const openVisit = summary.visits.find((v) => v.endAt === null);
   const firstCheckIn =
     summary.visits.length > 0

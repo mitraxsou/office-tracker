@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, getRealCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
-import { deviceRegistrationReferenceAt, isLowActivityCount } from "@/lib/activity-signal";
+import {
+  deviceRegistrationReferenceAt,
+  isLowActivityCount,
+  latestDeviceLastSeenAt,
+  resolveAgentSyncHealth,
+} from "@/lib/activity-signal";
 import { getTodaySummary, getPulseStats } from "@/lib/heartbeat-service";
 import { getUserHoursTarget, getEffectiveAgentStaleGraceHours } from "@/lib/app-config";
 import { isUserOutOfOffice } from "@/lib/out-of-office";
@@ -46,8 +51,19 @@ export async function GET() {
   }
 
   const deviceReferenceAt = deviceRegistrationReferenceAt(user.agentDevices);
+  const lastSyncedAt = latestDeviceLastSeenAt(user.agentDevices);
+  const syncHealth = resolveAgentSyncHealth({
+    lastSyncedAt,
+    graceHours,
+    pulseAgentHealthy: pulse.agentHealthy,
+    pulsesLast24h: pulse.pulsesLast24h,
+    expectedPulsesPerDay: pulse.expectedPulsesPerDay,
+    deviceReferenceAt,
+  });
+  // With hourly health snapshots, low server-side tick counts are expected during
+  // the day. Only surface this when sync itself looks unhealthy.
   const showLowActivityWarning =
-    pulse.agentHealthy &&
+    !syncHealth.healthy &&
     user.agentDevices.length > 0 &&
     isLowActivityCount(
       pulse.pulsesLast24h,

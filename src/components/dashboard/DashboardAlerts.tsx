@@ -55,10 +55,11 @@ export function DashboardAlerts({
   if (adminAccess && !agentNeverConnected && ssidMissing) {
     alerts.push(
       <CompactAlert key="ssid" tone="amber">
-        <p className="text-sm font-medium text-amber-400">Wi-Fi SSID not detected</p>
+        <p className="text-sm font-medium text-amber-400">Office Wi-Fi name missing</p>
         <p className="mt-0.5 text-xs text-muted">
-          Add a <strong>manual visit</strong> at the bottom of this page if detection stays missing
-          after the next agent sync (up to ~6 min by default).
+          The agent thinks you are in office but did not read a Wi-Fi name. If you are on site, wait
+          for the next sync or add a <strong>manual visit</strong>. Working from home is fine — no
+          action needed when you are not in office.
         </p>
       </CompactAlert>,
     );

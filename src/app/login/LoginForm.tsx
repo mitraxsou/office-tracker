@@ -11,6 +11,7 @@ type LoginFormProps = {
   lockedOut: boolean;
   lockoutMessage: string;
   passwordLogin: (formData: FormData) => void;
+  otpSelfRegistration?: boolean;
 };
 
 export function LoginForm({
@@ -18,6 +19,7 @@ export function LoginForm({
   lockedOut,
   lockoutMessage,
   passwordLogin,
+  otpSelfRegistration = true,
 }: LoginFormProps) {
   const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
@@ -292,10 +294,27 @@ export function LoginForm({
         )}
       </div>
 
+      {!otpSelfRegistration && (
+        <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-sm">
+          <p className="font-medium text-amber-300">Open signup is closed</p>
+          <p className="mt-1 text-muted">
+            Existing accounts can still sign in with a Teams code. Need access?{" "}
+            <Link href="/request-account" className="text-accent hover:underline">
+              Request an account
+            </Link>{" "}
+            and a pilot admin will review your details.
+          </p>
+        </div>
+      )}
+
       <p className="mt-4 text-center text-sm text-muted">
         New to My Office Pulse?{" "}
         <Link href="/help" className="text-accent hover:underline">
           Read the setup guide
+        </Link>
+        {" · "}
+        <Link href="/request-account" className="text-accent hover:underline">
+          Request an account
         </Link>
       </p>
     </div>

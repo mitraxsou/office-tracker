@@ -43,7 +43,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           <h2 className="text-lg font-medium">What it does</h2>
           <p className="text-sm text-muted">
             {APP_NAME} counts time you spend in the office toward your daily hours target (5 hours in the pilot).
-            Visits build from agent heartbeats on approved office Wi-Fi, manual check-in, or admin corrections.
+            Visits build from the Windows agent on approved office Wi-Fi, manual check-in, or admin corrections.
+            You are not expected to be in office every day — home days simply do not add office hours.
           </p>
           <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
             <li>
@@ -56,8 +57,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
               <strong>Settings:</strong> install or update the agent, account details, and notification prefs
             </li>
             <li>
-              Windows agent: task <code>{AGENT_TASK_NAME}</code> wakes every 2 minutes and sends on the
-              server interval (5 minutes by default)
+              Windows agent: task <code>{AGENT_TASK_NAME}</code> records local pulses every 2 minutes, syncs
+              office in/out immediately, sends an hourly health check, and uploads detailed ticks at end of day
             </li>
           </ul>
         </section>
@@ -107,6 +108,14 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             <li>
               <strong className="text-foreground">Install token.</strong> Your first OTP sign-in creates a laptop
               token. Copy <strong>Copy install command</strong> from Settings → Agent for that laptop.
+            </li>
+            <li>
+              <strong className="text-foreground">Open signup closed?</strong> If the login page says open signup
+              is closed, use{" "}
+              <Link href="/request-account" className="text-accent hover:underline">
+                Request an account
+              </Link>
+              . A pilot admin reviews your details and creates access; then you sign in with Teams OTP.
             </li>
           </ol>
         </section>
@@ -338,16 +347,24 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             <div>
               <p className="font-medium">Wrong or missing Wi-Fi name (SSID)</p>
               <p className="mt-1 text-muted">
-                The agent reads your WLAN name via netsh (IT may block Location; you do not need to turn Location on).
-                During captive portal sign-in, Windows may briefly show <code>pwcglb.com</code> instead of{" "}
-                <code>ExternalConnect</code>. Wait for Wi-Fi to settle or use <strong>Check in</strong> on Today.
+                At home or on Ethernet, a missing Wi-Fi name is normal when Status is Healthy — no action needed.
+                On site, the agent reads your WLAN name via netsh (IT may block Location). During captive portal
+                sign-in, Windows may briefly show <code>pwcglb.com</code> instead of <code>ExternalConnect</code>.
+                Wait for Wi-Fi to settle or use <strong>Check in</strong> on Today.
+              </p>
+            </div>
+            <div>
+              <p className="font-medium">“Low office activity” while Status is Healthy</p>
+              <p className="mt-1 text-muted">
+                That warning should not appear for a healthy agent. Working from home does not require office ticks.
+                If you still see it, refresh Today after the latest deploy or update the agent from Settings.
               </p>
             </div>
             <div>
               <p className="font-medium">After sleep or laptop wake</p>
               <p className="mt-1 text-muted">
-                Heartbeats pause while asleep. After unlock, allow about 5 minutes for the next pulse. Refresh Today if
-                status still looks stale.
+                Local pulses pause while asleep. After unlock, the agent syncs wake/resume promptly and continues
+                hourly health checks. Refresh Today if status still looks stale after a few minutes.
               </p>
             </div>
             <div>
@@ -387,10 +404,17 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             <li>You do not edit SSID names on your laptop.</li>
             <li>Manual check-in and check-out cover gaps when auto-detection fails.</li>
             <li>
-              <strong>Not counted:</strong> VPN (for example GlobalProtect), home networks, and gaps longer than about 15
-              minutes without a heartbeat (ends the visit).
+              <strong>Not counted:</strong> VPN (for example GlobalProtect), home networks, and leaving office Wi-Fi
+              (or a long gap without confirmed office pulses).
             </li>
-            <li>Default heartbeat interval is about 5 minutes; admins can change it between 2 and 60 minutes.</li>
+            <li>
+              On the laptop, pulses stay local every 2 minutes. Critical office in/out syncs immediately; an hourly
+              health check keeps Status Healthy; detailed ticks upload at end of day for diagnostics.
+            </li>
+            <li>
+              Healthy agent + working from home is expected. Alerts on Today are for install/sync problems or office
+              detection failures on site — not for skipping an office day.
+            </li>
           </ul>
         </section>
 

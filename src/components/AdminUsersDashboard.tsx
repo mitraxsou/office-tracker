@@ -64,6 +64,8 @@ function registrationSourceLabel(source: string): string {
   switch (source) {
     case "otp_self":
       return "Self-registered (OTP)";
+    case "account_request":
+      return "Approved account request";
     case "seed":
       return "Seed";
     default:

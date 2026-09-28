@@ -95,9 +95,11 @@ export function AdminPilotControls({
             <p className="font-medium">Allow OTP self-registration</p>
             <p className="mt-1 text-sm text-muted">
               When on (default for the pilot), colleagues sign in with a PwC email OTP and get an
-              account on first verify, including an agent install token. When off, OTP works only
-              for emails already in the database. This is separate from the legacy password register
-              page, which is controlled by ALLOW_REGISTRATION in Vercel.
+              account on first verify, including an agent install token. When off, existing users
+              can still OTP sign-in, and new people use{" "}
+              <strong>Request an account</strong> on the login page — you approve or reject under
+              Admin → Account requests. This is separate from ALLOW_REGISTRATION in Vercel (legacy
+              password register only).
             </p>
           </div>
           <button

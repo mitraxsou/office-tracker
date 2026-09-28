@@ -679,6 +679,28 @@ export async function registerNode() {
     await prisma.$executeRawUnsafe(
       'CREATE INDEX IF NOT EXISTS "AlertDispatch_userId_dayKey_idx" ON "AlertDispatch"("userId", "dayKey");',
     );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "AccountAccessRequest" (
+        "id" TEXT NOT NULL,
+        "email" TEXT NOT NULL,
+        "name" TEXT,
+        "message" TEXT,
+        "status" TEXT NOT NULL DEFAULT 'open',
+        "adminNote" TEXT,
+        "reviewedAt" TIMESTAMP(3),
+        "reviewedById" TEXT,
+        "createdUserId" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "AccountAccessRequest_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "AccountAccessRequest_status_createdAt_idx" ON "AccountAccessRequest"("status", "createdAt");',
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "AccountAccessRequest_email_status_idx" ON "AccountAccessRequest"("email", "status");',
+    );
     await ensureAppConfig();
     const { ensureLegalConfig } = await import("./lib/legal-config");
     await ensureLegalConfig();

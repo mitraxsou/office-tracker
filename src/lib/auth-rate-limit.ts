@@ -20,7 +20,14 @@ export const AUTH_RATE_LIMIT_BUCKETS = {
   otpVerifyEmail: "otp_verify:email",
   otpResendCooldown: "otp_resend:cooldown",
   passwordLoginIp: "password_login:ip",
+  accountRequestIp: "account_request:ip",
+  accountRequestEmail: "account_request:email",
 } as const;
+
+export const ACCOUNT_REQUEST_IP_MAX = 8;
+export const ACCOUNT_REQUEST_IP_WINDOW_MS = 15 * 60 * 1000;
+export const ACCOUNT_REQUEST_EMAIL_MAX = 3;
+export const ACCOUNT_REQUEST_EMAIL_WINDOW_MS = 60 * 60 * 1000;
 
 export type RateLimitBucket = (typeof AUTH_RATE_LIMIT_BUCKETS)[keyof typeof AUTH_RATE_LIMIT_BUCKETS];
 
@@ -260,4 +267,42 @@ export async function checkPasswordLoginIpLimit(ip: string): Promise<RateLimitRe
 
 export async function recordPasswordLoginIpAttempt(ip: string): Promise<void> {
   await recordRateLimitEvent(AUTH_RATE_LIMIT_BUCKETS.passwordLoginIp, ip);
+}
+
+export async function checkAccountRequestRateLimit(
+  email: string,
+  ip: string,
+): Promise<RateLimitResult & { error?: string }> {
+  const normalizedEmail = email.toLowerCase().trim();
+  const ipLimit = await checkRateLimit(AUTH_RATE_LIMIT_BUCKETS.accountRequestIp, ip, {
+    max: ACCOUNT_REQUEST_IP_MAX,
+    windowMs: ACCOUNT_REQUEST_IP_WINDOW_MS,
+  });
+  if (!ipLimit.allowed) {
+    return {
+      ...ipLimit,
+      error: "Too many account requests from this network. Try again later.",
+    };
+  }
+  const emailLimit = await checkRateLimit(
+    AUTH_RATE_LIMIT_BUCKETS.accountRequestEmail,
+    normalizedEmail,
+    {
+      max: ACCOUNT_REQUEST_EMAIL_MAX,
+      windowMs: ACCOUNT_REQUEST_EMAIL_WINDOW_MS,
+    },
+  );
+  if (!emailLimit.allowed) {
+    return {
+      ...emailLimit,
+      error: "Too many account requests for this email. Try again later.",
+    };
+  }
+  return { allowed: true, retryAfterSeconds: 0 };
+}
+
+export async function recordAccountRequestRateLimit(email: string, ip: string): Promise<void> {
+  const normalizedEmail = email.toLowerCase().trim();
+  await recordRateLimitEvent(AUTH_RATE_LIMIT_BUCKETS.accountRequestIp, ip);
+  await recordRateLimitEvent(AUTH_RATE_LIMIT_BUCKETS.accountRequestEmail, normalizedEmail);
 }

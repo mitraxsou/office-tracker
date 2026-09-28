@@ -68,7 +68,9 @@ export type AuditAction =
   | "prior_compliance_reject"
   | "manual_visit_request"
   | "manual_visit_approve"
-  | "manual_visit_reject";
+  | "manual_visit_reject"
+  | "account_access.approved"
+  | "account_access.rejected";
 
 export async function logAuditEvent(params: {
   actorId: string;

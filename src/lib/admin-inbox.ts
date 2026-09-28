@@ -9,6 +9,7 @@ export const ADMIN_INBOX_KINDS = [
   "device_removal",
   "admin_contact",
   "prior_compliance",
+  "account_access",
 ] as const;
 
 export type AdminInboxKind = (typeof ADMIN_INBOX_KINDS)[number];
@@ -38,8 +39,17 @@ export async function getAdminInbox(): Promise<{
 }> {
   const { prisma } = await import("./db");
   const userSelect = { id: true, email: true, name: true } satisfies Prisma.UserSelect;
-  const [corrections, manualVisits, timezones, profiles, exemptions, removals, adminContacts, priorCompliance] =
-    await Promise.all([
+  const [
+    corrections,
+    manualVisits,
+    timezones,
+    profiles,
+    exemptions,
+    removals,
+    adminContacts,
+    priorCompliance,
+    accountAccess,
+  ] = await Promise.all([
     prisma.visitCorrectionRequest.findMany({
       where: { status: "open" },
       select: { id: true, createdAt: true, message: true, user: { select: userSelect } },
@@ -112,6 +122,16 @@ export async function getAdminInbox(): Promise<{
         user: { select: userSelect },
       },
     }),
+    prisma.accountAccessRequest.findMany({
+      where: { status: "open" },
+      select: {
+        id: true,
+        createdAt: true,
+        email: true,
+        name: true,
+        message: true,
+      },
+    }),
   ]);
 
   const href = "/admin/visit-reports";
@@ -120,6 +140,7 @@ export async function getAdminInbox(): Promise<{
     label: string,
     summary: string,
     row: { id: string; createdAt: Date; user: { id: string; email: string; name: string | null } },
+    itemHref = `${href}#${kind}`,
   ): AdminInboxItem => ({
     id: row.id,
     kind,
@@ -129,7 +150,7 @@ export async function getAdminInbox(): Promise<{
     userName: row.user.name,
     userEmail: row.user.email,
     createdAt: row.createdAt.toISOString(),
-    href: `${href}#${kind}`,
+    href: itemHref,
   });
 
   const items = [
@@ -179,6 +200,19 @@ export async function getAdminInbox(): Promise<{
         row,
       ),
     ),
+    ...accountAccess.map((row) =>
+      item(
+        "account_access",
+        "Account access",
+        row.message?.slice(0, 80) || "New account request",
+        {
+          id: row.id,
+          createdAt: row.createdAt,
+          user: { id: "", email: row.email, name: row.name },
+        },
+        "/admin/account-requests",
+      ),
+    ),
   ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   const counts: AdminInboxCounts = {
@@ -190,6 +224,7 @@ export async function getAdminInbox(): Promise<{
     device_removal: removals.length,
     admin_contact: adminContacts.length,
     prior_compliance: priorCompliance.length,
+    account_access: accountAccess.length,
   };
 
   return { counts, total: totalAdminInboxCount(counts), items };

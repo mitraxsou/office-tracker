@@ -278,11 +278,11 @@ export function AgentStatusPanel({
 
           <p>
 
-            Only {status.pulsesLast24h} activity ticks in the last 24 hours (expected ~
+            Only {status.pulsesLast24h} activity ticks reached the server in the last 24 hours
 
-            {status.expectedPulsesPerDay}). The laptop may have been asleep or the task may not be
+            (expected ~{status.expectedPulsesPerDay} when uploads are flowing). Working from home is
 
-            running reliably.{" "}
+            fine — this warning means sync itself looks incomplete.{" "}
 
             <a href="#install" className="text-accent hover:underline">
 

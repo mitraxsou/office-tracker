@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 const links = [
   { href: "/admin", label: "Reports", key: "reports" as const },
   { href: "/admin/inbox", label: "Inbox", key: "inbox" as const },
+  { href: "/admin/account-requests", label: "Account requests", key: "account-requests" as const },
   { href: "/admin/visit-reports", label: "Corrections", key: "corrections" as const },
   { href: "/admin/users", label: "Users & tokens", key: "users" as const },
   { href: "/admin/audit", label: "Audit", key: "audit" as const },
@@ -16,7 +17,15 @@ const links = [
 export function AdminSubNav({
   active,
 }: {
-  active: "reports" | "inbox" | "corrections" | "users" | "audit" | "settings" | "guide";
+  active:
+    | "reports"
+    | "inbox"
+    | "account-requests"
+    | "corrections"
+    | "users"
+    | "audit"
+    | "settings"
+    | "guide";
 }) {
   const router = useRouter();
   const activeHref = links.find((link) => link.key === active)?.href ?? "/admin";
