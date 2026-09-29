@@ -14,7 +14,7 @@ $ConfigCacheMaxAgeMinutes = 120
 $UpdateCheckIntervalMinutes = 60
 $LocalPulseIntervalMinutes = 2
 $HealthSyncIntervalMinutes = 60
-$AgentScriptVersion = "1.5.16"
+$AgentScriptVersion = "1.5.17"
 $CriticalEventTypes = @(
     "wifi_connected",
     "wifi_disconnected",
@@ -794,9 +794,9 @@ function Test-HasCriticalQueuedEvents {
     return $false
 }
 
-function Test-HasEndOfDayQueuedEvents {
+function Test-HasDailySummaryQueued {
     foreach ($event in @(Get-EventQueue)) {
-        if (Test-IsEndOfDayEventType -Type ([string]$event.type)) { return $true }
+        if ([string]$event.type -eq "daily_summary") { return $true }
     }
     return $false
 }
@@ -1625,7 +1625,10 @@ Set-SyncState $syncState
 
 $healthSyncDue = Test-HealthSyncDue -SyncState $syncState
 $criticalSyncDue = Test-HasCriticalQueuedEvents
-$endOfDaySyncDue = $dayRolledOver -or (Test-HasEndOfDayQueuedEvents)
+# Activity ticks stay local until true day rollover (or a retry when daily_summary
+# is still queued after a failed flush). Do not treat "ticks in queue" as EOD due —
+# that caused a server sync every ~2 minutes labeled end_of_day.
+$endOfDaySyncDue = $dayRolledOver -or (Test-HasDailySummaryQueued)
 $shouldSync = $criticalSyncDue -or $healthSyncDue -or $endOfDaySyncDue
 if ($shouldSync) {
     $hoursTargetMetQueued = @((Get-EventQueue) | Where-Object { $_.type -eq "hours_target_met" }).Count -gt 0

@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.16";
+export const APP_VERSION = "1.5.17";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,21 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-09-29",
+    userBullets: [
+      "Windows agent 1.5.17 keeps 2-minute pulses on the laptop only; the server gets critical office in/out, an hourly health check, and a true end-of-day tick upload.",
+      "Fixes a bug where every local pulse was labeled “end-of-day diagnostics” and hit the API every few minutes.",
+      "Working from home is normal: Today no longer warns about missing Wi-Fi name or “low office activity” when the agent is healthy and you are not in office.",
+      "Office hours still count only on approved office Wi-Fi; VPN and home networks never qualify.",
+    ],
+    adminBullets: [
+      "Presence timeline should show Sync: end-of-day diagnostics once per day rollover (plus retries), not on every local pulse.",
+      "Admin user reports support selected-day diagnostics (API hits, timeline, activity, install history).",
+      "Diagnostic retention (default 7 days) purges legacy heartbeats and activity ticks together; visits and daily API-hit rollups are kept.",
+    ],
+  },
+  {
+    version: "1.5.16",
     date: "2026-09-28",
     userBullets: [
       "Windows agent 1.5.16 keeps 2-minute pulses on the laptop, syncs critical office in/out immediately, and sends a compact hourly health check.",

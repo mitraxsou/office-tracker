@@ -41,5 +41,9 @@ describe("BUG-009 office exit after laptop sleep", () => {
       "$shouldSync = $criticalSyncDue -or $healthSyncDue -or $endOfDaySyncDue",
     );
     expect(heartbeat).toContain('$EndOfDayEventTypes = @("daily_summary", "activity_tick")');
+    expect(heartbeat).toContain(
+      "$endOfDaySyncDue = $dayRolledOver -or (Test-HasDailySummaryQueued)",
+    );
+    expect(heartbeat).not.toContain("Test-HasEndOfDayQueuedEvents");
   });
 });

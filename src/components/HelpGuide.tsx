@@ -58,7 +58,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             </li>
             <li>
               Windows agent: task <code>{AGENT_TASK_NAME}</code> records local pulses every 2 minutes, syncs
-              office in/out immediately, sends an hourly health check, and uploads detailed ticks at end of day
+              office in/out immediately, sends an hourly health check, and uploads detailed ticks on day rollover
             </li>
           </ul>
         </section>
@@ -409,7 +409,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             </li>
             <li>
               On the laptop, pulses stay local every 2 minutes. Critical office in/out syncs immediately; an hourly
-              health check keeps Status Healthy; detailed ticks upload at end of day for diagnostics.
+              health check keeps Status Healthy; detailed ticks stay on the laptop until true
+              end of day (day rollover), not every local pulse.
             </li>
             <li>
               Healthy agent + working from home is expected. Alerts on Today are for install/sync problems or office

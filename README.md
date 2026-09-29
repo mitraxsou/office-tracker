@@ -253,9 +253,9 @@ npm run build
 | Install folder | `%LOCALAPPDATA%\OfficeTracker\` |
 | Scheduled task | `PwCOfficePulse` (hidden via VBS wrapper) |
 | Startup shortcut | `PwC Office Pulse.lnk` |
-| Current agent | `1.5.16` (`agent/version.txt`) |
+| Current agent | `1.5.17` (`agent/version.txt`) |
 
-**Sync shape (1.5.16+):** local pulse every ~2 minutes on disk; immediate sync for office enter/exit, Wi-Fi changes, sleep/wake, and hours-target met; one compact `health_ping` per hour (keeps `lastSeen` / Healthy status); activity ticks + daily summary at end of day (or first wake). Working from home is fine — office hours only accrue on allowlisted office SSIDs.
+**Sync shape (1.5.17+):** local pulse every ~2 minutes on disk only; immediate sync for office enter/exit, Wi-Fi changes, sleep/wake, and hours-target met; one compact `health_ping` per hour (keeps `lastSeen` / Healthy status); activity ticks + daily summary flush on true day rollover (not every local pulse). Working from home is fine — office hours only accrue on allowlisted office SSIDs.
 
 Help / release notes in the app: `/help#whats-new`.
 

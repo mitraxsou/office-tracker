@@ -121,6 +121,11 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain('type = "health_ping"');
     expect(heartbeat).toContain("lastLocalPulseAt");
     expect(heartbeat).toContain('$EndOfDayEventTypes = @("daily_summary", "activity_tick")');
+    expect(heartbeat).toContain("function Test-HasDailySummaryQueued");
+    expect(heartbeat).toContain(
+      "$endOfDaySyncDue = $dayRolledOver -or (Test-HasDailySummaryQueued)",
+    );
+    expect(heartbeat).not.toContain("Test-HasEndOfDayQueuedEvents");
     expect(heartbeat).toContain(
       "$shouldSync = $criticalSyncDue -or $healthSyncDue -or $endOfDaySyncDue",
     );
