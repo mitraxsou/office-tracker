@@ -1,4 +1,5 @@
-import { getAppConfig } from "./app-config";
+import { DEFAULT_EVENT_MODE_STALE_MINUTES, getAppConfig } from "./app-config";
+import { isOfficeSsid } from "./constants";
 import { prisma } from "./db";
 import { computeDeviceAgentStatus, type AgentDeviceStatus } from "./device-status";
 import { heartbeatInOffice } from "./heartbeat-office";
@@ -191,14 +192,108 @@ export function deviceRegistrationReferenceAt(
   }, devices[0].installedAt ?? devices[0].lastSeenAt ?? devices[0].createdAt);
 }
 
-/** Open visit is authoritative; pulse is a secondary signal when no visit is open. */
-export function resolveInOfficeNow(params: {
+/** Presence rows that describe where the laptop is right now. */
+export const LIVE_PRESENCE_TYPES = [
+  "health_ping",
+  "ssid_changed",
+  "wifi_connected",
+  "wifi_disconnected",
+  "session_resume",
+  "session_suspend",
+] as const;
+
+export type LivePresenceSignal = {
+  at: Date;
+  inOffice: boolean;
+  ssid: string | null;
+  source: string;
+};
+
+/**
+ * How long a presence reading still means "in the office now".
+ * Event-mode agents upload a health snapshot about once an hour, so 15 minutes
+ * would drop people between snapshots. Legacy heartbeats stay on the short gap.
+ */
+export function presenceFreshMs(useActivityTicks: boolean, agentStaleMs: number): number {
+  if (!useActivityTicks) return agentStaleMs;
+  return DEFAULT_EVENT_MODE_STALE_MINUTES * 60 * 1000;
+}
+
+/** SSID allowlist wins when the snapshot includes a network name. */
+export function presenceSignalInOffice(params: {
+  ssid: string | null;
+  storedInOffice: boolean;
+  officeSsids: string[];
+}): boolean {
+  if (params.ssid) return isOfficeSsid(params.ssid, params.officeSsids);
+  return params.storedInOffice;
+}
+
+export function pickNewerPresenceSignal(
+  activity: LivePresenceSignal | null,
+  transition: LivePresenceSignal | null,
+): LivePresenceSignal | null {
+  if (!activity) return transition;
+  if (!transition) return activity;
+  return transition.at.getTime() >= activity.at.getTime() ? transition : activity;
+}
+
+export type InOfficeNowInput = {
   hasOpenVisit: boolean;
+  /** Manual check-in stays until the user checks out. */
+  openVisitManual: boolean;
+  /** Wifi visit started inside the presence freshness window. */
+  openVisitRecent: boolean;
+  /** Visit start is after the latest presence pulse, or there is no pulse. */
+  openVisitAfterPulse: boolean;
   pulseRecent: boolean;
   lastPulseInOffice: boolean;
-}): boolean {
-  if (params.hasOpenVisit) return true;
-  return params.pulseRecent && params.lastPulseInOffice;
+  /** A visit ended after the latest in-office pulse and nothing is open. */
+  checkedOutAfterPulse: boolean;
+};
+
+/**
+ * Latest presence wins. A stuck open visit does not keep someone "in office"
+ * after a newer health snapshot or Wi-Fi change says they left.
+ * A recent in-office snapshot counts even when the visit row was never opened.
+ */
+export function resolveInOfficeNow(params: InOfficeNowInput): boolean {
+  const leftAfterVisit =
+    params.pulseRecent && !params.lastPulseInOffice && !params.openVisitAfterPulse;
+
+  if (params.hasOpenVisit && params.openVisitManual && !leftAfterVisit) return true;
+  if (leftAfterVisit) return false;
+  if (params.checkedOutAfterPulse && !params.hasOpenVisit) return false;
+  if (params.pulseRecent && params.lastPulseInOffice) return true;
+  if (params.hasOpenVisit && params.openVisitRecent && params.openVisitAfterPulse) return true;
+  return false;
+}
+
+export async function getLatestLivePresenceSignal(
+  userId: string,
+  officeSsids: string[],
+  activity: LivePresenceSignal | null,
+): Promise<LivePresenceSignal | null> {
+  const transition = await prisma.presenceTransition.findFirst({
+    where: { userId, type: { in: [...LIVE_PRESENCE_TYPES] } },
+    orderBy: { at: "desc" },
+    select: { at: true, inOffice: true, ssid: true, type: true },
+  });
+
+  const fromTransition: LivePresenceSignal | null = transition
+    ? {
+        at: transition.at,
+        ssid: transition.ssid,
+        source: transition.type,
+        inOffice: presenceSignalInOffice({
+          ssid: transition.ssid,
+          storedInOffice: transition.inOffice,
+          officeSsids,
+        }),
+      }
+    : null;
+
+  return pickNewerPresenceSignal(activity, fromTransition);
 }
 
 export async function resolveAgentSignalMode(

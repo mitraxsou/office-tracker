@@ -1,0 +1,42 @@
+{
+  "stuckOpenVisitAfterHomeSnapshot": {
+    "hasOpenVisit": true,
+    "openVisitManual": false,
+    "openVisitRecent": false,
+    "openVisitAfterPulse": false,
+    "pulseRecent": true,
+    "lastPulseInOffice": false,
+    "checkedOutAfterPulse": false,
+    "expected": false
+  },
+  "inOfficeHealthSnapshotWithoutVisit": {
+    "hasOpenVisit": false,
+    "openVisitManual": false,
+    "openVisitRecent": false,
+    "openVisitAfterPulse": false,
+    "pulseRecent": true,
+    "lastPulseInOffice": true,
+    "checkedOutAfterPulse": false,
+    "expected": true
+  },
+  "arrivedAfterEarlierHomeSnapshot": {
+    "hasOpenVisit": true,
+    "openVisitManual": false,
+    "openVisitRecent": true,
+    "openVisitAfterPulse": true,
+    "pulseRecent": true,
+    "lastPulseInOffice": false,
+    "checkedOutAfterPulse": false,
+    "expected": true
+  },
+  "checkedOutAfterLastOfficeSnapshot": {
+    "hasOpenVisit": false,
+    "openVisitManual": false,
+    "openVisitRecent": false,
+    "openVisitAfterPulse": false,
+    "pulseRecent": true,
+    "lastPulseInOffice": true,
+    "checkedOutAfterPulse": true,
+    "expected": false
+  }
+}

@@ -9,6 +9,8 @@ import {
   lowActivityThreshold,
   minutesSinceAt,
   resolveAgentSyncHealth,
+  presenceFreshMs,
+  presenceSignalInOffice,
   resolveInOfficeNow,
   shouldUseActivityTicks,
 } from "../src/lib/activity-signal";
@@ -59,21 +61,58 @@ describe("shouldUseActivityTicks", () => {
   });
 });
 
-describe("resolveInOfficeNow", () => {
-  it("treats an open visit as authoritative", () => {
+const idleVisit = {
+  openVisitManual: false,
+  openVisitRecent: false,
+  openVisitAfterPulse: false,
+  checkedOutAfterPulse: false,
+};
+
+describe("presence freshness", () => {
+  it("keeps event-mode snapshots fresh across the hourly health ping", () => {
+    expect(presenceFreshMs(true, 15 * 60 * 1000)).toBe(70 * 60 * 1000);
+  });
+
+  it("keeps legacy heartbeats on the short stale gap", () => {
+    expect(presenceFreshMs(false, 15 * 60 * 1000)).toBe(15 * 60 * 1000);
+  });
+
+  it("recomputes office presence from the SSID when the snapshot has one", () => {
+    const allowlist = ["OfficeConnect", "ExternalConnect", "pwcglb.com"];
     expect(
-      resolveInOfficeNow({
-        hasOpenVisit: true,
-        pulseRecent: false,
-        lastPulseInOffice: false,
+      presenceSignalInOffice({
+        ssid: "HomeWiFi",
+        storedInOffice: true,
+        officeSsids: allowlist,
+      }),
+    ).toBe(false);
+    expect(
+      presenceSignalInOffice({
+        ssid: "ExternalConnect",
+        storedInOffice: false,
+        officeSsids: allowlist,
       }),
     ).toBe(true);
   });
+});
 
-  it("uses recent in-office pulse when no visit is open", () => {
+describe("resolveInOfficeNow", () => {
+  it("does not keep a stuck open visit after a newer out-of-office signal", () => {
+    expect(
+      resolveInOfficeNow({
+        hasOpenVisit: true,
+        ...idleVisit,
+        pulseRecent: true,
+        lastPulseInOffice: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("counts a recent in-office signal even when no visit is open", () => {
     expect(
       resolveInOfficeNow({
         hasOpenVisit: false,
+        ...idleVisit,
         pulseRecent: true,
         lastPulseInOffice: true,
       }),
@@ -81,10 +120,51 @@ describe("resolveInOfficeNow", () => {
     expect(
       resolveInOfficeNow({
         hasOpenVisit: false,
+        ...idleVisit,
         pulseRecent: true,
         lastPulseInOffice: false,
       }),
     ).toBe(false);
+  });
+
+  it("counts a visit that started after the last out-of-office signal", () => {
+    expect(
+      resolveInOfficeNow({
+        hasOpenVisit: true,
+        openVisitManual: false,
+        openVisitRecent: true,
+        openVisitAfterPulse: true,
+        pulseRecent: true,
+        lastPulseInOffice: false,
+        checkedOutAfterPulse: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("hides someone who checked out after the last in-office signal", () => {
+    expect(
+      resolveInOfficeNow({
+        hasOpenVisit: false,
+        ...idleVisit,
+        pulseRecent: true,
+        lastPulseInOffice: true,
+        checkedOutAfterPulse: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps a manual check-in until a newer out-of-office signal", () => {
+    expect(
+      resolveInOfficeNow({
+        hasOpenVisit: true,
+        openVisitManual: true,
+        openVisitRecent: false,
+        openVisitAfterPulse: true,
+        pulseRecent: false,
+        lastPulseInOffice: false,
+        checkedOutAfterPulse: false,
+      }),
+    ).toBe(true);
   });
 });
 

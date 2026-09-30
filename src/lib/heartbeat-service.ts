@@ -7,10 +7,13 @@ import {
   expectedTicksPerDay,
   getLastAgentSignalAt,
   getLastAgentSignalOnDay,
+  getLatestLivePresenceSignal,
   heartbeatToSignal,
+  presenceFreshMs,
   resolveAgentSignalMode,
   resolveInOfficeNow,
   type AgentSignalSnapshot,
+  type LivePresenceSignal,
 } from "./activity-signal";
 import { heartbeatInOffice } from "./heartbeat-office";
 import { maybePurgeOldHeartbeats } from "./heartbeat-retention";
@@ -551,9 +554,6 @@ export async function getTodaySummary(
   const config = await getAppConfig();
   const effectiveGraceHours = graceHours ?? config.agentStaleGraceHours;
   const graceMs = agentHealthGraceMs(effectiveGraceHours);
-  const pulseRecent =
-    params.lastHeartbeatAt !== null &&
-    now.getTime() - params.lastHeartbeatAt.getTime() <= params.staleMs;
   const agentHealthy =
     params.lastHeartbeatAt !== null &&
     now.getTime() - params.lastHeartbeatAt.getTime() <= graceMs;
@@ -561,8 +561,44 @@ export async function getTodaySummary(
   const totalMs = daySpanMsForDay(visits, params);
   const totalHours = totalMs / (1000 * 60 * 60);
   const laptopActiveHours = laptopActiveHoursForDay(laptopActiveParams);
-  const lastPulseInOffice = lastHeartbeat?.inOffice ?? false;
-  const hasOpenVisit = visits.some((visit) => visit.endAt === null);
+  const useActivity = agentModeUsesActivityTicks(config.agentMode);
+  const freshMs = presenceFreshMs(useActivity, params.staleMs);
+  const activitySignal: LivePresenceSignal | null = lastHeartbeat
+    ? {
+        at: lastHeartbeat.recordedAt,
+        inOffice: lastHeartbeat.inOffice,
+        ssid: lastHeartbeat.ssid,
+        source: lastHeartbeat.source,
+      }
+    : null;
+  const livePresence = await getLatestLivePresenceSignal(
+    userId,
+    config.officeSsids,
+    activitySignal,
+  );
+
+  const openVisit = visits.find((visit) => visit.endAt === null) ?? null;
+  const openVisitAt = openVisit?.startAt ?? null;
+  const pulseAt = livePresence?.at ?? null;
+  const livePulseRecent =
+    pulseAt !== null && now.getTime() - pulseAt.getTime() <= freshMs;
+  const openVisitRecent =
+    openVisitAt !== null && now.getTime() - openVisitAt.getTime() <= freshMs;
+  const openVisitAfterPulse =
+    openVisitAt !== null &&
+    (pulseAt === null || openVisitAt.getTime() > pulseAt.getTime());
+
+  let checkedOutAt: Date | null = null;
+  for (const visit of visits) {
+    if (!visit.endAt) continue;
+    if (!checkedOutAt || visit.endAt > checkedOutAt) checkedOutAt = visit.endAt;
+  }
+  const checkedOutAfterPulse =
+    !openVisit &&
+    checkedOutAt !== null &&
+    pulseAt !== null &&
+    livePresence?.inOffice === true &&
+    checkedOutAt.getTime() > pulseAt.getTime();
 
   return {
     dayKey,
@@ -573,12 +609,17 @@ export async function getTodaySummary(
     metTarget: totalHours >= hoursTarget,
     remainingHours: Math.max(0, hoursTarget - totalHours),
     inOfficeNow: resolveInOfficeNow({
-      hasOpenVisit,
-      pulseRecent,
-      lastPulseInOffice,
+      hasOpenVisit: Boolean(openVisit),
+      openVisitManual: openVisit?.source === "manual",
+      openVisitRecent,
+      openVisitAfterPulse,
+      pulseRecent: livePulseRecent,
+      lastPulseInOffice: livePresence?.inOffice ?? false,
+      checkedOutAfterPulse,
     }),
     visits,
     lastHeartbeat,
+    livePresence,
     agentHealthy,
   };
 }

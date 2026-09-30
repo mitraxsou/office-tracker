@@ -13,13 +13,17 @@ vi.mock("@/lib/db", () => ({
 vi.mock("@/lib/app-config", () => ({
   getAppConfig: vi.fn().mockResolvedValue({
     agentStaleMinutes: 15,
+    agentMode: "events",
     officeSsids: ["OfficeConnect"],
   }),
+  getEventModeAgentStaleMs: vi.fn().mockResolvedValue(70 * 60 * 1000),
+  getAgentStaleMs: vi.fn().mockResolvedValue(15 * 60 * 1000),
 }));
 vi.mock("@/lib/activity-signal", () => ({
   getLastAgentSignalAt: vi.fn().mockResolvedValue(null),
   getLastAgentSignalOnDay: vi.fn().mockResolvedValue(null),
   resolveAgentSignalMode: vi.fn().mockResolvedValue({ useActivity: true }),
+  agentModeUsesActivityTicks: (mode?: string | null) => (mode ?? "events") !== "heartbeat",
 }));
 
 import {

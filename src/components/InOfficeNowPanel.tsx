@@ -27,8 +27,17 @@ const REFRESH_MS = 45_000;
 
 function formatSource(source: string | null): string {
   if (!source) return "Unknown";
-  if (source === "wifi") return "Wi-Fi";
+  if (
+    source === "wifi" ||
+    source === "health_ping" ||
+    source === "ssid_changed" ||
+    source === "wifi_connected" ||
+    source === "activity_tick"
+  ) {
+    return "Wi-Fi";
+  }
   if (source === "manual") return "Manual";
+  if (source === "wifi_disconnected") return "Wi-Fi disconnect";
   return source;
 }
 
@@ -111,7 +120,7 @@ export function InOfficeNowPanel({
               In office now
             </h2>
             <p className="mt-1 text-sm text-muted">
-              Live list of users with an active office visit and recent agent activity.
+              Users whose latest agent signal is still on office Wi-Fi.
             </p>
           </div>
           <button

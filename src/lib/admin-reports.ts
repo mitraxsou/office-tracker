@@ -361,6 +361,7 @@ export async function getInOfficeNowUsers(): Promise<{
       if (!summary.inOfficeNow) return null;
 
       const openVisit = summary.visits.find((v) => v.endAt === null);
+      const live = summary.livePresence;
       return {
         userId: user.id,
         email: user.email,
@@ -368,11 +369,15 @@ export async function getInOfficeNowUsers(): Promise<{
         hoursToday: roundHours(summary.totalHours),
         hoursTarget,
         metTarget: summary.metTarget,
-        visitStartAt: openVisit?.startAt.toISOString() ?? null,
-        visitSource: openVisit?.source ?? null,
-        visitSsid: openVisit?.ssid ?? null,
-        lastHeartbeatAt: summary.lastHeartbeat?.recordedAt.toISOString() ?? null,
-        lastHeartbeatSource: summary.lastHeartbeat?.source ?? null,
+        visitStartAt:
+          openVisit?.startAt.toISOString() ?? live?.at.toISOString() ?? null,
+        visitSource: openVisit?.source ?? live?.source ?? null,
+        visitSsid: openVisit?.ssid ?? live?.ssid ?? null,
+        lastHeartbeatAt:
+          live?.at.toISOString() ??
+          summary.lastHeartbeat?.recordedAt.toISOString() ??
+          null,
+        lastHeartbeatSource: live?.source ?? summary.lastHeartbeat?.source ?? null,
         inOfficeNow: true as const,
       };
     }),

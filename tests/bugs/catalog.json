@@ -133,6 +133,20 @@
       "skipReason": null
     },
     {
+      "id": "BUG-010",
+      "title": "In office now kept users with a stuck open visit",
+      "date": "2026-09",
+      "severity": "high",
+      "area": "admin",
+      "reproSummary": "Admin In office now treated any open visit as current presence. Event-mode agents only upload activity ticks at day end and send hourly health snapshots, so a visit left open after someone went home still listed them, and someone on office Wi-Fi without a visit row was missing.",
+      "assertion": "resolveInOfficeNow follows the latest presence signal: a newer out-of-office snapshot or checkout removes the user; a recent in-office snapshot includes them even without an open visit.",
+      "fixture": "fixtures/in-office-now-latest-signal.json",
+      "testFile": "tests/bugs/BUG-010-in-office-now-latest-signal.test.ts",
+      "relatedTests": ["tests/activity-signal.test.ts"],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
       "id": "CORE-001",
       "title": "Heartbeat in-office uses SSID allowlist",
       "date": "2026-01",
