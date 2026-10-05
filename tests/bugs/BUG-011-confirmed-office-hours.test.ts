@@ -87,4 +87,100 @@ describe("BUG-011 confirmed office time follows the latest allowlisted snapshot"
     expect(spanMs).toBe(confirmed.getTime() - entered.getTime());
     expect(spanMs).toBeLessThan(new Date(fixture.pageOpenedAt).getTime() - entered.getTime());
   });
+
+  it("stops at a later leave and ignores the non-office snapshot after it", () => {
+    const entered = new Date(fixture.enteredAt);
+    const confirmed = new Date(fixture.confirmedAt);
+    const left = new Date(confirmed.getTime() + 20 * 60 * 1000);
+    const homeAfter = new Date(left.getTime() + 30 * 60 * 1000);
+    const latest = latestConfirmedOfficeAt(
+      [
+        ...fixture.signals,
+        { at: homeAfter.toISOString(), ssid: "Ashutosh", storedInOffice: false },
+      ].map((signal) => ({
+        at: new Date(signal.at),
+        ssid: signal.ssid,
+        storedInOffice: signal.storedInOffice,
+      })),
+      fixture.officeSsids,
+    );
+    expect(latest?.toISOString()).toBe(fixture.confirmedAt);
+    const { start: dayStart, end: dayEnd } = dayBoundsFromKey("2026-10-05", "Asia/Kolkata");
+    const spanMs = daySpanMsForDay(
+      [
+        {
+          id: "visit-1",
+          startAt: entered,
+          endAt: left,
+          source: "wifi",
+          updatedAt: left,
+        },
+      ],
+      {
+        dayStart,
+        dayEnd,
+        now: new Date(fixture.pageOpenedAt),
+        staleMs: 15 * 60 * 1000,
+        lastHeartbeatAt: confirmed,
+        firstInOfficeHeartbeatAt: entered,
+        lastInOfficeHeartbeatAt: latest,
+      },
+    );
+    expect(spanMs).toBe(left.getTime() - entered.getTime());
+    expect(spanMs).toBeLessThan(new Date(fixture.pageOpenedAt).getTime() - entered.getTime());
+  });
+
+  it("does not recalculate a past day against the current clock", () => {
+    const entered = new Date(fixture.enteredAt);
+    const confirmed = new Date(fixture.confirmedAt);
+    const { start: dayStart, end: dayEnd } = dayBoundsFromKey("2026-10-05", "Asia/Kolkata");
+    const spanMs = daySpanMsForDay(
+      [
+        {
+          id: "visit-1",
+          startAt: entered,
+          endAt: confirmed,
+          source: "wifi",
+          updatedAt: confirmed,
+        },
+      ],
+      {
+        dayStart,
+        dayEnd,
+        now: new Date("2026-10-06T12:00:00+05:30"),
+        staleMs: 15 * 60 * 1000,
+        lastHeartbeatAt: confirmed,
+        firstInOfficeHeartbeatAt: entered,
+        lastInOfficeHeartbeatAt: confirmed,
+      },
+    );
+    expect(spanMs).toBe(confirmed.getTime() - entered.getTime());
+  });
+
+  it("keeps an open manual visit running until checkout", () => {
+    const start = new Date(fixture.enteredAt);
+    const now = new Date(fixture.pageOpenedAt);
+    const { start: dayStart, end: dayEnd } = dayBoundsFromKey("2026-10-05", "Asia/Kolkata");
+    const spanMs = daySpanMsForDay(
+      [
+        {
+          id: "visit-manual",
+          startAt: start,
+          endAt: null,
+          source: "manual",
+          updatedAt: start,
+        },
+      ],
+      {
+        dayStart,
+        dayEnd,
+        now,
+        staleMs: 15 * 60 * 1000,
+        lastHeartbeatAt: new Date(fixture.confirmedAt),
+        firstInOfficeHeartbeatAt: start,
+        lastInOfficeHeartbeatAt: new Date(fixture.confirmedAt),
+      },
+    );
+    expect(spanMs).toBe(now.getTime() - start.getTime());
+  });
 });
