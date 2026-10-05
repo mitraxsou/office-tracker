@@ -363,7 +363,7 @@ describe("hours calculations", () => {
     expect(spanMs).toBe(0);
   });
 
-  it("later in-office heartbeat extends past closed manual checkout", () => {
+  it("closed manual checkout is final even with a later office heartbeat", () => {
     const dayStart = new Date("2026-08-27T00:00:00+05:30");
     const dayEnd = new Date("2026-08-27T23:59:59.999+05:30");
     const visits = [
@@ -383,7 +383,31 @@ describe("hours calculations", () => {
       lastHeartbeatAt: new Date("2026-08-27T17:30:00+05:30"),
       lastInOfficeHeartbeatAt: new Date("2026-08-27T17:30:00+05:30"),
     });
-    expect(spanMs).toBeCloseTo(8.5 * ms(60), 0);
+    expect(spanMs).toBeCloseTo(7 * ms(60), 0);
+  });
+
+  it("closed manual visit is not stretched by a later out-of-office agent sync", () => {
+    const dayStart = new Date("2026-10-05T00:00:00+05:30");
+    const dayEnd = new Date("2026-10-05T23:59:59.999+05:30");
+    const visits = [
+      {
+        id: "1",
+        startAt: new Date("2026-10-05T14:42:00+05:30"),
+        endAt: new Date("2026-10-05T14:47:00+05:30"),
+        source: "manual",
+        updatedAt: new Date("2026-10-05T14:47:00+05:30"),
+      },
+    ];
+    const spanMs = daySpanMsForDay(visits, {
+      dayStart,
+      dayEnd,
+      now: new Date("2026-10-05T19:14:00+05:30"),
+      staleMs: VISIT_GAP_MS,
+      lastHeartbeatAt: new Date("2026-10-05T15:46:00+05:30"),
+      firstInOfficeHeartbeatAt: null,
+      lastInOfficeHeartbeatAt: null,
+    });
+    expect(spanMs).toBe(5 * ms(1));
   });
 
   it("closed manual then closed wifi sums both sessions (Arnab)", () => {

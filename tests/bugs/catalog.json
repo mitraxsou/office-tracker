@@ -175,6 +175,20 @@
       "skipReason": null
     },
     {
+      "id": "BUG-013",
+      "title": "Closed manual visit stretched by later out-of-office agent sync",
+      "date": "2026-10",
+      "severity": "high",
+      "area": "visits",
+      "reproSummary": "A closed manual check-in/out of 5 minutes (2:42-2:47 pm) showed about 1h 4m because a later same-day agent health sync was treated as the last office heartbeat and extended the manual session.",
+      "assertion": "Closed manual visits credit only endAt - startAt. Later agent syncs that are not confirmed office presence must not extend them. Confirmed office snapshots may still extend wifi sessions.",
+      "fixture": "fixtures/closed-manual-not-stretched.json",
+      "testFile": "tests/bugs/BUG-013-closed-manual-not-stretched.test.ts",
+      "relatedTests": ["tests/visits.test.ts", "tests/bugs/BUG-011-confirmed-office-hours.test.ts"],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
       "id": "CORE-001",
       "title": "Heartbeat in-office uses SSID allowlist",
       "date": "2026-01",

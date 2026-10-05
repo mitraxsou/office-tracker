@@ -80,18 +80,12 @@ function mergeIntervalMs(intervals: Array<{ start: number; end: number }>): numb
   return merged.reduce((sum, interval) => sum + Math.max(0, interval.end - interval.start), 0);
 }
 
-function lastInOfficeHeartbeatOnDay(params: DaySpanParams): Date | null {
-  const dayStartMs = params.dayStart.getTime();
-  const dayEndMs = params.dayEnd.getTime();
-  return (
-    params.lastInOfficeHeartbeatAt ??
-    (params.lastHeartbeatAt &&
-    params.lastHeartbeatAt.getTime() >= dayStartMs &&
-    params.lastHeartbeatAt.getTime() <= dayEndMs
-      ? params.lastHeartbeatAt
-      : null)
-  );
-}
+type OfficeInterval = {
+  start: number;
+  end: number;
+  source: string;
+  closed: boolean;
+};
 
 function officeIntervalsForDay(
   visits: VisitForDaySpan[],
@@ -99,8 +93,9 @@ function officeIntervalsForDay(
 ): Array<{ start: number; end: number }> {
   const dayEndMs = params.dayEnd.getTime();
   const isCurrentDay = isCurrentCalendarDay(params.dayStart, params.dayEnd, params.now);
-  const lastHb = lastInOfficeHeartbeatOnDay(params);
-  const intervals: Array<{ start: number; end: number }> = [];
+  // Confirmed allowlisted office only. Never fall back to any agent sync.
+  const lastHb = params.lastInOfficeHeartbeatAt ?? null;
+  const intervals: OfficeInterval[] = [];
 
   for (const visit of visits) {
     if (visit.endAt === null && !isCurrentDay) continue;
@@ -117,7 +112,12 @@ function officeIntervalsForDay(
     const clippedEnd = Math.min(end.getTime(), dayEndMs);
     const start = clipToDay(visit.startAt.getTime(), params.dayStart, params.dayEnd);
     if (start === null || clippedEnd < start) continue;
-    intervals.push({ start, end: clippedEnd });
+    intervals.push({
+      start,
+      end: clippedEnd,
+      source: visit.source,
+      closed: visit.endAt !== null,
+    });
   }
 
   const openVisit = visits.find((visit) => visit.endAt === null) ?? null;
@@ -136,14 +136,23 @@ function officeIntervalsForDay(
     const start = clipToDay(openVisit.startAt.getTime(), params.dayStart, params.dayEnd);
     const endMs = Math.min(end.getTime(), dayEndMs);
     if (start !== null && endMs >= start) {
-      intervals.push({ start, end: endMs });
+      intervals.push({
+        start,
+        end: endMs,
+        source: openVisit.source,
+        closed: false,
+      });
     }
   }
 
   if (lastHb) {
     const hbEnd = Math.min(lastHb.getTime(), dayEndMs);
     const host = intervals
-      .filter((interval) => interval.start <= hbEnd)
+      .filter(
+        (interval) =>
+          interval.start <= hbEnd &&
+          !(isManualSource(interval.source) && interval.closed),
+      )
       .sort((a, b) => b.start - a.start)[0];
     if (host) {
       host.end = Math.max(host.end, hbEnd);
@@ -155,7 +164,11 @@ function officeIntervalsForDay(
     : null;
   if (firstHb !== null) {
     const host = intervals
-      .filter((interval) => interval.end >= firstHb)
+      .filter(
+        (interval) =>
+          interval.end >= firstHb &&
+          !(isManualSource(interval.source) && interval.closed),
+      )
       .sort((a, b) => a.start - b.start)[0];
     if (host && firstHb < host.start && host.start - firstHb <= params.staleMs) {
       host.start = firstHb;
@@ -168,11 +181,16 @@ function officeIntervalsForDay(
       firstHb ??
       clipToDay(lastHb.getTime(), params.dayStart, params.dayEnd);
     if (hbStart !== null && hbEnd >= hbStart && (openVisit || firstHb !== null)) {
-      intervals.push({ start: hbStart, end: hbEnd });
+      intervals.push({
+        start: hbStart,
+        end: hbEnd,
+        source: "wifi",
+        closed: false,
+      });
     }
   }
 
-  return intervals;
+  return intervals.map(({ start, end }) => ({ start, end }));
 }
 
 /** First clipped check-in on the day from visits, or a nearby in-office pulse. */
