@@ -291,6 +291,8 @@ function DeskClockTodayStatsGrid({
           tone={idealCheckout ? (metTarget ? "success" : "warning") : "muted"}
           tooltip={IDEAL_CHECKOUT_TOOLTIP}
         />
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
         <DashboardMiniStat
           label="Agent uptime"
           value={formatHoursHms(stats.laptopActiveHours)}
@@ -300,13 +302,11 @@ function DeskClockTodayStatsGrid({
               : LAPTOP_TOOLTIP
           }
         />
-        <div className="col-span-2 sm:col-span-3">
-          <DashboardMiniStat
-            label="Last synced"
-            value={stats.lastSyncedLabel}
-            tone={stats.lastSyncedTone}
-          />
-        </div>
+        <DashboardMiniStat
+          label="Last synced"
+          value={stats.lastSyncedLabel}
+          tone={stats.lastSyncedTone}
+        />
       </div>
     </div>
   );
