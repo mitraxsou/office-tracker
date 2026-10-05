@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { presenceSignalInOffice } from "./activity-signal";
 import { isOfficeSsid, normalizeSsid } from "./constants";
 import { getUserHoursTarget } from "./app-config";
 import { getCachedAppConfig } from "./agent-config-cache";
@@ -101,7 +102,14 @@ export async function processAgentSync(params: {
 
   let lastEventAt: Date | null = null;
   let lastInOffice = false;
+  let officeReportedAt: Date | null = null;
   let lastConfirmedPulseAt: Date | null = null;
+  const noteOffice = (at: Date, inOffice: boolean) => {
+    if (!inOffice) return;
+    if (!officeReportedAt || at.getTime() > officeReportedAt.getTime()) {
+      officeReportedAt = at;
+    }
+  };
   const pendingActivityTicks: Array<{
     id: string;
     at: Date;
@@ -164,6 +172,7 @@ export async function processAgentSync(params: {
           });
           lastEventAt = eventAt;
           lastInOffice = inOffice;
+          noteOffice(eventAt, inOffice);
           await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
           ackedEventIds.push(event.id);
           break;
@@ -225,6 +234,7 @@ export async function processAgentSync(params: {
           visitIds[localVisitId] = visit.id;
           lastEventAt = eventAt;
           lastInOffice = true;
+          noteOffice(eventAt, true);
           await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
           ackedEventIds.push(event.id);
           break;
@@ -288,6 +298,7 @@ export async function processAgentSync(params: {
           });
           lastEventAt = eventAt;
           lastInOffice = inOffice;
+          noteOffice(eventAt, inOffice);
           if (inOffice) lastConfirmedPulseAt = eventAt;
           break;
         }
@@ -386,10 +397,13 @@ export async function processAgentSync(params: {
         }
         case "health_ping": {
           const ssid = event.ssid ? normalizeSsid(sanitizeSsid(event.ssid) ?? event.ssid) : null;
-          const inOffice =
-            typeof event.inOffice === "boolean"
-              ? event.inOffice
-              : isOfficeSsid(ssid, allowlist);
+          const storedInOffice =
+            typeof event.inOffice === "boolean" ? event.inOffice : isOfficeSsid(ssid, allowlist);
+          const inOffice = presenceSignalInOffice({
+            ssid,
+            storedInOffice,
+            officeSsids: allowlist,
+          });
           await prisma.presenceTransition.create({
             data: {
               userId: params.userId,
@@ -412,6 +426,7 @@ export async function processAgentSync(params: {
           if (pulseAt) lastConfirmedPulseAt = pulseAt;
           lastEventAt = eventAt;
           lastInOffice = inOffice;
+          noteOffice(eventAt, inOffice);
           await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
           ackedEventIds.push(event.id);
           break;
@@ -433,6 +448,7 @@ export async function processAgentSync(params: {
           });
           lastEventAt = eventAt;
           lastInOffice = inOffice;
+          noteOffice(eventAt, inOffice);
           await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
           ackedEventIds.push(event.id);
           break;
@@ -454,6 +470,7 @@ export async function processAgentSync(params: {
           });
           lastEventAt = eventAt;
           lastInOffice = inOffice;
+          noteOffice(eventAt, inOffice);
           await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
           ackedEventIds.push(event.id);
           break;
@@ -506,7 +523,11 @@ export async function processAgentSync(params: {
   });
   const hoursTarget = await getUserHoursTarget({ hoursTarget: userRow?.hoursTarget ?? null });
   const alertRecordedAt = lastEventAt ?? new Date();
-  const alertInOffice = Boolean(openVisitRow) || lastInOffice;
+  const alertDay = dayKeyInTimezone(alertRecordedAt, params.userTimezone);
+  const officeOnAlertDay =
+    officeReportedAt !== null &&
+    dayKeyInTimezone(officeReportedAt, params.userTimezone) === alertDay;
+  const alertInOffice = Boolean(openVisitRow) || lastInOffice || officeOnAlertDay;
   try {
     await maybeDispatchHeartbeatAlerts({
       userId: params.userId,

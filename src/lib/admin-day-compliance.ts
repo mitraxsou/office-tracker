@@ -5,6 +5,9 @@ import {
   getLastAgentSignalBefore,
   groupAgentPulseRowsByUserId,
   lastAgentSignalAtOrBefore,
+  LIVE_PRESENCE_TYPES,
+  mergeConfirmedOfficeInstants,
+  presenceSignalInOffice,
 } from "./activity-signal";
 import { getAppConfig, getEffectiveAgentStaleGraceHours, getUserHoursTarget } from "./app-config";
 import {
@@ -226,6 +229,8 @@ export function computeUserDayComplianceRow(input: {
   ooo: boolean;
   visits: DayVisitRow[];
   dayPulses: DayPulseRow[];
+  /** Allowlisted presence instants for the same day, such as health snapshots. */
+  confirmedOfficeAt?: Date[];
   useActivity: boolean;
   officeSsids: string[];
   hoursTarget: number;
@@ -249,8 +254,12 @@ export function computeUserDayComplianceRow(input: {
     input.useActivity,
     input.officeSsids,
   );
-  const firstInOfficeHeartbeatAt = inOfficeToday[0]?.at ?? null;
-  const lastInOfficeHeartbeatAt = inOfficeToday[inOfficeToday.length - 1]?.at ?? null;
+  const confirmedBounds = mergeConfirmedOfficeInstants([
+    ...inOfficeToday.map((row) => row.at),
+    ...(input.confirmedOfficeAt ?? []),
+  ]);
+  const firstInOfficeHeartbeatAt = confirmedBounds.first;
+  const lastInOfficeHeartbeatAt = confirmedBounds.last;
 
   const params = {
     dayStart,
@@ -265,7 +274,10 @@ export function computeUserDayComplianceRow(input: {
   const hours = roundHoursToMinute(totalMs / (1000 * 60 * 60));
   const metTarget = hours >= input.hoursTarget;
 
-  const inOfficeHeartbeats = inOfficeToday.map((h) => h.at);
+  const inOfficeHeartbeats = [
+    ...inOfficeToday.map((h) => h.at),
+    ...(input.confirmedOfficeAt ?? []),
+  ];
   const attended = userAttendedOnDay({
     visits: input.visits,
     dayStart,
@@ -320,7 +332,7 @@ export async function evaluateUserDayCompliance(input: {
       ? input.lastHeartbeatBeforeDayEnd
       : await getLastAgentSignalBefore(user.id, dayEnd, useActivity);
 
-  const [ooo, visits, dayPulses] = await Promise.all([
+  const [ooo, visits, dayPulses, presenceRows] = await Promise.all([
     isUserOutOfOffice(user.id, dayKey),
     prisma.visit.findMany({
       where: {
@@ -331,6 +343,14 @@ export async function evaluateUserDayCompliance(input: {
       orderBy: { startAt: "asc" },
     }),
     loadDayPulseRowsForDay(user.id, dayStart, dayEnd, useActivity),
+    prisma.presenceTransition.findMany({
+      where: {
+        userId: user.id,
+        at: { gte: dayStart, lte: dayEnd },
+        type: { in: [...LIVE_PRESENCE_TYPES] },
+      },
+      select: { at: true, ssid: true, inOffice: true },
+    }),
   ]);
 
   return computeUserDayComplianceRow({
@@ -341,6 +361,7 @@ export async function evaluateUserDayCompliance(input: {
     ooo,
     visits,
     dayPulses,
+    confirmedOfficeAt: confirmedOfficeInstants(presenceRows, config.officeSsids),
     useActivity,
     officeSsids: config.officeSsids,
     hoursTarget,
@@ -398,7 +419,7 @@ export async function getAdminDayCompliance(
   const maxGraceHours = Math.max(...graceHoursList, 24);
   const staleLookbackStart = new Date(rangeStartMs - maxGraceHours * 60 * 60 * 1000);
 
-  const [oooRows, visitRows, pulseRows, hoursTargets] = await Promise.all([
+  const [oooRows, visitRows, pulseRows, presenceRows, hoursTargets] = await Promise.all([
     prisma.userOutOfOffice.findMany({
       where: {
         userId: { in: userIds },
@@ -453,6 +474,14 @@ export async function getAdminDayCompliance(
             inOffice: row.inOffice,
           })),
         ),
+    prisma.presenceTransition.findMany({
+      where: {
+        userId: { in: userIds },
+        at: { gte: rangeStart, lte: rangeEnd },
+        type: { in: [...LIVE_PRESENCE_TYPES] },
+      },
+      select: { userId: true, at: true, ssid: true, inOffice: true },
+    }),
     Promise.all(users.map((user) => getUserHoursTarget(user))),
   ]);
 
@@ -478,6 +507,12 @@ export async function getAdminDayCompliance(
   }
 
   const pulsesByUser = groupAgentPulseRowsByUserId(pulseRows);
+  const presenceByUser = new Map<string, Array<{ at: Date; ssid: string | null; inOffice: boolean }>>();
+  for (const row of presenceRows) {
+    const list = presenceByUser.get(row.userId) ?? [];
+    list.push({ at: row.at, ssid: row.ssid, inOffice: row.inOffice });
+    presenceByUser.set(row.userId, list);
+  }
 
   const rows = users.map((user, index) => {
     const bounds = userBounds.find((b) => b.userId === user.id)!;
@@ -499,6 +534,12 @@ export async function getAdminDayCompliance(
       ooo,
       visits: dayVisits,
       dayPulses,
+      confirmedOfficeAt: confirmedOfficeInstants(
+        (presenceByUser.get(user.id) ?? []).filter(
+          (row) => row.at >= bounds.dayStart && row.at <= bounds.dayEnd,
+        ),
+        officeSsids,
+      ),
       useActivity,
       officeSsids,
       hoursTarget: hoursTargets[index] ?? 0,
@@ -517,6 +558,21 @@ export async function getAdminDayCompliance(
 
 export function todayKeyForTimezone(timezone: string, now = new Date()): string {
   return dayKeyInTimezone(now, timezone);
+}
+
+function confirmedOfficeInstants(
+  rows: Array<{ at: Date; ssid: string | null; inOffice: boolean }>,
+  officeSsids: string[],
+): Date[] {
+  return rows
+    .filter((row) =>
+      presenceSignalInOffice({
+        ssid: row.ssid,
+        storedInOffice: row.inOffice,
+        officeSsids,
+      }),
+    )
+    .map((row) => row.at);
 }
 
 function emptyFutureDayUserRow(user: ComplianceUser, hoursTarget: number): AdminDayUserRow {

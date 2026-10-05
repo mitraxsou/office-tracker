@@ -227,6 +227,32 @@ describe("hours calculations", () => {
     expect(spanMs).toBeCloseTo(8.5 * ms(60), 0);
   });
 
+  it("caps a closed visit at the latest confirmed office time, not the page clock", () => {
+    const dayStart = new Date("2026-10-05T00:00:00+05:30");
+    const dayEnd = new Date("2026-10-05T23:59:59.999+05:30");
+    const entered = new Date("2026-10-05T15:15:00+05:30");
+    const confirmed = new Date("2026-10-05T16:16:00+05:30");
+    const visits = [
+      {
+        id: "1",
+        startAt: entered,
+        endAt: entered,
+        source: "wifi",
+        updatedAt: entered,
+      },
+    ];
+    const spanMs = daySpanMsForDay(visits, {
+      dayStart,
+      dayEnd,
+      now: new Date("2026-10-05T17:24:00+05:30"),
+      staleMs: VISIT_GAP_MS,
+      lastHeartbeatAt: confirmed,
+      firstInOfficeHeartbeatAt: entered,
+      lastInOfficeHeartbeatAt: confirmed,
+    });
+    expect(spanMs).toBe(61 * ms(1));
+  });
+
   it("open visit extends day past earlier closed manual visit", () => {
     const dayStart = new Date("2026-09-02T00:00:00+05:30");
     const dayEnd = new Date("2026-09-02T23:59:59.999+05:30");

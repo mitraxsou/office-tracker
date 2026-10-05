@@ -25,7 +25,7 @@ import {
   latestDeviceLastSeenAt,
   resolveAgentSyncHealth,
 } from "@/lib/activity-signal";
-import { formatLastHeartbeat } from "@/lib/visits";
+import { formatLastHeartbeat, formatTime } from "@/lib/visits";
 import { formatPulseAge } from "@/lib/pulse-age";
 import { getUserAgentVersionSummary } from "@/lib/agent-update";
 import {
@@ -106,6 +106,10 @@ export default async function DashboardPage() {
     !summary.lastHeartbeat.ssid &&
     (summary.lastHeartbeat.inOffice === true || summary.inOfficeNow);
   const openVisit = summary.visits.find((v) => v.endAt === null);
+  const confirmedThroughLabel =
+    !openVisit && summary.totalHours > 0 && summary.lastConfirmedOfficeAt
+      ? `Confirmed through ${formatTime(summary.lastConfirmedOfficeAt, user.timezone)}. Updates on the next agent sync.`
+      : null;
   const firstCheckIn =
     summary.visits.length > 0
       ? summary.visits.reduce((earliest, visit) =>
@@ -219,6 +223,7 @@ export default async function DashboardPage() {
           lastSyncedTone={lastSyncedTone}
           lastOfficeActivityLabel={lastOfficeActivityLabel}
           lastOfficeActivityTone={lastOfficeActivityTone}
+          confirmedThroughLabel={confirmedThroughLabel}
           openVisitStartAt={openVisit?.startAt ?? null}
           openVisitSsid={openVisit?.ssid ?? null}
         />

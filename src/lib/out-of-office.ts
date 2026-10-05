@@ -122,6 +122,40 @@ export async function removeOutOfOfficeRange(userId: string, rangeId: string) {
   });
 }
 
+export type OutOfOfficeSegment = {
+  startDate: string;
+  endDate: string;
+  source: string;
+};
+
+/**
+ * Days that remain after removing one calendar day from a range.
+ * Null means the day is outside the range. An empty list means the whole range goes away.
+ */
+export function remainingOutOfOfficeSegments(
+  row: { startDate: string; endDate: string; source: string },
+  dayKey: string,
+): OutOfOfficeSegment[] | null {
+  if (!isDayKeyInRange(dayKey, row.startDate, row.endDate)) return null;
+  if (row.startDate === dayKey && row.endDate === dayKey) return [];
+  const segments: OutOfOfficeSegment[] = [];
+  if (row.startDate < dayKey) {
+    segments.push({
+      startDate: row.startDate,
+      endDate: addDaysToDayKey(dayKey, -1),
+      source: row.source,
+    });
+  }
+  if (row.endDate > dayKey) {
+    segments.push({
+      startDate: addDaysToDayKey(dayKey, 1),
+      endDate: row.endDate,
+      source: row.source,
+    });
+  }
+  return segments;
+}
+
 /** Clears OOO for the given calendar day when office presence is detected. */
 export async function maybeClearOutOfOfficeOnOfficePresence(
   userId: string,
@@ -138,43 +172,31 @@ export async function maybeClearOutOfOfficeOnOfficePresence(
 
 export async function clearUserOutOfOffice(userId: string, dayKey: string) {
   assertValidDayKey(dayKey);
-  const covering = await prisma.userOutOfOffice.findMany({
-    where: {
-      userId,
-      startDate: { lte: dayKey },
-      endDate: { gte: dayKey },
-    },
+  await prisma.$transaction(async (tx) => {
+    const covering = await tx.userOutOfOffice.findMany({
+      where: {
+        userId,
+        startDate: { lte: dayKey },
+        endDate: { gte: dayKey },
+      },
+    });
+
+    for (const row of covering) {
+      const segments = remainingOutOfOfficeSegments(row, dayKey);
+      if (!segments) continue;
+      await tx.userOutOfOffice.delete({ where: { id: row.id } });
+      for (const segment of segments) {
+        await tx.userOutOfOffice.create({
+          data: {
+            userId,
+            startDate: segment.startDate,
+            endDate: segment.endDate,
+            source: segment.source,
+          },
+        });
+      }
+    }
   });
-
-  for (const row of covering) {
-    if (row.startDate === row.endDate && row.startDate === dayKey) {
-      await prisma.userOutOfOffice.delete({ where: { id: row.id } });
-      continue;
-    }
-
-    await prisma.userOutOfOffice.delete({ where: { id: row.id } });
-
-    if (row.startDate < dayKey) {
-      await prisma.userOutOfOffice.create({
-        data: {
-          userId,
-          startDate: row.startDate,
-          endDate: addDaysToDayKey(dayKey, -1),
-          source: row.source,
-        },
-      });
-    }
-    if (row.endDate > dayKey) {
-      await prisma.userOutOfOffice.create({
-        data: {
-          userId,
-          startDate: addDaysToDayKey(dayKey, 1),
-          endDate: row.endDate,
-          source: row.source,
-        },
-      });
-    }
-  }
 }
 
 export async function listUserOutOfOffice(userId: string, fromDayKey?: string) {

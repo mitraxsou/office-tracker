@@ -4,6 +4,7 @@ import {
   redeemOutOfOfficeLinkToken,
   isDayKeyInRange,
   dateRangesOverlap,
+  remainingOutOfOfficeSegments,
 } from "../src/lib/out-of-office";
 import { computeDeviceAgentStatus } from "../src/lib/device-status";
 
@@ -43,24 +44,69 @@ describe("out-of-office links", () => {
   });
 });
 
+describe("remainingOutOfOfficeSegments", () => {
+  it("removes only the confirmed day from a multi-day range", () => {
+    expect(
+      remainingOutOfOfficeSegments(
+        { startDate: "2026-10-03", endDate: "2026-10-07", source: "admin" },
+        "2026-10-05",
+      ),
+    ).toEqual([
+      { startDate: "2026-10-03", endDate: "2026-10-04", source: "admin" },
+      { startDate: "2026-10-06", endDate: "2026-10-07", source: "admin" },
+    ]);
+  });
+
+  it("keeps the tail when the first day is cleared", () => {
+    expect(
+      remainingOutOfOfficeSegments(
+        { startDate: "2026-10-05", endDate: "2026-10-07", source: "settings" },
+        "2026-10-05",
+      ),
+    ).toEqual([{ startDate: "2026-10-06", endDate: "2026-10-07", source: "settings" }]);
+  });
+
+  it("keeps the head when the last day is cleared", () => {
+    expect(
+      remainingOutOfOfficeSegments(
+        { startDate: "2026-10-03", endDate: "2026-10-05", source: "link" },
+        "2026-10-05",
+      ),
+    ).toEqual([{ startDate: "2026-10-03", endDate: "2026-10-04", source: "link" }]);
+  });
+
+  it("drops a single-day range", () => {
+    expect(
+      remainingOutOfOfficeSegments(
+        { startDate: "2026-10-05", endDate: "2026-10-05", source: "settings" },
+        "2026-10-05",
+      ),
+    ).toEqual([]);
+  });
+});
+
 describe("maybeClearOutOfOfficeOnOfficePresence", () => {
   it("clears OOO for the matching day when user is marked out", async () => {
     const prismaFindFirst = vi.fn().mockResolvedValue({ id: "ooo-1" });
     const prismaDelete = vi.fn().mockResolvedValue({});
+    const userOutOfOffice = {
+      findFirst: prismaFindFirst,
+      findMany: vi.fn().mockResolvedValue([
+        {
+          id: "ooo-1",
+          startDate: "2026-09-08",
+          endDate: "2026-09-08",
+          source: "settings",
+        },
+      ]),
+      delete: prismaDelete,
+      create: vi.fn(),
+    };
     vi.doMock("../src/lib/db", () => ({
       prisma: {
-        userOutOfOffice: {
-          findFirst: prismaFindFirst,
-          findMany: vi.fn().mockResolvedValue([
-            {
-              id: "ooo-1",
-              startDate: "2026-09-08",
-              endDate: "2026-09-08",
-              source: "settings",
-            },
-          ]),
-          delete: prismaDelete,
-        },
+        userOutOfOffice,
+        $transaction: async (fn: (tx: { userOutOfOffice: typeof userOutOfOffice }) => Promise<void>) =>
+          fn({ userOutOfOffice }),
       },
     }));
 

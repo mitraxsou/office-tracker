@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const agentEventFindUniqueMock = vi.hoisted(() => vi.fn());
 const agentEventUpsertMock = vi.hoisted(() => vi.fn());
@@ -76,6 +76,16 @@ import {
   syncBatchNeedsVisitMaintenance,
 } from "../src/lib/agent-sync";
 import { dayBoundsFromKey } from "../src/lib/timezone-dates";
+
+// Sync fixtures are dated September 2026. Pin the clock so the 7-day event window stays valid.
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-09-25T12:30:00.000Z"));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("parseAgentSyncEvents", () => {
   it("parses valid event array", () => {

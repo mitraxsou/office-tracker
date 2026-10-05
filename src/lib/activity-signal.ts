@@ -174,12 +174,33 @@ export function resolveAgentSyncHealth(
 }
 
 export async function getLastOfficeActivityAt(userId: string): Promise<Date | null> {
-  const tick = await prisma.activityTick.findFirst({
-    where: { userId, inOffice: true },
-    orderBy: { at: "desc" },
-    select: { at: true },
-  });
-  return tick?.at ?? null;
+  const config = await getAppConfig();
+  const [ticks, transitions] = await Promise.all([
+    prisma.activityTick.findMany({
+      where: { userId, inOffice: true },
+      orderBy: { at: "desc" },
+      take: 20,
+      select: { at: true, ssid: true, inOffice: true },
+    }),
+    prisma.presenceTransition.findMany({
+      where: {
+        userId,
+        inOffice: true,
+        type: { in: [...LIVE_PRESENCE_TYPES] },
+      },
+      orderBy: { at: "desc" },
+      take: 20,
+      select: { at: true, ssid: true, inOffice: true },
+    }),
+  ]);
+  return latestConfirmedOfficeAt(
+    [...ticks, ...transitions].map((row) => ({
+      at: row.at,
+      ssid: row.ssid,
+      storedInOffice: row.inOffice,
+    })),
+    config.officeSsids,
+  );
 }
 
 export function deviceRegistrationReferenceAt(
@@ -227,6 +248,48 @@ export function presenceSignalInOffice(params: {
 }): boolean {
   if (params.ssid) return isOfficeSsid(params.ssid, params.officeSsids);
   return params.storedInOffice;
+}
+
+export type ConfirmedOfficeSignal = {
+  at: Date;
+  ssid: string | null;
+  storedInOffice: boolean;
+};
+
+/** Latest allowlisted office instant. A personal network name does not qualify. */
+export function latestConfirmedOfficeAt(
+  signals: ConfirmedOfficeSignal[],
+  officeSsids: string[],
+): Date | null {
+  let latest: Date | null = null;
+  for (const signal of signals) {
+    if (Number.isNaN(signal.at.getTime())) continue;
+    if (
+      !presenceSignalInOffice({
+        ssid: signal.ssid,
+        storedInOffice: signal.storedInOffice,
+        officeSsids,
+      })
+    ) {
+      continue;
+    }
+    if (!latest || signal.at.getTime() > latest.getTime()) latest = signal.at;
+  }
+  return latest;
+}
+
+/** First and last valid instants. Empty values are ignored. */
+export function mergeConfirmedOfficeInstants(
+  instants: Array<Date | null | undefined>,
+): { first: Date | null; last: Date | null } {
+  let first: Date | null = null;
+  let last: Date | null = null;
+  for (const instant of instants) {
+    if (!instant || Number.isNaN(instant.getTime())) continue;
+    if (!first || instant.getTime() < first.getTime()) first = instant;
+    if (!last || instant.getTime() > last.getTime()) last = instant;
+  }
+  return { first, last };
 }
 
 export function pickNewerPresenceSignal(

@@ -9,7 +9,10 @@ import {
   getLastAgentSignalOnDay,
   getLatestLivePresenceSignal,
   heartbeatToSignal,
+  LIVE_PRESENCE_TYPES,
+  mergeConfirmedOfficeInstants,
   presenceFreshMs,
+  presenceSignalInOffice,
   resolveAgentSignalMode,
   resolveInOfficeNow,
   type AgentSignalSnapshot,
@@ -20,6 +23,7 @@ import { maybePurgeOldHeartbeats } from "./heartbeat-retention";
 import { resolveLaptopActiveForDay, laptopActiveHoursForDay, type LaptopActiveParams } from "./laptop-active";
 import { daySpanMsForDay, dayKeyInTimezone, effectiveVisitEnd, type DaySpanParams } from "./visits";
 import { dayBoundsFromKey, getDayBounds } from "./timezone-dates";
+import { maybeClearOutOfOfficeOnOfficePresence } from "./out-of-office";
 import { validateVisitTimestamps } from "./visit-validation";
 
 /** Skip repeat maintenance on dashboard reads within this window. */
@@ -136,8 +140,30 @@ export async function loadDaySpanContext(
 
   const dayPulses = await loadDayPulseRowsForDay(userId, dayStart, dayEnd, useActivity);
   const inOfficeToday = filterInOfficeDayPulses(dayPulses, useActivity, allowlist);
-  firstInOfficeHeartbeatAt = inOfficeToday[0]?.at ?? null;
-  lastInOfficeHeartbeatAt = inOfficeToday[inOfficeToday.length - 1]?.at ?? null;
+  const presenceRows = await prisma.presenceTransition.findMany({
+    where: {
+      userId,
+      at: { gte: dayStart, lte: dayEnd },
+      type: { in: [...LIVE_PRESENCE_TYPES] },
+    },
+    orderBy: { at: "asc" },
+    select: { at: true, type: true, ssid: true, inOffice: true },
+  });
+  const confirmedPresenceAt = presenceRows
+    .filter((row) =>
+      presenceSignalInOffice({
+        ssid: row.ssid,
+        storedInOffice: row.inOffice,
+        officeSsids: allowlist,
+      }),
+    )
+    .map((row) => row.at);
+  const confirmedBounds = mergeConfirmedOfficeInstants([
+    ...inOfficeToday.map((row) => row.at),
+    ...confirmedPresenceAt,
+  ]);
+  firstInOfficeHeartbeatAt = confirmedBounds.first;
+  lastInOfficeHeartbeatAt = confirmedBounds.last;
   if (useActivity) {
     lastSignalOverall = lastActivity?.at ?? null;
     lastHeartbeat = lastActivity ? activityTickToSignal(lastActivity) : null;
@@ -147,17 +173,10 @@ export async function loadDaySpanContext(
   }
   uptimeSignals = dayPulses.map((row) => ({ at: row.at, kind: "tick" as const }));
 
-  const sessionResumes = await prisma.presenceTransition.findMany({
-    where: {
-      userId,
-      type: "session_resume",
-      at: { gte: dayStart, lte: dayEnd },
-    },
-    orderBy: { at: "asc" },
-    select: { at: true },
-  });
-  for (const row of sessionResumes) {
-    uptimeSignals.push({ at: row.at, kind: "session_resume" });
+  for (const row of presenceRows) {
+    if (row.type === "session_resume") {
+      uptimeSignals.push({ at: row.at, kind: "session_resume" });
+    }
   }
   uptimeSignals.sort((a, b) => a.at.getTime() - b.at.getTime());
 
@@ -560,6 +579,14 @@ export async function getTodaySummary(
 
   const totalMs = daySpanMsForDay(visits, params);
   const totalHours = totalMs / (1000 * 60 * 60);
+  const lastConfirmedOfficeAt = params.lastInOfficeHeartbeatAt;
+  if (lastConfirmedOfficeAt) {
+    try {
+      await maybeClearOutOfOfficeOnOfficePresence(userId, timezone, lastConfirmedOfficeAt);
+    } catch {
+      console.error("[today] Failed to clear out of office after office presence");
+    }
+  }
   const laptopActiveHours = laptopActiveHoursForDay(laptopActiveParams);
   const useActivity = agentModeUsesActivityTicks(config.agentMode);
   const freshMs = presenceFreshMs(useActivity, params.staleMs);
@@ -608,6 +635,7 @@ export async function getTodaySummary(
     hoursTarget,
     metTarget: totalHours >= hoursTarget,
     remainingHours: Math.max(0, hoursTarget - totalHours),
+    lastConfirmedOfficeAt,
     inOfficeNow: resolveInOfficeNow({
       hasOpenVisit: Boolean(openVisit),
       openVisitManual: openVisit?.source === "manual",

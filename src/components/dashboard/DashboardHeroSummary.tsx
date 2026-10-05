@@ -11,6 +11,7 @@ type DashboardHeroSummaryProps = {
   lastSyncedTone: StatusTone;
   lastOfficeActivityLabel: string;
   lastOfficeActivityTone: StatusTone;
+  confirmedThroughLabel: string | null;
   openVisitStartAt: Date | null;
   openVisitSsid: string | null;
 };
@@ -25,6 +26,7 @@ export function DashboardHeroSummary({
   lastSyncedTone,
   lastOfficeActivityLabel,
   lastOfficeActivityTone,
+  confirmedThroughLabel,
   openVisitStartAt,
   openVisitSsid,
 }: DashboardHeroSummaryProps) {
@@ -74,8 +76,13 @@ export function DashboardHeroSummary({
         </p>
       </div>
 
+      {confirmedThroughLabel && (
+        <p className="mt-2 text-xs text-foreground">{confirmedThroughLabel}</p>
+      )}
+
       <p className="mt-2 text-[11px] text-muted">
-        {dayKey} · First check-in to last check-out counts toward today&apos;s target.
+        {dayKey} · First check-in to last confirmed office time counts toward today&apos;s target.
+        The day total is final after the last agent sync.
       </p>
     </section>
   );

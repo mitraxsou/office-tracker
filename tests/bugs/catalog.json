@@ -147,6 +147,20 @@
       "skipReason": null
     },
     {
+      "id": "BUG-011",
+      "title": "Closed visit stayed at 0h after a later in-office health snapshot",
+      "date": "2026-10",
+      "severity": "high",
+      "area": "visits",
+      "reproSummary": "A zero-duration office visit at 3:15 PM was followed by a pwcglb.com health snapshot at 4:16 PM. The dashboard showed In office Yes and 0.0h, and last office activity stayed on an older personal-network day. Out of office also stayed set.",
+      "assertion": "Allowlisted presence extends the day span through the latest confirmed office timestamp. Personal SSIDs do not. The span does not run to the page clock.",
+      "fixture": "fixtures/confirmed-office-through-snapshot.json",
+      "testFile": "tests/bugs/BUG-011-confirmed-office-hours.test.ts",
+      "relatedTests": ["tests/visits.test.ts", "tests/out-of-office.test.ts", "tests/activity-signal.test.ts"],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
       "id": "CORE-001",
       "title": "Heartbeat in-office uses SSID allowlist",
       "date": "2026-01",
