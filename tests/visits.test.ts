@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_HOURS_TARGET, VISIT_GAP_MS } from "../src/lib/constants";
 import {
+  liveOfficeMsForDay,
   daySpanHoursForDay,
   daySpanMsForDay,
   effectiveVisitEnd,
@@ -251,6 +252,35 @@ describe("hours calculations", () => {
       lastInOfficeHeartbeatAt: confirmed,
     });
     expect(spanMs).toBe(61 * ms(1));
+  });
+
+  it("live office time stretches to the page clock while still in office", () => {
+    const dayStart = new Date("2026-10-05T00:00:00+05:30");
+    const dayEnd = new Date("2026-10-05T23:59:59.999+05:30");
+    const entered = new Date("2026-10-05T15:15:00+05:30");
+    const confirmed = new Date("2026-10-05T17:18:00+05:30");
+    const now = new Date("2026-10-05T18:00:00+05:30");
+    const visits = [
+      {
+        id: "1",
+        startAt: entered,
+        endAt: entered,
+        source: "wifi",
+        updatedAt: entered,
+      },
+    ];
+    const params = {
+      dayStart,
+      dayEnd,
+      now,
+      staleMs: VISIT_GAP_MS,
+      lastHeartbeatAt: confirmed,
+      firstInOfficeHeartbeatAt: entered,
+      lastInOfficeHeartbeatAt: confirmed,
+    };
+    expect(daySpanMsForDay(visits, params)).toBe(confirmed.getTime() - entered.getTime());
+    expect(liveOfficeMsForDay(visits, params, true)).toBe(now.getTime() - entered.getTime());
+    expect(liveOfficeMsForDay(visits, params, false)).toBe(confirmed.getTime() - entered.getTime());
   });
 
   it("open visit extends day past earlier closed manual visit", () => {

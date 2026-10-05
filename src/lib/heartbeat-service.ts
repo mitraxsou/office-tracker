@@ -21,7 +21,7 @@ import {
 import { heartbeatInOffice } from "./heartbeat-office";
 import { maybePurgeOldHeartbeats } from "./heartbeat-retention";
 import { resolveLaptopActiveForDay, laptopActiveHoursForDay, type LaptopActiveParams } from "./laptop-active";
-import { daySpanMsForDay, dayKeyInTimezone, effectiveVisitEnd, type DaySpanParams } from "./visits";
+import { daySpanMsForDay, dayKeyInTimezone, effectiveVisitEnd, liveOfficeMsForDay, type DaySpanParams } from "./visits";
 import { dayBoundsFromKey, getDayBounds } from "./timezone-dates";
 import { maybeClearOutOfOfficeOnOfficePresence } from "./out-of-office";
 import { validateVisitTimestamps } from "./visit-validation";
@@ -627,24 +627,31 @@ export async function getTodaySummary(
     livePresence?.inOffice === true &&
     checkedOutAt.getTime() > pulseAt.getTime();
 
+  const inOfficeNow = resolveInOfficeNow({
+    hasOpenVisit: Boolean(openVisit),
+    openVisitManual: openVisit?.source === "manual",
+    openVisitRecent,
+    openVisitAfterPulse,
+    pulseRecent: livePulseRecent,
+    lastPulseInOffice: livePresence?.inOffice ?? false,
+    checkedOutAfterPulse,
+  });
+
+  const liveMs = liveOfficeMsForDay(visits, params, inOfficeNow);
+  const liveHours = liveMs / (1000 * 60 * 60);
+
   return {
     dayKey,
     totalHours,
+    confirmedHours: totalHours,
+    liveHours,
     laptopActiveHours,
     firstAgentOnAt,
     hoursTarget,
-    metTarget: totalHours >= hoursTarget,
-    remainingHours: Math.max(0, hoursTarget - totalHours),
+    metTarget: liveHours >= hoursTarget,
+    remainingHours: Math.max(0, hoursTarget - liveHours),
     lastConfirmedOfficeAt,
-    inOfficeNow: resolveInOfficeNow({
-      hasOpenVisit: Boolean(openVisit),
-      openVisitManual: openVisit?.source === "manual",
-      openVisitRecent,
-      openVisitAfterPulse,
-      pulseRecent: livePulseRecent,
-      lastPulseInOffice: livePresence?.inOffice ?? false,
-      checkedOutAfterPulse,
-    }),
+    inOfficeNow,
     visits,
     lastHeartbeat,
     livePresence,
@@ -658,11 +665,8 @@ export async function getQuickMetTarget(
   timezone: string,
   hoursTarget: number,
 ): Promise<boolean> {
-  const now = new Date();
-  const { dayKey } = getDayBounds(now, timezone);
-  const { visits, params } = await loadDaySpanContext(userId, dayKey, timezone);
-  const totalMs = daySpanMsForDay(visits, params);
-  return totalMs / (1000 * 60 * 60) >= hoursTarget;
+  const summary = await getTodaySummary(userId, timezone, hoursTarget);
+  return summary.liveHours >= hoursTarget;
 }
 
 export function laptopActiveHoursFromContext(

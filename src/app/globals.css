@@ -215,6 +215,10 @@ html[data-theme="light"] .text-blue-400 {
   background: var(--pwc-orange);
 }
 
+.progress-fill-estimated {
+  background: var(--pwc-yellow);
+}
+
 .progress-fill-met {
   background: var(--success);
 }

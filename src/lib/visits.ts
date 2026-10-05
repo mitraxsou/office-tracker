@@ -60,27 +60,12 @@ function isManualSource(source: string): boolean {
   return source === "manual";
 }
 
-/**
- * Daily total: first check-in to last check-out on the day (gaps between visits count).
- * lastOut is the max of all visit effective ends, last in-office heartbeat, and now for
- * an open visit on the current day. Manual check-out does not cap later office activity.
- * Capped at 24 hours.
- */
-export function daySpanMsForDay(
+/** First clipped check-in on the day from visits or an in-office pulse. */
+export function firstOfficeInMsForDay(
   visits: VisitForDaySpan[],
-  params: DaySpanParams
-): number {
-  const dayStartMs = params.dayStart.getTime();
-  const dayEndMs = params.dayEnd.getTime();
+  params: DaySpanParams,
+): number | null {
   const firstHb = params.firstInOfficeHeartbeatAt ?? null;
-  const lastHb =
-    params.lastInOfficeHeartbeatAt ??
-    (params.lastHeartbeatAt &&
-    params.lastHeartbeatAt.getTime() >= dayStartMs &&
-    params.lastHeartbeatAt.getTime() <= dayEndMs
-      ? params.lastHeartbeatAt
-      : null);
-
   let firstIn: number | null = null;
   const isCurrentDay = isCurrentCalendarDay(params.dayStart, params.dayEnd, params.now);
 
@@ -99,6 +84,51 @@ export function daySpanMsForDay(
       firstIn = hbStart;
     }
   }
+
+  return firstIn;
+}
+
+/**
+ * While still in office, stretch confirmed time to the page clock so the user
+ * can see remaining time until the 5h target. Does not change stored hours.
+ */
+export function liveOfficeMsForDay(
+  visits: VisitForDaySpan[],
+  params: DaySpanParams,
+  inOfficeNow: boolean,
+): number {
+  const confirmedMs = daySpanMsForDay(visits, params);
+  if (!inOfficeNow) return confirmedMs;
+  if (!isCurrentCalendarDay(params.dayStart, params.dayEnd, params.now)) return confirmedMs;
+  const firstIn = firstOfficeInMsForDay(visits, params);
+  if (firstIn === null) return confirmedMs;
+  const nowMs = Math.min(params.now.getTime(), params.dayEnd.getTime());
+  const liveMs = Math.max(0, nowMs - firstIn);
+  return Math.min(Math.max(confirmedMs, liveMs), MS_PER_DAY);
+}
+
+/**
+ * Daily total: first check-in to last check-out on the day (gaps between visits count).
+ * lastOut is the max of all visit effective ends, last in-office heartbeat, and now for
+ * an open visit on the current day. Manual check-out does not cap later office activity.
+ * Capped at 24 hours.
+ */
+export function daySpanMsForDay(
+  visits: VisitForDaySpan[],
+  params: DaySpanParams
+): number {
+  const dayStartMs = params.dayStart.getTime();
+  const dayEndMs = params.dayEnd.getTime();
+  const lastHb =
+    params.lastInOfficeHeartbeatAt ??
+    (params.lastHeartbeatAt &&
+    params.lastHeartbeatAt.getTime() >= dayStartMs &&
+    params.lastHeartbeatAt.getTime() <= dayEndMs
+      ? params.lastHeartbeatAt
+      : null);
+
+  const isCurrentDay = isCurrentCalendarDay(params.dayStart, params.dayEnd, params.now);
+  const firstIn = firstOfficeInMsForDay(visits, params);
 
   if (firstIn === null) return 0;
 

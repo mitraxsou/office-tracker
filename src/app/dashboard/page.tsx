@@ -107,8 +107,8 @@ export default async function DashboardPage() {
     (summary.lastHeartbeat.inOffice === true || summary.inOfficeNow);
   const openVisit = summary.visits.find((v) => v.endAt === null);
   const confirmedThroughLabel =
-    !openVisit && summary.totalHours > 0 && summary.lastConfirmedOfficeAt
-      ? `Confirmed through ${formatTime(summary.lastConfirmedOfficeAt, user.timezone)}. Updates on the next agent sync.`
+    summary.lastConfirmedOfficeAt
+      ? `Confirmed through ${formatTime(summary.lastConfirmedOfficeAt, user.timezone)}. Yellow is estimated until the next agent sync.`
       : null;
   const firstCheckIn =
     summary.visits.length > 0
@@ -151,7 +151,7 @@ export default async function DashboardPage() {
     hourInTimezone(greetingNow, user.timezone),
   );
   const statusInput = {
-    totalHours: summary.totalHours,
+    totalHours: summary.liveHours,
     targetHours: summary.hoursTarget,
     metTarget: summary.metTarget,
     inOfficeNow: summary.inOfficeNow,
@@ -199,7 +199,7 @@ export default async function DashboardPage() {
           monthKey={monthlyProgress.monthKey}
           monthDays={monthlyProgress.days}
           todayStats={{
-            totalHours: summary.totalHours,
+            totalHours: summary.liveHours,
             targetHours: summary.hoursTarget,
             metTarget: summary.metTarget,
             inOfficeNow: summary.inOfficeNow,
@@ -214,9 +214,11 @@ export default async function DashboardPage() {
         />
 
         <DashboardHeroSummary
-          totalHours={summary.totalHours}
+          totalHours={summary.liveHours}
+          confirmedHours={summary.confirmedHours}
           targetHours={summary.hoursTarget}
           metTarget={summary.metTarget}
+          inOfficeNow={summary.inOfficeNow}
           dayKey={summary.dayKey}
           timezone={user.timezone}
           lastSyncedLabel={lastSyncedLabel}

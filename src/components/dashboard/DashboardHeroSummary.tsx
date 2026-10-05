@@ -3,8 +3,10 @@ import { toneClass, type StatusTone } from "@/components/dashboard/DashboardMini
 
 type DashboardHeroSummaryProps = {
   totalHours: number;
+  confirmedHours: number;
   targetHours: number;
   metTarget: boolean;
+  inOfficeNow: boolean;
   dayKey: string;
   timezone: string;
   lastSyncedLabel: string;
@@ -18,8 +20,10 @@ type DashboardHeroSummaryProps = {
 
 export function DashboardHeroSummary({
   totalHours,
+  confirmedHours,
   targetHours,
   metTarget,
+  inOfficeNow,
   dayKey,
   timezone,
   lastSyncedLabel,
@@ -30,8 +34,11 @@ export function DashboardHeroSummary({
   openVisitStartAt,
   openVisitSsid,
 }: DashboardHeroSummaryProps) {
-  const pct = Math.min(100, (totalHours / targetHours) * 100);
   const remaining = Math.max(0, targetHours - totalHours);
+  const estimatedHours = Math.max(0, totalHours - confirmedHours);
+  const confirmedPct = Math.min(100, (confirmedHours / targetHours) * 100);
+  const estimatedPct = Math.min(100 - confirmedPct, (estimatedHours / targetHours) * 100);
+  const showEstimate = inOfficeNow && estimatedHours > 0.004;
 
   return (
     <section className="card card-brand card-wash p-4 sm:p-5">
@@ -42,6 +49,14 @@ export function DashboardHeroSummary({
             {totalHours.toFixed(1)}
             <span className="text-base font-normal text-muted sm:text-lg"> / {targetHours}h</span>
           </p>
+          {showEstimate && (
+            <p className="mt-1 text-xs text-muted">
+              <span className="text-foreground">{confirmedHours.toFixed(1)}h confirmed</span>
+              {" · "}
+              <span className="text-[var(--pwc-yellow)]">{estimatedHours.toFixed(1)}h estimated</span>
+              {" until the next agent sync"}
+            </p>
+          )}
         </div>
         <span
           className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium sm:px-3 sm:text-sm ${metTarget ? "badge-met" : "badge-pending"}`}
@@ -50,11 +65,14 @@ export function DashboardHeroSummary({
         </span>
       </div>
 
-      <div className="progress-track mt-3 h-2 overflow-hidden rounded-full sm:h-2.5">
+      <div className="progress-track mt-3 flex h-2 overflow-hidden rounded-full sm:h-2.5">
         <div
-          className={`h-full rounded-full transition-all ${metTarget ? "progress-fill-met" : "progress-fill"}`}
-          style={{ width: `${pct}%` }}
+          className={`h-full ${metTarget && !showEstimate ? "progress-fill-met" : "progress-fill"}`}
+          style={{ width: `${confirmedPct}%` }}
         />
+        {showEstimate && (
+          <div className="h-full progress-fill-estimated" style={{ width: `${estimatedPct}%` }} />
+        )}
       </div>
 
       {openVisitStartAt && (
@@ -81,8 +99,8 @@ export function DashboardHeroSummary({
       )}
 
       <p className="mt-2 text-[11px] text-muted">
-        {dayKey} · First check-in to last confirmed office time counts toward today&apos;s target.
-        The day total is final after the last agent sync.
+        {dayKey} · Orange is time confirmed by the agent. Yellow is estimated from first check-in
+        while you still look in office. The day total is final after the last agent sync.
       </p>
     </section>
   );

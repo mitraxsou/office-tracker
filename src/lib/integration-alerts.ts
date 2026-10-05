@@ -350,7 +350,7 @@ async function evaluateUserAlerts(
     alerts.push({
       ...base,
       type: "hours_met",
-      message: buildHoursMetMessage(summary.totalHours, hoursTarget),
+      message: buildHoursMetMessage(summary.liveHours ?? summary.totalHours, hoursTarget),
       deliveryChannel,
       notifyTeams: deliversToTeams(deliveryChannel),
     });
