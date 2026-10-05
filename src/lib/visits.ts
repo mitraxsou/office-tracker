@@ -60,26 +60,6 @@ function isManualSource(source: string): boolean {
   return source === "manual";
 }
 
-function mergeIntervalMs(intervals: Array<{ start: number; end: number }>): number {
-  const sorted = intervals
-    .filter((interval) => interval.end >= interval.start)
-    .sort((a, b) => a.start - b.start);
-  if (sorted.length === 0) return 0;
-
-  const merged: Array<{ start: number; end: number }> = [{ ...sorted[0] }];
-  for (let i = 1; i < sorted.length; i += 1) {
-    const current = sorted[i];
-    const last = merged[merged.length - 1];
-    if (current.start <= last.end) {
-      last.end = Math.max(last.end, current.end);
-    } else {
-      merged.push({ ...current });
-    }
-  }
-
-  return merged.reduce((sum, interval) => sum + Math.max(0, interval.end - interval.start), 0);
-}
-
 type OfficeInterval = {
   start: number;
   end: number;
@@ -223,8 +203,21 @@ export function firstOfficeInMsForDay(
   return firstIn;
 }
 
+function firstLastMsFromIntervals(
+  intervals: Array<{ start: number; end: number }>,
+): number {
+  if (intervals.length === 0) return 0;
+  let firstIn = intervals[0].start;
+  let lastOut = intervals[0].end;
+  for (const interval of intervals) {
+    if (interval.start < firstIn) firstIn = interval.start;
+    if (interval.end > lastOut) lastOut = interval.end;
+  }
+  return Math.max(0, lastOut - firstIn);
+}
+
 /**
- * While still in office, stretch the current session to the page clock so the user
+ * While still in office, stretch last-out to the page clock so the user
  * can see remaining time until the 5h target. Does not change stored hours.
  */
 export function liveOfficeMsForDay(
@@ -238,7 +231,7 @@ export function liveOfficeMsForDay(
     isCurrentCalendarDay(params.dayStart, params.dayEnd, params.now)
   ) {
     const nowMs = Math.min(params.now.getTime(), params.dayEnd.getTime());
-    const last = [...intervals].sort((a, b) => b.start - a.start)[0];
+    const last = [...intervals].sort((a, b) => b.end - a.end)[0];
     if (last) {
       last.end = Math.max(last.end, nowMs);
     } else {
@@ -248,20 +241,20 @@ export function liveOfficeMsForDay(
       }
     }
   }
-  return Math.min(mergeIntervalMs(intervals), MS_PER_DAY);
+  return Math.min(firstLastMsFromIntervals(intervals), MS_PER_DAY);
 }
 
 /**
- * Daily total: time actually spent in office (merged visit segments).
- * Gaps between separate visits do not count. Overlapping segments are not
- * double-counted. A later in-office snapshot can extend the last session.
- * A stray early pulse does not open a day-long span. Capped at 24 hours.
+ * Daily total: first check-in to last check-out (gaps between visits count).
+ * Closed manual visits keep their own endAt and are not stretched by agent syncs.
+ * A later confirmed office snapshot can extend a wifi session. A stray early
+ * pulse does not open a day-long span. Capped at 24 hours.
  */
 export function daySpanMsForDay(
   visits: VisitForDaySpan[],
   params: DaySpanParams
 ): number {
-  return Math.min(mergeIntervalMs(officeIntervalsForDay(visits, params)), MS_PER_DAY);
+  return Math.min(firstLastMsFromIntervals(officeIntervalsForDay(visits, params)), MS_PER_DAY);
 }
 
 export function daySpanHoursForDay(
@@ -316,20 +309,12 @@ export function effectiveVisitEnd(params: {
   return new Date(lastActivity.getTime() + params.staleMs);
 }
 
-/** Daily total for visits already scoped to one day: merged in-office segments. */
+/** Daily total for visits already scoped to one day: first in to last out. */
 export function totalHoursFromVisits(visits: VisitPoint[], now = new Date()): number {
   if (visits.length === 0) return 0;
-  return (
-    Math.min(
-      mergeIntervalMs(
-        visits.map((visit) => ({
-          start: visit.startAt.getTime(),
-          end: (visit.endAt ?? now).getTime(),
-        })),
-      ),
-      MS_PER_DAY,
-    ) / MS_PER_HOUR
-  );
+  const firstIn = Math.min(...visits.map((v) => v.startAt.getTime()));
+  const lastOut = Math.max(...visits.map((v) => (v.endAt ?? now).getTime()));
+  return Math.min(Math.max(0, lastOut - firstIn), MS_PER_DAY) / MS_PER_HOUR;
 }
 
 export function meetsHoursTarget(

@@ -130,7 +130,7 @@ export function MonthlyReportSection({
         <KpiCard
           label="Total office hours"
           value={formatHours(totalHours)}
-          tooltip="Total office time across all days in the selected month. Each day is time spent in office, not first check-in to last check-out."
+          tooltip="Total office time across all days in the selected month. Each day runs from first check-in to last check-out."
           tone="neutral"
         />
         <KpiCard

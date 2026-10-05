@@ -18,8 +18,8 @@ const fixture = JSON.parse(
   visits: Array<{ id: string; startAt: string; endAt: string }>;
 };
 
-describe("BUG-012 day total is time spent in office, not first pulse to last checkout", () => {
-  it("merges overlapping afternoon visits and ignores a leftover overnight pulse", () => {
+describe("BUG-012 day total is first visit check-in to last check-out, not overnight pulse", () => {
+  it("spans afternoon visits and ignores a leftover overnight pulse", () => {
     const { start: dayStart, end: dayEnd } = dayBoundsFromKey(
       fixture.dayKey,
       fixture.timezone,
