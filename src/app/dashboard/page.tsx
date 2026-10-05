@@ -211,6 +211,7 @@ export default async function DashboardPage() {
             firstAgentOnAt: summary.firstAgentOnAt,
             lastSyncedLabel,
             lastSyncedTone,
+            lastConfirmedOfficeAt: summary.lastConfirmedOfficeAt,
           }}
         />
 
@@ -228,6 +229,7 @@ export default async function DashboardPage() {
           lastOfficeActivityLabel={lastOfficeActivityLabel}
           lastOfficeActivityTone={lastOfficeActivityTone}
           confirmedThroughLabel={confirmedThroughLabel}
+          lastConfirmedOfficeAt={summary.lastConfirmedOfficeAt}
           openVisitStartAt={openVisit?.startAt ?? null}
           openVisitSsid={openVisit?.ssid ?? null}
         />

@@ -152,7 +152,7 @@ describe("hours calculations", () => {
     expect(visitDurationMs(visits[0])).toBeCloseTo(3 * ms(60), 0);
   });
 
-  it("uses first in to last out for daily total across gaps", () => {
+  it("sums merged in-office segments and ignores lunch gaps", () => {
     const visits = [
       {
         id: "1",
@@ -167,13 +167,13 @@ describe("hours calculations", () => {
         source: "wifi",
       },
     ];
-    expect(totalHoursFromVisits(visits)).toBeCloseTo(9, 1);
+    expect(totalHoursFromVisits(visits)).toBeCloseTo(8, 1);
     const segmentSum =
       visitDurationMs(visits[0]) + visitDurationMs(visits[1]);
     expect(segmentSum).toBeCloseTo(8 * ms(60), 0);
   });
 
-  it("daySpanMsForDay spans first check-in to last check-out", () => {
+  it("daySpanMsForDay sums in-office time and skips gaps", () => {
     const dayStart = new Date("2026-08-27T00:00:00+05:30");
     const dayEnd = new Date("2026-08-27T23:59:59.999+05:30");
     const visits = [
@@ -201,8 +201,8 @@ describe("hours calculations", () => {
       lastInOfficeHeartbeatAt: new Date("2026-08-27T18:00:00+05:30"),
     };
     const spanMs = daySpanMsForDay(visits, params);
-    expect(spanMs).toBeCloseTo(9 * ms(60), 0);
-    expect(daySpanHoursForDay(visits, params)).toBeCloseTo(9, 1);
+    expect(spanMs).toBeCloseTo(8 * ms(60), 0);
+    expect(daySpanHoursForDay(visits, params)).toBeCloseTo(8, 1);
   });
 
   it("extends wifi day to last in-office heartbeat after visit ended earlier", () => {
@@ -314,7 +314,7 @@ describe("hours calculations", () => {
       firstInOfficeHeartbeatAt: new Date("2026-09-02T18:22:00+05:30"),
       lastInOfficeHeartbeatAt: new Date("2026-09-02T18:58:00+05:30"),
     });
-    expect(spanMs).toBeCloseTo(6 * ms(60), 0);
+    expect(spanMs).toBeCloseTo(2 * ms(60) + 38 * ms(1), 0);
   });
 
   it("open manual visit extends to now when still in office", () => {
@@ -386,7 +386,7 @@ describe("hours calculations", () => {
     expect(spanMs).toBeCloseTo(8.5 * ms(60), 0);
   });
 
-  it("closed manual then closed wifi spans first-in to last-out (Arnab)", () => {
+  it("closed manual then closed wifi sums both sessions (Arnab)", () => {
     const dayStart = new Date("2026-09-02T00:00:00+05:30");
     const dayEnd = new Date("2026-09-02T23:59:59.999+05:30");
     const visits = [
@@ -414,7 +414,7 @@ describe("hours calculations", () => {
       firstInOfficeHeartbeatAt: new Date("2026-09-02T17:35:00+05:30"),
       lastInOfficeHeartbeatAt: new Date("2026-09-02T20:08:00+05:30"),
     });
-    expect(spanMs).toBeCloseTo(5.1 * ms(60), 0);
+    expect(spanMs).toBeCloseTo((32 + 153) * ms(1), 0);
     expect(daySpanHoursForDay(visits, {
       dayStart,
       dayEnd,
@@ -423,7 +423,7 @@ describe("hours calculations", () => {
       lastHeartbeatAt: new Date("2026-09-02T20:08:00+05:30"),
       firstInOfficeHeartbeatAt: new Date("2026-09-02T17:35:00+05:30"),
       lastInOfficeHeartbeatAt: new Date("2026-09-02T20:08:00+05:30"),
-    })).toBeGreaterThanOrEqual(5);
+    })).toBeCloseTo(3 + 5 / 60, 2);
   });
 
   it("open visit on current day extends to now when agent is healthy", () => {
@@ -484,7 +484,7 @@ describe("hours calculations", () => {
     expect(withoutHeartbeats).toBe(0);
   });
 
-  it("first-in last-out across lunch gap with heartbeat tail", () => {
+  it("does not count lunch gap even with a heartbeat tail on the last session", () => {
     const dayStart = new Date("2026-08-27T00:00:00+05:30");
     const dayEnd = new Date("2026-08-27T23:59:59.999+05:30");
     const visits = [
@@ -512,7 +512,46 @@ describe("hours calculations", () => {
       lastHeartbeatAt: lastHb,
       lastInOfficeHeartbeatAt: lastHb,
     });
-    expect(spanMs).toBeCloseTo(9 * ms(60), 0);
+    expect(spanMs).toBeCloseTo(8 * ms(60), 0);
+  });
+
+  it("does not let a leftover overnight pulse turn afternoon visits into a 21h day", () => {
+    const dayStart = new Date("2026-09-25T00:00:00+05:30");
+    const dayEnd = new Date("2026-09-25T23:59:59.999+05:30");
+    const visits = [
+      {
+        id: "1",
+        startAt: new Date("2026-09-25T14:39:00+05:30"),
+        endAt: new Date("2026-09-25T15:14:00+05:30"),
+        source: "wifi",
+        updatedAt: new Date("2026-09-25T15:14:00+05:30"),
+      },
+      {
+        id: "2",
+        startAt: new Date("2026-09-25T14:39:00+05:30"),
+        endAt: new Date("2026-09-25T15:06:00+05:30"),
+        source: "wifi",
+        updatedAt: new Date("2026-09-25T15:06:00+05:30"),
+      },
+      {
+        id: "3",
+        startAt: new Date("2026-09-25T15:14:00+05:30"),
+        endAt: new Date("2026-09-25T22:03:00+05:30"),
+        source: "wifi",
+        updatedAt: new Date("2026-09-25T22:03:00+05:30"),
+      },
+    ];
+    const spanMs = daySpanMsForDay(visits, {
+      dayStart,
+      dayEnd,
+      now: new Date("2026-10-05T18:00:00+05:30"),
+      staleMs: VISIT_GAP_MS,
+      lastHeartbeatAt: new Date("2026-09-25T22:03:00+05:30"),
+      firstInOfficeHeartbeatAt: new Date("2026-09-25T00:37:00+05:30"),
+      lastInOfficeHeartbeatAt: new Date("2026-09-25T22:03:00+05:30"),
+    });
+    expect(spanMs).toBeCloseTo(7 * ms(60) + 24 * ms(1), 0);
+    expect(spanMs).toBeLessThan(10 * ms(60));
   });
 
   it("detects 5h target met", () => {

@@ -43,6 +43,7 @@ export type DeskClockTodayStats = {
   firstAgentOnAt: Date | null;
   lastSyncedLabel: string;
   lastSyncedTone: StatusTone;
+  lastConfirmedOfficeAt?: Date | null;
 };
 
 type DeskClockPanelProps = {
@@ -237,7 +238,14 @@ export function DeskClockPanel({
 }
 
 function liveOfficeHoursFromStats(stats: DeskClockTodayStats, now: Date): number {
-  if (!stats.inOfficeNow || !stats.firstCheckIn) return stats.totalHours;
+  if (!stats.inOfficeNow) return stats.totalHours;
+  if (stats.lastConfirmedOfficeAt) {
+    const extra =
+      Math.max(0, now.getTime() - new Date(stats.lastConfirmedOfficeAt).getTime()) /
+      (1000 * 60 * 60);
+    return Math.max(stats.totalHours, stats.confirmedHours + extra);
+  }
+  if (!stats.firstCheckIn) return stats.totalHours;
   const fromFirst =
     Math.max(0, now.getTime() - new Date(stats.firstCheckIn).getTime()) / (1000 * 60 * 60);
   return Math.max(stats.confirmedHours, fromFirst, stats.totalHours);

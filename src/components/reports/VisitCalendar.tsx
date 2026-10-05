@@ -176,8 +176,8 @@ export function VisitCalendar({
       {!compact && (
         <p className="text-xs text-muted">
           Green = daily target met ({hoursTarget}h). Orange tint = visits but below target. Daily
-          total is first check-in to last check-out (gaps count). Last in-office activity counts as
-          checkout unless you checked out manually. Click a day for visit details.
+          total is time spent in office (gaps between visits do not count). Last in-office activity
+          can extend the last session unless you checked out manually. Click a day for visit details.
         </p>
       )}
 
@@ -227,7 +227,7 @@ function VisitDayDetail({
         <div>
           <h3 className="font-medium text-accent">{dayLabel}</h3>
           <p className="mt-1 text-sm text-muted">
-            Total: {formatHours(totalHours)} / {hoursTarget}h target (first check-in to last check-out)
+            Total: {formatHours(totalHours)} / {hoursTarget}h target (time spent in office)
             {" · "}
             <span className={metTarget ? "text-green-400" : "text-accent"}>
               {metTarget ? "Target met" : "Below target"}

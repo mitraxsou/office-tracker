@@ -60,7 +60,122 @@ function isManualSource(source: string): boolean {
   return source === "manual";
 }
 
-/** First clipped check-in on the day from visits or an in-office pulse. */
+function mergeIntervalMs(intervals: Array<{ start: number; end: number }>): number {
+  const sorted = intervals
+    .filter((interval) => interval.end >= interval.start)
+    .sort((a, b) => a.start - b.start);
+  if (sorted.length === 0) return 0;
+
+  const merged: Array<{ start: number; end: number }> = [{ ...sorted[0] }];
+  for (let i = 1; i < sorted.length; i += 1) {
+    const current = sorted[i];
+    const last = merged[merged.length - 1];
+    if (current.start <= last.end) {
+      last.end = Math.max(last.end, current.end);
+    } else {
+      merged.push({ ...current });
+    }
+  }
+
+  return merged.reduce((sum, interval) => sum + Math.max(0, interval.end - interval.start), 0);
+}
+
+function lastInOfficeHeartbeatOnDay(params: DaySpanParams): Date | null {
+  const dayStartMs = params.dayStart.getTime();
+  const dayEndMs = params.dayEnd.getTime();
+  return (
+    params.lastInOfficeHeartbeatAt ??
+    (params.lastHeartbeatAt &&
+    params.lastHeartbeatAt.getTime() >= dayStartMs &&
+    params.lastHeartbeatAt.getTime() <= dayEndMs
+      ? params.lastHeartbeatAt
+      : null)
+  );
+}
+
+function officeIntervalsForDay(
+  visits: VisitForDaySpan[],
+  params: DaySpanParams,
+): Array<{ start: number; end: number }> {
+  const dayEndMs = params.dayEnd.getTime();
+  const isCurrentDay = isCurrentCalendarDay(params.dayStart, params.dayEnd, params.now);
+  const lastHb = lastInOfficeHeartbeatOnDay(params);
+  const intervals: Array<{ start: number; end: number }> = [];
+
+  for (const visit of visits) {
+    if (visit.endAt === null && !isCurrentDay) continue;
+    if (visit.endAt === null && isManualSource(visit.source) && isCurrentDay) continue;
+    const end = effectiveVisitEnd({
+      endAt: visit.endAt,
+      updatedAt: visit.updatedAt ?? visit.startAt,
+      startAt: visit.startAt,
+      now: params.now,
+      staleMs: params.staleMs,
+      lastHeartbeatAt: params.lastHeartbeatAt,
+      dayEnd: params.dayEnd,
+    });
+    const clippedEnd = Math.min(end.getTime(), dayEndMs);
+    const start = clipToDay(visit.startAt.getTime(), params.dayStart, params.dayEnd);
+    if (start === null || clippedEnd < start) continue;
+    intervals.push({ start, end: clippedEnd });
+  }
+
+  const openVisit = visits.find((visit) => visit.endAt === null) ?? null;
+  if (openVisit && isCurrentDay) {
+    const end = isManualSource(openVisit.source)
+      ? params.now
+      : effectiveVisitEnd({
+          endAt: null,
+          updatedAt: openVisit.updatedAt ?? openVisit.startAt,
+          startAt: openVisit.startAt,
+          now: params.now,
+          staleMs: params.staleMs,
+          lastHeartbeatAt: params.lastHeartbeatAt,
+          dayEnd: params.dayEnd,
+        });
+    const start = clipToDay(openVisit.startAt.getTime(), params.dayStart, params.dayEnd);
+    const endMs = Math.min(end.getTime(), dayEndMs);
+    if (start !== null && endMs >= start) {
+      intervals.push({ start, end: endMs });
+    }
+  }
+
+  if (lastHb) {
+    const hbEnd = Math.min(lastHb.getTime(), dayEndMs);
+    const host = intervals
+      .filter((interval) => interval.start <= hbEnd)
+      .sort((a, b) => b.start - a.start)[0];
+    if (host) {
+      host.end = Math.max(host.end, hbEnd);
+    }
+  }
+
+  const firstHb = params.firstInOfficeHeartbeatAt
+    ? clipToDay(params.firstInOfficeHeartbeatAt.getTime(), params.dayStart, params.dayEnd)
+    : null;
+  if (firstHb !== null) {
+    const host = intervals
+      .filter((interval) => interval.end >= firstHb)
+      .sort((a, b) => a.start - b.start)[0];
+    if (host && firstHb < host.start && host.start - firstHb <= params.staleMs) {
+      host.start = firstHb;
+    }
+  }
+
+  if (intervals.length === 0 && lastHb) {
+    const hbEnd = Math.min(lastHb.getTime(), dayEndMs);
+    const hbStart =
+      firstHb ??
+      clipToDay(lastHb.getTime(), params.dayStart, params.dayEnd);
+    if (hbStart !== null && hbEnd >= hbStart && (openVisit || firstHb !== null)) {
+      intervals.push({ start: hbStart, end: hbEnd });
+    }
+  }
+
+  return intervals;
+}
+
+/** First clipped check-in on the day from visits, or a nearby in-office pulse. */
 export function firstOfficeInMsForDay(
   visits: VisitForDaySpan[],
   params: DaySpanParams,
@@ -80,8 +195,10 @@ export function firstOfficeInMsForDay(
 
   if (firstHb) {
     const hbStart = clipToDay(firstHb.getTime(), params.dayStart, params.dayEnd);
-    if (hbStart !== null && (firstIn === null || hbStart < firstIn)) {
-      firstIn = hbStart;
+    if (hbStart !== null) {
+      if (firstIn === null || (hbStart < firstIn && firstIn - hbStart <= params.staleMs)) {
+        firstIn = hbStart;
+      }
     }
   }
 
@@ -89,7 +206,7 @@ export function firstOfficeInMsForDay(
 }
 
 /**
- * While still in office, stretch confirmed time to the page clock so the user
+ * While still in office, stretch the current session to the page clock so the user
  * can see remaining time until the 5h target. Does not change stored hours.
  */
 export function liveOfficeMsForDay(
@@ -97,98 +214,36 @@ export function liveOfficeMsForDay(
   params: DaySpanParams,
   inOfficeNow: boolean,
 ): number {
-  const confirmedMs = daySpanMsForDay(visits, params);
-  if (!inOfficeNow) return confirmedMs;
-  if (!isCurrentCalendarDay(params.dayStart, params.dayEnd, params.now)) return confirmedMs;
-  const firstIn = firstOfficeInMsForDay(visits, params);
-  if (firstIn === null) return confirmedMs;
-  const nowMs = Math.min(params.now.getTime(), params.dayEnd.getTime());
-  const liveMs = Math.max(0, nowMs - firstIn);
-  return Math.min(Math.max(confirmedMs, liveMs), MS_PER_DAY);
+  const intervals = officeIntervalsForDay(visits, params);
+  if (
+    inOfficeNow &&
+    isCurrentCalendarDay(params.dayStart, params.dayEnd, params.now)
+  ) {
+    const nowMs = Math.min(params.now.getTime(), params.dayEnd.getTime());
+    const last = [...intervals].sort((a, b) => b.start - a.start)[0];
+    if (last) {
+      last.end = Math.max(last.end, nowMs);
+    } else {
+      const firstIn = firstOfficeInMsForDay(visits, params);
+      if (firstIn !== null && nowMs >= firstIn) {
+        intervals.push({ start: firstIn, end: nowMs });
+      }
+    }
+  }
+  return Math.min(mergeIntervalMs(intervals), MS_PER_DAY);
 }
 
 /**
- * Daily total: first check-in to last check-out on the day (gaps between visits count).
- * lastOut is the max of all visit effective ends, last in-office heartbeat, and now for
- * an open visit on the current day. Manual check-out does not cap later office activity.
- * Capped at 24 hours.
+ * Daily total: time actually spent in office (merged visit segments).
+ * Gaps between separate visits do not count. Overlapping segments are not
+ * double-counted. A later in-office snapshot can extend the last session.
+ * A stray early pulse does not open a day-long span. Capped at 24 hours.
  */
 export function daySpanMsForDay(
   visits: VisitForDaySpan[],
   params: DaySpanParams
 ): number {
-  const dayStartMs = params.dayStart.getTime();
-  const dayEndMs = params.dayEnd.getTime();
-  const lastHb =
-    params.lastInOfficeHeartbeatAt ??
-    (params.lastHeartbeatAt &&
-    params.lastHeartbeatAt.getTime() >= dayStartMs &&
-    params.lastHeartbeatAt.getTime() <= dayEndMs
-      ? params.lastHeartbeatAt
-      : null);
-
-  const isCurrentDay = isCurrentCalendarDay(params.dayStart, params.dayEnd, params.now);
-  const firstIn = firstOfficeInMsForDay(visits, params);
-
-  if (firstIn === null) return 0;
-
-  const openVisit = visits.find((v) => v.endAt === null);
-
-  let lastOut: number | null = null;
-
-  for (const v of visits) {
-    if (v.endAt === null && isManualSource(v.source) && isCurrentDay) {
-      continue;
-    }
-    if (v.endAt === null && !isCurrentDay) {
-      continue;
-    }
-    const end = effectiveVisitEnd({
-      endAt: v.endAt,
-      updatedAt: v.updatedAt ?? v.startAt,
-      startAt: v.startAt,
-      now: params.now,
-      staleMs: params.staleMs,
-      lastHeartbeatAt: params.lastHeartbeatAt,
-      dayEnd: params.dayEnd,
-    });
-    const clippedEnd = Math.min(end.getTime(), dayEndMs);
-    const start = clipToDay(v.startAt.getTime(), params.dayStart, params.dayEnd);
-    if (start === null || clippedEnd < start) continue;
-    if (lastOut === null || clippedEnd > lastOut) lastOut = clippedEnd;
-  }
-
-  if (lastHb) {
-    const hbEnd = Math.min(lastHb.getTime(), dayEndMs);
-    if (lastOut === null || hbEnd > lastOut) lastOut = hbEnd;
-  }
-
-  if (openVisit && isCurrentDay) {
-    const end = isManualSource(openVisit.source)
-      ? params.now
-      : effectiveVisitEnd({
-          endAt: null,
-          updatedAt: openVisit.updatedAt ?? openVisit.startAt,
-          startAt: openVisit.startAt,
-          now: params.now,
-          staleMs: params.staleMs,
-          lastHeartbeatAt: params.lastHeartbeatAt,
-          dayEnd: params.dayEnd,
-        });
-    const endMs = Math.min(end.getTime(), dayEndMs);
-    if (lastOut === null || endMs > lastOut) lastOut = endMs;
-  } else if (openVisit && !isCurrentDay && lastHb) {
-    // Past day: credit an open visit only when there was in-office activity that day.
-    const hbEnd = Math.min(lastHb.getTime(), dayEndMs);
-    if (firstIn !== null && hbEnd >= firstIn) {
-      if (lastOut === null || hbEnd > lastOut) lastOut = hbEnd;
-    }
-  }
-
-  if (lastOut === null) return 0;
-
-  const spanMs = Math.max(0, lastOut - firstIn);
-  return Math.min(spanMs, MS_PER_DAY);
+  return Math.min(mergeIntervalMs(officeIntervalsForDay(visits, params)), MS_PER_DAY);
 }
 
 export function daySpanHoursForDay(
@@ -243,13 +298,20 @@ export function effectiveVisitEnd(params: {
   return new Date(lastActivity.getTime() + params.staleMs);
 }
 
-/** Daily total for visits already scoped to one day: first in to last out. */
+/** Daily total for visits already scoped to one day: merged in-office segments. */
 export function totalHoursFromVisits(visits: VisitPoint[], now = new Date()): number {
   if (visits.length === 0) return 0;
-  const firstIn = Math.min(...visits.map((v) => v.startAt.getTime()));
-  const lastOut = Math.max(...visits.map((v) => (v.endAt ?? now).getTime()));
-  const spanMs = Math.max(0, lastOut - firstIn);
-  return Math.min(spanMs, MS_PER_DAY) / MS_PER_HOUR;
+  return (
+    Math.min(
+      mergeIntervalMs(
+        visits.map((visit) => ({
+          start: visit.startAt.getTime(),
+          end: (visit.endAt ?? now).getTime(),
+        })),
+      ),
+      MS_PER_DAY,
+    ) / MS_PER_HOUR
+  );
 }
 
 export function meetsHoursTarget(

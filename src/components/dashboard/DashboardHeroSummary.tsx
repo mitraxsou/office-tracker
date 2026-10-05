@@ -18,6 +18,7 @@ type DashboardHeroSummaryProps = {
   lastOfficeActivityLabel: string;
   lastOfficeActivityTone: StatusTone;
   confirmedThroughLabel: string | null;
+  lastConfirmedOfficeAt?: Date | string | null;
   openVisitStartAt: Date | string | null;
   openVisitSsid: string | null;
 };
@@ -30,11 +31,18 @@ function asDate(value: Date | string | null): Date | null {
 function liveHoursNow(
   inOfficeNow: boolean,
   firstCheckIn: Date | null,
+  lastConfirmedOfficeAt: Date | null,
   confirmedHours: number,
   totalHours: number,
   now: Date,
 ): number {
-  if (!inOfficeNow || !firstCheckIn) return totalHours;
+  if (!inOfficeNow) return totalHours;
+  if (lastConfirmedOfficeAt) {
+    const extra =
+      Math.max(0, now.getTime() - lastConfirmedOfficeAt.getTime()) / (1000 * 60 * 60);
+    return Math.max(totalHours, confirmedHours + extra);
+  }
+  if (!firstCheckIn) return totalHours;
   const fromFirst = Math.max(0, now.getTime() - firstCheckIn.getTime()) / (1000 * 60 * 60);
   return Math.max(confirmedHours, fromFirst, totalHours);
 }
@@ -53,10 +61,12 @@ export function DashboardHeroSummary({
   lastOfficeActivityLabel,
   lastOfficeActivityTone,
   confirmedThroughLabel,
+  lastConfirmedOfficeAt,
   openVisitStartAt,
   openVisitSsid,
 }: DashboardHeroSummaryProps) {
   const firstIn = asDate(firstCheckIn);
+  const lastConfirmed = asDate(lastConfirmedOfficeAt ?? null);
   const openVisitStart = asDate(openVisitStartAt);
   const [now, setNow] = useState(() => new Date());
 
@@ -66,7 +76,14 @@ export function DashboardHeroSummary({
     return () => window.clearInterval(id);
   }, [inOfficeNow]);
 
-  const liveHours = liveHoursNow(inOfficeNow, firstIn, confirmedHours, totalHours, now);
+  const liveHours = liveHoursNow(
+    inOfficeNow,
+    firstIn,
+    lastConfirmed,
+    confirmedHours,
+    totalHours,
+    now,
+  );
   const remaining = Math.max(0, targetHours - liveHours);
   const estimatedHours = Math.max(0, liveHours - confirmedHours);
   const confirmedPct = Math.min(100, (confirmedHours / targetHours) * 100);
