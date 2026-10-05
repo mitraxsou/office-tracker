@@ -200,6 +200,7 @@ export default async function DashboardPage() {
           monthDays={monthlyProgress.days}
           todayStats={{
             totalHours: summary.liveHours,
+            confirmedHours: summary.confirmedHours,
             targetHours: summary.hoursTarget,
             metTarget: summary.metTarget,
             inOfficeNow: summary.inOfficeNow,
@@ -219,6 +220,7 @@ export default async function DashboardPage() {
           targetHours={summary.hoursTarget}
           metTarget={summary.metTarget}
           inOfficeNow={summary.inOfficeNow}
+          firstCheckIn={firstCheckIn}
           dayKey={summary.dayKey}
           timezone={user.timezone}
           lastSyncedLabel={lastSyncedLabel}

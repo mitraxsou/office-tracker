@@ -6,8 +6,10 @@ import {
   daySpanMsForDay,
   effectiveVisitEnd,
   formatHours,
+  formatHoursHms,
   formatLastHeartbeat,
   formatVisitDurationLabel,
+  idealCheckoutAt,
   mergeHeartbeatsIntoVisits,
   meetsHoursTarget,
   remainingHours,
@@ -593,6 +595,19 @@ describe("roundHoursToMinute", () => {
 
   it("does not print negative durations", () => {
     expect(formatHours(-1.433)).toBe("0h 0m");
+  });
+
+  it("prints hours, minutes, and seconds for dashboard metrics", () => {
+    expect(formatHoursHms(2 + 45 / 60 + 12 / 3600)).toBe("2h 45m 12s");
+    expect(formatHoursHms(5)).toBe("5h 0m 0s");
+    expect(formatHoursHms(-0.5)).toBe("0h 0m 0s");
+  });
+
+  it("computes ideal checkout from first check-in and daily target", () => {
+    const first = new Date("2026-10-05T15:15:00+05:30");
+    expect(idealCheckoutAt(first, 5).toISOString()).toBe(
+      new Date("2026-10-05T20:15:00+05:30").toISOString(),
+    );
   });
 
   it("flags end-before-start visits instead of 0h 0m", () => {

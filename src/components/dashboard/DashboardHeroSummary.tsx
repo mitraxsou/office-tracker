@@ -1,4 +1,7 @@
-import { formatTime } from "@/lib/visits";
+"use client";
+
+import { useEffect, useState } from "react";
+import { formatHoursHms, formatTime } from "@/lib/visits";
 import { toneClass, type StatusTone } from "@/components/dashboard/DashboardMiniStat";
 
 type DashboardHeroSummaryProps = {
@@ -7,6 +10,7 @@ type DashboardHeroSummaryProps = {
   targetHours: number;
   metTarget: boolean;
   inOfficeNow: boolean;
+  firstCheckIn: Date | string | null;
   dayKey: string;
   timezone: string;
   lastSyncedLabel: string;
@@ -14,16 +18,34 @@ type DashboardHeroSummaryProps = {
   lastOfficeActivityLabel: string;
   lastOfficeActivityTone: StatusTone;
   confirmedThroughLabel: string | null;
-  openVisitStartAt: Date | null;
+  openVisitStartAt: Date | string | null;
   openVisitSsid: string | null;
 };
+
+function asDate(value: Date | string | null): Date | null {
+  if (!value) return null;
+  return value instanceof Date ? value : new Date(value);
+}
+
+function liveHoursNow(
+  inOfficeNow: boolean,
+  firstCheckIn: Date | null,
+  confirmedHours: number,
+  totalHours: number,
+  now: Date,
+): number {
+  if (!inOfficeNow || !firstCheckIn) return totalHours;
+  const fromFirst = Math.max(0, now.getTime() - firstCheckIn.getTime()) / (1000 * 60 * 60);
+  return Math.max(confirmedHours, fromFirst, totalHours);
+}
 
 export function DashboardHeroSummary({
   totalHours,
   confirmedHours,
   targetHours,
-  metTarget,
+  metTarget: _metTarget,
   inOfficeNow,
+  firstCheckIn,
   dayKey,
   timezone,
   lastSyncedLabel,
@@ -34,40 +56,57 @@ export function DashboardHeroSummary({
   openVisitStartAt,
   openVisitSsid,
 }: DashboardHeroSummaryProps) {
-  const remaining = Math.max(0, targetHours - totalHours);
-  const estimatedHours = Math.max(0, totalHours - confirmedHours);
+  const firstIn = asDate(firstCheckIn);
+  const openVisitStart = asDate(openVisitStartAt);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    if (!inOfficeNow) return;
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, [inOfficeNow]);
+
+  const liveHours = liveHoursNow(inOfficeNow, firstIn, confirmedHours, totalHours, now);
+  const remaining = Math.max(0, targetHours - liveHours);
+  const estimatedHours = Math.max(0, liveHours - confirmedHours);
   const confirmedPct = Math.min(100, (confirmedHours / targetHours) * 100);
   const estimatedPct = Math.min(100 - confirmedPct, (estimatedHours / targetHours) * 100);
-  const showEstimate = inOfficeNow && estimatedHours > 0.004;
+  const showEstimate = inOfficeNow && estimatedHours > 1 / 3600;
+  const liveMet = liveHours >= targetHours;
 
   return (
     <section className="card card-brand card-wash p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs text-muted sm:text-sm">Today&apos;s office time</p>
-          <p className="mt-0.5 text-3xl font-bold sm:text-4xl">
-            {totalHours.toFixed(1)}
-            <span className="text-base font-normal text-muted sm:text-lg"> / {targetHours}h</span>
+          <p className="mt-0.5 text-2xl font-bold tabular-nums sm:text-3xl">
+            {formatHoursHms(liveHours)}
+            <span className="text-base font-normal text-muted sm:text-lg">
+              {" "}
+              / {formatHoursHms(targetHours)}
+            </span>
           </p>
           {showEstimate && (
             <p className="mt-1 text-xs text-muted">
-              <span className="text-foreground">{confirmedHours.toFixed(1)}h confirmed</span>
+              <span className="text-foreground">{formatHoursHms(confirmedHours)} confirmed</span>
               {" · "}
-              <span className="text-[var(--pwc-yellow)]">{estimatedHours.toFixed(1)}h estimated</span>
+              <span className="text-[var(--pwc-yellow)]">
+                {formatHoursHms(estimatedHours)} estimated
+              </span>
               {" until the next agent sync"}
             </p>
           )}
         </div>
         <span
-          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium sm:px-3 sm:text-sm ${metTarget ? "badge-met" : "badge-pending"}`}
+          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium tabular-nums sm:px-3 sm:text-sm ${liveMet ? "badge-met" : "badge-pending"}`}
         >
-          {metTarget ? "Target met" : `${remaining.toFixed(1)}h left`}
+          {liveMet ? "Target met" : `${formatHoursHms(remaining)} left`}
         </span>
       </div>
 
       <div className="progress-track mt-3 flex h-2 overflow-hidden rounded-full sm:h-2.5">
         <div
-          className={`h-full ${metTarget && !showEstimate ? "progress-fill-met" : "progress-fill"}`}
+          className={`h-full ${liveMet && !showEstimate ? "progress-fill-met" : "progress-fill"}`}
           style={{ width: `${confirmedPct}%` }}
         />
         {showEstimate && (
@@ -75,10 +114,10 @@ export function DashboardHeroSummary({
         )}
       </div>
 
-      {openVisitStartAt && (
+      {openVisitStart && (
         <p className="mt-3 text-xs text-muted">
           Open visit since{" "}
-          <strong className="text-accent">{formatTime(openVisitStartAt, timezone)}</strong>
+          <strong className="text-accent">{formatTime(openVisitStart, timezone)}</strong>
           {openVisitSsid ? ` on ${openVisitSsid}` : ""}
         </p>
       )}

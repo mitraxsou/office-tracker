@@ -24,7 +24,9 @@ export function DashboardMiniStat({
         <p className="text-[10px] uppercase tracking-wide text-muted sm:text-xs">{label}</p>
         {tooltip && <MetricHelp tooltip={tooltip} />}
       </div>
-      <p className={`mt-0.5 truncate text-sm font-semibold sm:text-base ${toneClass(tone)}`}>
+      <p
+        className={`mt-0.5 text-sm font-semibold tabular-nums leading-snug sm:text-base ${toneClass(tone)}`}
+      >
         {value}
       </p>
     </div>

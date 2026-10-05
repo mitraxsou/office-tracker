@@ -22,13 +22,17 @@ import type { MonthlyProgressDay } from "@/lib/monthly-progress";
 import { DashboardRefreshButton } from "@/components/DashboardRefreshButton";
 import { DeskClockCalendar } from "./DeskClockCalendar";
 import { DashboardMiniStat, type StatusTone } from "@/components/dashboard/DashboardMiniStat";
-import { formatTime } from "@/lib/visits";
+import { formatHoursHms, formatTime, idealCheckoutAt } from "@/lib/visits";
 
 const LAPTOP_TOOLTIP =
   "Total time today your laptop was on with the My Office Pulse agent running. Sleep and long gaps between pulses are excluded. This is not the span from first to last pulse.";
 
+const IDEAL_CHECKOUT_TOOLTIP =
+  "First check-in plus your daily office hours target. Leave around this time to meet the day goal if you stay on office Wi-Fi.";
+
 export type DeskClockTodayStats = {
   totalHours: number;
+  confirmedHours: number;
   targetHours: number;
   metTarget: boolean;
   inOfficeNow: boolean;
@@ -221,7 +225,7 @@ export function DeskClockPanel({
             />
           )}
         </div>
-        <DeskClockTodayStatsGrid timezone={timezone} stats={todayStats} />
+        <DeskClockTodayStatsGrid timezone={timezone} stats={todayStats} now={now} />
         {settings.showCalendar && (
           <div className="shrink-0 lg:ml-auto">
             <DeskClockCalendar monthKey={monthKey} todayKey={dayKey} monthDays={monthDays} />
@@ -232,16 +236,30 @@ export function DeskClockPanel({
   );
 }
 
+function liveOfficeHoursFromStats(stats: DeskClockTodayStats, now: Date): number {
+  if (!stats.inOfficeNow || !stats.firstCheckIn) return stats.totalHours;
+  const fromFirst =
+    Math.max(0, now.getTime() - new Date(stats.firstCheckIn).getTime()) / (1000 * 60 * 60);
+  return Math.max(stats.confirmedHours, fromFirst, stats.totalHours);
+}
+
 function DeskClockTodayStatsGrid({
   timezone,
   stats,
+  now,
 }: {
   timezone: string;
   stats: DeskClockTodayStats;
+  now: Date;
 }) {
-  const remaining = Math.max(0, stats.targetHours - stats.totalHours);
-  const officeHoursValue = `${stats.totalHours.toFixed(1)} / ${stats.targetHours}h`;
-  const targetTone: StatusTone = stats.metTarget ? "success" : "warning";
+  const liveHours = liveOfficeHoursFromStats(stats, now);
+  const remaining = Math.max(0, stats.targetHours - liveHours);
+  const metTarget = liveHours >= stats.targetHours;
+  const officeHoursValue = `${formatHoursHms(liveHours)} / ${formatHoursHms(stats.targetHours)}`;
+  const targetTone: StatusTone = metTarget ? "success" : "warning";
+  const idealCheckout = stats.firstCheckIn
+    ? idealCheckoutAt(new Date(stats.firstCheckIn), stats.targetHours)
+    : null;
 
   return (
     <div className="min-w-0 flex-1">
@@ -253,7 +271,7 @@ function DeskClockTodayStatsGrid({
         />
         <DashboardMiniStat
           label="Target"
-          value={stats.metTarget ? "Met" : `${remaining.toFixed(1)}h left`}
+          value={metTarget ? "Met" : `${formatHoursHms(remaining)} left`}
           tone={targetTone}
         />
         <DashboardMiniStat
@@ -268,8 +286,14 @@ function DeskClockTodayStatsGrid({
           tone={stats.firstCheckIn ? "success" : "muted"}
         />
         <DashboardMiniStat
+          label="Ideal checkout"
+          value={idealCheckout ? formatTime(idealCheckout, timezone) : "None"}
+          tone={idealCheckout ? (metTarget ? "success" : "warning") : "muted"}
+          tooltip={IDEAL_CHECKOUT_TOOLTIP}
+        />
+        <DashboardMiniStat
           label="Agent uptime"
-          value={`${stats.laptopActiveHours.toFixed(1)}h`}
+          value={formatHoursHms(stats.laptopActiveHours)}
           tooltip={
             stats.firstAgentOnAt
               ? `${LAPTOP_TOOLTIP} First switch-on today: ${formatTime(stats.firstAgentOnAt, timezone)}.`

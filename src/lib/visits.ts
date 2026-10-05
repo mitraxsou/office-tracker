@@ -339,6 +339,22 @@ export function formatHours(hours: number): string {
   return `${h}h ${m}m`;
 }
 
+/** Live dashboard durations: hours, minutes, and seconds. */
+export function formatHoursHms(hours: number): string {
+  const safe = Number.isFinite(hours) ? Math.max(0, hours) : 0;
+  const totalSeconds = Math.floor(safe * 3600 + 1e-9);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return `${h}h ${m}m ${s}s`;
+}
+
+/** First check-in plus the daily hours target. */
+export function idealCheckoutAt(firstCheckIn: Date, targetHours: number): Date {
+  const hours = Number.isFinite(targetHours) ? Math.max(0, targetHours) : 0;
+  return new Date(firstCheckIn.getTime() + hours * 60 * 60 * 1000);
+}
+
 /** True when a closed visit has endAt strictly before startAt. */
 export function visitHasInvalidTimestamps(visit: {
   startAt: Date;
