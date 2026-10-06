@@ -29,6 +29,7 @@ export default async function AdminPage() {
         <AdminDashboard
           fiscalYearStartMonth={config.fiscalYearStartMonth}
           fiscalYearEndMonth={config.fiscalYearEndMonth}
+          timezone={admin.timezone}
         />
       </main>
     </>

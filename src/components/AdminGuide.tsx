@@ -21,7 +21,11 @@ function GuideBlockView({ block }: { block: GuideBlock }) {
     case "paragraph":
       return <p className="text-sm text-muted">{block.text}</p>;
     case "subheading":
-      return <h3 className="text-sm font-medium">{block.text}</h3>;
+      return (
+        <h3 id={block.id} className="scroll-mt-header text-sm font-medium">
+          {block.text}
+        </h3>
+      );
     case "list":
       if (block.ordered) {
         return (
@@ -68,6 +72,24 @@ function GuideBlockView({ block }: { block: GuideBlock }) {
             </span>
           ))}
         </p>
+      );
+    case "definitions":
+      return (
+        <dl className="space-y-3 text-sm">
+          {block.items.map((item) => (
+            <div
+              key={item.id}
+              id={item.id}
+              className="scroll-mt-header rounded-lg border border-[var(--border)] p-3"
+            >
+              <dt className="font-medium">
+                {item.term}{" "}
+                <span className="font-mono text-xs font-normal text-muted">{item.code}</span>
+              </dt>
+              <dd className="mt-1 text-muted">{item.text}</dd>
+            </div>
+          ))}
+        </dl>
       );
     default:
       return null;

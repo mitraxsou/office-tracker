@@ -1,10 +1,16 @@
+import { AUDIT_ACTION_GUIDE, INTEGRATION_ALERT_TYPE_GUIDE, auditActionAnchorId } from "./audit-actions";
+
 export type GuideBlock =
   | { type: "paragraph"; text: string }
   | { type: "list"; items: string[]; ordered?: boolean }
-  | { type: "subheading"; text: string }
+  | { type: "subheading"; text: string; id?: string }
   | { type: "diagram"; lines: string[] }
   | { type: "troubleshooting"; items: { problem: string; fix: string }[] }
-  | { type: "links"; items: { href: string; label: string }[] };
+  | { type: "links"; items: { href: string; label: string }[] }
+  | {
+      type: "definitions";
+      items: { id: string; term: string; code: string; text: string }[];
+    };
 
 export type GuideSection = {
   id: string;
@@ -449,7 +455,37 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
           "Actor: admin who performed the action.",
           "Action type: partial match on action code (e.g. config_update, impersonate_start).",
           "Date range: from / to for investigation.",
+          "Display timezone: times are stored in UTC; pick IST, UTC, or another zone to display them.",
         ],
+      },
+      {
+        type: "subheading",
+        id: "audit-actions",
+        text: "What each action means",
+      },
+      {
+        type: "paragraph",
+        text:
+          "The Audit table stores UTC instants. The page shows them in your profile timezone, or any timezone you pick (including UTC). Actor is who the system recorded as sending the event. For Teams/email alerts, actor and target are often the same user. This log is not office presence.",
+      },
+      {
+        type: "definitions",
+        items: Object.entries(AUDIT_ACTION_GUIDE).map(([code, meta]) => ({
+          id: auditActionAnchorId(code),
+          term: meta.label,
+          code,
+          text: meta.summary,
+        })),
+      },
+      {
+        type: "subheading",
+        text: "integration_alert types (Details)",
+      },
+      {
+        type: "list",
+        items: Object.entries(INTEGRATION_ALERT_TYPE_GUIDE).map(
+          ([code, text]) => `${code}: ${text}`,
+        ),
       },
       {
         type: "subheading",

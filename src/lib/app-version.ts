@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.22";
+export const APP_VERSION = "1.5.23";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,17 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-06",
+    userBullets: [
+      "No user-facing change in this release.",
+    ],
+    adminBullets: [
+      "Audit timestamps show in your timezone, with a picker for UTC or other zones. ISO times in Details are converted too.",
+      "Each audit action has a short label, help text, and an SOP link to Admin guide (what each action means).",
+    ],
+  },
+  {
+    version: "1.5.22",
     date: "2026-10-06",
     userBullets: [
       "Activity details on Today shows Visits and Manual visit only. Dense agent ticks are not listed as a live session.",

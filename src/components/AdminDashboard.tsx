@@ -20,6 +20,7 @@ import { exportToCsv } from "@/lib/report-range";
 import { InOfficeNowPanel } from "@/components/InOfficeNowPanel";
 import { AgentFollowUpPanel, useAgentFollowUpCount } from "@/components/AgentFollowUpPanel";
 import { AdminOrgCalendar } from "@/components/AdminOrgCalendar";
+import { describeAuditAction, formatAuditTimestamp } from "@/lib/audit-actions";
 
 type DailyPoint = { date: string; totalHours: number; compliancePct: number };
 
@@ -90,9 +91,11 @@ type ReportsData = {
 export function AdminDashboard({
   fiscalYearStartMonth,
   fiscalYearEndMonth,
+  timezone,
 }: {
   fiscalYearStartMonth: number;
   fiscalYearEndMonth: number;
+  timezone: string;
 }) {
   const [monthKey, setMonthKey] = useState(() => currentMonthKey("Asia/Kolkata"));
   const [fromKey, setFromKey] = useState("");
@@ -540,23 +543,32 @@ export function AdminDashboard({
           </section>
 
           <section className="card p-6">
-            <h2 className="mb-4 text-lg font-medium">Admin activity log</h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-lg font-medium">Admin activity log</h2>
+              <Link href="/admin/audit" className="text-xs text-accent hover:underline">
+                Open Audit (timezone + SOP)
+              </Link>
+            </div>
             {data.auditLog.length === 0 ? (
               <p className="text-sm text-muted">No admin actions yet.</p>
             ) : (
               <ul className="divide-y divide-[var(--border)] text-sm">
-                {data.auditLog.map((log) => (
+                {data.auditLog.map((log) => {
+                  const guide = describeAuditAction(log.action);
+                  return (
                   <li key={log.id} className="py-2">
                     <span className="text-muted">
-                      {new Date(log.createdAt).toLocaleString("en-IN")}
+                      {formatAuditTimestamp(log.createdAt, timezone)}
                     </span>
                     {" · "}
-                    <span className="font-medium">{log.action.replace(/_/g, " ")}</span>
+                    <span className="font-medium">{guide.label}</span>
+                    <span className="text-xs text-muted"> ({log.action})</span>
                     {" by "}
                     {log.actorEmail}
                     {log.targetEmail && <> for {log.targetEmail}</>}
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </section>

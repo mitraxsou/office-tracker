@@ -92,6 +92,7 @@ export async function searchAuditLogs(input: AuditSearchInput) {
       actor: row.actor,
       targetUser: row.targetUser,
       detailsSummary: summarizeAuditDetails(row.details),
+      detailsRaw: row.details,
     })),
   };
 }
