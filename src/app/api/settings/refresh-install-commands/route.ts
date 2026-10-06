@@ -1,22 +1,11 @@
 import { NextResponse } from "next/server";
-import {
-  getCurrentUser,
-  getUserInstallTokenState,
-  regenerateAgentToken,
-} from "@/lib/auth";
-import {
-  buildBootstrapUninstallCommand,
-  buildInstallCommand,
-  buildSetupCommand,
-  buildUpdateCommand,
-} from "@/lib/agent-branding";
-import { logAuditEvent } from "@/lib/audit-log";
+import { getCurrentUser } from "@/lib/auth";
 import {
   TOKEN_REGEN_NEEDS_APPROVAL,
   canImmediateAgentTokenReissue,
 } from "@/lib/agent-token-regenerate-requests";
 
-/** Issue a fresh token with copy-paste install/update commands (full -Token in command). */
+/** Refreshing install commands revokes the current token. Settings must request approval. */
 export async function POST() {
   const user = await getCurrentUser();
   if (!user) {
@@ -30,35 +19,8 @@ export async function POST() {
     );
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const before = await getUserInstallTokenState(user.id, appUrl);
-  const needsRefresh =
-    before.installTokens.some((t) => t.usesLocalConfig) || before.legacyBoundCount > 0;
-
-  if (before.installTokens.length > 0 && !needsRefresh) {
-    return NextResponse.json(
-      { error: "Full install commands are already shown below." },
-      { status: 400 },
-    );
-  }
-
-  const { plainToken } = await regenerateAgentToken(user.id);
-
-  await logAuditEvent({
-    actorId: user.id,
-    action: "agent_token_reissue",
-    targetUserId: user.id,
-    details: { reason: "refresh_install_commands", selfService: true },
-  });
-
-  const after = await getUserInstallTokenState(user.id, appUrl);
-
-  return NextResponse.json({
-    token: plainToken,
-    setupCommand: buildSetupCommand(appUrl, plainToken),
-    bootstrapUninstallCommand: buildBootstrapUninstallCommand(appUrl, plainToken),
-    installCommand: buildInstallCommand(appUrl, plainToken),
-    updateCommand: buildUpdateCommand(appUrl, plainToken),
-    installTokens: after.installTokens,
-  });
+  return NextResponse.json(
+    { error: TOKEN_REGEN_NEEDS_APPROVAL, code: "approval_required" },
+    { status: 403 },
+  );
 }

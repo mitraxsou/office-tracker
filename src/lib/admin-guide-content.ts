@@ -328,7 +328,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         items: [
           "Visit correction: user disputes hours or missing visit. Review message, approve with edit, or deny.",
           "Timezone change: user requests a new IANA timezone. Approve to apply or deny.",
-          "Token regenerate: user asks to replace a bound laptop token. Approve revokes the old token immediately; the user must paste the new reinstall command from Settings.",
+          "Token regenerate: anyone on Settings (including admins replacing their own token) must request first. Approve revokes the old token; the user must paste the new reinstall command from Settings. Admins helping another user can still reissue from that user's report.",
           "Profile change: user requests name or email update. Approve or deny.",
           "HR exemption: user notifies admin they have HR approval for a month or day. Log the exemption after verification (unless auto-log is on).",
           "Laptop removal: user wants a device de-registered. Approve removes device and frees a token slot.",

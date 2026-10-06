@@ -19,8 +19,9 @@ export function isValidTokenRegenKind(value: string): value is TokenRegenKind {
   return (TOKEN_REGEN_KINDS as readonly string[]).includes(value);
 }
 
-export function canImmediateAgentTokenReissue(user: { role: string }) {
-  return user.role === "admin";
+/** Settings never revokes a bound token on the spot, including for admin accounts. */
+export function canImmediateAgentTokenReissue(_user?: { role: string }) {
+  return false;
 }
 
 export function validateTokenRegenSubmission(params: {

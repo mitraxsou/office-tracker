@@ -114,8 +114,6 @@ type AgentStatusPanelProps = {
 
   appUrl?: string;
 
-  canImmediateTokenReissue?: boolean;
-
 };
 
 
@@ -127,8 +125,6 @@ export function AgentStatusPanel({
   legacyBoundCount = 0,
 
   appUrl,
-
-  canImmediateTokenReissue = false,
 
 }: AgentStatusPanelProps = {}) {
 
@@ -239,8 +235,6 @@ export function AgentStatusPanel({
               legacyBoundCount={legacyBoundCount}
 
               compact
-
-              canImmediateReissue={canImmediateTokenReissue}
 
             />
 

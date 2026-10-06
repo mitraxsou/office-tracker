@@ -20,8 +20,8 @@ describe("token regenerate request helpers", () => {
     expect(isValidTokenRegenKind("other")).toBe(false);
   });
 
-  it("lets admins reissue immediately and blocks regular users", () => {
-    expect(canImmediateAgentTokenReissue({ role: "admin" })).toBe(true);
+  it("blocks Settings self-reissue for admins and regular users", () => {
+    expect(canImmediateAgentTokenReissue({ role: "admin" })).toBe(false);
     expect(canImmediateAgentTokenReissue({ role: "user" })).toBe(false);
   });
 
