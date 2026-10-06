@@ -36,6 +36,7 @@ type SettingsPageClientProps = {
   monthlyDaysTarget: number;
   appUrl: string;
   adminAccess?: boolean;
+  canImmediateTokenReissue?: boolean;
   isWelcome?: boolean;
   devices: Device[];
   agentVersionSummary: UserAgentVersionSummary;
@@ -61,6 +62,7 @@ export function SettingsPageClient({
   monthlyDaysTarget,
   appUrl,
   adminAccess = false,
+  canImmediateTokenReissue = false,
   isWelcome,
   devices: initialDevices,
   agentVersionSummary,
@@ -147,6 +149,7 @@ export function SettingsPageClient({
                   legacyBoundCount={legacyBoundCount}
                   localDevAgentPath={localDevAgentPath}
                   adminAccess={adminAccess}
+                  canImmediateTokenReissue={canImmediateTokenReissue}
                   agentVersionSummary={agentVersionSummary}
                 />
                 <UserSettingsForm
@@ -170,6 +173,7 @@ export function SettingsPageClient({
                   installTokens={installTokens}
                   legacyBoundCount={legacyBoundCount}
                   appUrl={appUrl}
+                  canImmediateTokenReissue={canImmediateTokenReissue}
                 />
               </>
             ),

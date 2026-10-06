@@ -12,6 +12,10 @@ import {
 } from "@/lib/agent-branding";
 import { logAuditEvent } from "@/lib/audit-log";
 import { checkRateLimit } from "@/lib/security";
+import {
+  TOKEN_REGEN_NEEDS_APPROVAL,
+  canImmediateAgentTokenReissue,
+} from "@/lib/agent-token-regenerate-requests";
 
 const REGENERATE_RATE_LIMIT_MS = 60_000;
 
@@ -19,6 +23,13 @@ export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!canImmediateAgentTokenReissue(user)) {
+    return NextResponse.json(
+      { error: TOKEN_REGEN_NEEDS_APPROVAL, code: "approval_required" },
+      { status: 403 },
+    );
   }
 
   if (!checkRateLimit(`settings-agent-token-regen:${user.id}`, REGENERATE_RATE_LIMIT_MS)) {
@@ -48,7 +59,7 @@ export async function POST(request: Request) {
       action: "agent_token_reissue",
       targetUserId: user.id,
       details: {
-        reason: "self_regenerate",
+        reason: "admin_self_regenerate",
         selfService: true,
         oldTokenId: tokenId ?? null,
         newTokenId: record.id,

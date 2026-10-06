@@ -2,16 +2,18 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { InstallTokenForUser } from "@/lib/install-token-types";
 import { formatAgentZipDownloadFilename } from "@/lib/agent-branding";
+import type { TokenRegenRequestSummary } from "@/lib/agent-token-regenerate-requests";
 
 type InstallTokenCommandsProps = {
   installTokens: InstallTokenForUser[];
   legacyBoundCount?: number;
   compact?: boolean;
   serverAgentVersion?: string | null;
+  canImmediateReissue?: boolean;
 };
 
 export function needsRefreshInstallCommands(
@@ -26,6 +28,7 @@ export function InstallTokenCommands({
   legacyBoundCount = 0,
   compact = false,
   serverAgentVersion = null,
+  canImmediateReissue = false,
 }: InstallTokenCommandsProps) {
   const zipDownloadName = serverAgentVersion
     ? formatAgentZipDownloadFilename(serverAgentVersion)
@@ -44,8 +47,82 @@ export function InstallTokenCommands({
   const [storeError, setStoreError] = useState<Record<string, string>>({});
   const [pasteToken, setPasteToken] = useState<Record<string, string>>({});
   const [showToken, setShowToken] = useState<Record<string, boolean>>({});
+  const [openRequest, setOpenRequest] = useState<TokenRegenRequestSummary | null>(null);
+  const [latestRejected, setLatestRejected] = useState<TokenRegenRequestSummary | null>(null);
+  const [requesting, setRequesting] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+
+  async function loadRequestState() {
+    const res = await fetch("/api/settings/agent-token-regenerate-request");
+    if (!res.ok) return;
+    const data = await res.json();
+    setOpenRequest(data.openRequest ?? null);
+    setLatestRejected(
+      data.latestRequest?.status === "rejected" ? data.latestRequest : null,
+    );
+  }
+
+  useEffect(() => {
+    if (canImmediateReissue) return;
+    void loadRequestState();
+  }, [canImmediateReissue]);
+
+  async function handleRequestTokenChange(
+    kind: "regenerate" | "refresh_install_commands",
+    tokenId?: string,
+  ) {
+    const confirmText =
+      kind === "refresh_install_commands"
+        ? "This asks an admin to issue a fresh install command. The current token stays valid until they approve. Continue?"
+        : "This asks an admin to replace this laptop token. The current token stays valid until they approve. After approval you must run the new reinstall command or the agent disconnects. Continue?";
+    if (!confirm(confirmText)) {
+      return;
+    }
+
+    setRequesting(true);
+    setRequestError(null);
+    const res = await fetch("/api/settings/agent-token-regenerate-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind,
+        tokenId: tokenId ?? undefined,
+      }),
+    });
+    setRequesting(false);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setRequestError(body.error ?? "Could not submit request");
+      return;
+    }
+    await loadRequestState();
+    router.refresh();
+  }
+
+  async function handleCancelRequest() {
+    if (!openRequest) return;
+    setRequesting(true);
+    setRequestError(null);
+    const res = await fetch(
+      `/api/settings/agent-token-regenerate-request?id=${encodeURIComponent(openRequest.id)}`,
+      { method: "DELETE" },
+    );
+    setRequesting(false);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      setRequestError(body.error ?? "Could not cancel request");
+      return;
+    }
+    setOpenRequest(null);
+    router.refresh();
+  }
 
   async function handleRefreshInstallCommands() {
+    if (!canImmediateReissue) {
+      await handleRequestTokenChange("refresh_install_commands");
+      return;
+    }
+
     if (
       !confirm(
         "This creates a new laptop token with full copy-paste commands. Your old token stops working until you run the new command. Continue?",
@@ -88,6 +165,11 @@ export function InstallTokenCommands({
   }
 
   async function handleRegenerateToken(tokenId?: string) {
+    if (!canImmediateReissue) {
+      await handleRequestTokenChange("regenerate", tokenId);
+      return;
+    }
+
     if (
       !confirm(
         "This revokes your current laptop token and creates a new one. Old copied install commands stop working until you run the new reinstall command on this laptop. Other laptop tokens are unchanged. Continue?",
@@ -209,15 +291,21 @@ export function InstallTokenCommands({
           <p className="font-medium text-[var(--pwc-orange)]">Refresh install commands</p>
           <p className="mt-1 text-xs text-muted">
             Your saved commands may read the token from the laptop config file or an older binding.
-            Issue a fresh token so copy-paste setup includes the full command again.
+            {canImmediateReissue
+              ? " Issue a fresh token so copy-paste setup includes the full command again."
+              : " Request an admin to issue a fresh token. Your current token stays valid until they approve."}
           </p>
           <button
             type="button"
             onClick={() => void handleRefreshInstallCommands()}
-            disabled={refreshing}
+            disabled={refreshing || requesting || !!openRequest}
             className="btn-primary mt-3 px-3 py-1.5 text-xs"
           >
-            {refreshing ? "Working..." : "Refresh install commands"}
+            {refreshing || requesting
+              ? "Working..."
+              : canImmediateReissue
+                ? "Refresh install commands"
+                : "Request refresh"}
           </button>
           {refreshError && (
             <p className="mt-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
@@ -225,6 +313,33 @@ export function InstallTokenCommands({
             </p>
           )}
         </div>
+      )}
+      {!canImmediateReissue && openRequest && (
+        <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+          <p className="font-medium text-amber-200">Token change requested</p>
+          <p className="mt-1 text-xs text-muted">
+            An admin must approve before this laptop token is replaced. Your current agent stays
+            connected until then.
+          </p>
+          <button
+            type="button"
+            onClick={() => void handleCancelRequest()}
+            disabled={requesting}
+            className="btn-secondary mt-2 px-3 py-1.5 text-xs"
+          >
+            {requesting ? "Working..." : "Cancel request"}
+          </button>
+        </div>
+      )}
+      {!canImmediateReissue && latestRejected && !openRequest && (
+        <p className="mb-4 text-xs text-muted">
+          Your last token request was denied
+          {latestRejected.adminNote ? `: ${latestRejected.adminNote}` : "."} You can request again
+          if you still need a new token.
+        </p>
+      )}
+      {requestError && (
+        <p className="mb-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{requestError}</p>
       )}
       <div className={compact ? "space-y-3" : "space-y-4"}>
         {installTokens.map((t) => (
@@ -291,16 +406,23 @@ export function InstallTokenCommands({
             <div className="mt-3 rounded border border-[var(--border)] bg-[var(--background-elevated)] p-3">
               <p className="text-sm font-medium">Laptop token</p>
               <p className="mt-1 text-xs text-muted">
-                Regenerate if your token was exposed or pasted commands no longer work. This revokes
-                only this laptop token.
+                {canImmediateReissue
+                  ? "Regenerate if this token was exposed or pasted commands no longer work. This revokes only this laptop token."
+                  : "If this token was exposed or commands no longer work, request a new one. An admin must approve; the current token stays valid until then."}
               </p>
               <button
                 type="button"
                 onClick={() => void handleRegenerateToken(t.id)}
-                disabled={regeneratingId === t.id}
+                disabled={
+                  regeneratingId === t.id || requesting || (!canImmediateReissue && !!openRequest)
+                }
                 className="btn-secondary mt-2 px-3 py-1.5 text-xs"
               >
-                {regeneratingId === t.id ? "Working..." : "Regenerate token"}
+                {regeneratingId === t.id || requesting
+                  ? "Working..."
+                  : canImmediateReissue
+                    ? "Regenerate token"
+                    : "Request regenerate"}
               </button>
               {regenerateError && regenerateErrorTokenId === t.id && (
                 <p className="mt-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
@@ -374,10 +496,14 @@ export function InstallTokenCommands({
                     <button
                       type="button"
                       onClick={() => void handleRefreshInstallCommands()}
-                      disabled={refreshing}
+                      disabled={refreshing || requesting || (!canImmediateReissue && !!openRequest)}
                       className="btn-secondary px-3 py-1 text-xs"
                     >
-                      {refreshing ? "Working..." : "Issue new token instead"}
+                      {refreshing || requesting
+                        ? "Working..."
+                        : canImmediateReissue
+                          ? "Issue new token instead"
+                          : "Request new token instead"}
                     </button>
                   </div>
                   {storeError[t.id] && <p className="text-red-400">{storeError[t.id]}</p>}

@@ -23,6 +23,7 @@ vi.mock("@/lib/security", () => ({
 }));
 
 import { POST } from "../src/app/api/settings/agent-token/regenerate/route";
+import { TOKEN_REGEN_NEEDS_APPROVAL } from "../src/lib/agent-token-regenerate-requests";
 
 describe("POST /api/settings/agent-token/regenerate", () => {
   beforeEach(() => {
@@ -30,7 +31,11 @@ describe("POST /api/settings/agent-token/regenerate", () => {
     process.env.AUTH_SECRET = "test-auth-secret-that-is-at-least-32-characters";
     process.env.NEXT_PUBLIC_APP_URL = "https://office.example";
     mocks.checkRateLimit.mockReturnValue(true);
-    mocks.getCurrentUser.mockResolvedValue({ id: "user-1", email: "u@example.com" });
+    mocks.getCurrentUser.mockResolvedValue({
+      id: "user-1",
+      email: "u@example.com",
+      role: "admin",
+    });
     mocks.regenerateUserAgentToken.mockResolvedValue({
       plainToken: "a".repeat(64),
       record: { id: "tok-new", label: "Laptop 1", userId: "user-1" },
@@ -47,13 +52,29 @@ describe("POST /api/settings/agent-token/regenerate", () => {
     expect(res.status).toBe(401);
   });
 
-  it("returns 429 when rate limited", async () => {
+  it("returns 403 for a regular user so they must request admin approval", async () => {
+    mocks.getCurrentUser.mockResolvedValue({ id: "user-1", email: "u@example.com", role: "user" });
+    const res = await POST(
+      new Request("http://localhost/api/settings/agent-token/regenerate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tokenId: "tok-old" }),
+      }),
+    );
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe("approval_required");
+    expect(body.error).toBe(TOKEN_REGEN_NEEDS_APPROVAL);
+    expect(mocks.regenerateUserAgentToken).not.toHaveBeenCalled();
+  });
+
+  it("returns 429 when an admin is rate limited", async () => {
     mocks.checkRateLimit.mockReturnValue(false);
     const res = await POST(new Request("http://localhost/api/settings/agent-token/regenerate", { method: "POST" }));
     expect(res.status).toBe(429);
   });
 
-  it("revokes and issues a token for the signed-in user", async () => {
+  it("revokes and issues a token for an admin on their own settings", async () => {
     const res = await POST(
       new Request("http://localhost/api/settings/agent-token/regenerate", {
         method: "POST",
@@ -70,7 +91,7 @@ describe("POST /api/settings/agent-token/regenerate", () => {
     expect(mocks.logAuditEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "agent_token_reissue",
-        details: expect.objectContaining({ reason: "self_regenerate", selfService: true }),
+        details: expect.objectContaining({ reason: "admin_self_regenerate", selfService: true }),
       }),
     );
   });

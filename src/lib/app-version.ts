@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.24";
+export const APP_VERSION = "1.5.25";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,18 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-06",
+    userBullets: [
+      "Regenerating a laptop token now needs approval first, so an accidental click cannot disconnect the agent.",
+      "First-time Generate setup command still works when you have no token yet.",
+    ],
+    adminBullets: [
+      "Token regenerate requests land on User requests. Approve to revoke the old token and issue a replacement.",
+      "Admins can still regenerate immediately on their own Settings. Impersonating a user follows the request flow.",
+    ],
+  },
+  {
+    version: "1.5.24",
     date: "2026-10-06",
     userBullets: [
       "No user-facing change in this release.",

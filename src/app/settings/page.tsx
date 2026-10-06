@@ -93,6 +93,7 @@ export default async function SettingsPage({
           monthlyDaysTarget={config.monthlyDaysTarget}
           appUrl={appUrl}
           adminAccess={adminAccess}
+          canImmediateTokenReissue={isAdmin(user)}
           isWelcome={params.welcome === "1"}
           devices={enrichedDevices}
           agentVersionSummary={agentVersionSummary}

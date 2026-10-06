@@ -328,6 +328,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         items: [
           "Visit correction: user disputes hours or missing visit. Review message, approve with edit, or deny.",
           "Timezone change: user requests a new IANA timezone. Approve to apply or deny.",
+          "Token regenerate: user asks to replace a bound laptop token. Approve revokes the old token immediately; the user must paste the new reinstall command from Settings.",
           "Profile change: user requests name or email update. Approve or deny.",
           "HR exemption: user notifies admin they have HR approval for a month or day. Log the exemption after verification (unless auto-log is on).",
           "Laptop removal: user wants a device de-registered. Approve removes device and frees a token slot.",
@@ -377,7 +378,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       {
         type: "paragraph",
         text:
-          "The Corrections page (/admin/visit-reports) hosts all approval queues. Sections are anchored: admin_contact, manual_visit, timezone_change, profile_change, compliance_exemption, device_removal, visit_correction.",
+          "The Corrections page (/admin/visit-reports) hosts all approval queues. Sections are anchored: admin_contact, manual_visit, timezone_change, agent_token_regenerate, profile_change, compliance_exemption, device_removal, visit_correction.",
       },
       {
         type: "subheading",
@@ -411,6 +412,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
         type: "list",
         items: [
           "Timezone: applies IANA timezone to future day boundaries for that user.",
+          "Token regenerate: revokes the old laptop token and issues a replacement. Tell the user to copy the new command from Settings and run it, or the agent stays disconnected.",
           "Profile: updates name or email on approval.",
           "HR exemption: month-level or day-level exemption logged by admin after user notification.",
           "Device removal: unbinds serial; user can install again with a new token.",

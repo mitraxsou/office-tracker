@@ -55,6 +55,22 @@ export const AUDIT_ACTION_GUIDE: Record<AuditAction, AuditActionGuide> = {
     label: "Install token reissued",
     summary: "The previous token was replaced so the user can run a fresh install or update command.",
   },
+  agent_token_regenerate_request: {
+    label: "Token regenerate requested",
+    summary: "The user asked an admin to replace a laptop token. The old token still works until approved.",
+  },
+  agent_token_regenerate_cancel: {
+    label: "Token regenerate cancelled",
+    summary: "A pending token regenerate request was cancelled.",
+  },
+  agent_token_regenerate_approve: {
+    label: "Token regenerate approved",
+    summary: "An admin approved a token regenerate. The old token is revoked; the user must run the new reinstall command.",
+  },
+  agent_token_regenerate_reject: {
+    label: "Token regenerate denied",
+    summary: "An admin denied a token regenerate request. The existing laptop token stays in place.",
+  },
   agent_token_revoke: {
     label: "Install token revoked",
     summary: "A pending or bound token was revoked and can no longer register a laptop.",

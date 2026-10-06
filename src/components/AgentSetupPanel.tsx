@@ -27,6 +27,7 @@ type AgentSetupPanelProps = {
   legacyBoundCount?: number;
   localDevAgentPath?: string | null;
   adminAccess?: boolean;
+  canImmediateTokenReissue?: boolean;
   agentVersionSummary?: UserAgentVersionSummary | null;
 };
 
@@ -36,6 +37,7 @@ export function AgentSetupPanel({
   legacyBoundCount = 0,
   localDevAgentPath,
   adminAccess = false,
+  canImmediateTokenReissue = false,
   agentVersionSummary = null,
 }: AgentSetupPanelProps) {
   const [copyError, setCopyError] = useState<string | null>(null);
@@ -126,6 +128,7 @@ export function AgentSetupPanel({
                 installTokens={installTokens}
                 legacyBoundCount={legacyBoundCount}
                 serverAgentVersion={serverAgentVersion}
+                canImmediateReissue={canImmediateTokenReissue}
               />
             </div>
           </li>

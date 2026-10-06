@@ -11,12 +11,23 @@ import {
   buildUpdateCommand,
 } from "@/lib/agent-branding";
 import { logAuditEvent } from "@/lib/audit-log";
+import {
+  TOKEN_REGEN_NEEDS_APPROVAL,
+  canImmediateAgentTokenReissue,
+} from "@/lib/agent-token-regenerate-requests";
 
 /** Issue a fresh token with copy-paste install/update commands (full -Token in command). */
 export async function POST() {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!canImmediateAgentTokenReissue(user)) {
+    return NextResponse.json(
+      { error: TOKEN_REGEN_NEEDS_APPROVAL, code: "approval_required" },
+      { status: 403 },
+    );
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";

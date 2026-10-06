@@ -7,6 +7,7 @@ export const ADMIN_INBOX_KINDS = [
   "profile_change",
   "compliance_exemption",
   "device_removal",
+  "agent_token_regenerate",
   "admin_contact",
   "prior_compliance",
   "account_access",
@@ -46,6 +47,7 @@ export async function getAdminInbox(): Promise<{
     profiles,
     exemptions,
     removals,
+    tokenRegens,
     adminContacts,
     priorCompliance,
     accountAccess,
@@ -93,6 +95,18 @@ export async function getAdminInbox(): Promise<{
         id: true,
         createdAt: true,
         device: { select: { serialNumber: true } },
+        user: { select: userSelect },
+      },
+    }),
+    prisma.agentTokenRegenerateRequest.findMany({
+      where: { status: "open" },
+      select: {
+        id: true,
+        createdAt: true,
+        kind: true,
+        tokenPrefix: true,
+        tokenLabel: true,
+        boundSerial: true,
         user: { select: userSelect },
       },
     }),
@@ -184,6 +198,18 @@ export async function getAdminInbox(): Promise<{
     ...removals.map((row) =>
       item("device_removal", "Laptop removal", row.device.serialNumber, row),
     ),
+    ...tokenRegens.map((row) =>
+      item(
+        "agent_token_regenerate",
+        "Token regenerate",
+        row.kind === "refresh_install_commands"
+          ? "Refresh install commands"
+          : [row.tokenLabel ?? "Laptop token", row.tokenPrefix, row.boundSerial]
+              .filter(Boolean)
+              .join(" · "),
+        row,
+      ),
+    ),
     ...adminContacts.map((row) =>
       item(
         "admin_contact",
@@ -222,6 +248,7 @@ export async function getAdminInbox(): Promise<{
     profile_change: profiles.length,
     compliance_exemption: exemptions.length,
     device_removal: removals.length,
+    agent_token_regenerate: tokenRegens.length,
     admin_contact: adminContacts.length,
     prior_compliance: priorCompliance.length,
     account_access: accountAccess.length,

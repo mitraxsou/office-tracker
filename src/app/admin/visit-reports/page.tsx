@@ -7,6 +7,7 @@ import { AdminVisitReports } from "@/components/AdminVisitReports";
 import { AdminComplianceExemptionRequests } from "@/components/AdminComplianceExemptionRequests";
 import { AdminDeviceRemovalRequests } from "@/components/AdminDeviceRemovalRequests";
 import { AdminTimezoneChangeRequests } from "@/components/AdminTimezoneChangeRequests";
+import { AdminTokenRegenerateRequests } from "@/components/AdminTokenRegenerateRequests";
 import { AdminProfileChangeRequests } from "@/components/AdminProfileChangeRequests";
 import { AdminContactSubmissions } from "@/components/AdminContactSubmissions";
 import { AdminPriorComplianceRequests } from "@/components/AdminPriorComplianceRequests";
@@ -25,15 +26,16 @@ export default async function AdminVisitReportsPage() {
         <header className="page-hero">
           <h1 className="text-2xl font-semibold">User requests</h1>
           <p className="mt-1 text-sm text-muted">
-            Manual visit requests, visit corrections, timezone changes, profile changes, prior
-            compliance declarations, HR exemption notifications, laptop removal requests, and
-            reach-out-to-admin messages.
+            Manual visit requests, visit corrections, timezone changes, token regenerate requests,
+            profile changes, prior compliance declarations, HR exemption notifications, laptop
+            removal requests, and reach-out-to-admin messages.
           </p>
         </header>
         <AdminSubNav active="corrections" />
         <div id="admin_contact" className="scroll-mt-header"><AdminContactSubmissions /></div>
         <div id="manual_visit" className="scroll-mt-header"><AdminManualVisitRequests /></div>
         <div id="timezone_change" className="scroll-mt-header"><AdminTimezoneChangeRequests /></div>
+        <div id="agent_token_regenerate" className="scroll-mt-header"><AdminTokenRegenerateRequests /></div>
         <div id="profile_change" className="scroll-mt-header"><AdminProfileChangeRequests /></div>
         <div id="prior_compliance" className="scroll-mt-header"><AdminPriorComplianceRequests /></div>
         <div id="compliance_exemption" className="scroll-mt-header"><AdminComplianceExemptionRequests /></div>

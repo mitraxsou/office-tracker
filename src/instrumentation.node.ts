@@ -277,6 +277,31 @@ export async function registerNode() {
       'CREATE INDEX IF NOT EXISTS "VisitCorrectionMessage_requestId_createdAt_idx" ON "VisitCorrectionMessage"("requestId", "createdAt");'
     );
     await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "AgentTokenRegenerateRequest" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "kind" TEXT NOT NULL,
+        "tokenId" TEXT,
+        "tokenPrefix" TEXT,
+        "tokenLabel" TEXT,
+        "boundSerial" TEXT,
+        "message" TEXT,
+        "status" TEXT NOT NULL DEFAULT 'open',
+        "adminNote" TEXT,
+        "reviewedAt" TIMESTAMP(3),
+        "reviewedById" TEXT,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "AgentTokenRegenerateRequest_pkey" PRIMARY KEY ("id")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "AgentTokenRegenerateRequest_status_createdAt_idx" ON "AgentTokenRegenerateRequest"("status", "createdAt");'
+    );
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "AgentTokenRegenerateRequest_userId_idx" ON "AgentTokenRegenerateRequest"("userId");'
+    );
+    await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "TimezoneChangeRequest" (
         "id" TEXT NOT NULL,
         "userId" TEXT NOT NULL,

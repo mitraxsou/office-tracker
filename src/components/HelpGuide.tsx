@@ -383,8 +383,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             <div>
               <p className="font-medium">Wrong laptop or regenerated token</p>
               <p className="mt-1 text-muted">
-                Each token binds to one laptop serial on first sync. After admin regenerates a token, run the new install
-                command on that laptop only.
+                Each token binds to one laptop serial on first sync. Request a new token from Settings;
+                after an admin approves, run the new reinstall command on that laptop only.
               </p>
             </div>
           </div>
