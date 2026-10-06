@@ -38,6 +38,8 @@ import {
 } from "@/lib/agent-version-display";
 import { formatPulseAge } from "@/lib/pulse-age";
 import { AdminPresenceTimeline } from "./AdminPresenceTimeline";
+import { MetricHelp } from "@/components/MetricHelp";
+import { ADMIN_SETTINGS_HREF } from "@/lib/admin-settings-hash";
 
 type UserReport = {
   user: {
@@ -158,6 +160,7 @@ type UserReport = {
     officeHours: number;
     officeTransitions: number;
   } | null;
+  heartbeatRetentionDays?: number;
   monthlyDaysTarget: number;
   monthlyProgress: {
     monthKey: string;
@@ -613,7 +616,13 @@ export function AdminUserReport({
           </div>
           {data.agentTracking && (
             <div className="sm:col-span-2">
-              <dt className="text-muted">Tracking mode (this user)</dt>
+              <dt className="flex items-center gap-1.5 text-muted">
+                Tracking mode (this user)
+                <MetricHelp
+                  label="Tracking mode help"
+                  tooltip="Events mode: 2-minute ticks stay on the laptop until end of day. This is not the live office clock. Local pulse interval is hardcoded on the agent."
+                />
+              </dt>
               <dd className="text-xs">
                 Server: <span className="font-mono">{data.agentTracking.serverAgentMode}</span>
                 {" · "}
@@ -621,6 +630,10 @@ export function AdminUserReport({
                 {data.agentTracking.signalSource === "activity_tick"
                   ? "sync activity ticks (new agent)"
                   : "legacy heartbeat rows"}
+                {" · "}
+                <Link href={ADMIN_SETTINGS_HREF.advancedAgent} className="text-accent hover:underline">
+                  Agent mode
+                </Link>
               </dd>
             </div>
           )}
@@ -635,7 +648,13 @@ export function AdminUserReport({
           )}
           {data.dayDiagnostics && (
             <div className="sm:col-span-2">
-              <dt className="text-muted">Selected day diagnostics ({data.dayDiagnostics.dayKey})</dt>
+              <dt className="flex items-center gap-1.5 text-muted">
+                Selected day diagnostics ({data.dayDiagnostics.dayKey})
+                <MetricHelp
+                  label="Selected day diagnostics help"
+                  tooltip="Counts uploaded ticks in that calendar day. Pulses 0 before tonight's flush is expected. Last seen can still update from an hourly health ping."
+                />
+              </dt>
               <dd className="text-xs space-y-1">
                 <div>
                   First signal{" "}
@@ -678,7 +697,13 @@ export function AdminUserReport({
             </div>
           )}
           <div className="sm:col-span-2">
-            <dt className="text-muted">Installed agent versions</dt>
+            <dt className="flex items-center gap-1.5 text-muted">
+              Installed agent versions
+              <MetricHelp
+                label="Installed agent versions help"
+                tooltip="Device version and last successful sync (often hourly health). Not a 2-minute trail. Last seen uses Agent health grace, not tick retention."
+              />
+            </dt>
             <dd>
               {data.devices.length === 0 ? (
                 "No registered laptops"
@@ -764,30 +789,28 @@ export function AdminUserReport({
                   })}
                 </ul>
               )}
+              <p className="mt-2 text-xs text-muted">
+                Last seen uses{" "}
+                <Link href={ADMIN_SETTINGS_HREF.agentSync} className="text-accent hover:underline">
+                  Agent health grace
+                </Link>
+                , not tick retention.
+              </p>
             </dd>
           </div>
         </dl>
-        {data.pulse.recentPulses.length > 0 && (
-          <ul className="mt-3 space-y-1 text-xs text-muted">
-            {data.pulse.recentPulses.map((p, i) => (
-              <li key={i}>
-                {new Date(p.recordedAt).toLocaleString("en-IN")} ·{" "}
-                {p.inOffice ? "in office" : "out"} · {p.ssid ?? "no SSID"}
-                {p.vpnGateway ? ` · VPN ${p.vpnGateway}` : ""}
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
 
       <AdminPresenceTimeline
         userId={userId}
         timezone={data.user.timezone}
         selectedDate={selectedDate}
+        lastUploadedTicks={data.pulse.recentPulses}
+        retentionDays={data.heartbeatRetentionDays ?? 7}
       />
 
       <section className="card p-6">
-        <h3 className="mb-3 text-sm font-medium">
+        <h3 className="mb-3 flex flex-wrap items-center gap-1.5 text-sm font-medium">
           {selectedDate ? `Activity on ${selectedDate}` : "Recent activity (retention window)"}
           {data.agentTracking && (
             <span className="ml-2 font-normal text-muted">
@@ -798,6 +821,10 @@ export function AdminUserReport({
               )
             </span>
           )}
+          <MetricHelp
+            label="Selected-day activity help"
+            tooltip="Uploaded ticks for the selected day only. Empty before end-of-day flush. Kept for the diagnostic retention window. Enable Activity ticks on the Wi-Fi table for the same trail in context."
+          />
         </h3>
         {data.heartbeats.length === 0 ? (
           <p className="text-sm text-muted">

@@ -9,11 +9,13 @@ export function RecentHeartbeats({
   timezone,
   retentionDays,
   embedded = false,
+  lastUploadedOnly = false,
 }: {
   pulses: Pulse[];
   timezone: string;
-  retentionDays: number;
+  retentionDays?: number;
   embedded?: boolean;
+  lastUploadedOnly?: boolean;
 }) {
   const wrapperClass = embedded ? "" : "card p-6";
 
@@ -26,14 +28,16 @@ export function RecentHeartbeats({
     );
   }
 
+  const help = lastUploadedOnly
+    ? "Last 12 ticks that reached the server, newest first. Often the previous evening until end-of-day flush. This is a display limit, not retention."
+    : `Wi-Fi and activity events from your laptop agent (up to ${retentionDays ?? 7} day${
+        (retentionDays ?? 7) === 1 ? "" : "s"
+      } kept on the server). This is separate from "Office session since", which tracks your current visit window.`;
+
   return (
     <section className={wrapperClass}>
       {!embedded && <h2 className="mb-1 text-lg font-medium">Recent agent activity</h2>}
-      <p className={`text-sm text-muted ${embedded ? "mb-2" : "mb-4"}`}>
-        Wi-Fi and activity events from your laptop agent (up to {retentionDays} day
-        {retentionDays === 1 ? "" : "s"} kept on the server). This is separate from
-        &quot;Office session since&quot;, which tracks your current visit window.
-      </p>
+      <p className={`text-sm text-muted ${embedded ? "mb-2" : "mb-4"}`}>{help}</p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>

@@ -271,9 +271,6 @@ export default async function DashboardPage() {
           visits={summary.visits}
           timezone={user.timezone}
           visitCount={summary.visits.length}
-          showPulses={adminAccess && !agentNeverConnected && pulse.recentPulses.length > 0}
-          pulses={pulse.recentPulses}
-          retentionDays={config.heartbeatRetentionDays}
         />
 
         <p className="text-xs text-muted">

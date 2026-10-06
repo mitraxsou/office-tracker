@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ADMIN_SETTINGS_HASH } from "@/lib/admin-settings-hash";
 import {
   MAINTENANCE_TABLE_LABELS,
   NEVER_PURGED_TABLES,
@@ -66,7 +67,7 @@ export function AdminMaintenance() {
   }
 
   return (
-    <section className="card border border-red-500/30 p-6">
+    <section id={ADMIN_SETTINGS_HASH.dataMaintenance} className="card scroll-mt-20 border border-red-500/30 p-6">
       <h2 className="mb-1 text-lg font-medium">Data maintenance</h2>
       <p className="mb-4 text-sm text-muted">
         Remove old operational data. Never purged: {NEVER_PURGED_TABLES.join(", ")} (visit logs are

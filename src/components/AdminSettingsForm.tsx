@@ -1,12 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   fiscalYearEndMonthForStart,
   formatFiscalYearSpanLabel,
   MONTH_NAMES,
 } from "@/lib/fiscal-year";
+import {
+  ADMIN_SETTINGS_HASH,
+  hashOpensAdvancedAgentOptions,
+} from "@/lib/admin-settings-hash";
 
 export function AdminSettingsForm({
   hoursTarget,
@@ -51,6 +55,24 @@ export function AdminSettingsForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  useEffect(() => {
+    function syncHash() {
+      if (typeof window === "undefined") return;
+      const hash = window.location.hash;
+      if (hashOpensAdvancedAgentOptions(hash)) {
+        setAdvancedOpen(true);
+        const id = hash.replace(/^#/, "");
+        requestAnimationFrame(() => {
+          document.getElementById(id)?.scrollIntoView({ block: "start" });
+        });
+      }
+    }
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, []);
 
   function handleFyStartChange(month: number) {
     setFyStartMonth(month);
@@ -207,12 +229,12 @@ export function AdminSettingsForm({
         />
       </section>
 
-      <section className="card p-6">
+      <section id={ADMIN_SETTINGS_HASH.agentSync} className="card scroll-mt-20 p-6">
         <h2 className="mb-2 text-lg font-medium">Agent sync settings</h2>
         <p className="mb-4 text-sm text-muted">
-          Agents wake every 2 minutes and sync with the server on the check-in interval. Each sync
-          sends Wi-Fi events, activity ticks, and visit updates. Pending install tokens auto-revoke
-          if never bound.
+          Agents wake every 2 minutes locally. Critical office in/out syncs immediately; health
+          pings follow the check-in interval. Activity ticks still upload at end of day. Pending
+          install tokens auto-revoke if never bound.
         </p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <label className="block text-sm">
@@ -265,7 +287,12 @@ export function AdminSettingsForm({
           stale agents when no sync or activity for that long and the user is not out of office.
         </p>
 
-        <details className="mt-4 rounded-lg border border-[var(--border)] p-4 text-sm">
+        <details
+          id={ADMIN_SETTINGS_HASH.advancedAgent}
+          className="mt-4 scroll-mt-20 rounded-lg border border-[var(--border)] p-4 text-sm"
+          open={advancedOpen}
+          onToggle={(event) => setAdvancedOpen((event.target as HTMLDetailsElement).open)}
+        >
           <summary className="cursor-pointer font-medium text-muted">Advanced agent options</summary>
           <div className="mt-4 space-y-4">
             <label className="block text-sm">
@@ -283,7 +310,7 @@ export function AdminSettingsForm({
                 agents only.
               </span>
             </label>
-            <label className="block text-sm">
+            <label id={ADMIN_SETTINGS_HASH.diagnosticRetention} className="block scroll-mt-20 text-sm">
               <span className="text-muted">Diagnostic retention (days)</span>
               <input
                 type="number"

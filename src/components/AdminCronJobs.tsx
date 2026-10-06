@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ADMIN_SETTINGS_HASH } from "@/lib/admin-settings-hash";
 
 type CronJob = {
   name: string;
@@ -64,7 +65,7 @@ export function AdminCronJobs({ initialJobs }: { initialJobs: CronJob[] }) {
   }
 
   return (
-    <section className="card p-6">
+    <section id={ADMIN_SETTINGS_HASH.cronJobs} className="card scroll-mt-20 p-6">
       <h2 className="text-lg font-medium">Cron jobs</h2>
       <p className="mt-1 text-sm text-muted">
         Vercel calls these paths with a CRON_SECRET bearer token. Run now uses your admin session and

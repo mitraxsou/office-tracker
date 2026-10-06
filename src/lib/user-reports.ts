@@ -269,6 +269,7 @@ export async function getUserReport(
       byDevice: deviceApiHits,
     },
     dayDiagnostics,
+    heartbeatRetentionDays: config.heartbeatRetentionDays,
   };
 }
 

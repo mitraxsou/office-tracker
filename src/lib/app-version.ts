@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.21";
+export const APP_VERSION = "1.5.22";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,17 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-06",
+    userBullets: [
+      "Activity details on Today shows Visits and Manual visit only. Dense agent ticks are not listed as a live session.",
+    ],
+    adminBullets: [
+      "Last uploaded ticks sit under Debug on the user report Wi-Fi log, with help on when to use each trail.",
+      "Diagnostic retention, health grace, visit gap, and tick purge link from that log to Global settings.",
+    ],
+  },
+  {
+    version: "1.5.21",
     date: "2026-10-06",
     userBullets: [
       "Refreshing Today applies a recovered Wi-Fi check-in that already reached the server, without waiting for the next hourly health ping.",

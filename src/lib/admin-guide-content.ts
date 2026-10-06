@@ -792,6 +792,28 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       },
       {
         type: "subheading",
+        text: "User report logs (when to use)",
+      },
+      {
+        type: "list",
+        items: [
+          "Visits and Wi-Fi and sync activity: office hours, enter/exit, SSID changes, health/sync. Use these first.",
+          "Activity ticks checkbox: dense 2-minute SSID trail for the selected day after end-of-day upload. Off by default.",
+          "Debug: last uploaded ticks: last 12 ticks on the server (often last night until midnight flush). Display limit, not live status.",
+          "Laptop %LOCALAPPDATA%\\OfficeTracker\\logs\\heartbeat.log: sync or update failures. Size-capped on the machine, not a day count. Local 2-minute pulse and queue size are not Global settings.",
+        ],
+      },
+      {
+        type: "links",
+        items: [
+          { href: "/admin/settings#diagnostic-retention", label: "Diagnostic retention (keep ticks 1–30 days)" },
+          { href: "/admin/settings#agent-sync", label: "Agent health grace and visit gap" },
+          { href: "/admin/settings#cron-jobs", label: "purge-heartbeats cron" },
+          { href: "/admin/settings#data-maintenance", label: "Data maintenance (manual older purge)" },
+        ],
+      },
+      {
+        type: "subheading",
         text: "Install checklist for support",
       },
       {

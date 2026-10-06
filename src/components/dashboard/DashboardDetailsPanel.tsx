@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { VisitList } from "@/components/VisitList";
 import { ManualVisitForm } from "@/components/ManualVisitForm";
-import { RecentHeartbeats } from "@/components/RecentHeartbeats";
 
 type Visit = {
   id: string;
@@ -13,21 +12,12 @@ type Visit = {
   ssid: string | null;
 };
 
-type Pulse = {
-  recordedAt: string;
-  inOffice: boolean;
-  ssid: string | null;
-};
-
-type TabId = "visits" | "manual" | "pulses";
+type TabId = "visits" | "manual";
 
 type DashboardDetailsPanelProps = {
   visits: Visit[];
   timezone: string;
   visitCount: number;
-  showPulses: boolean;
-  pulses: Pulse[];
-  retentionDays: number;
 };
 
 const TABS: { id: TabId; label: string }[] = [
@@ -39,14 +29,9 @@ export function DashboardDetailsPanel({
   visits,
   timezone,
   visitCount,
-  showPulses,
-  pulses,
-  retentionDays,
 }: DashboardDetailsPanelProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<TabId>("visits");
-
-  const tabs = showPulses ? [...TABS, { id: "pulses" as TabId, label: "Agent activity" }] : TABS;
 
   const summary =
     visitCount === 0
@@ -73,7 +58,7 @@ export function DashboardDetailsPanel({
       {open && (
         <div className="border-t border-[var(--border)] px-4 pb-4 pt-3">
           <div className="mb-3 flex flex-wrap gap-1">
-            {tabs.map((item) => (
+            {TABS.map((item) => (
               <button
                 key={item.id}
                 type="button"
@@ -97,10 +82,6 @@ export function DashboardDetailsPanel({
           )}
 
           {tab === "manual" && <ManualVisitForm timezone={timezone} embedded />}
-
-          {tab === "pulses" && showPulses && (
-            <RecentHeartbeats pulses={pulses} timezone={timezone} retentionDays={retentionDays} embedded />
-          )}
         </div>
       )}
     </section>

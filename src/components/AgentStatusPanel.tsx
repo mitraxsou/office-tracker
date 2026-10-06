@@ -368,38 +368,6 @@ export function AgentStatusPanel({
 
       </dl>
 
-
-
-      {status.recentPulses.length > 0 && (
-
-        <div className="mt-3">
-
-          <p className="mb-1 text-xs font-medium text-muted">Recent activity</p>
-
-          <ul className="space-y-1 text-xs text-muted">
-
-            {status.recentPulses.map((p, i) => (
-
-              <li key={i}>
-
-                {new Date(p.recordedAt).toLocaleTimeString("en-IN")} ·{" "}
-
-                {p.inOffice ? "in office" : "out"}
-
-                {p.ssid ? ` · ${p.ssid}` : ""}
-
-              </li>
-
-            ))}
-
-          </ul>
-
-        </div>
-
-      )}
-
-
-
       {status.devices.length > 0 && (
 
         <ul className="mt-3 space-y-1 text-xs">
