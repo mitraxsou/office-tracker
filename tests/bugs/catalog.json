@@ -189,6 +189,20 @@
       "skipReason": null
     },
     {
+      "id": "BUG-014",
+      "title": "OfficeConnect dropped from cached office SSID allowlist",
+      "date": "2026-10",
+      "severity": "high",
+      "area": "wifi",
+      "reproSummary": "Laptop on OfficeConnect with a healthy agent showed 0h in office. Cached/server allowlist was ExternalConnect and pwcglb.com only, so visit_start never fired.",
+      "assertion": "mergeRequiredOfficeSsids restores OfficeConnect (and other curated defaults) while keeping extra admin SSIDs.",
+      "fixture": "fixtures/officeconnect-allowlist-merge.json",
+      "testFile": "tests/bugs/BUG-014-officeconnect-allowlist.test.ts",
+      "relatedTests": ["tests/ssid.test.ts"],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
       "id": "CORE-001",
       "title": "Heartbeat in-office uses SSID allowlist",
       "date": "2026-01",

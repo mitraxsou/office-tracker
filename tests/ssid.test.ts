@@ -5,6 +5,7 @@ import {
   allowlistMatchPrefix,
   officeSsidAllowlistChanged,
   parseDefaultSsidsFromEnv,
+  mergeRequiredOfficeSsids,
   ssidsNoLongerAllowed,
   DEFAULT_OFFICE_SSIDS,
 } from "../src/lib/constants";
@@ -100,6 +101,25 @@ describe("officeSsidAllowlistChanged", () => {
     expect(officeSsidAllowlistChanged(base, ["pwcglb.com", " officeconnect ", "EXTERNALCONNECT"])).toBe(
       false,
     );
+  });
+});
+
+describe("mergeRequiredOfficeSsids", () => {
+  it("restores OfficeConnect when an older save dropped it", () => {
+    expect(mergeRequiredOfficeSsids(["ExternalConnect", "pwcglb.com"])).toEqual([
+      "ExternalConnect",
+      "pwcglb.com",
+      "OfficeConnect",
+    ]);
+  });
+
+  it("keeps extra admin SSIDs and canonical default names", () => {
+    expect(mergeRequiredOfficeSsids(["officeconnect", "GuestWiFi"])).toEqual([
+      "OfficeConnect",
+      "GuestWiFi",
+      "ExternalConnect",
+      "pwcglb.com",
+    ]);
   });
 });
 

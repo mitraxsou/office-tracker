@@ -14,7 +14,7 @@ $ConfigCacheMaxAgeMinutes = 120
 $UpdateCheckIntervalMinutes = 60
 $LocalPulseIntervalMinutes = 2
 $HealthSyncIntervalMinutes = 60
-$AgentScriptVersion = "1.5.17"
+$AgentScriptVersion = "1.5.19"
 $CriticalEventTypes = @(
     "wifi_connected",
     "wifi_disconnected",
@@ -239,6 +239,13 @@ function Get-CurrentWifiSsid {
             $normalized = Normalize-WifiSsid $profile.Name
             if ($normalized) { return @{ Ssid = $normalized; Method = "NetConnectionProfile" } }
         }
+        $anyProfile = Get-NetConnectionProfile -ErrorAction Stop |
+            Where-Object { $_.Name -and (Test-ValidWifiSsid $_.Name) } |
+            Select-Object -First 1
+        if ($anyProfile -and $anyProfile.Name) {
+            $normalized = Normalize-WifiSsid $anyProfile.Name
+            if ($normalized) { return @{ Ssid = $normalized; Method = "NetConnectionProfileAny" } }
+        }
     } catch {}
 
     try {
@@ -442,6 +449,29 @@ function Set-SyncState($State) {
     Write-JsonFile (Get-SyncStatePath) $State
 }
 
+function Get-RequiredOfficeSsids {
+    @("OfficeConnect", "ExternalConnect", "pwcglb.com")
+}
+
+function Merge-RequiredOfficeSsids {
+    param($Config)
+    if (-not $Config) { return $Config }
+    $existing = @()
+    if ($Config.ssids) { $existing = @($Config.ssids) }
+    $seen = New-Object "System.Collections.Generic.HashSet[string]" ([StringComparer]::OrdinalIgnoreCase)
+    $merged = New-Object System.Collections.ArrayList
+    foreach ($item in $existing) {
+        $name = [string]$item
+        if (-not $name) { continue }
+        if ($seen.Add($name)) { [void]$merged.Add($name) }
+    }
+    foreach ($required in Get-RequiredOfficeSsids) {
+        if ($seen.Add($required)) { [void]$merged.Add($required) }
+    }
+    $Config.ssids = @($merged)
+    return $Config
+}
+
 function Test-IsOfficeSsid {
     param(
         [string]$Ssid,
@@ -450,7 +480,9 @@ function Test-IsOfficeSsid {
     if (-not $Ssid) { return $false }
     if (-not $ServerConfig -or -not $ServerConfig.ssids) { return $false }
     foreach ($allowed in $ServerConfig.ssids) {
-        if ([string]$allowed -eq $Ssid) { return $true }
+        if ([string]::Equals([string]$allowed, $Ssid, [StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
     }
     return $false
 }
@@ -997,6 +1029,7 @@ function Apply-SyncConfig {
     $config = $null
     if ($Response.config) { $config = $Response.config }
     if ($config) {
+        $config = Merge-RequiredOfficeSsids $config
         $config | ConvertTo-Json -Compress | Set-Content -Path (Get-CachePath) -Encoding UTF8
     }
     return $config
@@ -1483,6 +1516,7 @@ $forceConfigFetch = -not (Test-ConfigCacheFresh $cachePath)
 try {
     $serverConfig = Get-ServerConfig -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber `
         -Force:$forceConfigFetch
+    $serverConfig = Merge-RequiredOfficeSsids $serverConfig
 } catch {
     Write-Log "ERROR: Cannot fetch server config"
     if ($DryRun) { Write-Host "ERROR: Cannot fetch server config: $($_.Exception.Message)"; exit 1 }
@@ -1531,7 +1565,8 @@ if ($isResumeRun -and $suspendAtTime) {
 
 $isOfficeNow = Test-IsOfficeSsid -Ssid $ssid -ServerConfig $serverConfig
 $hasOpenVisit = [bool](Get-OpenVisitFromState $syncState)
-if ($isOfficeNow -and -not $hasOpenVisit -and ($dayRolledOver -or $isResumeRun)) {
+Write-Log "presence method=$ssidMethod isOffice=$isOfficeNow hasSsid=$([bool]$ssid) openVisit=$hasOpenVisit ssidChanged=pending"
+if ($isOfficeNow -and -not $hasOpenVisit) {
     $hoursTarget = 5
     if ($serverConfig -and $null -ne $serverConfig.hoursTarget) {
         $hoursTarget = [double]$serverConfig.hoursTarget
@@ -1546,6 +1581,11 @@ if ($isOfficeNow -and -not $hasOpenVisit -and ($dayRolledOver -or $isResumeRun))
 
 $ssidChanged = ($previousSsid -ne $ssid)
 $pendingEvents = @()
+
+if ($ssidChanged -and -not $ssid) {
+    Write-Log "SKIP wifi transition: current SSID empty (detection miss); keeping last known presence"
+    $ssidChanged = $false
+}
 
 if ($ssidChanged) {
     $alreadyQueued = $syncState.pendingSsid -and [string]$syncState.pendingSsid -eq $ssid

@@ -1,0 +1,4 @@
+{
+  "storedSsids": ["ExternalConnect", "pwcglb.com"],
+  "expectedSsids": ["ExternalConnect", "pwcglb.com", "OfficeConnect"]
+}

@@ -10,7 +10,7 @@
 | `DATABASE_URL_*` | Misconfigured Storage prefix vars, auto-mapped; reconnect Storage with no prefix |
 | `AUTH_SECRET` | Session JWT (32+ chars) |
 | `NEXT_PUBLIC_APP_URL` | Public URL for install commands and agent |
-| `DEFAULT_OFFICE_SSIDS` | Seed value (`OfficeConnect`, `ExternalConnect`, `pwcglb.com`); admin manages via AppConfig in prod; startup merges missing defaults |
+| `DEFAULT_OFFICE_SSIDS` | Curated office SSIDs (`OfficeConnect`, `ExternalConnect`, `pwcglb.com`). Admin may add extras; missing curated names are merged back on read/save. |
 | `DEFAULT_HEARTBEAT_INTERVAL_MINUTES` | Seed value for a new AppConfig (default 5, range 2-60); admin manages the stored value |
 | `ADMIN_EMAIL` | Promote user to admin on seed |
 | `BREAKGLASS_EMAIL` | Recovery admin email (with password) |

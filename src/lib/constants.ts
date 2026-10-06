@@ -45,6 +45,27 @@ export function parseDefaultSsidsFromEnv(): string[] {
     .filter(Boolean);
 }
 
+/** Keep curated PwC office SSIDs even if an older admin save dropped one. Extra admin SSIDs stay. */
+export function mergeRequiredOfficeSsids(stored: string[]): string[] {
+  const required = parseDefaultSsidsFromEnv();
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (ssid: string) => {
+    const key = normalizeSsid(ssid).toLowerCase();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    out.push(normalizeSsid(ssid));
+  };
+  for (const ssid of stored) {
+    if (typeof ssid !== "string" || !ssid.trim()) continue;
+    const key = normalizeSsid(ssid).toLowerCase();
+    const requiredMatch = required.find((item) => normalizeSsid(item).toLowerCase() === key);
+    push(requiredMatch ?? ssid);
+  }
+  for (const ssid of required) push(ssid);
+  return out;
+}
+
 export function normalizeSsid(ssid: string): string {
   return ssid
     .trim()

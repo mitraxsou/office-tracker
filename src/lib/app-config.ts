@@ -3,6 +3,8 @@ import { prisma } from "./db";
 import {
   DEFAULT_HOURS_TARGET,
   DEFAULT_MONTHLY_DAYS_TARGET,
+  mergeRequiredOfficeSsids,
+  officeSsidAllowlistChanged,
   parseDefaultSsidsFromEnv,
 } from "./constants";
 import {
@@ -139,8 +141,15 @@ export async function ensureAppConfig(): Promise<AppConfigData> {
         },
       });
     } else {
-      // DEFAULT_OFFICE_SSIDS seeds a new config only. Re-adding env defaults here would
-      // silently undo an SSID the admin removed in /admin/settings.
+      const stored = storedOfficeSsids(config.officeSsids);
+      const merged = mergeRequiredOfficeSsids(stored);
+      if (officeSsidAllowlistChanged(stored, merged)) {
+        config = await prisma.appConfig.update({
+          where: { id: CONFIG_ID },
+          data: { officeSsids: JSON.stringify(merged) },
+        });
+        invalidateAgentConfigCache();
+      }
       await reconcileHeartbeatsWithAllowlist(parseConfig(config));
     }
     return parseConfig(config);
@@ -159,7 +168,9 @@ export async function updateAppConfig(data: Partial<AppConfigData>) {
   const update: Record<string, unknown> = {};
   if (data.hoursTarget !== undefined) update.hoursTarget = data.hoursTarget;
   if (data.monthlyDaysTarget !== undefined) update.monthlyDaysTarget = data.monthlyDaysTarget;
-  if (data.officeSsids !== undefined) update.officeSsids = JSON.stringify(data.officeSsids);
+  if (data.officeSsids !== undefined) {
+    update.officeSsids = JSON.stringify(mergeRequiredOfficeSsids(data.officeSsids));
+  }
   if (data.maxDevicesPerUser !== undefined) update.maxDevicesPerUser = data.maxDevicesPerUser;
   if (data.allowRegistration !== undefined) update.allowRegistration = data.allowRegistration;
   if (data.allowOtpSelfRegistration !== undefined) {
@@ -214,6 +225,18 @@ export function agentHealthGraceMs(graceHours: number) {
   return graceHours * 60 * 60 * 1000;
 }
 
+function storedOfficeSsids(raw: string): string[] {
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((ssid): ssid is string => typeof ssid === "string");
+    }
+  } catch {
+    /* ignore */
+  }
+  return [];
+}
+
 function parseConfig(config: {
   hoursTarget: number;
   monthlyDaysTarget?: number;
@@ -235,7 +258,7 @@ function parseConfig(config: {
   let ssids: string[] = parseDefaultSsidsFromEnv();
   try {
     const parsed = JSON.parse(config.officeSsids);
-    if (Array.isArray(parsed)) ssids = parsed;
+    if (Array.isArray(parsed)) ssids = mergeRequiredOfficeSsids(parsed.filter((s) => typeof s === "string"));
   } catch {
     /* use default */
   }
