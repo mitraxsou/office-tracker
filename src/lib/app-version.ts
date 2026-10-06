@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.25";
+export const APP_VERSION = "1.5.26";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,17 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-06",
+    userBullets: [
+      "No user-facing change in this release.",
+    ],
+    adminBullets: [
+      "Audit rows keep the ? help tooltip. Per-row SOP links are gone; use How to read this log and What each action means on the page.",
+      "Audit From/To date pickers stay dark in dark mode instead of flashing a light calendar control.",
+    ],
+  },
+  {
+    version: "1.5.25",
     date: "2026-10-06",
     userBullets: [
       "Regenerating a laptop token now needs approval first, so an accidental click cannot disconnect the agent.",

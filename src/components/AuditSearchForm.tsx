@@ -41,14 +41,14 @@ export function AuditSearchForm({
         name="from"
         defaultValue={filters.from}
         aria-label="From date"
-        className="rounded-lg border px-3 py-2 text-sm"
+        className="picker-input rounded-lg border px-3 py-2 text-sm"
       />
       <input
         type="date"
         name="to"
         defaultValue={filters.to}
         aria-label="To date"
-        className="rounded-lg border px-3 py-2 text-sm"
+        className="picker-input rounded-lg border px-3 py-2 text-sm"
       />
       <label className="block text-sm">
         <span className="sr-only">Display timezone</span>

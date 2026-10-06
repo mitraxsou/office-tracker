@@ -1,7 +1,5 @@
-import Link from "next/link";
 import { MetricHelp } from "@/components/MetricHelp";
 import {
-  auditActionGuideHref,
   describeAuditAction,
   formatAuditDetailsSummary,
   formatAuditTimestamp,
@@ -59,12 +57,6 @@ export function AuditLogTable({
                       <p className="font-mono text-[11px] text-muted">{row.action}</p>
                     </div>
                     <MetricHelp label={`${guide.label} help`} tooltip={guide.summary} />
-                    <Link
-                      href={auditActionGuideHref(row.action)}
-                      className="shrink-0 text-[11px] text-accent hover:underline"
-                    >
-                      SOP
-                    </Link>
                   </div>
                 </td>
                 <td className="p-3">
