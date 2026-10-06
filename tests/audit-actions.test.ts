@@ -31,6 +31,11 @@ describe("audit timezone and actions", () => {
     expect(summary).toMatch(/4:00:09/i);
   });
 
+  it("does not throw on an invalid timezone", () => {
+    expect(resolveAuditTimezone("Garbage/Zone", "")).toBe("Asia/Kolkata");
+    expect(formatAuditTimestamp("2026-10-06T10:30:09.331Z", "not-a-zone")).toMatch(/2026/);
+  });
+
   it("falls back to the admin timezone when tz is missing or invalid", () => {
     expect(resolveAuditTimezone(undefined, "Asia/Kolkata")).toBe("Asia/Kolkata");
     expect(resolveAuditTimezone("not-a-zone", "Asia/Kolkata")).toBe("Asia/Kolkata");

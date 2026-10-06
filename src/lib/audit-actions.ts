@@ -305,17 +305,20 @@ const ISO_INSTANT =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
 
 export function resolveAuditTimezone(requested: string | undefined, fallback: string): string {
-  const base = fallback?.trim() || DEFAULT_TIMEZONE;
+  const base = isValidTimeZone(fallback?.trim()) ? fallback.trim() : DEFAULT_TIMEZONE;
   const value = requested?.trim();
   if (!value) return base;
-  if (value === "UTC") return "UTC";
-  const known = new Set(timezoneOptionsForUser(base).map((option) => option.value));
-  if (known.has(value)) return value;
+  if (isValidTimeZone(value)) return value;
+  return base;
+}
+
+function isValidTimeZone(value: string | undefined): boolean {
+  if (!value) return false;
   try {
     new Intl.DateTimeFormat("en-IN", { timeZone: value }).format(new Date());
-    return value;
+    return true;
   } catch {
-    return base;
+    return false;
   }
 }
 
@@ -346,17 +349,22 @@ export function auditActionAnchorId(action: string): string {
 export function formatAuditTimestamp(iso: string, timezone: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return new Intl.DateTimeFormat("en-IN", {
-    timeZone: timezone,
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-    timeZoneName: "short",
-  }).format(date);
+  const zone = isValidTimeZone(timezone) ? timezone : DEFAULT_TIMEZONE;
+  try {
+    return new Intl.DateTimeFormat("en-IN", {
+      timeZone: zone,
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+      timeZoneName: "short",
+    }).format(date);
+  } catch {
+    return date.toISOString();
+  }
 }
 
 export function formatAuditDetailValue(value: unknown, timezone: string): string {

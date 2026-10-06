@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.23";
+export const APP_VERSION = "1.5.24";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,16 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-06",
+    userBullets: [
+      "No user-facing change in this release.",
+    ],
+    adminBullets: [
+      "Fixes the Audit page crash so timestamps, timezone picker, and action SOP links load.",
+    ],
+  },
+  {
+    version: "1.5.23",
     date: "2026-10-06",
     userBullets: [
       "No user-facing change in this release.",

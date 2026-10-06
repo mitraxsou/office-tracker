@@ -1,3 +1,5 @@
+"use client";
+
 export function MetricHelp({
   tooltip,
   label = "More information",
