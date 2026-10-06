@@ -212,7 +212,12 @@
       "assertion": "Contiguous same-day office activity ticks recover the Wi-Fi visit start to the earliest verified office pulse. Closed manual visits are not changed.",
       "fixture": "fixtures/office-visit-recovery.json",
       "testFile": "tests/bugs/BUG-015-office-visit-recovery.test.ts",
-      "relatedTests": ["tests/office-visit-recovery.test.ts", "tests/agent-sync.test.ts", "tests/agent-heartbeat-sync.test.ts"],
+      "relatedTests": [
+        "tests/office-visit-recovery.test.ts",
+        "tests/office-visit-recovery-persist.test.ts",
+        "tests/agent-sync.test.ts",
+        "tests/agent-heartbeat-sync.test.ts"
+      ],
       "status": "guarded",
       "skipReason": null
     },

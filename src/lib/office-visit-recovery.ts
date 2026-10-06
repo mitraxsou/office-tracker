@@ -86,6 +86,53 @@ export function shouldBackdateWifiVisit(params: {
   return validateVisitTimestamps(params.recoveredStartAt, params.endAt, params.now) === null;
 }
 
+export type RecoveredVisitStart = {
+  localVisitId: string;
+  startAt: Date;
+  ssid: string | null;
+  deviceId: string | null;
+};
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+/** Parse a stored visit_start agent event. Does not use the 7-day inbound clamp. */
+export function recoveredStartFromVisitStartPayload(
+  payload: unknown,
+  extras?: { deviceId?: string | null },
+): RecoveredVisitStart | null {
+  const record = asRecord(payload);
+  if (!record) return null;
+  const localVisitId =
+    typeof record.localVisitId === "string" ? record.localVisitId.trim() : "";
+  if (!localVisitId) return null;
+  if (typeof record.at !== "string" && typeof record.at !== "number") return null;
+  const startAt = new Date(record.at);
+  if (Number.isNaN(startAt.getTime())) return null;
+  const ssid = typeof record.ssid === "string" && record.ssid.trim() ? record.ssid.trim() : null;
+  return {
+    localVisitId,
+    startAt,
+    ssid,
+    deviceId: extras?.deviceId ?? null,
+  };
+}
+
+export function earliestRecoveredStartByLocalVisit(
+  recovered: RecoveredVisitStart[],
+): Map<string, RecoveredVisitStart> {
+  const byLocal = new Map<string, RecoveredVisitStart>();
+  for (const item of recovered) {
+    const current = byLocal.get(item.localVisitId);
+    if (!current || item.startAt.getTime() < current.startAt.getTime()) {
+      byLocal.set(item.localVisitId, item);
+    }
+  }
+  return byLocal;
+}
+
 export function shouldCreateRecoveredWifiVisit(params: {
   existing: WifiVisitForRecovery | null;
   recoveredStartAt: Date;

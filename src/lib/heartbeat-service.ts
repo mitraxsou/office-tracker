@@ -25,6 +25,7 @@ import { daySpanMsForDay, dayKeyInTimezone, effectiveVisitEnd, firstOfficeInMsFo
 import { dayBoundsFromKey, getDayBounds } from "./timezone-dates";
 import { maybeClearOutOfOfficeOnOfficePresence } from "./out-of-office";
 import { validateVisitTimestamps } from "./visit-validation";
+import { persistRecoveredWifiVisitStarts } from "./office-visit-recovery-persist";
 
 /** Skip repeat maintenance on dashboard reads within this window. */
 export const VISIT_MAINTENANCE_THROTTLE_MS = 15 * 60 * 1000;
@@ -113,6 +114,11 @@ export async function loadDaySpanContext(
   const staleMs = config.agentStaleMinutes * 60 * 1000;
   if (!options?.skipMaintenance) {
     await maybeRunVisitMaintenance(userId, timezone, staleMs);
+    try {
+      await persistRecoveredWifiVisitStarts(userId, timezone);
+    } catch {
+      console.error("[today] Failed to persist recovered Wi-Fi visit starts");
+    }
   }
 
   const { start: dayStart, end: dayEnd } = dayBoundsFromKey(dayKey, timezone);

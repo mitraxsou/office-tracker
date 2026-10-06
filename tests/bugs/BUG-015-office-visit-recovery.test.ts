@@ -3,6 +3,7 @@ import path from "path";
 import { describe, expect, it } from "vitest";
 import {
   earliestContiguousOfficeAt,
+  recoveredStartFromVisitStartPayload,
   shouldBackdateWifiVisit,
 } from "@/lib/office-visit-recovery";
 import { dayBoundsFromKey } from "@/lib/timezone-dates";
@@ -35,6 +36,14 @@ describe("BUG-015 recover office visit start from local Wi-Fi ticks", () => {
       allowlist: fixture.allowlist,
     });
     expect(recovered?.toISOString()).toBe(fixture.expectedFirstCheckInAt);
+    expect(
+      recoveredStartFromVisitStartPayload({
+        type: "visit_start",
+        at: fixture.expectedFirstCheckInAt,
+        localVisitId: "lv-1",
+        ssid: "OfficeConnect",
+      })?.startAt.toISOString(),
+    ).toBe(fixture.expectedFirstCheckInAt);
     expect(
       shouldBackdateWifiVisit({
         source: "wifi",

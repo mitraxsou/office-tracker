@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.20";
+export const APP_VERSION = "1.5.21";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,16 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-06",
+    userBullets: [
+      "Refreshing Today applies a recovered Wi-Fi check-in that already reached the server, without waiting for the next hourly health ping.",
+    ],
+    adminBullets: [
+      "Accepted visit_start events backdate the matching Wi-Fi visit when Today loads, including recoveries that arrived before 1.5.20.",
+    ],
+  },
+  {
+    version: "1.5.20",
     date: "2026-10-06",
     userBullets: [
       "If office Wi-Fi was seen but a visit started late, the agent now recovers the real first check-in from local pulses on its own.",

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   contiguousOfficeSegment,
   earliestContiguousOfficeAt,
+  recoveredStartFromVisitStartPayload,
   shouldBackdateWifiVisit,
   shouldCreateRecoveredWifiVisit,
 } from "../src/lib/office-visit-recovery";
@@ -78,6 +79,18 @@ describe("wifi visit backdate guards", () => {
         now,
       }),
     ).toBe(false);
+  });
+
+  it("reads the recovered time from a stored visit_start payload", () => {
+    const recovered = recoveredStartFromVisitStartPayload({
+      id: "evt-recover",
+      type: "visit_start",
+      at: "2026-10-06T09:19:36.000Z",
+      localVisitId: "lv-1",
+      ssid: "OfficeConnect",
+    });
+    expect(recovered?.startAt.toISOString()).toBe("2026-10-06T09:19:36.000Z");
+    expect(recovered?.localVisitId).toBe("lv-1");
   });
 
   it("creates an open recovered visit while still in office", () => {
