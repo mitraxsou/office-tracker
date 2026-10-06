@@ -110,12 +110,7 @@ export default async function DashboardPage() {
     summary.lastConfirmedOfficeAt
       ? `Confirmed through ${formatTime(summary.lastConfirmedOfficeAt, user.timezone)}. Yellow is estimated until the next agent sync.`
       : null;
-  const firstCheckIn =
-    summary.visits.length > 0
-      ? summary.visits.reduce((earliest, visit) =>
-          visit.startAt < earliest.startAt ? visit : earliest,
-        ).startAt
-      : null;
+  const firstCheckIn = summary.firstCheckInAt;
   const agentStatusValue = agentNeverConnected
     ? "Not connected"
     : syncHealth.healthy

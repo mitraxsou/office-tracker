@@ -203,6 +203,20 @@
       "skipReason": null
     },
     {
+      "id": "BUG-015",
+      "title": "Late visit_start ignores earlier local OfficeConnect ticks",
+      "date": "2026-10",
+      "severity": "high",
+      "area": "visits",
+      "reproSummary": "Laptop was on OfficeConnect from about 2:49 pm but visit_start only fired at 3:40 pm after an allowlist cache miss. End-of-day tick upload did not move the visit start, so First check-in stayed late unless an admin edited it.",
+      "assertion": "Contiguous same-day office activity ticks recover the Wi-Fi visit start to the earliest verified office pulse. Closed manual visits are not changed.",
+      "fixture": "fixtures/office-visit-recovery.json",
+      "testFile": "tests/bugs/BUG-015-office-visit-recovery.test.ts",
+      "relatedTests": ["tests/office-visit-recovery.test.ts", "tests/agent-sync.test.ts", "tests/agent-heartbeat-sync.test.ts"],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
       "id": "CORE-001",
       "title": "Heartbeat in-office uses SSID allowlist",
       "date": "2026-01",

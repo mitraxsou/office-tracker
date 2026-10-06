@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.19";
+export const APP_VERSION = "1.5.20";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,21 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-06",
+    userBullets: [
+      "If office Wi-Fi was seen but a visit started late, the agent now recovers the real first check-in from local pulses on its own.",
+      "Windows agent 1.5.20 treats OfficeConnect as in-office even if an older settings save left it off the Wi-Fi list.",
+      "Office tracking starts whenever approved office Wi-Fi (or the office network name) is visible, even if the SSID did not just change.",
+      "A missed Wi-Fi read no longer counts as leaving the office.",
+    ],
+    adminBullets: [
+      "Delayed office activity ticks backdate the matching Wi-Fi visit start. Closed manual visits are left unchanged.",
+      "OfficeConnect, ExternalConnect, and pwcglb.com stay on the global allowlist; extra SSIDs can still be added.",
+      "Agent falls back to any connected network profile name (including Ethernet/captive-portal domains like pwcglb.com) when netsh has no WLAN SSID.",
+    ],
+  },
+  {
+    version: "1.5.19",
     date: "2026-10-06",
     userBullets: [
       "Windows agent 1.5.19 treats OfficeConnect as in-office even if an older settings save left it off the Wi-Fi list.",

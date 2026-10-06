@@ -14,7 +14,8 @@ $ConfigCacheMaxAgeMinutes = 120
 $UpdateCheckIntervalMinutes = 60
 $LocalPulseIntervalMinutes = 2
 $HealthSyncIntervalMinutes = 60
-$AgentScriptVersion = "1.5.19"
+$OfficeVisitGapMinutes = 15
+$AgentScriptVersion = "1.5.20"
 $CriticalEventTypes = @(
     "wifi_connected",
     "wifi_disconnected",
@@ -324,13 +325,30 @@ function Get-AgentTimezone($ServerConfig) {
     return "Asia/Kolkata"
 }
 
-function Get-DayKey([string]$TimezoneId) {
+function Get-DayKeyFromUtc([datetime]$Utc, [string]$TimezoneId) {
     try {
         $tz = [TimeZoneInfo]::FindSystemTimeZoneById($TimezoneId)
-        $local = [TimeZoneInfo]::ConvertTimeFromUtc((Get-Date).ToUniversalTime(), $tz)
-        return $local.ToString("yyyy-MM-dd")
+        return [TimeZoneInfo]::ConvertTimeFromUtc($Utc.ToUniversalTime(), $tz).ToString("yyyy-MM-dd")
     } catch {
-        return (Get-Date).ToString("yyyy-MM-dd")
+        try {
+            $iana = [TimeZoneInfo]::FindSystemTimeZoneById("India Standard Time")
+            return [TimeZoneInfo]::ConvertTimeFromUtc($Utc.ToUniversalTime(), $iana).ToString("yyyy-MM-dd")
+        } catch {
+            return $Utc.ToUniversalTime().AddMinutes(330).ToString("yyyy-MM-dd")
+        }
+    }
+}
+
+function Get-DayKey([string]$TimezoneId) {
+    return Get-DayKeyFromUtc -Utc (Get-Date).ToUniversalTime() -TimezoneId $TimezoneId
+}
+
+function Get-EventDayKey([string]$At, [string]$TimezoneId) {
+    try {
+        $utc = [DateTime]::Parse($At).ToUniversalTime()
+        return Get-DayKeyFromUtc -Utc $utc -TimezoneId $TimezoneId
+    } catch {
+        return $null
     }
 }
 
@@ -531,14 +549,78 @@ function Show-OfficePulseToast {
     }
 }
 
+function Get-EarliestContiguousOfficeTickAt {
+    param(
+        $ServerConfig,
+        [string]$DayKey,
+        [string]$TimezoneId
+    )
+    if (-not $DayKey) { return $null }
+    $points = New-Object System.Collections.Generic.List[object]
+    foreach ($evt in @(Get-EventQueue)) {
+        if ([string]$evt.type -ne "activity_tick") { continue }
+        if (-not $evt.at) { continue }
+        $eventDay = Get-EventDayKey -At ([string]$evt.at) -TimezoneId $TimezoneId
+        if ($eventDay -ne $DayKey) { continue }
+        try {
+            $at = [DateTime]::Parse([string]$evt.at).ToUniversalTime()
+        } catch {
+            continue
+        }
+        $ssid = if ($evt.ssid) { [string]$evt.ssid } else { $null }
+        [void]$points.Add(@{ at = $at; ssid = $ssid; iso = $at.ToString("o") })
+    }
+
+    if ($points.Count -eq 0) { return $null }
+    $ordered = @($points | Sort-Object { $_.at.Ticks })
+    $latestOffice = -1
+    for ($i = $ordered.Count - 1; $i -ge 0; $i--) {
+        if (Test-IsOfficeSsid -Ssid ([string]$ordered[$i].ssid) -ServerConfig $ServerConfig) {
+            $latestOffice = $i
+            break
+        }
+    }
+    if ($latestOffice -lt 0) { return $null }
+
+    $earliest = $ordered[$latestOffice]
+    for ($j = $latestOffice - 1; $j -ge 0; $j--) {
+        $older = $ordered[$j]
+        $newer = $ordered[$j + 1]
+        $gapMinutes = ($newer.at - $older.at).TotalMinutes
+        if ($gapMinutes -gt $OfficeVisitGapMinutes) { break }
+        if (-not $older.ssid) { break }
+        if (-not (Test-IsOfficeSsid -Ssid ([string]$older.ssid) -ServerConfig $ServerConfig)) { break }
+        $earliest = $older
+    }
+    return $earliest.iso
+}
+
 function Start-LocalVisit {
     param(
         $SyncState,
         [string]$Ssid,
-        [double]$HoursTarget = 5
+        [double]$HoursTarget = 5,
+        [string]$StartAt,
+        $ServerConfig,
+        [string]$DayKey,
+        [string]$TimezoneId
     )
     $visitId = New-EventId
-    $startAt = Get-NowIso
+    $startAt = if ($StartAt) { $StartAt } else { Get-NowIso }
+    if ($ServerConfig -and $DayKey) {
+        $recovered = Get-EarliestContiguousOfficeTickAt -ServerConfig $ServerConfig `
+            -DayKey $DayKey -TimezoneId $TimezoneId
+        if ($recovered) {
+            try {
+                $recoveredUtc = [DateTime]::Parse($recovered).ToUniversalTime()
+                $startUtc = [DateTime]::Parse($startAt).ToUniversalTime()
+                if ($recoveredUtc -lt $startUtc) {
+                    $startAt = $recovered
+                    Write-Log "RECOVER visit_start from local office ticks at $recovered"
+                }
+            } catch {}
+        }
+    }
     $SyncState.openVisit = @{
         localVisitId = $visitId
         startAt = $startAt
@@ -549,11 +631,52 @@ function Start-LocalVisit {
     Add-QueuedEvent -Type "visit_start" -Fields @{
         localVisitId = $visitId
         ssid = $Ssid
-    }
+    } -At $startAt
     $targetLabel = if ($HoursTarget -gt 0) { "$HoursTarget" } else { "5" }
     Show-OfficePulseToast -Title "My Office Pulse" `
         -Body "You are in the office. Time monitoring is on. Daily target: ${targetLabel}h."
     return $SyncState
+}
+
+function Maybe-RecoverOpenVisitStart {
+    param(
+        $SyncState,
+        $ServerConfig,
+        [string]$DayKey,
+        [string]$TimezoneId,
+        [string]$Ssid
+    )
+    try {
+        $open = Get-OpenVisitFromState $SyncState
+        if (-not $open) { return $SyncState }
+        $recovered = Get-EarliestContiguousOfficeTickAt -ServerConfig $ServerConfig `
+            -DayKey $DayKey -TimezoneId $TimezoneId
+        if (-not $recovered) {
+            Write-Log "RECOVER skip: no contiguous office ticks for $DayKey"
+            return $SyncState
+        }
+        try {
+            $recoveredUtc = [DateTime]::Parse($recovered).ToUniversalTime()
+            $currentUtc = [DateTime]::Parse([string]$open.startAt).ToUniversalTime()
+        } catch {
+            return $SyncState
+        }
+        if ($recoveredUtc -ge $currentUtc) { return $SyncState }
+        $SyncState.openVisit = @{
+            localVisitId = [string]$open.localVisitId
+            startAt = $recovered
+            ssid = $Ssid
+        }
+        Add-QueuedEvent -Type "visit_start" -Fields @{
+            localVisitId = [string]$open.localVisitId
+            ssid = $Ssid
+        } -At $recovered
+        Write-Log "RECOVER visit_start from local office ticks at $recovered"
+        return $SyncState
+    } catch {
+        Write-Log "WARN recover failed: $($_.Exception.Message)"
+        return $SyncState
+    }
 }
 
 function End-LocalVisit {
@@ -650,7 +773,9 @@ function Update-VisitBoundaries {
         [string]$PreviousSsid,
         [string]$CurrentSsid,
         $ServerConfig,
-        [string]$TransitionAt
+        [string]$TransitionAt,
+        [string]$DayKey,
+        [string]$TimezoneId
     )
     $wasOffice = Test-IsOfficeSsid -Ssid $PreviousSsid -ServerConfig $ServerConfig
     $isOffice = Test-IsOfficeSsid -Ssid $CurrentSsid -ServerConfig $ServerConfig
@@ -663,7 +788,8 @@ function Update-VisitBoundaries {
         if ($ServerConfig -and $null -ne $ServerConfig.hoursTarget) {
             $hoursTarget = [double]$ServerConfig.hoursTarget
         }
-        $SyncState = Start-LocalVisit -SyncState $SyncState -Ssid $CurrentSsid -HoursTarget $hoursTarget
+        $SyncState = Start-LocalVisit -SyncState $SyncState -Ssid $CurrentSsid -HoursTarget $hoursTarget `
+            -ServerConfig $ServerConfig -DayKey $DayKey -TimezoneId $TimezoneId
     }
     return $SyncState
 }
@@ -1571,7 +1697,8 @@ if ($isOfficeNow -and -not $hasOpenVisit) {
     if ($serverConfig -and $null -ne $serverConfig.hoursTarget) {
         $hoursTarget = [double]$serverConfig.hoursTarget
     }
-    $syncState = Start-LocalVisit -SyncState $syncState -Ssid $ssid -HoursTarget $hoursTarget
+    $syncState = Start-LocalVisit -SyncState $syncState -Ssid $ssid -HoursTarget $hoursTarget `
+        -ServerConfig $serverConfig -DayKey $dayKey -TimezoneId $timezone
     if ($dayRolledOver) {
         Write-Log "NEW_DAY visit_start on office Wi-Fi"
     } else {
@@ -1596,7 +1723,8 @@ if ($ssidChanged) {
             -HeartbeatIntervalMinutes $heartbeatInterval
         Add-WifiChangeEvents -PreviousSsid $fromSsid -CurrentSsid $ssid -At $transitionAt
         $syncState = Update-VisitBoundaries -SyncState $syncState -PreviousSsid $fromSsid `
-            -CurrentSsid $ssid -ServerConfig $serverConfig -TransitionAt $transitionAt
+            -CurrentSsid $ssid -ServerConfig $serverConfig -TransitionAt $transitionAt `
+            -DayKey $dayKey -TimezoneId $timezone
         if (Test-IsOfficeSsid -Ssid $ssid -ServerConfig $serverConfig) {
             $syncState = Maybe-EnqueueHoursTargetMet -SyncState $syncState -DayKey $dayKey `
                 -ServerConfig $serverConfig
@@ -1629,6 +1757,12 @@ if ($isResumeRun -or $activityDue) {
     $syncState.lastActivityTickAt = Get-NowIso
     $syncState.lastActivityTickSsid = $ssid
     $pendingEvents = @(Get-EventQueue)
+}
+
+if ($isOfficeNow -or (Get-OpenVisitFromState $syncState)) {
+    $recoverSsid = if ($ssid) { $ssid } else { [string]((Get-OpenVisitFromState $syncState).ssid) }
+    $syncState = Maybe-RecoverOpenVisitStart -SyncState $syncState -ServerConfig $serverConfig `
+        -DayKey $dayKey -TimezoneId $timezone -Ssid $recoverSsid
 }
 
 if (Test-IsOfficeSsid -Ssid $ssid -ServerConfig $serverConfig) {

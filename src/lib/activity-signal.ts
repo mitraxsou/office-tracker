@@ -177,19 +177,18 @@ export async function getLastOfficeActivityAt(userId: string): Promise<Date | nu
   const config = await getAppConfig();
   const [ticks, transitions] = await Promise.all([
     prisma.activityTick.findMany({
-      where: { userId, inOffice: true },
+      where: { userId },
       orderBy: { at: "desc" },
-      take: 20,
+      take: 40,
       select: { at: true, ssid: true, inOffice: true },
     }),
     prisma.presenceTransition.findMany({
       where: {
         userId,
-        inOffice: true,
         type: { in: [...LIVE_PRESENCE_TYPES] },
       },
       orderBy: { at: "desc" },
-      take: 20,
+      take: 40,
       select: { at: true, ssid: true, inOffice: true },
     }),
   ]);

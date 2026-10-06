@@ -12,6 +12,12 @@ import {
 import { daySpanMsForDay, dayKeyInTimezone } from "./visits";
 import { dayBoundsFromKey } from "./timezone-dates";
 import { validateVisitTimestamps } from "./visit-validation";
+import {
+  contiguousOfficeSegment,
+  RECOVERED_VISIT_FRESH_MS,
+  shouldBackdateWifiVisit,
+  shouldCreateRecoveredWifiVisit,
+} from "./office-visit-recovery";
 import { maybeDispatchHeartbeatAlerts } from "./heartbeat-alerts";
 import { loadDaySpanContext, maybeRunVisitMaintenance } from "./heartbeat-service";
 import { parseAgentEventTimestamp, sanitizeSsid, sanitizeSerialNumber } from "./security";
@@ -205,6 +211,20 @@ export async function processAgentSync(params: {
           });
           if (existingVisit) {
             visitIds[localVisitId] = existingVisit.id;
+            if (
+              existingVisit.source !== "manual" &&
+              shouldBackdateWifiVisit({
+                source: existingVisit.source,
+                currentStartAt: existingVisit.startAt,
+                recoveredStartAt: eventAt,
+                endAt: existingVisit.endAt,
+              })
+            ) {
+              await prisma.visit.update({
+                where: { id: existingVisit.id },
+                data: { startAt: eventAt, ...(ssid ? { ssid } : {}) },
+              });
+            }
             ackedEventIds.push(event.id);
             await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
             break;
@@ -496,6 +516,17 @@ export async function processAgentSync(params: {
       ticks: pendingActivityTicks,
       ackedEventIds,
     });
+    await reconcileWifiVisitsFromActivity({
+      userId: params.userId,
+      deviceId: params.deviceId,
+      timezone: params.userTimezone,
+      allowlist,
+      incomingTicks: pendingActivityTicks.map((tick) => ({
+        at: tick.at,
+        ssid: tick.ssid,
+        inOffice: tick.inOffice,
+      })),
+    });
   }
 
   if (syncBatchNeedsVisitMaintenance(params.events)) {
@@ -578,6 +609,152 @@ export async function processAgentSync(params: {
       vercelProtectionBypass: vercelProtectionBypassSecret(),
     },
   };
+}
+
+async function reconcileWifiVisitsFromActivity(params: {
+  userId: string;
+  deviceId: string;
+  timezone: string;
+  allowlist: string[];
+  incomingTicks: Array<{ at: Date; ssid: string | null; inOffice: boolean }>;
+}) {
+  const dayKeys = new Set(
+    params.incomingTicks.map((tick) => dayKeyInTimezone(tick.at, params.timezone)),
+  );
+  const now = new Date();
+  const freshMs = RECOVERED_VISIT_FRESH_MS;
+
+  for (const dayKey of dayKeys) {
+    const { start, end } = dayBoundsFromKey(dayKey, params.timezone);
+    const stored = await prisma.activityTick.findMany({
+      where: {
+        userId: params.userId,
+        deviceId: params.deviceId,
+        at: { gte: start, lte: end },
+      },
+      select: { at: true, ssid: true, inOffice: true },
+    });
+    const merged = [
+      ...stored.map((row) => ({ at: row.at, ssid: row.ssid })),
+      ...params.incomingTicks.filter((tick) => tick.at >= start && tick.at <= end),
+    ];
+    const segment = contiguousOfficeSegment({
+      ticks: merged,
+      now,
+      dayStart: start,
+      dayEnd: end,
+      allowlist: params.allowlist,
+    });
+    if (!segment) continue;
+
+    const stillInOffice = now.getTime() - segment.end.getTime() <= freshMs;
+    const open = await prisma.visit.findFirst({
+      where: { userId: params.userId, deviceId: params.deviceId, endAt: null },
+      orderBy: { startAt: "desc" },
+    });
+    if (open) {
+      if (
+        shouldBackdateWifiVisit({
+          source: open.source,
+          currentStartAt: open.startAt,
+          recoveredStartAt: segment.start,
+          endAt: open.endAt,
+          now,
+        })
+      ) {
+        await prisma.visit.update({
+          where: { id: open.id },
+          data: { startAt: segment.start },
+        });
+      } else if (open.endAt && open.endAt.getTime() < open.startAt.getTime()) {
+        await prisma.visit.update({
+          where: { id: open.id },
+          data: { endAt: null, updatedAt: segment.end },
+        });
+      }
+      continue;
+    }
+
+    const wifiSameDay = await prisma.visit.findFirst({
+      where: {
+        userId: params.userId,
+        deviceId: params.deviceId,
+        source: "wifi",
+        startAt: { gte: start, lte: end },
+      },
+      orderBy: { startAt: "desc" },
+    });
+    if (wifiSameDay) {
+      if (wifiSameDay.endAt && wifiSameDay.endAt.getTime() < wifiSameDay.startAt.getTime()) {
+        await prisma.visit.update({
+          where: { id: wifiSameDay.id },
+          data: {
+            endAt: stillInOffice ? null : wifiSameDay.endAt,
+            startAt: shouldBackdateWifiVisit({
+              source: wifiSameDay.source,
+              currentStartAt: wifiSameDay.startAt,
+              recoveredStartAt: segment.start,
+              endAt: stillInOffice ? null : wifiSameDay.endAt,
+              now,
+            })
+              ? segment.start
+              : wifiSameDay.startAt,
+            updatedAt: segment.end,
+          },
+        });
+        continue;
+      }
+      if (
+        shouldBackdateWifiVisit({
+          source: wifiSameDay.source,
+          currentStartAt: wifiSameDay.startAt,
+          recoveredStartAt: segment.start,
+          endAt: wifiSameDay.endAt,
+          now,
+        })
+      ) {
+        await prisma.visit.update({
+          where: { id: wifiSameDay.id },
+          data: { startAt: segment.start },
+        });
+      }
+      continue;
+    }
+
+    if (
+      shouldCreateRecoveredWifiVisit({
+        existing: null,
+        recoveredStartAt: segment.start,
+        recoveredEndAt: segment.end,
+        stillInOffice,
+      })
+    ) {
+      const officeSsid =
+        [...params.incomingTicks].reverse().find((tick) => tick.ssid)?.ssid ??
+        stored.find((row) => row.ssid)?.ssid ??
+        null;
+      await prisma.visit.create({
+        data: {
+          userId: params.userId,
+          deviceId: params.deviceId,
+          startAt: segment.start,
+          endAt: stillInOffice ? null : segment.end,
+          source: "wifi",
+          ssid: officeSsid,
+          localVisitId: `recover-${randomUUID().replace(/-/g, "")}`,
+        },
+      });
+    } else if (stillInOffice) {
+      await ensureOpenOfficeVisitFromActivity({
+        userId: params.userId,
+        deviceId: params.deviceId,
+        eventAt: segment.start,
+        ssid:
+          [...params.incomingTicks].reverse().find((tick) => tick.ssid)?.ssid ?? null,
+        localVisitId: null,
+      });
+    }
+  }
 }
 
 async function ensureOpenOfficeVisitFromActivity(params: {
@@ -675,6 +852,20 @@ async function reconcileAgentOpenVisit(params: {
       await prisma.visit.update({
         where: { id: existing.id },
         data: { endAt: null, updatedAt: new Date() },
+      });
+    }
+    if (
+      existing.source !== "manual" &&
+      shouldBackdateWifiVisit({
+        source: existing.source,
+        currentStartAt: existing.startAt,
+        recoveredStartAt: startAt,
+        endAt: existing.endAt,
+      })
+    ) {
+      await prisma.visit.update({
+        where: { id: existing.id },
+        data: { startAt, ...(ssid ? { ssid } : {}) },
       });
     }
     return;
@@ -785,17 +976,6 @@ async function flushPendingActivityTicks(params: {
     await upsertAgentDailyUptime(params.userId, tick.dayKey, {
       laptopActiveMs: tick.laptopActiveMs,
       firstAgentOnAt: tick.firstAgentOnAt,
-    });
-  }
-
-  const latestOffice = [...params.ticks].reverse().find((tick) => tick.inOffice);
-  if (latestOffice) {
-    await ensureOpenOfficeVisitFromActivity({
-      userId: params.userId,
-      deviceId: params.deviceId,
-      eventAt: latestOffice.at,
-      ssid: latestOffice.ssid,
-      localVisitId: latestOffice.localVisitId ?? null,
     });
   }
 

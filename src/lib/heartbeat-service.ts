@@ -21,7 +21,7 @@ import {
 import { heartbeatInOffice } from "./heartbeat-office";
 import { maybePurgeOldHeartbeats } from "./heartbeat-retention";
 import { resolveLaptopActiveForDay, laptopActiveHoursForDay, type LaptopActiveParams } from "./laptop-active";
-import { daySpanMsForDay, dayKeyInTimezone, effectiveVisitEnd, liveOfficeMsForDay, type DaySpanParams } from "./visits";
+import { daySpanMsForDay, dayKeyInTimezone, effectiveVisitEnd, firstOfficeInMsForDay, liveOfficeMsForDay, type DaySpanParams } from "./visits";
 import { dayBoundsFromKey, getDayBounds } from "./timezone-dates";
 import { maybeClearOutOfOfficeOnOfficePresence } from "./out-of-office";
 import { validateVisitTimestamps } from "./visit-validation";
@@ -40,7 +40,15 @@ export function filterInOfficeDayPulses(
   useActivity: boolean,
   officeSsids: string[],
 ): DayPulseRow[] {
-  if (useActivity) return dayPulses.filter((p) => p.inOffice);
+  if (useActivity) {
+    return dayPulses.filter((p) =>
+      presenceSignalInOffice({
+        ssid: p.ssid,
+        storedInOffice: p.inOffice,
+        officeSsids,
+      }),
+    );
+  }
   return dayPulses.filter((p) => heartbeatInOffice(p, officeSsids));
 }
 
@@ -639,6 +647,8 @@ export async function getTodaySummary(
 
   const liveMs = liveOfficeMsForDay(visits, params, inOfficeNow);
   const liveHours = liveMs / (1000 * 60 * 60);
+  const firstCheckInMs = firstOfficeInMsForDay(visits, params);
+  const firstCheckInAt = firstCheckInMs !== null ? new Date(firstCheckInMs) : null;
 
   return {
     dayKey,
@@ -651,6 +661,7 @@ export async function getTodaySummary(
     metTarget: liveHours >= hoursTarget,
     remainingHours: Math.max(0, hoursTarget - liveHours),
     lastConfirmedOfficeAt,
+    firstCheckInAt,
     inOfficeNow,
     visits,
     lastHeartbeat,

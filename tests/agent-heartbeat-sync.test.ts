@@ -186,4 +186,14 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain("You completed your");
     expect(heartbeat).toContain("Time monitoring is on");
   });
+
+  it("recovers visit_start from contiguous local office ticks", () => {
+    expect(heartbeat).toContain("function Get-EarliestContiguousOfficeTickAt");
+    expect(heartbeat).toContain("function Maybe-RecoverOpenVisitStart");
+    expect(heartbeat).toContain("$OfficeVisitGapMinutes = 15");
+    expect(heartbeat).toContain("RECOVER skip: no contiguous office ticks");
+    expect(heartbeat).toContain("-At $startAt");
+    expect(heartbeat).toContain("Maybe-RecoverOpenVisitStart -SyncState $syncState");
+    expect(heartbeat).toContain("$isOfficeNow -or (Get-OpenVisitFromState $syncState)");
+  });
 });

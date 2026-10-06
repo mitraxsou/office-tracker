@@ -28,14 +28,15 @@ describe("app version", () => {
   it("keeps prior releases in changelog history", () => {
     expect(APP_CHANGELOG.length).toBeGreaterThan(2);
     expect(APP_CHANGELOG[0].version).toBe(APP_VERSION);
-    expect(APP_CHANGELOG[1].version).toBe("1.5.18");
-    expect(APP_CHANGELOG[2].version).toBe("1.5.17");
-    expect(APP_CHANGELOG[3].version).toBe("1.5.16");
-    expect(APP_CHANGELOG[4].version).toBe("1.5.4");
-    expect(APP_CHANGELOG[5].version).toBe("1.5.3");
-    expect(APP_CHANGELOG[6].version).toBe("1.5.2");
-    expect(APP_CHANGELOG[7].version).toBe("1.5.1");
-    expect(APP_CHANGELOG[8].version).toBe("1.5.0");
-    expect(APP_CHANGELOG[9].version).toBe("1.4.0");
+    expect(APP_CHANGELOG[1].version).toBe("1.5.19");
+    expect(APP_CHANGELOG[2].version).toBe("1.5.18");
+    expect(APP_CHANGELOG[3].version).toBe("1.5.17");
+    expect(APP_CHANGELOG[4].version).toBe("1.5.16");
+    expect(APP_CHANGELOG[5].version).toBe("1.5.4");
+    expect(APP_CHANGELOG[6].version).toBe("1.5.3");
+    expect(APP_CHANGELOG[7].version).toBe("1.5.2");
+    expect(APP_CHANGELOG[8].version).toBe("1.5.1");
+    expect(APP_CHANGELOG[9].version).toBe("1.5.0");
+    expect(APP_CHANGELOG[10].version).toBe("1.4.0");
   });
 });

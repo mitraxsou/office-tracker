@@ -37,12 +37,12 @@ function liveHoursNow(
   now: Date,
 ): number {
   if (!inOfficeNow) return totalHours;
+  if (!firstCheckIn) return totalHours;
   if (lastConfirmedOfficeAt) {
     const extra =
       Math.max(0, now.getTime() - lastConfirmedOfficeAt.getTime()) / (1000 * 60 * 60);
     return Math.max(totalHours, confirmedHours + extra);
   }
-  if (!firstCheckIn) return totalHours;
   const fromFirst = Math.max(0, now.getTime() - firstCheckIn.getTime()) / (1000 * 60 * 60);
   return Math.max(confirmedHours, fromFirst, totalHours);
 }
