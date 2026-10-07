@@ -1,6 +1,6 @@
 import { addDaysToDayKey } from "./office-schedule";
 import { currentMonthKey, daysInMonth, parseMonthKey } from "./month-range";
-import { dayKeyInTimezone } from "./timezone-dates";
+import { dayBoundsFromKey, dayKeyInTimezone } from "./timezone-dates";
 
 const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -104,6 +104,8 @@ export type SelectedDayVisit = {
   endAt: string | null;
   source: string;
   ssid: string | null;
+  /** True when the visit started on a previous local calendar day. */
+  startedPreviousDay?: boolean;
 };
 
 export type SelectedDaySummary = {
@@ -117,17 +119,34 @@ export type SelectedDaySummary = {
   visits: SelectedDayVisit[];
 };
 
+function visitOverlapsDayKey(
+  visit: SelectedDayVisit,
+  dayKey: string,
+  timezone: string,
+  now = new Date(),
+): boolean {
+  const { start, end } = dayBoundsFromKey(dayKey, timezone);
+  const vStart = new Date(visit.startAt).getTime();
+  const vEnd = visit.endAt ? new Date(visit.endAt).getTime() : now.getTime();
+  return vStart <= end.getTime() && vEnd >= start.getTime();
+}
+
 export function summarizeSelectedDay(params: {
   dayKey: string;
   timezone: string;
   hoursTarget: number;
   dailyTrend: DailyTrendPoint[];
   visits: SelectedDayVisit[];
+  now?: Date;
 }): SelectedDaySummary {
-  const { dayKey, timezone, hoursTarget, dailyTrend, visits } = params;
+  const { dayKey, timezone, hoursTarget, dailyTrend, visits, now = new Date() } = params;
   const trend = dailyTrend.find((d) => d.date === dayKey);
   const dayVisits = visits
-    .filter((v) => dayKeyInTimezone(new Date(v.startAt), timezone) === dayKey)
+    .filter((v) => visitOverlapsDayKey(v, dayKey, timezone, now))
+    .map((v) => ({
+      ...v,
+      startedPreviousDay: dayKeyInTimezone(new Date(v.startAt), timezone) !== dayKey,
+    }))
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
 
   let firstActivityAt: string | null = null;
@@ -140,15 +159,17 @@ export function summarizeSelectedDay(params: {
     }
     if (visit.endAt === null) {
       openVisit = true;
-      const candidate = new Date().toISOString();
+      const candidate = now.toISOString();
       if (!lastActivityAt || candidate > lastActivityAt) lastActivityAt = candidate;
     } else if (!lastActivityAt || visit.endAt > lastActivityAt) {
       lastActivityAt = visit.endAt;
     }
   }
 
-  const totalHours = trend?.totalHours ?? 0;
-  const metTarget = trend?.metTarget ?? totalHours >= hoursTarget;
+  // Hours require editable Visit rows; never show Met with an empty visit list.
+  const totalHours = dayVisits.length === 0 ? 0 : (trend?.totalHours ?? 0);
+  const metTarget =
+    dayVisits.length === 0 ? false : (trend?.metTarget ?? totalHours >= hoursTarget);
 
   return {
     dayKey,
@@ -157,7 +178,7 @@ export function summarizeSelectedDay(params: {
     visitCount: dayVisits.length,
     openVisit,
     firstActivityAt,
-    lastActivityAt: openVisit ? lastActivityAt : lastActivityAt,
+    lastActivityAt,
     visits: dayVisits,
   };
 }

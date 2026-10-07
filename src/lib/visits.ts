@@ -77,8 +77,29 @@ function officeIntervalsForDay(
   const lastHb = params.lastInOfficeHeartbeatAt ?? null;
   const intervals: OfficeInterval[] = [];
 
+  const firstHbMs = params.firstInOfficeHeartbeatAt
+    ? clipToDay(params.firstInOfficeHeartbeatAt.getTime(), params.dayStart, params.dayEnd)
+    : null;
+
   for (const visit of visits) {
-    if (visit.endAt === null && !isCurrentDay) continue;
+    if (visit.endAt === null && !isCurrentDay) {
+      // Past day: open visits only count with same-day office heartbeats (Visit-backed).
+      const hbEnd = lastHb ? Math.min(lastHb.getTime(), dayEndMs) : null;
+      if (hbEnd === null && firstHbMs === null) continue;
+      if (visit.startAt.getTime() > dayEndMs) continue;
+      const start =
+        firstHbMs ??
+        clipToDay(visit.startAt.getTime(), params.dayStart, params.dayEnd);
+      const end = hbEnd ?? firstHbMs;
+      if (start === null || end === null || end < start) continue;
+      intervals.push({
+        start,
+        end,
+        source: visit.source,
+        closed: false,
+      });
+      continue;
+    }
     if (visit.endAt === null && isManualSource(visit.source) && isCurrentDay) continue;
     const end = effectiveVisitEnd({
       endAt: visit.endAt,
@@ -139,41 +160,25 @@ function officeIntervalsForDay(
     }
   }
 
-  const firstHb = params.firstInOfficeHeartbeatAt
-    ? clipToDay(params.firstInOfficeHeartbeatAt.getTime(), params.dayStart, params.dayEnd)
-    : null;
-  if (firstHb !== null) {
+  if (firstHbMs !== null) {
     const host = intervals
       .filter(
         (interval) =>
-          interval.end >= firstHb &&
+          interval.end >= firstHbMs &&
           !(isManualSource(interval.source) && interval.closed),
       )
       .sort((a, b) => a.start - b.start)[0];
-    if (host && firstHb < host.start && host.start - firstHb <= params.staleMs) {
-      host.start = firstHb;
+    if (host && firstHbMs < host.start && host.start - firstHbMs <= params.staleMs) {
+      host.start = firstHbMs;
     }
   }
 
-  if (intervals.length === 0 && lastHb) {
-    const hbEnd = Math.min(lastHb.getTime(), dayEndMs);
-    const hbStart =
-      firstHb ??
-      clipToDay(lastHb.getTime(), params.dayStart, params.dayEnd);
-    if (hbStart !== null && hbEnd >= hbStart && (openVisit || firstHb !== null)) {
-      intervals.push({
-        start: hbStart,
-        end: hbEnd,
-        source: "wifi",
-        closed: false,
-      });
-    }
-  }
+  // No pulse-only invent: hours require a Visit interval (closed or open Visit-backed).
 
   return intervals.map(({ start, end }) => ({ start, end }));
 }
 
-/** First clipped check-in on the day from visits, or a nearby in-office pulse. */
+/** First clipped check-in on the day from visits; pulse may only pull earlier within staleMs. */
 export function firstOfficeInMsForDay(
   visits: VisitForDaySpan[],
   params: DaySpanParams,
@@ -184,6 +189,15 @@ export function firstOfficeInMsForDay(
 
   for (const v of visits) {
     if (v.endAt === null && !isCurrentDay) {
+      // Past open visit: use same-day office pulse start when present.
+      if (!firstHb && !params.lastInOfficeHeartbeatAt) continue;
+      const start =
+        (firstHb
+          ? clipToDay(firstHb.getTime(), params.dayStart, params.dayEnd)
+          : null) ??
+        clipToDay(v.startAt.getTime(), params.dayStart, params.dayEnd);
+      if (start === null) continue;
+      if (firstIn === null || start < firstIn) firstIn = start;
       continue;
     }
     const start = clipToDay(v.startAt.getTime(), params.dayStart, params.dayEnd);
@@ -191,12 +205,11 @@ export function firstOfficeInMsForDay(
     if (firstIn === null || start < firstIn) firstIn = start;
   }
 
-  if (firstHb) {
+  // Pulses alone never invent a check-in; they may only adjust an existing Visit start.
+  if (firstHb && firstIn !== null) {
     const hbStart = clipToDay(firstHb.getTime(), params.dayStart, params.dayEnd);
-    if (hbStart !== null) {
-      if (firstIn === null || (hbStart < firstIn && firstIn - hbStart <= params.staleMs)) {
-        firstIn = hbStart;
-      }
+    if (hbStart !== null && hbStart < firstIn && firstIn - hbStart <= params.staleMs) {
+      firstIn = hbStart;
     }
   }
 

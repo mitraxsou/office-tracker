@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AdminVisitManager } from "./AdminVisitManager";
+import { AdminCorrectDayModal } from "./AdminCorrectDayModal";
 import { ComplianceExportButton } from "@/components/reports/ComplianceExportButton";
 import { NotificationPrefsForm } from "./NotificationPrefsForm";
 import { OutOfOfficeSection } from "./OutOfOfficeSection";
@@ -212,6 +213,7 @@ export function AdminUserReport({
   const [impersonating, setImpersonating] = useState(false);
   const [pushingDeviceId, setPushingDeviceId] = useState<string | null>(null);
   const [deregistering, setDeregistering] = useState(false);
+  const [correctOpen, setCorrectOpen] = useState(false);
 
   const syncUrlState = useCallback(
     (nextMonth: string, nextDate: string | null) => {
@@ -347,8 +349,8 @@ export function AdminUserReport({
     document.getElementById("day-details")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function scrollToVisitData() {
-    document.getElementById("visit-data")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  function openCorrectDay() {
+    setCorrectOpen(true);
   }
 
   const resetRange = useMemo(
@@ -464,7 +466,7 @@ export function AdminUserReport({
         </button>
       </div>
 
-      <AdminUserReportSectionNav onJumpToday={jumpToToday} />
+      <AdminUserReportSectionNav onJumpToday={jumpToToday} onCorrect={openCorrectDay} />
 
       <MonthReportToolbar
         monthKey={monthKey}
@@ -498,7 +500,20 @@ export function AdminUserReport({
           todayKey={todayKey}
           inOfficeNow={data.today.inOfficeNow}
           onSelectDate={selectDate}
-          onCorrect={scrollToVisitData}
+          onCorrect={openCorrectDay}
+        />
+      )}
+
+      {selectedDaySummary && (
+        <AdminCorrectDayModal
+          open={correctOpen}
+          onClose={() => setCorrectOpen(false)}
+          userId={userId}
+          dayKey={selectedDaySummary.dayKey}
+          timezone={data.user.timezone}
+          officeSsids={officeSsids}
+          visits={selectedDaySummary.visits}
+          onChanged={() => void load(monthKey, selectedDate)}
         />
       )}
 
@@ -520,34 +535,43 @@ export function AdminUserReport({
         todayKey={todayKey}
       />
 
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="text-lg font-medium">Visit corrections</h3>
-            <p className="mt-1 text-sm text-muted">
-              Edit or add visits for the selected day. Changes refresh the day and month
-              summaries.
-            </p>
+      <details id="diagnostics" className="card scroll-mt-20 overflow-hidden">
+        <summary className="cursor-pointer list-none px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-lg font-medium">Diagnostics</h3>
+              <p className="text-sm text-muted">
+                Full visit editor, agent activity, and presence timeline.
+              </p>
+            </div>
+            <span className="rounded-md border border-[var(--border)] px-3 py-1.5 text-xs text-muted">
+              Show / hide
+            </span>
           </div>
-          <ComplianceExportButton
-            hrefBase={`/api/admin/users/${userId}/reports/export`}
-            monthKey={monthKey}
+        </summary>
+        <div className="space-y-4 border-t border-[var(--border)] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted">
+              Prefer <span className="text-accent">Correct this day</span> above for quick fixes.
+            </p>
+            <ComplianceExportButton
+              hrefBase={`/api/admin/users/${userId}/reports/export`}
+              monthKey={monthKey}
+              timezone={data.user.timezone}
+              label="Download user report"
+              fiscalYearStartMonth={fiscalYearStartMonth}
+              fiscalYearEndMonth={fiscalYearEndMonth}
+            />
+          </div>
+          <AdminVisitManager
+            userId={userId}
+            officeSsids={officeSsids}
             timezone={data.user.timezone}
-            label="Download user report"
-            fiscalYearStartMonth={fiscalYearStartMonth}
-            fiscalYearEndMonth={fiscalYearEndMonth}
+            focusDay={selectedDate}
+            onChanged={() => void load(monthKey, selectedDate)}
           />
-        </div>
-        <AdminVisitManager
-          userId={userId}
-          officeSsids={officeSsids}
-          timezone={data.user.timezone}
-          focusDay={selectedDate}
-          onChanged={() => void load(monthKey, selectedDate)}
-        />
-      </div>
 
-      <section id="agent-activity" className="card scroll-mt-20 p-6">
+      <section id="agent-activity" className="scroll-mt-20 rounded-lg border border-[var(--border)] p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-medium">Agent activity</h3>
           <div className="flex flex-wrap items-center gap-3">
@@ -904,6 +928,8 @@ export function AdminUserReport({
           )}
         </section>
       )}
+        </div>
+      </details>
 
       <section id="account" className="card scroll-mt-20 p-6">
         <h3 className="mb-2 text-sm font-medium">Account</h3>

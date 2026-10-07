@@ -222,6 +222,20 @@
       "skipReason": null
     },
     {
+      "id": "BUG-016",
+      "title": "Pulse-only first/last invents Met with zero Visit rows",
+      "date": "2026-10",
+      "severity": "critical",
+      "area": "visits",
+      "reproSummary": "Overnight or stray in-office pulses set first/last heartbeats with no Visit row. Admin day cards showed multi-hour Met while Visit data was empty, so Correct had nothing to edit.",
+      "assertion": "daySpanMsForDay is 0 with empty visits even when first/last in-office pulses exist; userAttendedOnDay is false for pulse-only days.",
+      "fixture": "fixtures/pulse-only-no-visit-hours.json",
+      "testFile": "tests/bugs/BUG-016-pulse-only-no-visit-hours.test.ts",
+      "relatedTests": ["tests/visits.test.ts", "tests/admin-day-compliance.test.ts"],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
       "id": "CORE-001",
       "title": "Heartbeat in-office uses SSID allowlist",
       "date": "2026-01",

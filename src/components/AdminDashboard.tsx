@@ -20,7 +20,14 @@ import { exportToCsv } from "@/lib/report-range";
 import { InOfficeNowPanel } from "@/components/InOfficeNowPanel";
 import { AgentFollowUpPanel, useAgentFollowUpCount } from "@/components/AgentFollowUpPanel";
 import { AdminOrgCalendar } from "@/components/AdminOrgCalendar";
+import { AdminOfficeDayRoster } from "@/components/AdminOfficeDayRoster";
 import { describeAuditAction, formatAuditTimestamp } from "@/lib/audit-actions";
+import {
+  buildAdminUserReportHref,
+  monthKeyFromDayKey,
+} from "@/lib/admin-user-report-date";
+import { dayKeyInTimezone } from "@/lib/timezone-dates";
+import { formatHours, formatTime } from "@/lib/visits";
 
 type DailyPoint = { date: string; totalHours: number; compliancePct: number };
 
@@ -49,6 +56,8 @@ type DayDetailUser = {
   attended: boolean;
   status: string;
   agentHealthy: boolean;
+  firstInAt?: string | null;
+  lastOutAt?: string | null;
 };
 
 type DayDetailData = {
@@ -115,6 +124,19 @@ export function AdminDashboard({
   const [followUpCount, setFollowUpCount] = useAgentFollowUpCount(!loading && !!data);
   const [viewTab, setViewTab] = useState<"charts" | "calendar">("charts");
   const [calendarMonthKey, setCalendarMonthKey] = useState(() => currentMonthKey("Asia/Kolkata"));
+  const [dayRosterLoading, setDayRosterLoading] = useState(false);
+
+  const loadDayDetail = useCallback(async (date: string) => {
+    setDayRosterLoading(true);
+    const res = await fetch(`/api/admin/reports/day?date=${date}`);
+    setDayRosterLoading(false);
+    if (res.ok) {
+      const json: DayDetailData = await res.json();
+      setDayDetail(json);
+      setSelectedDate(date);
+      setDayPicker(date);
+    }
+  }, []);
 
   const load = useCallback(
     async (month: string, silent = false) => {
@@ -139,26 +161,16 @@ export function AdminDashboard({
       setFromKey(json.range.from);
       setToKey(json.range.to);
       setCalendarMonthKey(json.range.month);
-      setSelectedDate(null);
-      setDayDetail(null);
+      const today = dayKeyInTimezone(new Date(), timezone);
+      void loadDayDetail(today);
     },
-    [],
+    [loadDayDetail, timezone],
   );
 
   useEffect(() => {
     void load("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  async function loadDayDetail(date: string) {
-    const res = await fetch(`/api/admin/reports/day?date=${date}`);
-    if (res.ok) {
-      const json: DayDetailData = await res.json();
-      setDayDetail(json);
-      setSelectedDate(date);
-      setDayPicker(date);
-    }
-  }
 
   async function handleBarClick(date: string) {
     if (selectedDate === date) {
@@ -289,6 +301,29 @@ export function AdminDashboard({
               value={`${data.summary.avgHours}h`}
             />
           </div>
+
+          <p className="text-sm text-muted">
+            Find a person in the day roster below, open their day, then use Correct this day.
+          </p>
+
+          <AdminOfficeDayRoster
+            selectedDate={selectedDate}
+            timezone={timezone}
+            loading={dayRosterLoading}
+            onSelectDate={(dayKey) => void loadDayDetail(dayKey)}
+            users={(dayDetail?.users ?? [])
+              .filter((u) => u.attended)
+              .map((u) => ({
+                userId: u.userId,
+                email: u.email,
+                name: u.name,
+                hours: u.hours,
+                hoursTarget: u.hoursTarget,
+                metTarget: u.metTarget,
+                firstInAt: u.firstInAt ?? null,
+                lastOutAt: u.lastOutAt ?? null,
+              }))}
+          />
 
           <section className="card p-4">
             <div className="mb-3 flex flex-wrap gap-2">
@@ -442,6 +477,12 @@ export function AdminDashboard({
                     <th className="cursor-pointer py-2 pr-4" onClick={() => toggleSort("email")}>
                       User {sortKey === "email" ? (sortDir === "asc" ? "↑" : "↓") : ""}
                     </th>
+                    {selectedDate && (
+                      <>
+                        <th className="py-2 pr-4">In</th>
+                        <th className="py-2 pr-4">Out</th>
+                      </>
+                    )}
                     <th className="py-2 pr-4">Hours</th>
                     <th className="py-2 pr-4">Target met</th>
                     {!selectedDate && (
@@ -451,18 +492,51 @@ export function AdminDashboard({
                         <th className="py-2">Report</th>
                       </>
                     )}
-                    {selectedDate && <th className="py-2">Agent</th>}
+                    {selectedDate && (
+                      <>
+                        <th className="py-2 pr-4">Agent</th>
+                        <th className="py-2">Open day</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
-                  {displayUsers.map((u) => (
+                  {displayUsers.map((u) => {
+                    const dayUser =
+                      selectedDate && dayDetail
+                        ? dayDetail.users.find((row) => row.userId === u.id)
+                        : null;
+                    const dayHref =
+                      selectedDate
+                        ? buildAdminUserReportHref(u.id, {
+                            month: monthKeyFromDayKey(selectedDate),
+                            date: selectedDate,
+                          })
+                        : `/admin/reports/users/${u.id}`;
+                    return (
                     <tr key={u.id} className="border-b border-[var(--border)]">
                       <td className="py-3 pr-4">
                         <div className="font-medium">{u.email}</div>
                         {u.name && <div className="text-xs text-muted">{u.name}</div>}
                       </td>
+                      {selectedDate && (
+                        <>
+                          <td className="py-3 pr-4 text-xs">
+                            {dayUser?.firstInAt
+                              ? formatTime(new Date(dayUser.firstInAt), timezone)
+                              : "-"}
+                          </td>
+                          <td className="py-3 pr-4 text-xs">
+                            {dayUser?.lastOutAt
+                              ? formatTime(new Date(dayUser.lastOutAt), timezone)
+                              : dayUser?.firstInAt
+                                ? "Still in"
+                                : "-"}
+                          </td>
+                        </>
+                      )}
                       <td className="py-3 pr-4">
-                        {u.today.totalHours.toFixed(1)}h / {u.hoursTarget}h
+                        {formatHours(u.today.totalHours)} / {u.hoursTarget}h
                       </td>
                       <td className="py-3 pr-4">
                         <span className={u.today.metTarget ? "text-green-400" : "text-accent"}>
@@ -481,7 +555,7 @@ export function AdminDashboard({
                           </td>
                           <td className="py-3">
                             <Link
-                              href={`/admin/reports/users/${u.id}`}
+                              href={dayHref}
                               className="text-xs text-accent hover:underline"
                             >
                               View report
@@ -490,12 +564,23 @@ export function AdminDashboard({
                         </>
                       )}
                       {selectedDate && (
-                        <td className="py-3">
-                          {u.today.agentHealthy ? "Healthy" : "Stale"}
-                        </td>
+                        <>
+                          <td className="py-3 pr-4">
+                            {u.today.agentHealthy ? "Healthy" : "Stale"}
+                          </td>
+                          <td className="py-3">
+                            <Link
+                              href={dayHref}
+                              className="text-xs text-accent hover:underline"
+                            >
+                              Open day
+                            </Link>
+                          </td>
+                        </>
                       )}
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

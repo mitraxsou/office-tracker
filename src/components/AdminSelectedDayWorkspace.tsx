@@ -31,15 +31,22 @@ export function AdminSelectedDayWorkspace({
     year: "numeric",
   }).format(new Date(`${summary.dayKey}T12:00:00`));
 
+  const ghostHours =
+    summary.visitCount === 0 && summary.totalHours === 0
+      ? null
+      : summary.visitCount === 0
+        ? "Hours need a Visit row. Use Correct this day to add one."
+        : null;
+
   return (
     <section
       id="day-details"
       className="card scroll-mt-20 space-y-4 border border-[var(--pwc-orange)]/25 p-4"
       aria-labelledby="day-details-heading"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] uppercase tracking-wide text-muted">Selected day</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-[11px] uppercase tracking-wide text-muted">Day workspace</p>
           <h3 id="day-details-heading" className="text-lg font-medium text-accent">
             {dayLabel}
             {isToday ? (
@@ -49,11 +56,11 @@ export function AdminSelectedDayWorkspace({
             ) : null}
           </h3>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <button
             type="button"
             onClick={() => onSelectDate(todayKey)}
-            className="btn-secondary px-3 py-1.5 text-xs"
+            className="btn-secondary min-h-11 px-3 py-1.5 text-xs"
             aria-pressed={isToday}
           >
             Today
@@ -61,26 +68,47 @@ export function AdminSelectedDayWorkspace({
           <button
             type="button"
             onClick={() => onSelectDate(shiftDayKey(summary.dayKey, -1))}
-            className="btn-secondary px-3 py-1.5 text-xs"
+            className="btn-secondary min-h-11 px-3 py-1.5 text-xs"
             aria-label="Previous day"
           >
-            Previous day
+            Previous
           </button>
           <button
             type="button"
             onClick={() => onSelectDate(shiftDayKey(summary.dayKey, 1))}
-            className="btn-secondary px-3 py-1.5 text-xs"
+            className="btn-secondary min-h-11 px-3 py-1.5 text-xs"
             aria-label="Next day"
           >
-            Next day
+            Next
           </button>
-          <button type="button" onClick={onCorrect} className="btn-primary px-3 py-1.5 text-xs">
-            Correct visits
+          <label className="text-sm">
+            <span className="sr-only">Pick day</span>
+            <input
+              type="date"
+              value={summary.dayKey}
+              onChange={(e) => {
+                if (e.target.value) onSelectDate(e.target.value);
+              }}
+              className="picker-input min-h-11 rounded border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-sm"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={onCorrect}
+            className="btn-primary min-h-11 w-full px-3 py-1.5 text-xs sm:ml-auto sm:w-auto"
+          >
+            Correct this day
           </button>
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {ghostHours ? (
+        <p className="rounded-lg border border-[var(--pwc-orange)]/40 bg-[var(--pwc-orange-muted)]/40 px-3 py-2 text-sm">
+          {ghostHours}
+        </p>
+      ) : null}
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <DayStat
           label="Office time"
           value={formatHours(summary.totalHours)}
@@ -138,9 +166,18 @@ export function AdminSelectedDayWorkspace({
           </button>
         </div>
         {summary.visits.length === 0 ? (
-          <p className="text-sm text-muted">
-            No visits on this day. Use Correct visits to add one for {summary.dayKey}.
-          </p>
+          <div className="space-y-2">
+            <p className="text-sm text-muted">
+              No visits on this day. Office hours stay at 0 until you add a Visit.
+            </p>
+            <button
+              type="button"
+              onClick={onCorrect}
+              className="btn-primary min-h-11 w-full px-3 py-2 text-sm sm:w-auto"
+            >
+              Correct this day
+            </button>
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -162,7 +199,14 @@ export function AdminSelectedDayWorkspace({
                     : null;
                   return (
                     <tr key={visit.id} className="border-b border-[var(--border)]">
-                      <td className="py-2 pr-3">{formatTime(start, timezone)}</td>
+                      <td className="py-2 pr-3">
+                        {formatTime(start, timezone)}
+                        {visit.startedPreviousDay ? (
+                          <span className="mt-0.5 block text-[11px] text-accent">
+                            Started previous day
+                          </span>
+                        ) : null}
+                      </td>
                       <td className="py-2 pr-3">
                         {end ? formatTime(end, timezone) : <span className="text-accent">Open</span>}
                       </td>
@@ -178,6 +222,16 @@ export function AdminSelectedDayWorkspace({
             </table>
           </div>
         )}
+      </div>
+
+      <div className="sticky bottom-2 z-10 sm:hidden">
+        <button
+          type="button"
+          onClick={onCorrect}
+          className="btn-primary w-full min-h-11 px-3 py-2 text-sm shadow-lg"
+        >
+          Correct this day
+        </button>
       </div>
     </section>
   );

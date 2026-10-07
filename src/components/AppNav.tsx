@@ -85,11 +85,11 @@ export async function AppNav() {
     { href: "/reports", label: "Reports" },
     { href: "/settings", label: "Settings" },
     { href: "/help", label: "Help" },
+    ...(adminAccess ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 
   const secondaryNavLinks: NavLink[] = [
     { href: "/contact-admin", label: "Contact admin" },
-    ...(adminAccess ? [{ href: "/admin", label: "Admin" }] : []),
   ];
 
   const mobileNavLinks: NavLink[] = [...primaryNavLinks, ...secondaryNavLinks];

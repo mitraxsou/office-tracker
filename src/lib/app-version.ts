@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.30";
+export const APP_VERSION = "1.5.31";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,19 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-07",
+    userBullets: [
+      "Office hours for a day only count when there is a Visit row, so a ghost Met day without visits no longer appears.",
+    ],
+    adminBullets: [
+      "User reports center on a Day workspace with Correct this day opening a modal (bottom sheet on phones).",
+      "Admin home has a collapsible In office that day roster with in/out times, date navigation, and Open day links.",
+      "Admin sits in the primary nav on desktop and in the mobile menu for admins.",
+      "Diagnostics (full visit editor, agent activity) are collapsed under the day workspace.",
+    ],
+  },
+  {
+    version: "1.5.30",
     date: "2026-10-07",
     userBullets: [
       "Agent 1.5.23 writes a plain-English last-run-summary.txt on your laptop so you can see wake, Wi-Fi, and whether office time started.",

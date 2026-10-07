@@ -19,7 +19,12 @@ import { isoWeekdayFromDayKey } from "./office-schedule";
 import { isDayKeyInRange, isUserOutOfOffice } from "./out-of-office";
 import { prisma } from "./db";
 import { dayBoundsFromKey, dayKeyInTimezone, isCurrentCalendarDay, isFutureDayKey } from "./timezone-dates";
-import { daySpanMsForDay, roundHoursToMinute, type VisitForDaySpan } from "./visits";
+import {
+  daySpanMsForDay,
+  firstOfficeInMsForDay,
+  roundHoursToMinute,
+  type VisitForDaySpan,
+} from "./visits";
 
 export type AdminDayUserStatus =
   | "attended_met"
@@ -39,6 +44,10 @@ export type AdminDayUserRow = {
   status: AdminDayUserStatus;
   agentHealthy: boolean;
   agentStaleOnDay: boolean;
+  /** Earliest Visit-backed check-in on the day (ISO), if any. */
+  firstInAt: string | null;
+  /** Latest Visit-backed check-out on the day (ISO), null when still open today. */
+  lastOutAt: string | null;
 };
 
 export type AdminDayComplianceSummary = {
@@ -114,7 +123,7 @@ export function resolveDayUserStatus(input: {
   return "no_visit";
 }
 
-/** True when the user had office presence on the day (visit segment or in-office pulse). */
+/** True when the user had Visit-backed office presence on the day (hours or overlapping visit). */
 export function userAttendedOnDay(input: {
   visits: Array<{ startAt: Date; endAt: Date | null }>;
   dayStart: Date;
@@ -124,7 +133,6 @@ export function userAttendedOnDay(input: {
   now?: Date;
 }): boolean {
   if (input.totalMs > 0) return true;
-  if (input.inOfficeHeartbeats.length > 0) return true;
 
   const now = input.now ?? new Date();
   if (now.getTime() < input.dayStart.getTime()) return false;
@@ -294,6 +302,30 @@ export function computeUserDayComplianceRow(input: {
     metTarget,
   });
 
+  const firstInMs = firstOfficeInMsForDay(input.visits, params);
+  let lastOutMs: number | null = null;
+  let hasOpenOnDay = false;
+  const isCurrentDay = isCurrentCalendarDay(dayStart, dayEnd, now);
+  for (const visit of input.visits) {
+    const startMs = visit.startAt.getTime();
+    if (startMs > dayEnd.getTime()) continue;
+    if (visit.endAt === null) {
+      if (isCurrentDay && startMs <= dayEnd.getTime()) {
+        hasOpenOnDay = true;
+        lastOutMs = Math.max(lastOutMs ?? 0, Math.min(now.getTime(), dayEnd.getTime()));
+      } else if (lastInOfficeHeartbeatAt) {
+        const hb = Math.min(lastInOfficeHeartbeatAt.getTime(), dayEnd.getTime());
+        if (hb >= dayStart.getTime()) {
+          lastOutMs = Math.max(lastOutMs ?? 0, hb);
+        }
+      }
+      continue;
+    }
+    const endMs = visit.endAt.getTime();
+    if (endMs < dayStart.getTime()) continue;
+    lastOutMs = Math.max(lastOutMs ?? 0, Math.min(endMs, dayEnd.getTime()));
+  }
+
   return {
     userId: user.id,
     email: user.email,
@@ -305,6 +337,13 @@ export function computeUserDayComplianceRow(input: {
     status,
     agentHealthy: !agentStaleOnDay,
     agentStaleOnDay,
+    firstInAt: firstInMs !== null ? new Date(firstInMs).toISOString() : null,
+    lastOutAt:
+      hasOpenOnDay && isCurrentDay
+        ? null
+        : lastOutMs !== null
+          ? new Date(lastOutMs).toISOString()
+          : null,
   };
 }
 
@@ -587,6 +626,8 @@ function emptyFutureDayUserRow(user: ComplianceUser, hoursTarget: number): Admin
     status: "no_visit",
     agentHealthy: true,
     agentStaleOnDay: false,
+    firstInAt: null,
+    lastOutAt: null,
   };
 }
 

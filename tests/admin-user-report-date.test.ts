@@ -151,6 +151,39 @@ describe("summarizeSelectedDay", () => {
     expect(summary.metTarget).toBe(false);
     expect(summary.totalHours).toBe(0);
   });
+
+  it("includes overnight open visits and never shows Met without visits", () => {
+    const summary = summarizeSelectedDay({
+      dayKey: "2026-09-18",
+      timezone: "Asia/Kolkata",
+      hoursTarget: 5,
+      dailyTrend: [{ date: "2026-09-18", totalHours: 16, metTarget: true }],
+      visits: [
+        {
+          id: "overnight",
+          startAt: "2026-09-17T18:00:00.000Z",
+          endAt: null,
+          source: "wifi",
+          ssid: "OfficeConnect",
+        },
+      ],
+      now: new Date("2026-09-18T12:00:00+05:30"),
+    });
+    expect(summary.visitCount).toBe(1);
+    expect(summary.visits[0]?.startedPreviousDay).toBe(true);
+    expect(summary.openVisit).toBe(true);
+
+    const ghost = summarizeSelectedDay({
+      dayKey: "2026-09-18",
+      timezone: "Asia/Kolkata",
+      hoursTarget: 5,
+      dailyTrend: [{ date: "2026-09-18", totalHours: 16, metTarget: true }],
+      visits: [],
+    });
+    expect(ghost.visitCount).toBe(0);
+    expect(ghost.totalHours).toBe(0);
+    expect(ghost.metTarget).toBe(false);
+  });
 });
 
 describe("day navigation helpers", () => {

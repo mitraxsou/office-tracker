@@ -505,6 +505,21 @@ describe("hours calculations", () => {
     expect(spanMs).toBeCloseTo(6 * ms(60), 0);
   });
 
+  it("does not invent day hours from pulses when there is no Visit", () => {
+    const dayStart = new Date("2026-10-07T00:00:00+05:30");
+    const dayEnd = new Date("2026-10-07T23:59:59.999+05:30");
+    const spanMs = daySpanMsForDay([], {
+      dayStart,
+      dayEnd,
+      now: new Date("2026-10-07T18:00:00+05:30"),
+      staleMs: VISIT_GAP_MS,
+      lastHeartbeatAt: new Date("2026-10-07T17:00:00+05:30"),
+      firstInOfficeHeartbeatAt: new Date("2026-10-07T02:00:00+05:30"),
+      lastInOfficeHeartbeatAt: new Date("2026-10-07T17:00:00+05:30"),
+    });
+    expect(spanMs).toBe(0);
+  });
+
   it("open visit on a past day credits hours only with same-day in-office heartbeats", () => {
     const dayStart = new Date("2026-09-03T00:00:00+05:30");
     const dayEnd = new Date("2026-09-03T23:59:59.999+05:30");

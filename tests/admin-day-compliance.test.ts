@@ -89,7 +89,7 @@ describe("userAttendedOnDay", () => {
     ).toBe(true);
   });
 
-  it("attended with in-office heartbeat even if hours are zero", () => {
+  it("does not count pulse-only presence without a Visit", () => {
     expect(
       userAttendedOnDay({
         visits: [],
@@ -98,7 +98,7 @@ describe("userAttendedOnDay", () => {
         inOfficeHeartbeats: [new Date("2026-09-04T10:00:00+05:30")],
         totalMs: 0,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("attended with overlapping visit segment", () => {
@@ -294,6 +294,8 @@ describe("summarizeDayCompliance", () => {
       status: "attended_met",
       agentHealthy: true,
       agentStaleOnDay: false,
+      firstInAt: null,
+      lastOutAt: null,
     },
     {
       userId: "2",
@@ -306,6 +308,8 @@ describe("summarizeDayCompliance", () => {
       status: "attended_not_met",
       agentHealthy: true,
       agentStaleOnDay: false,
+      firstInAt: null,
+      lastOutAt: null,
     },
     {
       userId: "3",
@@ -318,6 +322,8 @@ describe("summarizeDayCompliance", () => {
       status: "no_visit",
       agentHealthy: true,
       agentStaleOnDay: false,
+      firstInAt: null,
+      lastOutAt: null,
     },
     {
       userId: "4",
@@ -330,6 +336,8 @@ describe("summarizeDayCompliance", () => {
       status: "excluded_ooo",
       agentHealthy: true,
       agentStaleOnDay: false,
+      firstInAt: null,
+      lastOutAt: null,
     },
     {
       userId: "5",
@@ -342,6 +350,8 @@ describe("summarizeDayCompliance", () => {
       status: "excluded_stale",
       agentHealthy: false,
       agentStaleOnDay: true,
+      firstInAt: null,
+      lastOutAt: null,
     },
   ];
 

@@ -20,6 +20,8 @@ describe("toAdminOrgCalendarDay", () => {
         status: "attended_met",
         agentHealthy: true,
         agentStaleOnDay: false,
+        firstInAt: null,
+        lastOutAt: null,
       },
       {
         userId: "2",
@@ -32,6 +34,8 @@ describe("toAdminOrgCalendarDay", () => {
         status: "attended_not_met",
         agentHealthy: true,
         agentStaleOnDay: false,
+        firstInAt: null,
+        lastOutAt: null,
       },
       {
         userId: "3",
@@ -44,6 +48,8 @@ describe("toAdminOrgCalendarDay", () => {
         status: "excluded_ooo",
         agentHealthy: true,
         agentStaleOnDay: false,
+        firstInAt: null,
+        lastOutAt: null,
       },
     ];
 
@@ -167,7 +173,7 @@ describe("computeUserDayComplianceRow OOO override", () => {
     expect(row.agentStaleOnDay).toBe(false);
   });
 
-  it("counts in-office activity ticks when useActivity is true", () => {
+  it("does not count pulse-only activity ticks as attendance without a Visit", () => {
     const row = computeUserDayComplianceRow({
       user,
       dayKey: "2026-09-04",
@@ -188,8 +194,48 @@ describe("computeUserDayComplianceRow OOO override", () => {
       graceHours: 24,
     });
 
+    expect(row.attended).toBe(false);
+    expect(row.hours).toBe(0);
+    expect(row.status).toBe("no_visit");
+  });
+
+  it("extends a Visit with in-office activity ticks when useActivity is true", () => {
+    const row = computeUserDayComplianceRow({
+      user,
+      dayKey: "2026-09-04",
+      hadInstalledDevice: true,
+      lastHeartbeatBeforeDayEnd: new Date("2026-09-04T18:00:00+05:30"),
+      ooo: false,
+      visits: [
+        {
+          id: "v1",
+          startAt: new Date("2026-09-04T10:00:00+05:30"),
+          endAt: new Date("2026-09-04T12:00:00+05:30"),
+          source: "wifi",
+          updatedAt: new Date("2026-09-04T12:00:00+05:30"),
+        },
+      ],
+      dayPulses: [
+        {
+          at: new Date("2026-09-04T10:00:00+05:30"),
+          ssid: "OfficeConnect",
+          inOffice: true,
+        },
+        {
+          at: new Date("2026-09-04T14:00:00+05:30"),
+          ssid: "OfficeConnect",
+          inOffice: true,
+        },
+      ],
+      useActivity: true,
+      officeSsids: ["OfficeConnect"],
+      hoursTarget: 5,
+      graceHours: 24,
+    });
+
     expect(row.attended).toBe(true);
-    expect(row.status).toBe("attended_not_met");
+    expect(row.hours).toBeGreaterThanOrEqual(4);
+    expect(row.firstInAt).toBeTruthy();
   });
 
   it("uses activity tick for stale check when heartbeats are absent", () => {
