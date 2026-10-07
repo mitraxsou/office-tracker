@@ -577,6 +577,9 @@ export async function getTodaySummary(
   graceHours?: number,
 ) {
   const now = new Date();
+  // Drop overnight open visits before liveHours / hours_met so a stale start
+  // cannot inflate the day span to midnight-or-earlier through now.
+  await closeEndOfDayOpenVisits(userId, timezone);
   const { dayKey } = getDayBounds(now, timezone);
   const { visits, params, lastHeartbeat, laptopActiveParams, firstAgentOnAt } = await loadDaySpanContext(
     userId,

@@ -79,10 +79,18 @@ export function shouldBackdateWifiVisit(params: {
   recoveredStartAt: Date;
   endAt: Date | null;
   now?: Date;
+  /** When set, never backdate before this local-day start (blocks overnight openVisit). */
+  dayStart?: Date | null;
 }): boolean {
   if (params.source === "manual") return false;
   if (params.recoveredStartAt.getTime() >= params.currentStartAt.getTime()) return false;
   if (params.endAt && params.endAt.getTime() < params.recoveredStartAt.getTime()) return false;
+  if (
+    params.dayStart &&
+    params.recoveredStartAt.getTime() < params.dayStart.getTime()
+  ) {
+    return false;
+  }
   return validateVisitTimestamps(params.recoveredStartAt, params.endAt, params.now) === null;
 }
 

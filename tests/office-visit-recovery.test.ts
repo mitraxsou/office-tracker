@@ -81,6 +81,19 @@ describe("wifi visit backdate guards", () => {
     ).toBe(false);
   });
 
+  it("never backdates before the local day start", () => {
+    expect(
+      shouldBackdateWifiVisit({
+        source: "wifi",
+        currentStartAt: new Date("2026-10-06T11:40:00.000Z"),
+        recoveredStartAt: new Date("2026-10-05T10:00:00.000Z"), // previous local day
+        endAt: null,
+        now,
+        dayStart: new Date("2026-10-05T18:30:00.000Z"), // Asia/Kolkata midnight for 2026-10-06
+      }),
+    ).toBe(false);
+  });
+
   it("reads the recovered time from a stored visit_start payload", () => {
     const recovered = recoveredStartFromVisitStartPayload({
       id: "evt-recover",

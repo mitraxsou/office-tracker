@@ -187,6 +187,16 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain("Time monitoring is on");
   });
 
+  it("closes leftover openVisit on day rollover and clips day office ms", () => {
+    expect(heartbeat).toContain("function Get-LocalDayStartUtc");
+    expect(heartbeat).toContain("function Get-LocalDayEndUtc");
+    expect(heartbeat).toContain("NEW_DAY closed leftover openVisit");
+    expect(heartbeat).toContain("Maybe-EnqueueDailySummary -SyncState $syncState -DayKey $dayKey -TimezoneId $timezone");
+    expect(heartbeat).toContain(
+      "Get-CurrentDayOfficeMs -SyncState $SyncState -DayKey $DayKey -TimezoneId (Get-AgentTimezone $ServerConfig)",
+    );
+  });
+
   it("recovers visit_start from contiguous local office ticks", () => {
     expect(heartbeat).toContain("function Get-EarliestContiguousOfficeTickAt");
     expect(heartbeat).toContain("function Maybe-RecoverOpenVisitStart");

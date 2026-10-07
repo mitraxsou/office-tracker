@@ -15,7 +15,7 @@ $UpdateCheckIntervalMinutes = 60
 $LocalPulseIntervalMinutes = 2
 $HealthSyncIntervalMinutes = 60
 $OfficeVisitGapMinutes = 15
-$AgentScriptVersion = "1.5.20"
+$AgentScriptVersion = "1.5.21"
 $CriticalEventTypes = @(
     "wifi_connected",
     "wifi_disconnected",
@@ -349,6 +349,56 @@ function Get-EventDayKey([string]$At, [string]$TimezoneId) {
         return Get-DayKeyFromUtc -Utc $utc -TimezoneId $TimezoneId
     } catch {
         return $null
+    }
+}
+
+function Get-TimezoneInfo([string]$TimezoneId) {
+    try {
+        return [TimeZoneInfo]::FindSystemTimeZoneById($TimezoneId)
+    } catch {
+        try {
+            return [TimeZoneInfo]::FindSystemTimeZoneById("India Standard Time")
+        } catch {
+            return $null
+        }
+    }
+}
+
+# Local midnight (UTC instant) for a yyyy-MM-dd day key in the agent timezone.
+function Get-LocalDayStartUtc([string]$DayKey, [string]$TimezoneId) {
+    $parts = $DayKey -split "-"
+    if ($parts.Count -ne 3) { return $null }
+    try {
+        $year = [int]$parts[0]; $month = [int]$parts[1]; $day = [int]$parts[2]
+        $localMidnight = Get-Date -Year $year -Month $month -Day $day -Hour 0 -Minute 0 -Second 0
+        $unspecified = [DateTime]::SpecifyKind($localMidnight, [DateTimeKind]::Unspecified)
+        $tz = Get-TimezoneInfo -TimezoneId $TimezoneId
+        if ($tz) {
+            return [TimeZoneInfo]::ConvertTimeToUtc($unspecified, $tz)
+        }
+        return $unspecified.ToUniversalTime()
+    } catch {
+        return $null
+    }
+}
+
+# Last instant of the local day (23:59:59.999) as UTC.
+function Get-LocalDayEndUtc([string]$DayKey, [string]$TimezoneId) {
+    $start = Get-LocalDayStartUtc -DayKey $DayKey -TimezoneId $TimezoneId
+    if (-not $start) { return $null }
+    try {
+        $parts = $DayKey -split "-"
+        $year = [int]$parts[0]; $month = [int]$parts[1]; $day = [int]$parts[2]
+        $localEnd = Get-Date -Year $year -Month $month -Day $day -Hour 23 -Minute 59 -Second 59
+        $unspecified = [DateTime]::SpecifyKind($localEnd, [DateTimeKind]::Unspecified)
+        $tz = Get-TimezoneInfo -TimezoneId $TimezoneId
+        if ($tz) {
+            $endUtc = [TimeZoneInfo]::ConvertTimeToUtc($unspecified, $tz)
+            return $endUtc.AddMilliseconds(999)
+        }
+        return $unspecified.ToUniversalTime().AddMilliseconds(999)
+    } catch {
+        return $start.AddDays(1).AddMilliseconds(-1)
     }
 }
 
@@ -1015,10 +1065,28 @@ function New-HealthSnapshotEvent {
 function Maybe-EnqueueDailySummary {
     param(
         $SyncState,
-        [string]$DayKey
+        [string]$DayKey,
+        [string]$TimezoneId = "Asia/Kolkata"
     )
     $previousDayKey = if ($SyncState.dayKey) { [string]$SyncState.dayKey } else { $null }
     if ($previousDayKey -and $previousDayKey -ne $DayKey) {
+        # Never carry an open visit into a new calendar day. Close it at previous
+        # day end so Get-CurrentDayOfficeMs cannot inflate hours_target_met on boot.
+        $open = Get-OpenVisitFromState $SyncState
+        if ($open) {
+            try {
+                $dayEndUtc = Get-LocalDayEndUtc -DayKey $previousDayKey -TimezoneId $TimezoneId
+                $startUtc = [DateTime]::Parse([string]$open.startAt).ToUniversalTime()
+                if ($dayEndUtc -and $dayEndUtc -ge $startUtc) {
+                    $SyncState = End-LocalVisit -SyncState $SyncState -EndAt ($dayEndUtc.ToUniversalTime().ToString("o"))
+                } else {
+                    $SyncState.openVisit = $null
+                }
+            } catch {
+                $SyncState.openVisit = $null
+            }
+            Write-Log "NEW_DAY closed leftover openVisit from $previousDayKey"
+        }
         if ($SyncState.lastDailySummaryDayKey -ne $previousDayKey) {
             $endAt = Get-UptimeSessionEndTime -SyncState $SyncState
             $SyncState = Close-UptimeSessionIfOpen -SyncState $SyncState -EndAt $endAt
@@ -1046,12 +1114,20 @@ function Maybe-EnqueueDailySummary {
 }
 
 function Get-CurrentDayOfficeMs {
-    param($SyncState)
+    param(
+        $SyncState,
+        [string]$DayKey,
+        [string]$TimezoneId = "Asia/Kolkata"
+    )
     $total = if ($null -ne $SyncState.dayOfficeMs) { [int]$SyncState.dayOfficeMs } else { 0 }
     $open = Get-OpenVisitFromState $SyncState
     if ($open) {
         try {
             $start = [DateTime]::Parse([string]$open.startAt)
+            $dayStartUtc = Get-LocalDayStartUtc -DayKey $DayKey -TimezoneId $TimezoneId
+            if ($dayStartUtc -and $start.ToUniversalTime() -lt $dayStartUtc) {
+                $start = $dayStartUtc
+            }
             $total += [Math]::Max(0, [int](((Get-Date) - $start).TotalMilliseconds))
         } catch {}
     }
@@ -1078,7 +1154,7 @@ function Maybe-EnqueueHoursTargetMet {
         return $SyncState
     }
     $targetMs = Get-HoursTargetMs -ServerConfig $ServerConfig
-    $officeMs = Get-CurrentDayOfficeMs -SyncState $SyncState
+    $officeMs = Get-CurrentDayOfficeMs -SyncState $SyncState -DayKey $DayKey -TimezoneId (Get-AgentTimezone $ServerConfig)
     if ($officeMs -lt $targetMs) { return $SyncState }
     Add-QueuedEvent -Type "hours_target_met" -Fields @{
         dayKey = $DayKey
@@ -1677,7 +1753,7 @@ $presence = Get-PresenceState
 $previousSsid = $presence.ssid
 $syncState = Get-SyncState
 $previousDayKey = if ($syncState.dayKey) { [string]$syncState.dayKey } else { $null }
-$syncState = Maybe-EnqueueDailySummary -SyncState $syncState -DayKey $dayKey
+$syncState = Maybe-EnqueueDailySummary -SyncState $syncState -DayKey $dayKey -TimezoneId $timezone
 $dayRolledOver = $previousDayKey -and $previousDayKey -ne $dayKey
 
 # Sleep checkout must run before starting a new visit. Otherwise day-rollover /

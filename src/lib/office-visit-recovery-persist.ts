@@ -64,6 +64,7 @@ export async function persistRecoveredWifiVisitStarts(
         recoveredStartAt: item.startAt,
         endAt: visit.endAt,
         now,
+        dayStart,
       })
     ) {
       continue;

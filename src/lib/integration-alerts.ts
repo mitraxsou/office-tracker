@@ -372,8 +372,8 @@ async function evaluateUserAlerts(
       undefined,
       approvedExemptions,
     );
-    const todayMetTarget =
-      monthlyProgress.days.find((day) => day.dayKey === dayKey)?.metTarget ?? false;
+    // Same live day total as hours_met so wording cannot disagree in one batch.
+    const todayMetTarget = summary.metTarget;
     const deliveryChannel = channelForAlert(prefs, "monthly_snapshot");
     alerts.push({
       ...base,

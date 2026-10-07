@@ -17,6 +17,7 @@ const dailySummaryFindUniqueMock = vi.hoisted(() => vi.fn());
 const userFindUniqueMock = vi.hoisted(() => vi.fn());
 const loadDaySpanContextMock = vi.hoisted(() => vi.fn());
 const maybeRunVisitMaintenanceMock = vi.hoisted(() => vi.fn());
+const closeEndOfDayOpenVisitsMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/db", () => ({
   prisma: {
@@ -68,6 +69,7 @@ vi.mock("@/lib/heartbeat-alerts", () => ({
 vi.mock("@/lib/heartbeat-service", () => ({
   loadDaySpanContext: loadDaySpanContextMock,
   maybeRunVisitMaintenance: maybeRunVisitMaintenanceMock,
+  closeEndOfDayOpenVisits: closeEndOfDayOpenVisitsMock,
 }));
 
 import {
@@ -171,6 +173,7 @@ describe("processAgentSync session_resume", () => {
       firstAgentOnAt: null,
     });
     maybeRunVisitMaintenanceMock.mockResolvedValue(true);
+    closeEndOfDayOpenVisitsMock.mockResolvedValue(false);
   });
 
   it("parses gapMinutes on session_resume events", () => {
@@ -768,6 +771,73 @@ describe("processAgentSync session_resume", () => {
       }),
     );
   });
+
+  it("rejects overnight openVisit reconcile and still closes EOD before alerts", async () => {
+    // System time is 2026-09-25; openVisit from previous local day must not create/backdate.
+    const afternoonStart = "2026-09-25T11:40:00.000Z"; // ~5:10 PM IST
+    visitFindFirstMock.mockImplementation(
+      async (args: { where?: { localVisitId?: string; endAt?: null } }) => {
+        if (args?.where?.localVisitId === "lv-stale") return null;
+        if (args?.where?.localVisitId === "lv-today") return null;
+        if (args?.where?.endAt === null) {
+          return {
+            id: "visit-today",
+            endAt: null,
+            startAt: new Date(afternoonStart),
+            source: "wifi",
+          };
+        }
+        return null;
+      },
+    );
+    visitCreateMock.mockResolvedValue({
+      id: "visit-today",
+      userId: "user-1",
+      localVisitId: "lv-today",
+      startAt: new Date(afternoonStart),
+      endAt: null,
+    });
+
+    await processAgentSync({
+      userId: "user-1",
+      userTimezone: "Asia/Kolkata",
+      deviceId: "device-1",
+      serialNumber: "SERIAL-1",
+      events: [
+        {
+          id: "evt-start",
+          type: "visit_start",
+          at: afternoonStart,
+          localVisitId: "lv-today",
+          ssid: "OfficeConnect",
+        },
+      ],
+      openVisit: {
+        localVisitId: "lv-stale",
+        // Before Asia/Kolkata midnight on 2026-09-25 (2026-09-24T18:30Z).
+        startAt: "2026-09-24T10:00:00.000Z",
+        ssid: "OfficeConnect",
+      },
+      appUrl: "https://office.example",
+    });
+
+    expect(visitCreateMock).toHaveBeenCalledTimes(1);
+    expect(visitCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          localVisitId: "lv-today",
+          startAt: new Date(afternoonStart),
+        }),
+      }),
+    );
+    expect(visitCreateMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ localVisitId: "lv-stale" }),
+      }),
+    );
+    expect(closeEndOfDayOpenVisitsMock).toHaveBeenCalledWith("user-1", "Asia/Kolkata");
+    expect(maybeDispatchHeartbeatAlertsMock).toHaveBeenCalled();
+  });
 });
 
 describe("syncBatchNeedsVisitMaintenance", () => {
@@ -816,6 +886,7 @@ describe("processAgentSync health_ping", () => {
       firstAgentOnAt: null,
     });
     maybeRunVisitMaintenanceMock.mockResolvedValue(true);
+    closeEndOfDayOpenVisitsMock.mockResolvedValue(false);
   });
 
   it("parses lastLocalPulseAt on health_ping events", () => {

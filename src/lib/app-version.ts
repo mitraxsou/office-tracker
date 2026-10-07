@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.27";
+export const APP_VERSION = "1.5.28";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,18 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-07",
+    userBullets: [
+      "Turning the laptop off overnight no longer triggers a false \"5h completed\" Teams alert when you check in the next afternoon.",
+      "Agent 1.5.21 closes leftover open visits at day rollover so office hours restart cleanly.",
+    ],
+    adminBullets: [
+      "hours_met uses the same live day total as the monthly snapshot wording in one alert batch.",
+      "Server rejects overnight agent openVisit backdates and closes cross-day open visits before alert evaluation.",
+    ],
+  },
+  {
+    version: "1.5.27",
     date: "2026-10-06",
     userBullets: [
       "Replacing a laptop token from Settings now always needs approval first, even on a test account, so an accidental click cannot disconnect the agent.",

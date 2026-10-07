@@ -10,7 +10,7 @@ import {
   vercelProtectionBypassSecret,
 } from "./agent-download";
 import { daySpanMsForDay, dayKeyInTimezone } from "./visits";
-import { dayBoundsFromKey } from "./timezone-dates";
+import { dayBoundsFromKey, getDayBounds } from "./timezone-dates";
 import { validateVisitTimestamps } from "./visit-validation";
 import {
   contiguousOfficeSegment,
@@ -19,7 +19,11 @@ import {
   shouldCreateRecoveredWifiVisit,
 } from "./office-visit-recovery";
 import { maybeDispatchHeartbeatAlerts } from "./heartbeat-alerts";
-import { loadDaySpanContext, maybeRunVisitMaintenance } from "./heartbeat-service";
+import {
+  closeEndOfDayOpenVisits,
+  loadDaySpanContext,
+  maybeRunVisitMaintenance,
+} from "./heartbeat-service";
 import { parseAgentEventTimestamp, sanitizeSsid, sanitizeSerialNumber } from "./security";
 import { sanitizeSyncTrigger } from "./presence-timeline";
 import { randomUUID } from "crypto";
@@ -211,6 +215,7 @@ export async function processAgentSync(params: {
           });
           if (existingVisit) {
             visitIds[localVisitId] = existingVisit.id;
+            const { start: eventDayStart } = dayBoundsFromKey(dayKey, params.userTimezone);
             if (
               existingVisit.source !== "manual" &&
               shouldBackdateWifiVisit({
@@ -218,6 +223,7 @@ export async function processAgentSync(params: {
                 currentStartAt: existingVisit.startAt,
                 recoveredStartAt: eventAt,
                 endAt: existingVisit.endAt,
+                dayStart: eventDayStart,
               })
             ) {
               await prisma.visit.update({
@@ -541,7 +547,10 @@ export async function processAgentSync(params: {
     deviceId: params.deviceId,
     openVisit: params.openVisit ?? null,
     allowlist,
+    timezone: params.userTimezone,
   });
+  // Reconcile must not leave a yesterday openVisit that inflates hours_met.
+  await closeEndOfDayOpenVisits(params.userId, params.userTimezone);
 
   const openVisitRow = await prisma.visit.findFirst({
     where: { userId: params.userId, endAt: null },
@@ -660,6 +669,7 @@ async function reconcileWifiVisitsFromActivity(params: {
           recoveredStartAt: segment.start,
           endAt: open.endAt,
           now,
+          dayStart: start,
         })
       ) {
         await prisma.visit.update({
@@ -696,6 +706,7 @@ async function reconcileWifiVisitsFromActivity(params: {
               recoveredStartAt: segment.start,
               endAt: stillInOffice ? null : wifiSameDay.endAt,
               now,
+              dayStart: start,
             })
               ? segment.start
               : wifiSameDay.startAt,
@@ -711,6 +722,7 @@ async function reconcileWifiVisitsFromActivity(params: {
           recoveredStartAt: segment.start,
           endAt: wifiSameDay.endAt,
           now,
+          dayStart: start,
         })
       ) {
         await prisma.visit.update({
@@ -831,11 +843,16 @@ async function reconcileAgentOpenVisit(params: {
   deviceId: string;
   openVisit: AgentSyncOpenVisit | null;
   allowlist: string[];
+  timezone: string;
 }) {
   if (!params.openVisit) return;
 
   const startAt = parseAgentEventTimestamp(params.openVisit.startAt);
   if (!startAt) return;
+  const { start: dayStart } = getDayBounds(new Date(), params.timezone);
+  // Stale overnight openVisit must not recreate or backdate today's visit.
+  if (startAt.getTime() < dayStart.getTime()) return;
+
   const ssid = params.openVisit.ssid
     ? normalizeSsid(sanitizeSsid(params.openVisit.ssid) ?? params.openVisit.ssid)
     : null;
@@ -861,6 +878,7 @@ async function reconcileAgentOpenVisit(params: {
         currentStartAt: existing.startAt,
         recoveredStartAt: startAt,
         endAt: existing.endAt,
+        dayStart,
       })
     ) {
       await prisma.visit.update({
