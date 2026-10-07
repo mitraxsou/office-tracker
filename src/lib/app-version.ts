@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.28";
+export const APP_VERSION = "1.5.29";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,18 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-07",
+    userBullets: [
+      "After a long sleep, the agent only starts a new office visit when netsh shows a real office Wi-Fi SSID, so a false early-morning check-in cannot invent 15h of office time.",
+      "Agent 1.5.22 aborts network waits that freeze across sleep and re-checks Wi-Fi before presence decisions.",
+    ],
+    adminBullets: [
+      "Large-gap session_resume batches reject openVisit / visit_start stamps before the resume wake time.",
+      "Update the Windows agent to 1.5.22 so the laptop-side long-gap netsh gate applies.",
+    ],
+  },
+  {
+    version: "1.5.28",
     date: "2026-10-07",
     userBullets: [
       "Turning the laptop off overnight no longer triggers a false \"5h completed\" Teams alert when you check in the next afternoon.",

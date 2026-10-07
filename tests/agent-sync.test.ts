@@ -73,6 +73,7 @@ vi.mock("@/lib/heartbeat-service", () => ({
 }));
 
 import {
+  largeGapResumeFloorAt,
   parseAgentSyncEvents,
   parseAgentSyncOpenVisit,
   processAgentSync,
@@ -768,6 +769,89 @@ describe("processAgentSync session_resume", () => {
         userId: "user-1",
         inOffice: true,
         hoursTarget: 5,
+      }),
+    );
+  });
+
+  it("largeGapResumeFloorAt returns the latest long-gap session_resume.at", () => {
+    expect(
+      largeGapResumeFloorAt([
+        {
+          id: "r1",
+          type: "session_resume",
+          at: "2026-09-25T02:00:00.000Z",
+          gapMinutes: 10,
+        },
+        {
+          id: "r2",
+          type: "session_resume",
+          at: "2026-09-25T11:40:00.000Z",
+          gapMinutes: 309.6,
+        },
+      ])?.toISOString(),
+    ).toBe("2026-09-25T11:40:00.000Z");
+    expect(largeGapResumeFloorAt([{ id: "r3", type: "visit_start", at: "2026-09-25T11:40:00.000Z" }])).toBeNull();
+  });
+
+  it("clamps early visit_start and rejects pre-resume openVisit on large-gap resume", async () => {
+    const resumeAt = "2026-09-25T11:40:00.000Z"; // ~5:10 PM IST
+    const earlyMorningIst = "2026-09-24T20:33:00.000Z"; // ~2:03 AM IST same local day
+    visitFindFirstMock.mockImplementation(
+      async (args: { where?: { localVisitId?: string; endAt?: null } }) => {
+        if (args?.where?.localVisitId === "lv-early") return null;
+        if (args?.where?.localVisitId === "lv-stale-open") return null;
+        if (args?.where?.endAt === null) return null;
+        return null;
+      },
+    );
+    visitCreateMock.mockResolvedValue({
+      id: "visit-clamped",
+      userId: "user-1",
+      localVisitId: "lv-early",
+      startAt: new Date(resumeAt),
+      endAt: null,
+    });
+
+    await processAgentSync({
+      userId: "user-1",
+      userTimezone: "Asia/Kolkata",
+      deviceId: "device-1",
+      serialNumber: "SERIAL-1",
+      events: [
+        {
+          id: "evt-start-early",
+          type: "visit_start",
+          at: earlyMorningIst,
+          localVisitId: "lv-early",
+          ssid: "OfficeConnect",
+        },
+        {
+          id: "evt-resume",
+          type: "session_resume",
+          at: resumeAt,
+          gapMinutes: 309.6,
+          ssid: "OfficeConnect",
+        },
+      ],
+      openVisit: {
+        localVisitId: "lv-stale-open",
+        startAt: earlyMorningIst,
+        ssid: "OfficeConnect",
+      },
+      appUrl: "https://office.example",
+    });
+
+    expect(visitCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          localVisitId: "lv-early",
+          startAt: new Date(resumeAt),
+        }),
+      }),
+    );
+    expect(visitCreateMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ localVisitId: "lv-stale-open" }),
       }),
     );
   });

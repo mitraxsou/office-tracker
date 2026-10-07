@@ -15,7 +15,9 @@ $UpdateCheckIntervalMinutes = 60
 $LocalPulseIntervalMinutes = 2
 $HealthSyncIntervalMinutes = 60
 $OfficeVisitGapMinutes = 15
-$AgentScriptVersion = "1.5.21"
+# After this many minutes asleep, only trust netsh for a new office visit.
+$LongGapResumeMinutes = 30
+$AgentScriptVersion = "1.5.22"
 $CriticalEventTypes = @(
     "wifi_connected",
     "wifi_disconnected",
@@ -295,16 +297,41 @@ function Wait-NetworkReady {
         [int]$MaxWaitSec = 60
     )
     $hostName = ([Uri]$ApiUrl).Host
-    $deadline = (Get-Date).AddSeconds($MaxWaitSec)
+    $started = Get-Date
+    $deadline = $started.AddSeconds($MaxWaitSec)
+    # If the laptop sleeps mid-wait, wall clock jumps past MaxWaitSec; abort
+    # instead of continuing hours later with frozen resume state.
+    $overrunLimitSec = $MaxWaitSec + 60
     while ((Get-Date) -lt $deadline) {
+        $elapsed = ((Get-Date) - $started).TotalSeconds
+        if ($elapsed -gt $overrunLimitSec) {
+            Write-Log "WARN network wait overrun after sleep; aborting wait"
+            return @{ Ready = $false; Overrun = $true }
+        }
         try {
             [void][System.Net.Dns]::GetHostEntry($hostName)
-            return $true
+            return @{ Ready = $true; Overrun = $false }
         } catch {}
         Start-Sleep -Seconds 3
     }
+    $elapsed = ((Get-Date) - $started).TotalSeconds
+    if ($elapsed -gt $overrunLimitSec) {
+        Write-Log "WARN network wait overrun after sleep; aborting wait"
+        return @{ Ready = $false; Overrun = $true }
+    }
     Write-Log "WARN network not ready after ${MaxWaitSec}s; continuing anyway"
-    return $false
+    return @{ Ready = $false; Overrun = $false }
+}
+
+function Test-FreshNetshOfficeSsid {
+    param(
+        [string]$Ssid,
+        [string]$SsidMethod,
+        $ServerConfig
+    )
+    if ($SsidMethod -ne "netsh") { return $false }
+    if (-not $Ssid) { return $false }
+    return (Test-IsOfficeSsid -Ssid $Ssid -ServerConfig $ServerConfig)
 }
 
 function Get-HeartbeatIntervalMinutes($ServerConfig) {
@@ -1703,7 +1730,13 @@ if (-not $serialNumber -and $localConfig.serialNumber) {
 }
 
 $networkWaitSec = if ($isResumeRun) { 90 } else { 60 }
-Wait-NetworkReady -ApiUrl $apiUrl -MaxWaitSec $networkWaitSec | Out-Null
+$networkWait = Wait-NetworkReady -ApiUrl $apiUrl -MaxWaitSec $networkWaitSec
+$networkWaitOverrun = $false
+if ($networkWait -is [hashtable]) {
+    $networkWaitOverrun = [bool]$networkWait.Overrun
+} elseif ($networkWait -eq $true) {
+    $networkWaitOverrun = $false
+}
 
 $cachedServerConfig = $null
 $cachePath = Get-CachePath
@@ -1747,6 +1780,17 @@ $scriptVersion = Get-LocalAgentVersion
 $ssidResult = Get-CurrentWifiSsidWithRetry
 $ssid = $ssidResult.Ssid
 $ssidMethod = $ssidResult.Method
+# Frozen mid-wait resume: recompute gap and re-probe SSID before presence decisions.
+if ($networkWaitOverrun) {
+    if ($isResumeRun -and $suspendAtTime) {
+        $resumeGapMin = [Math]::Round(((Get-Date) - $suspendAtTime).TotalMinutes, 1)
+        Write-Log "RESUME gap recomputed after wait overrun: ${resumeGapMin}m"
+    }
+    $ssidResult = Get-CurrentWifiSsidWithRetry
+    $ssid = $ssidResult.Ssid
+    $ssidMethod = $ssidResult.Method
+    Write-Log "SSID re-probed after wait overrun method=$ssidMethod hasSsid=$([bool]$ssid)"
+}
 $vpnGateway = Get-VpnGatewayDiagnostic
 
 $presence = Get-PresenceState
@@ -1766,6 +1810,33 @@ if ($isResumeRun -and $suspendAtTime) {
 }
 
 $isOfficeNow = Test-IsOfficeSsid -Ssid $ssid -ServerConfig $serverConfig
+$longGapResume = $isResumeRun -and ($null -ne $resumeGapMin) -and ($resumeGapMin -ge $LongGapResumeMinutes)
+if ($longGapResume) {
+    $freshNetshOffice = Test-FreshNetshOfficeSsid -Ssid $ssid -SsidMethod $ssidMethod -ServerConfig $serverConfig
+    if (-not $freshNetshOffice) {
+        $isOfficeNow = $false
+        $openAfterCheckout = Get-OpenVisitFromState $syncState
+        if ($openAfterCheckout) {
+            $endIso = if ($suspendAtTime) {
+                $suspendAtTime.ToUniversalTime().ToString("o")
+            } else {
+                Get-NowIso
+            }
+            try {
+                $visitStartUtc = [DateTime]::Parse([string]$openAfterCheckout.startAt).ToUniversalTime()
+                $endUtc = [DateTime]::Parse($endIso).ToUniversalTime()
+                if ($endUtc -ge $visitStartUtc) {
+                    $syncState = End-LocalVisit -SyncState $syncState -EndAt $endIso -PreviousSsid $previousSsid
+                } else {
+                    $syncState.openVisit = $null
+                }
+            } catch {
+                $syncState.openVisit = $null
+            }
+        }
+        Write-Log "SKIP RESUME visit_start: no fresh netsh office SSID (method=$ssidMethod)"
+    }
+}
 $hasOpenVisit = [bool](Get-OpenVisitFromState $syncState)
 Write-Log "presence method=$ssidMethod isOffice=$isOfficeNow hasSsid=$([bool]$ssid) openVisit=$hasOpenVisit ssidChanged=pending"
 if ($isOfficeNow -and -not $hasOpenVisit) {
@@ -1777,8 +1848,10 @@ if ($isOfficeNow -and -not $hasOpenVisit) {
         -ServerConfig $serverConfig -DayKey $dayKey -TimezoneId $timezone
     if ($dayRolledOver) {
         Write-Log "NEW_DAY visit_start on office Wi-Fi"
-    } else {
+    } elseif ($isResumeRun) {
         Write-Log "RESUME visit_start on office Wi-Fi after sleep checkout"
+    } else {
+        Write-Log "visit_start on office Wi-Fi"
     }
 }
 
@@ -1841,7 +1914,7 @@ if ($isOfficeNow -or (Get-OpenVisitFromState $syncState)) {
         -DayKey $dayKey -TimezoneId $timezone -Ssid $recoverSsid
 }
 
-if (Test-IsOfficeSsid -Ssid $ssid -ServerConfig $serverConfig) {
+if ($isOfficeNow) {
     $syncState = Maybe-EnqueueHoursTargetMet -SyncState $syncState -DayKey $dayKey `
         -ServerConfig $serverConfig
 }

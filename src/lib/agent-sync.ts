@@ -29,6 +29,23 @@ import { sanitizeSyncTrigger } from "./presence-timeline";
 import { randomUUID } from "crypto";
 
 const SUMMARY_MISMATCH_MS = 5 * 60 * 1000;
+/** Long sleep/resume: ignore openVisit / backdates before session_resume.at. */
+const LONG_GAP_RESUME_MINUTES = 30;
+
+/** Latest large-gap session_resume.at in the batch, if any. */
+export function largeGapResumeFloorAt(events: AgentSyncEvent[]): Date | null {
+  let latest: Date | null = null;
+  for (const event of events) {
+    if (event.type !== "session_resume") continue;
+    if (typeof event.gapMinutes !== "number" || event.gapMinutes < LONG_GAP_RESUME_MINUTES) {
+      continue;
+    }
+    const at = event.at ? parseAgentEventTimestamp(event.at) : null;
+    if (!at) continue;
+    if (!latest || at.getTime() > latest.getTime()) latest = at;
+  }
+  return latest;
+}
 
 /** Process checkout and Wi-Fi transitions before daily summary / resume maintenance. */
 const AGENT_SYNC_EVENT_PRIORITY: Record<string, number> = {
@@ -133,6 +150,7 @@ export async function processAgentSync(params: {
   }> = [];
 
   const sortedEvents = sortAgentSyncEventsForProcessing(params.events);
+  const resumeFloorAt = largeGapResumeFloorAt(params.events);
 
   for (const event of sortedEvents) {
     if (!event.id || !event.type) {
@@ -213,6 +231,11 @@ export async function processAgentSync(params: {
           const existingVisit = await prisma.visit.findFirst({
             where: { userId: params.userId, localVisitId },
           });
+          // Large-gap resume: never pin first check-in before the wake timestamp.
+          const effectiveStartAt =
+            resumeFloorAt && eventAt.getTime() < resumeFloorAt.getTime()
+              ? resumeFloorAt
+              : eventAt;
           if (existingVisit) {
             visitIds[localVisitId] = existingVisit.id;
             const { start: eventDayStart } = dayBoundsFromKey(dayKey, params.userTimezone);
@@ -221,14 +244,14 @@ export async function processAgentSync(params: {
               shouldBackdateWifiVisit({
                 source: existingVisit.source,
                 currentStartAt: existingVisit.startAt,
-                recoveredStartAt: eventAt,
+                recoveredStartAt: effectiveStartAt,
                 endAt: existingVisit.endAt,
                 dayStart: eventDayStart,
               })
             ) {
               await prisma.visit.update({
                 where: { id: existingVisit.id },
-                data: { startAt: eventAt, ...(ssid ? { ssid } : {}) },
+                data: { startAt: effectiveStartAt, ...(ssid ? { ssid } : {}) },
               });
             }
             ackedEventIds.push(event.id);
@@ -240,17 +263,17 @@ export async function processAgentSync(params: {
             where: { userId: params.userId, endAt: null, deviceId: params.deviceId },
             orderBy: { startAt: "desc" },
           });
-          if (openOther && eventAt.getTime() >= openOther.startAt.getTime()) {
+          if (openOther && effectiveStartAt.getTime() >= openOther.startAt.getTime()) {
             await prisma.visit.update({
               where: { id: openOther.id },
-              data: { endAt: eventAt },
+              data: { endAt: effectiveStartAt },
             });
           }
 
           const visit = await prisma.visit.create({
             data: {
               userId: params.userId,
-              startAt: eventAt,
+              startAt: effectiveStartAt,
               source: "wifi",
               ssid,
               localVisitId,
@@ -258,9 +281,9 @@ export async function processAgentSync(params: {
             },
           });
           visitIds[localVisitId] = visit.id;
-          lastEventAt = eventAt;
+          lastEventAt = effectiveStartAt;
           lastInOffice = true;
-          noteOffice(eventAt, true);
+          noteOffice(effectiveStartAt, true);
           await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
           ackedEventIds.push(event.id);
           break;
@@ -548,6 +571,7 @@ export async function processAgentSync(params: {
     openVisit: params.openVisit ?? null,
     allowlist,
     timezone: params.userTimezone,
+    minStartAt: resumeFloorAt,
   });
   // Reconcile must not leave a yesterday openVisit that inflates hours_met.
   await closeEndOfDayOpenVisits(params.userId, params.userTimezone);
@@ -844,6 +868,8 @@ async function reconcileAgentOpenVisit(params: {
   openVisit: AgentSyncOpenVisit | null;
   allowlist: string[];
   timezone: string;
+  /** When set (large-gap resume), ignore openVisit starts before this instant. */
+  minStartAt?: Date | null;
 }) {
   if (!params.openVisit) return;
 
@@ -852,6 +878,8 @@ async function reconcileAgentOpenVisit(params: {
   const { start: dayStart } = getDayBounds(new Date(), params.timezone);
   // Stale overnight openVisit must not recreate or backdate today's visit.
   if (startAt.getTime() < dayStart.getTime()) return;
+  // Long-gap resume: do not pin first check-in to a frozen pre-wake openVisit.
+  if (params.minStartAt && startAt.getTime() < params.minStartAt.getTime()) return;
 
   const ssid = params.openVisit.ssid
     ? normalizeSsid(sanitizeSsid(params.openVisit.ssid) ?? params.openVisit.ssid)

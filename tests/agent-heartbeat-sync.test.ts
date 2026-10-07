@@ -197,6 +197,16 @@ describe("office-heartbeat wake and sync behavior", () => {
     );
   });
 
+  it("long-gap resume requires fresh netsh office SSID and aborts wait overrun", () => {
+    expect(heartbeat).toContain("$LongGapResumeMinutes = 30");
+    expect(heartbeat).toContain("function Test-FreshNetshOfficeSsid");
+    expect(heartbeat).toContain("SKIP RESUME visit_start: no fresh netsh office SSID");
+    expect(heartbeat).toContain("WARN network wait overrun after sleep; aborting wait");
+    expect(heartbeat).toContain("RESUME gap recomputed after wait overrun");
+    expect(heartbeat).toContain("SSID re-probed after wait overrun");
+    expect(heartbeat).toContain("Overrun = $true");
+  });
+
   it("recovers visit_start from contiguous local office ticks", () => {
     expect(heartbeat).toContain("function Get-EarliestContiguousOfficeTickAt");
     expect(heartbeat).toContain("function Maybe-RecoverOpenVisitStart");
