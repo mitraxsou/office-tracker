@@ -17,7 +17,15 @@ $HealthSyncIntervalMinutes = 60
 $OfficeVisitGapMinutes = 15
 # After this many minutes asleep, only trust netsh for a new office visit.
 $LongGapResumeMinutes = 30
-$AgentScriptVersion = "1.5.22"
+$AgentScriptVersion = "1.5.23"
+# Observe-only facts for last-run-summary.txt (never alters presence logic).
+$script:RunDiagFacts = @{
+    VisitAction = "none"
+    SyncOutcome = "not yet"
+    NetworkNote = ""
+    LongGapBlocked = $false
+    DayRolledOver = $false
+}
 $CriticalEventTypes = @(
     "wifi_connected",
     "wifi_disconnected",
@@ -42,12 +50,149 @@ if (-not $agentMutex.WaitOne(0)) {
     exit 0
 }
 
-function Write-Log([string]$Message) {
+function Get-LogsDir {
     $logDir = Join-Path (Get-InstallDir) "logs"
-    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
-    $logFile = Join-Path $logDir "heartbeat.log"
-    $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message"
-    Add-Content -Path $logFile -Value $line -ErrorAction SilentlyContinue
+    if (-not (Test-Path $logDir)) {
+        try { New-Item -ItemType Directory -Path $logDir -Force | Out-Null } catch {}
+    }
+    return $logDir
+}
+
+function Write-Log([string]$Message) {
+    try {
+        $logFile = Join-Path (Get-LogsDir) "heartbeat.log"
+        $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message"
+        Add-Content -Path $logFile -Value $line -ErrorAction SilentlyContinue
+    } catch {}
+}
+
+function Write-Diag {
+    param(
+        [Parameter(Mandatory = $true)][string]$Category,
+        [Parameter(Mandatory = $true)][string]$Message
+    )
+    Write-Log "[DIAG/$Category] $Message"
+}
+
+function Get-LastRunSummaryPath {
+    Join-Path (Get-LogsDir) "last-run-summary.txt"
+}
+
+function Get-SsidMethodPlainLabel([string]$Method) {
+    switch ($Method) {
+        "netsh" { return "live wireless connection (netsh)" }
+        "NetConnectionProfile" { return "Windows Wi-Fi profile (can be stale after sleep)" }
+        "NetConnectionProfileAny" { return "Windows network profile (can be stale after sleep)" }
+        "WMI" { return "WMI wireless lookup" }
+        default { return "not detected" }
+    }
+}
+
+function Write-LastRunSummary {
+    param(
+        [string]$Version,
+        [bool]$IsResume,
+        $ResumeGapMin,
+        [bool]$LongGap,
+        [bool]$LongGapBlocked,
+        [bool]$NetworkOverrun,
+        [string]$NetworkNote,
+        [string]$Ssid,
+        [string]$SsidMethod,
+        [bool]$IsOffice,
+        [string]$VisitAction,
+        $OpenVisit,
+        [string]$SyncOutcome,
+        [bool]$DayRolledOver
+    )
+    try {
+        $when = Get-Date -Format "d MMM yyyy, h:mm:ss tt"
+        $ssidLabel = if ($Ssid) { $Ssid } else { "(none)" }
+        $methodPlain = Get-SsidMethodPlainLabel $SsidMethod
+        $lines = New-Object System.Collections.Generic.List[string]
+        [void]$lines.Add("PwC Office Pulse — last agent check")
+        [void]$lines.Add("When: $when")
+        [void]$lines.Add("Agent version: $Version")
+        [void]$lines.Add("")
+        [void]$lines.Add("What happened")
+        if ($IsResume) {
+            $gapText = if ($null -ne $ResumeGapMin) { "about $([Math]::Round([double]$ResumeGapMin / 60.0, 1)) hours ($ResumeGapMin min)" } else { "unknown gap" }
+            $gateText = if ($LongGap) { "long-sleep safety rule ON" } else { "short wake" }
+            [void]$lines.Add("- Laptop woke after a sleep/gap ($gapText; $gateText).")
+        } else {
+            [void]$lines.Add("- Normal scheduled check (not a long wake from sleep).")
+        }
+        if ($NetworkOverrun) {
+            [void]$lines.Add("- Network wait froze across sleep; Wi-Fi was checked again afterward.")
+        } elseif ($NetworkNote) {
+            [void]$lines.Add("- Network: $NetworkNote")
+        }
+        if ($DayRolledOver) {
+            [void]$lines.Add("- Calendar day changed; leftover office visit from yesterday was closed.")
+        }
+        if ($IsOffice) {
+            [void]$lines.Add("- Wi-Fi looks like office: $ssidLabel via $methodPlain.")
+        } else {
+            [void]$lines.Add("- Not treated as office Wi-Fi: $ssidLabel via $methodPlain.")
+        }
+        if ($LongGapBlocked) {
+            [void]$lines.Add("- Office time was NOT started (safety rule after long sleep needs a live wireless office SSID).")
+        } elseif ($VisitAction -eq "started") {
+            [void]$lines.Add("- Office time STARTED on this check.")
+        } elseif ($VisitAction -eq "ended") {
+            [void]$lines.Add("- Office visit was closed on this check.")
+        } else {
+            [void]$lines.Add("- Office time was not started on this check.")
+        }
+        if ($OpenVisit) {
+            $ovStart = [string]$OpenVisit.startAt
+            [void]$lines.Add("- Open office visit on this laptop: yes (started $ovStart).")
+        } else {
+            [void]$lines.Add("- Open office visit on this laptop: none.")
+        }
+        [void]$lines.Add("- Sync to My Office Pulse: $SyncOutcome")
+        [void]$lines.Add("")
+        [void]$lines.Add("If hours look wrong on the website, send this file to your admin or open heartbeat.log and search for [DIAG/.")
+        $text = ($lines -join "`r`n") + "`r`n"
+        Set-Content -Path (Get-LastRunSummaryPath) -Value $text -Encoding UTF8 -ErrorAction SilentlyContinue
+    } catch {}
+}
+
+function Write-RunDiagSummary {
+    param(
+        [string]$Version,
+        [bool]$IsResume,
+        $ResumeGapMin,
+        [bool]$LongGap,
+        [string]$Ssid,
+        [string]$SsidMethod,
+        [bool]$IsOffice,
+        $OpenVisit,
+        [bool]$NetworkOverrun
+    )
+    try {
+        Write-Log ""
+        Write-Diag -Category "SUMMARY" -Message "===== RUN SUMMARY ====="
+        Write-Diag -Category "SUMMARY" -Message "version=$Version resume=$IsResume gapMin=$ResumeGapMin longGap=$LongGap"
+        Write-Diag -Category "SUMMARY" -Message "ssid=$(if ($Ssid) { $Ssid } else { '(none)' }) method=$SsidMethod office=$IsOffice networkOverrun=$NetworkOverrun"
+        $ov = if ($OpenVisit) { "yes startAt=$($OpenVisit.startAt)" } else { "none" }
+        Write-Diag -Category "SUMMARY" -Message "openVisit=$ov visitAction=$($script:RunDiagFacts.VisitAction) sync=$($script:RunDiagFacts.SyncOutcome)"
+        Write-LastRunSummary `
+            -Version $Version `
+            -IsResume $IsResume `
+            -ResumeGapMin $ResumeGapMin `
+            -LongGap $LongGap `
+            -LongGapBlocked ([bool]$script:RunDiagFacts.LongGapBlocked) `
+            -NetworkOverrun $NetworkOverrun `
+            -NetworkNote ([string]$script:RunDiagFacts.NetworkNote) `
+            -Ssid $Ssid `
+            -SsidMethod $SsidMethod `
+            -IsOffice $IsOffice `
+            -VisitAction ([string]$script:RunDiagFacts.VisitAction) `
+            -OpenVisit $OpenVisit `
+            -SyncOutcome ([string]$script:RunDiagFacts.SyncOutcome) `
+            -DayRolledOver ([bool]$script:RunDiagFacts.DayRolledOver)
+    } catch {}
 }
 
 function Get-StateDir {
@@ -306,10 +451,12 @@ function Wait-NetworkReady {
         $elapsed = ((Get-Date) - $started).TotalSeconds
         if ($elapsed -gt $overrunLimitSec) {
             Write-Log "WARN network wait overrun after sleep; aborting wait"
+            Write-Diag -Category "NETWORK" -Message "wait overrun after sleep (elapsedSec=$([int]$elapsed) maxWaitSec=$MaxWaitSec)"
             return @{ Ready = $false; Overrun = $true }
         }
         try {
             [void][System.Net.Dns]::GetHostEntry($hostName)
+            Write-Diag -Category "NETWORK" -Message "ready (dns ok for $hostName)"
             return @{ Ready = $true; Overrun = $false }
         } catch {}
         Start-Sleep -Seconds 3
@@ -317,9 +464,11 @@ function Wait-NetworkReady {
     $elapsed = ((Get-Date) - $started).TotalSeconds
     if ($elapsed -gt $overrunLimitSec) {
         Write-Log "WARN network wait overrun after sleep; aborting wait"
+        Write-Diag -Category "NETWORK" -Message "wait overrun after sleep (elapsedSec=$([int]$elapsed) maxWaitSec=$MaxWaitSec)"
         return @{ Ready = $false; Overrun = $true }
     }
     Write-Log "WARN network not ready after ${MaxWaitSec}s; continuing anyway"
+    Write-Diag -Category "NETWORK" -Message "not ready after ${MaxWaitSec}s; continuing anyway"
     return @{ Ready = $false; Overrun = $false }
 }
 
@@ -841,6 +990,8 @@ function Invoke-ResumeOfficeSleepCheckout {
         gapMinutes = $ResumeGapMin
     } -At $suspendAtIso
     Write-Log "SLEEP checkout office ssid=$LastKnownSsid at $suspendAtIso (gap ${ResumeGapMin}m)"
+    Write-Diag -Category "VISIT" -Message "sleep checkout closed office visit ssid=$LastKnownSsid at=$suspendAtIso gapMin=$ResumeGapMin"
+    $script:RunDiagFacts.VisitAction = "ended"
     return @{ syncState = $SyncState; handled = $true; suspendAtIso = $suspendAtIso }
 }
 
@@ -1113,6 +1264,9 @@ function Maybe-EnqueueDailySummary {
                 $SyncState.openVisit = $null
             }
             Write-Log "NEW_DAY closed leftover openVisit from $previousDayKey"
+            Write-Diag -Category "DAY" -Message "closed leftover openVisit from previous dayKey=$previousDayKey"
+            $script:RunDiagFacts.VisitAction = "ended"
+            $script:RunDiagFacts.DayRolledOver = $true
         }
         if ($SyncState.lastDailySummaryDayKey -ne $previousDayKey) {
             $endAt = Get-UptimeSessionEndTime -SyncState $SyncState
@@ -1717,6 +1871,10 @@ if ($isResumeRun) {
     if ($last) { $suspendAtTime = $last }
     $resumeGapMin = [Math]::Round(((Get-Date) - $last).TotalMinutes, 1)
     Write-Log "RESUME detected (gap ${resumeGapMin}m since last run)"
+    $suspendLocal = if ($suspendAtTime) { $suspendAtTime.ToString("yyyy-MM-dd HH:mm:ss") } else { "(unknown)" }
+    $suspendUtc = if ($suspendAtTime) { $suspendAtTime.ToUniversalTime().ToString("o") } else { "(unknown)" }
+    $longGapPreview = ($resumeGapMin -ge $LongGapResumeMinutes)
+    Write-Diag -Category "RESUME" -Message "gapMin=$resumeGapMin suspendLocal=$suspendLocal suspendUtc=$suspendUtc longGap=$longGapPreview"
 }
 Set-LastRunTime
 
@@ -1732,10 +1890,18 @@ if (-not $serialNumber -and $localConfig.serialNumber) {
 $networkWaitSec = if ($isResumeRun) { 90 } else { 60 }
 $networkWait = Wait-NetworkReady -ApiUrl $apiUrl -MaxWaitSec $networkWaitSec
 $networkWaitOverrun = $false
+$networkReady = $false
 if ($networkWait -is [hashtable]) {
     $networkWaitOverrun = [bool]$networkWait.Overrun
+    $networkReady = [bool]$networkWait.Ready
 } elseif ($networkWait -eq $true) {
     $networkWaitOverrun = $false
+    $networkReady = $true
+}
+if ($networkWaitOverrun) {
+    $script:RunDiagFacts.NetworkNote = "wait froze across sleep; Wi-Fi re-checked"
+} elseif (-not $networkReady) {
+    $script:RunDiagFacts.NetworkNote = "DNS not ready within ${networkWaitSec}s; continued anyway"
 }
 
 $cachedServerConfig = $null
@@ -1785,11 +1951,13 @@ if ($networkWaitOverrun) {
     if ($isResumeRun -and $suspendAtTime) {
         $resumeGapMin = [Math]::Round(((Get-Date) - $suspendAtTime).TotalMinutes, 1)
         Write-Log "RESUME gap recomputed after wait overrun: ${resumeGapMin}m"
+        Write-Diag -Category "RESUME" -Message "gap recomputed after wait overrun gapMin=$resumeGapMin"
     }
     $ssidResult = Get-CurrentWifiSsidWithRetry
     $ssid = $ssidResult.Ssid
     $ssidMethod = $ssidResult.Method
     Write-Log "SSID re-probed after wait overrun method=$ssidMethod hasSsid=$([bool]$ssid)"
+    Write-Diag -Category "SSID" -Message "re-probed after wait overrun ssid=$(if ($ssid) { $ssid } else { '(none)' }) method=$ssidMethod"
 }
 $vpnGateway = Get-VpnGatewayDiagnostic
 
@@ -1799,6 +1967,7 @@ $syncState = Get-SyncState
 $previousDayKey = if ($syncState.dayKey) { [string]$syncState.dayKey } else { $null }
 $syncState = Maybe-EnqueueDailySummary -SyncState $syncState -DayKey $dayKey -TimezoneId $timezone
 $dayRolledOver = $previousDayKey -and $previousDayKey -ne $dayKey
+if ($dayRolledOver) { $script:RunDiagFacts.DayRolledOver = $true }
 
 # Sleep checkout must run before starting a new visit. Otherwise day-rollover /
 # resume can open a visit at "now" and then close it with an older suspendAt
@@ -1811,10 +1980,12 @@ if ($isResumeRun -and $suspendAtTime) {
 
 $isOfficeNow = Test-IsOfficeSsid -Ssid $ssid -ServerConfig $serverConfig
 $longGapResume = $isResumeRun -and ($null -ne $resumeGapMin) -and ($resumeGapMin -ge $LongGapResumeMinutes)
+Write-Diag -Category "SSID" -Message "ssid=$(if ($ssid) { $ssid } else { '(none)' }) method=$ssidMethod allowlistedOffice=$isOfficeNow previousSsid=$(if ($previousSsid) { $previousSsid } else { '(none)' })"
 if ($longGapResume) {
     $freshNetshOffice = Test-FreshNetshOfficeSsid -Ssid $ssid -SsidMethod $ssidMethod -ServerConfig $serverConfig
     if (-not $freshNetshOffice) {
         $isOfficeNow = $false
+        $script:RunDiagFacts.LongGapBlocked = $true
         $openAfterCheckout = Get-OpenVisitFromState $syncState
         if ($openAfterCheckout) {
             $endIso = if ($suspendAtTime) {
@@ -1827,6 +1998,7 @@ if ($longGapResume) {
                 $endUtc = [DateTime]::Parse($endIso).ToUniversalTime()
                 if ($endUtc -ge $visitStartUtc) {
                     $syncState = End-LocalVisit -SyncState $syncState -EndAt $endIso -PreviousSsid $previousSsid
+                    $script:RunDiagFacts.VisitAction = "ended"
                 } else {
                     $syncState.openVisit = $null
                 }
@@ -1835,6 +2007,7 @@ if ($longGapResume) {
             }
         }
         Write-Log "SKIP RESUME visit_start: no fresh netsh office SSID (method=$ssidMethod)"
+        Write-Diag -Category "VISIT" -Message "SKIP start after long gap: need live wireless (netsh) office SSID; method=$ssidMethod"
     }
 }
 $hasOpenVisit = [bool](Get-OpenVisitFromState $syncState)
@@ -1846,12 +2019,16 @@ if ($isOfficeNow -and -not $hasOpenVisit) {
     }
     $syncState = Start-LocalVisit -SyncState $syncState -Ssid $ssid -HoursTarget $hoursTarget `
         -ServerConfig $serverConfig -DayKey $dayKey -TimezoneId $timezone
+    $script:RunDiagFacts.VisitAction = "started"
     if ($dayRolledOver) {
         Write-Log "NEW_DAY visit_start on office Wi-Fi"
+        Write-Diag -Category "VISIT" -Message "started new office visit (new calendar day) ssid=$ssid"
     } elseif ($isResumeRun) {
         Write-Log "RESUME visit_start on office Wi-Fi after sleep checkout"
+        Write-Diag -Category "VISIT" -Message "started new office visit after resume ssid=$ssid method=$ssidMethod"
     } else {
         Write-Log "visit_start on office Wi-Fi"
+        Write-Diag -Category "VISIT" -Message "started new office visit ssid=$ssid method=$ssidMethod"
     }
 }
 
@@ -1939,6 +2116,10 @@ if ($DryRun) {
     Write-Host ""
     Write-Host "Queued events: $(Get-EventQueue | ConvertTo-Json -Compress)"
     Write-Host "Open visit:    $(if ($syncState.openVisit) { ($syncState.openVisit | ConvertTo-Json -Compress) } else { '(none)' })"
+    $script:RunDiagFacts.SyncOutcome = "dry-run (no sync)"
+    Write-RunDiagSummary -Version $scriptVersion -IsResume $isResumeRun -ResumeGapMin $resumeGapMin `
+        -LongGap $longGapResume -Ssid $ssid -SsidMethod $ssidMethod -IsOffice $isOfficeNow `
+        -OpenVisit (Get-OpenVisitFromState $syncState) -NetworkOverrun $networkWaitOverrun
     exit 0
 }
 
@@ -1953,12 +2134,14 @@ $criticalSyncDue = Test-HasCriticalQueuedEvents
 # that caused a server sync every ~2 minutes labeled end_of_day.
 $endOfDaySyncDue = $dayRolledOver -or (Test-HasDailySummaryQueued)
 $shouldSync = $criticalSyncDue -or $healthSyncDue -or $endOfDaySyncDue
+$queuedCount = @((Get-EventQueue)).Count
 if ($shouldSync) {
     $hoursTargetMetQueued = @((Get-EventQueue) | Where-Object { $_.type -eq "hours_target_met" }).Count -gt 0
     $syncTrigger = Get-SyncTrigger -IsResumeRun $isResumeRun -SsidChanged $ssidChanged `
         -HoursTargetMetQueued $hoursTargetMetQueued -EndOfDayDue $endOfDaySyncDue `
         -HealthDue $healthSyncDue -CriticalDue $criticalSyncDue `
-        -QueuedEventCount (@(Get-EventQueue).Count)
+        -QueuedEventCount $queuedCount
+    Write-Diag -Category "SYNC" -Message "attempting trigger=$syncTrigger queued=$queuedCount critical=$criticalSyncDue health=$healthSyncDue eod=$endOfDaySyncDue"
     $flush = Invoke-FlushSync -ApiUrl $apiUrl -Token $token -SerialNumber $serialNumber `
         -ScriptVersion $scriptVersion -SyncState $syncState `
         -AllowHealthPing:($healthSyncDue -and -not $ssidChanged) `
@@ -1967,11 +2150,26 @@ if ($shouldSync) {
         -CriticalDue:$criticalSyncDue -HealthDue:$healthSyncDue -EndOfDayDue:$endOfDaySyncDue
     $syncState = $flush.syncState
     if (-not $flush.synced) {
-        if ($flush.error) { Write-Log "ERROR sync failed: $($flush.error)"; exit 1 }
+        if ($flush.error) {
+            Write-Log "ERROR sync failed: $($flush.error)"
+            $script:RunDiagFacts.SyncOutcome = "failed (see heartbeat.log; no secrets logged here)"
+            Write-Diag -Category "SYNC" -Message "failed trigger=$syncTrigger"
+            Write-RunDiagSummary -Version $scriptVersion -IsResume $isResumeRun -ResumeGapMin $resumeGapMin `
+                -LongGap $longGapResume -Ssid $ssid -SsidMethod $ssidMethod -IsOffice $isOfficeNow `
+                -OpenVisit (Get-OpenVisitFromState $syncState) -NetworkOverrun $networkWaitOverrun
+            exit 1
+        }
+        $script:RunDiagFacts.SyncOutcome = "not synced"
     } else {
+        $script:RunDiagFacts.SyncOutcome = "ok ($syncTrigger)"
+        Write-Diag -Category "SYNC" -Message "ok trigger=$syncTrigger"
         if ($flush.selfUpdated) {
             Set-SyncState $syncState
             Write-Log "EXIT after sync self-update; next run uses refreshed scripts"
+            Write-Diag -Category "SYNC" -Message "exiting after self-update"
+            Write-RunDiagSummary -Version $scriptVersion -IsResume $isResumeRun -ResumeGapMin $resumeGapMin `
+                -LongGap $longGapResume -Ssid $ssid -SsidMethod $ssidMethod -IsOffice $isOfficeNow `
+                -OpenVisit (Get-OpenVisitFromState $syncState) -NetworkOverrun $networkWaitOverrun
             exit 0
         }
         if ($ssidChanged) {
@@ -1982,7 +2180,12 @@ if ($shouldSync) {
     }
 } else {
     Write-Log "BATCH local pulse queued; health sync not due"
+    $script:RunDiagFacts.SyncOutcome = "skipped (local pulse only; health sync not due)"
+    Write-Diag -Category "SYNC" -Message "skipped local-only queued=$queuedCount"
 }
 
 Set-SyncState $syncState
+Write-RunDiagSummary -Version $scriptVersion -IsResume $isResumeRun -ResumeGapMin $resumeGapMin `
+    -LongGap $longGapResume -Ssid $ssid -SsidMethod $ssidMethod -IsOffice $isOfficeNow `
+    -OpenVisit (Get-OpenVisitFromState $syncState) -NetworkOverrun $networkWaitOverrun
 exit 0

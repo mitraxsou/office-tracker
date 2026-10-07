@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.29";
+export const APP_VERSION = "1.5.30";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,18 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-07",
+    userBullets: [
+      "Agent 1.5.23 writes a plain-English last-run-summary.txt on your laptop so you can see wake, Wi-Fi, and whether office time started.",
+      "Settings → Agent shows where to open that file; heartbeat.log also has [DIAG/…] lines for resume, SSID, and visits.",
+    ],
+    adminBullets: [
+      "Diagnostic logging is observe-only and does not change visit or hours logic.",
+      "Ask users for logs\\last-run-summary.txt first when investigating false check-ins after sleep.",
+    ],
+  },
+  {
+    version: "1.5.29",
     date: "2026-10-07",
     userBullets: [
       "After a long sleep, the agent only starts a new office visit when netsh shows a real office Wi-Fi SSID, so a false early-morning check-in cannot invent 15h of office time.",

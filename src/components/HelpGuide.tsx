@@ -377,7 +377,18 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
               <p className="font-medium">Open the agent folder on disk</p>
               <p className="mt-1 text-muted">
                 Press Win+R, paste <code>%LOCALAPPDATA%\OfficeTracker</code>, Enter. Useful files:{" "}
-                <code>office-heartbeat.ps1</code>, <code>run-heartbeat.vbs</code>, <code>logs\heartbeat.log</code>.
+                <code>office-heartbeat.ps1</code>, <code>run-heartbeat.vbs</code>,{" "}
+                <code>logs\last-run-summary.txt</code> (plain English, start here),{" "}
+                <code>logs\heartbeat.log</code> (search <code>[DIAG/</code> for resume, Wi-Fi, and visit
+                decisions). Needs agent 1.5.23+.
+              </p>
+            </div>
+            <div>
+              <p className="font-medium">Hours look wrong after sleep or wake</p>
+              <p className="mt-1 text-muted">
+                Open <code>logs\last-run-summary.txt</code> on the laptop. It says whether the agent woke
+                from a long sleep, whether office Wi-Fi was confirmed from the live wireless connection,
+                and whether office time was started or skipped. Share that file with your admin if needed.
               </p>
             </div>
             <div>

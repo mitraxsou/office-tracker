@@ -398,6 +398,20 @@ export function AgentStatusPanel({
 
 
 
+      <div className="mt-5 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-3 text-sm">
+        <p className="font-medium">Check my laptop log</p>
+        <p className="mt-1 text-muted">
+          On this laptop, open{" "}
+          <code>%LOCALAPPDATA%\OfficeTracker\logs\last-run-summary.txt</code> first (plain
+          English). For detail, open <code>heartbeat.log</code> in the same folder and search for{" "}
+          <code>[DIAG/RESUME]</code>, <code>[DIAG/SSID]</code>, or <code>[DIAG/VISIT]</code>.
+        </p>
+        <p className="mt-2 text-xs text-muted">
+          Requires agent 1.5.23 or newer. Press Win+R, paste the path, Enter. Update the agent from
+          Settings if those files are missing.
+        </p>
+      </div>
+
       <button
 
         type="button"

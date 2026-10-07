@@ -207,6 +207,20 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain("Overrun = $true");
   });
 
+  it("writes readable DIAG lines and last-run-summary for normal users", () => {
+    expect(heartbeat).toContain("function Write-Diag");
+    expect(heartbeat).toContain("function Write-LastRunSummary");
+    expect(heartbeat).toContain("function Write-RunDiagSummary");
+    expect(heartbeat).toContain("last-run-summary.txt");
+    expect(heartbeat).toContain("[DIAG/");
+    expect(heartbeat).toContain("===== RUN SUMMARY =====");
+    expect(heartbeat).toContain("PwC Office Pulse — last agent check");
+    expect(heartbeat).toContain('Write-Diag -Category "RESUME"');
+    expect(heartbeat).toContain('Write-Diag -Category "SSID"');
+    expect(heartbeat).toContain('Write-Diag -Category "VISIT"');
+    expect(heartbeat).toContain('Write-Diag -Category "SYNC"');
+  });
+
   it("recovers visit_start from contiguous local office ticks", () => {
     expect(heartbeat).toContain("function Get-EarliestContiguousOfficeTickAt");
     expect(heartbeat).toContain("function Maybe-RecoverOpenVisitStart");
