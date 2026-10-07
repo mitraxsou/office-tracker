@@ -68,6 +68,8 @@ Normalize before send: strip ` (Unauthenticated)`, band suffixes (` 2`, ` 5`), a
 
 **Setup Int32 / corrupt `version.txt`:** If update fails with `Cannot convert value "000…" to type System.Int32`, dump and remove `%LOCALAPPDATA%\OfficeTracker\version.txt`, then re-paste the update command — see `docs/agent-setup-recovery.md`. Agent **1.5.2+** hardens version compare, removes script-level `param()` from `setup.ps1`, and uses `Invoke-AgentScriptBypass` so `$ApiUrl` / `$Token` are not nulled on fresh install.
 
+**Auto-update hard gate (BUG-017):** The scheduled task runs `office-heartbeat.txt` via `Invoke-Expression`, not `-File .ps1`. Any `agent/` change that breaks `.txt` parse stops sync and further soft updates for the fleet. Follow the **agent-auto-update** skill: ASCII-only punctuation in agent scripts, `Publish-AgentScriptTxt` UTF-8 read/write, bump `agent/version.txt` with `$AgentScriptVersion`, run `tests/bugs/BUG-017-agent-iex-txt-must-parse.test.ts` before push.
+
 ## Roles
 
 ### User (`role=user`)
@@ -129,6 +131,7 @@ Before calling work done:
 5. No PowerShell window flash (VBS task verified)
 6. User vs admin permissions unchanged unless requested
 7. Copy/install commands use `NEXT_PUBLIC_APP_URL`
+8. **If `agent/` changed:** pass BUG-017 + confirm a laptop writes a fresh `START v…` in `heartbeat.log` after deploy (see **agent-auto-update** skill). Never ship em dashes in agent scripts.
 
 ## Regression catalog
 

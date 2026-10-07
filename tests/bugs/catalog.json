@@ -236,6 +236,24 @@
       "skipReason": null
     },
     {
+      "id": "BUG-017",
+      "title": "Agent soft-update publishes broken office-heartbeat.txt (IEX silent death)",
+      "date": "2026-10",
+      "severity": "critical",
+      "area": "agent-update",
+      "reproSummary": "Agent 1.5.23 added an em dash in Write-LastRunSummary. Publish-AgentScriptTxt read .ps1 with the system ANSI code page, mojibaked office-heartbeat.txt, and Invoke-Expression failed every task run. Wscript still returned 0 so the fleet looked healthy while sync and further auto-updates stopped.",
+      "assertion": "No em/en dashes in agent/*.ps1; Publish-AgentScriptTxt uses UTF-8 Get-Content; published office-heartbeat.txt parses; version.txt matches $AgentScriptVersion; task runner stays on .txt IEX.",
+      "fixture": "fixtures/publish-agent-txt-roundtrip.ps1",
+      "testFile": "tests/bugs/BUG-017-agent-iex-txt-must-parse.test.ts",
+      "relatedTests": [
+        "tests/agent-ps51-compat.test.ts",
+        "tests/agent-version.test.ts",
+        "tests/agent-heartbeat-sync.test.ts"
+      ],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
       "id": "CORE-001",
       "title": "Heartbeat in-office uses SSID allowlist",
       "date": "2026-01",

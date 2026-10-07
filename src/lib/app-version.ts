@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.31";
+export const APP_VERSION = "1.5.32";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,18 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-07",
+    userBullets: [
+      "Agent 1.5.24 fixes a crash after the 1.5.23 update where the scheduled task stopped writing logs (special dash character in the last-run summary).",
+      "If Today looks stuck after 1.5.23, run Copy update command from Settings once, or wait for this auto-update once a healthy laptop can sync.",
+    ],
+    adminBullets: [
+      "Publish-AgentScriptTxt now reads .ps1 as UTF-8 so Unicode cannot corrupt the IEX .txt runner.",
+      "Laptops already stuck on broken 1.5.23 office-heartbeat.txt cannot self-heal until someone runs update/reinstall once; Push update helps only after they can sync again.",
+    ],
+  },
+  {
+    version: "1.5.31",
     date: "2026-10-07",
     userBullets: [
       "Office hours for a day only count when there is a Visit row, so a ghost Met day without visits no longer appears.",

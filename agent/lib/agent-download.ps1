@@ -113,7 +113,9 @@ function Publish-AgentScriptTxt {
     param([string]$Ps1Path)
     Remove-MarkOfWeb -Path $Ps1Path
     $txtPath = [System.IO.Path]::ChangeExtension($Ps1Path, ".txt")
-    $raw = Get-Content -LiteralPath $Ps1Path -Raw
+    # PS 5.1 defaults to the system ANSI code page; UTF-8 .ps1 must be read as UTF-8
+    # or Unicode (e.g. em dash) becomes mojibake and Invoke-Expression fails to parse.
+    $raw = Get-Content -LiteralPath $Ps1Path -Raw -Encoding UTF8
     $body = Remove-AgentScriptParamBlock $raw
     Set-Content -LiteralPath $txtPath -Value $body -Encoding UTF8
     Remove-MarkOfWeb -Path $txtPath

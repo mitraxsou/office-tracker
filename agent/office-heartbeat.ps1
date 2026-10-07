@@ -17,7 +17,7 @@ $HealthSyncIntervalMinutes = 60
 $OfficeVisitGapMinutes = 15
 # After this many minutes asleep, only trust netsh for a new office visit.
 $LongGapResumeMinutes = 30
-$AgentScriptVersion = "1.5.23"
+$AgentScriptVersion = "1.5.24"
 # Observe-only facts for last-run-summary.txt (never alters presence logic).
 $script:RunDiagFacts = @{
     VisitAction = "none"
@@ -110,7 +110,7 @@ function Write-LastRunSummary {
         $ssidLabel = if ($Ssid) { $Ssid } else { "(none)" }
         $methodPlain = Get-SsidMethodPlainLabel $SsidMethod
         $lines = New-Object System.Collections.Generic.List[string]
-        [void]$lines.Add("PwC Office Pulse — last agent check")
+        [void]$lines.Add("PwC Office Pulse - last agent check")
         [void]$lines.Add("When: $when")
         [void]$lines.Add("Agent version: $Version")
         [void]$lines.Add("")
@@ -2130,7 +2130,7 @@ Set-SyncState $syncState
 $healthSyncDue = Test-HealthSyncDue -SyncState $syncState
 $criticalSyncDue = Test-HasCriticalQueuedEvents
 # Activity ticks stay local until true day rollover (or a retry when daily_summary
-# is still queued after a failed flush). Do not treat "ticks in queue" as EOD due —
+# is still queued after a failed flush). Do not treat "ticks in queue" as EOD due -
 # that caused a server sync every ~2 minutes labeled end_of_day.
 $endOfDaySyncDue = $dayRolledOver -or (Test-HasDailySummaryQueued)
 $shouldSync = $criticalSyncDue -or $healthSyncDue -or $endOfDaySyncDue

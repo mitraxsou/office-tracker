@@ -65,4 +65,18 @@ describe("PowerShell 5.1 compatibility patterns", () => {
     expect(setup).not.toContain("function Import-AgentDownloadModule");
     expect(setup).not.toContain("function Import-AgentStorageModule");
   });
+
+  it("Publish-AgentScriptTxt reads UTF-8 so Unicode in .ps1 cannot mojibake .txt", () => {
+    const download = readAgent("lib/agent-download.ps1");
+    expect(download).toContain(
+      "Get-Content -LiteralPath $Ps1Path -Raw -Encoding UTF8",
+    );
+  });
+
+  it("agent scripts avoid em dashes that break IEX .txt runners on PS 5.1", () => {
+    for (const file of agentFiles) {
+      const content = readAgent(file);
+      expect(content, file).not.toMatch(/\u2014|\u2013/);
+    }
+  });
 });
