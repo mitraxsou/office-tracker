@@ -1,0 +1,30 @@
+{
+  "incident": "BUG-018",
+  "policy": "no-fleet-agent-publish-until-soak",
+  "soakOwner": {
+    "displayName": "Soumitra",
+    "email": "soumitra.m.mandal@pwc.com",
+    "installPath": "%LOCALAPPDATA%\\OfficeTracker",
+    "apiHost": "office-tracker-theta.vercel.app"
+  },
+  "forbiddenUntilExplicitRolloutApproval": [
+    "bump agent/version.txt for production/fleet",
+    "publish agent zip to production download API consumers",
+    "commit Publish-AgentScriptTxt outputs that ship via soft update to all laptops",
+    "set forceAgentUpdate for the fleet / mass Push",
+    "merge/deploy agent version bumps that all devices will auto-pull"
+  ],
+  "allowedDefault": [
+    "edit agent/ locally",
+    "copy update on Soumitra laptop only",
+    "verify BUG-017 IEX parse, scheduled task, heartbeat, soft auto-update on that laptop"
+  ],
+  "soakChecklist": [
+    "BUG-017 npm tests green",
+    "scheduled task PwCOfficePulse still runs",
+    "heartbeat.log has fresh START v… within ~3 minutes",
+    "office-heartbeat.txt parses (no mojibake)",
+    "soft auto-update path still works when server version is newer"
+  ],
+  "rollout": "opt-in only after explicit user approval; never automatic"
+}

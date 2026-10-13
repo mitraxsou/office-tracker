@@ -39,6 +39,10 @@ export function selectHeartbeatAlertTypes(input: {
 /**
  * Evaluate heartbeat-driven alerts only when state may have changed.
  * Skips the heavy evaluateUserAlerts path on routine beats.
+ *
+ * Call from agent sync/heartbeat ASAP when office is seen, and from the
+ * dashboard when live/yellow hours already meet the target even if the agent
+ * has not synced recently (once-per-day AlertDispatch still dedupes).
  */
 export async function maybeDispatchHeartbeatAlerts(params: {
   userId: string;
@@ -46,6 +50,8 @@ export async function maybeDispatchHeartbeatAlerts(params: {
   recordedAt: Date;
   inOffice: boolean;
   hoursTarget: number;
+  /** When set (e.g. dashboard liveHours), skip a second getTodaySummary. */
+  metTarget?: boolean;
 }) {
   const { userId, timezone, recordedAt, inOffice, hoursTarget } = params;
   const dayKey = dayKeyInTimezone(recordedAt, timezone);
@@ -64,7 +70,10 @@ export async function maybeDispatchHeartbeatAlerts(params: {
 
   let metTarget = false;
   if (!hoursMetSent) {
-    metTarget = await getQuickMetTarget(userId, timezone, hoursTarget);
+    metTarget =
+      params.metTarget !== undefined
+        ? params.metTarget
+        : await getQuickMetTarget(userId, timezone, hoursTarget);
   }
 
   const types = selectHeartbeatAlertTypes({

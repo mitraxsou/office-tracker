@@ -4,11 +4,13 @@ import {
   deviceRegistrationReferenceAt,
   expectedTicksPerDay,
   isLowActivityCount,
+  latestDate,
   latestDeviceLastSeenAt,
   lastAgentSignalAtOrBefore,
   lowActivityThreshold,
   minutesSinceAt,
   resolveAgentSyncHealth,
+  resolveEventModeLastHeartbeatAt,
   presenceFreshMs,
   presenceSignalInOffice,
   resolveInOfficeNow,
@@ -44,6 +46,49 @@ describe("lastAgentSignalAtOrBefore", () => {
     expect(lastAgentSignalAtOrBefore(rows, new Date("2026-09-04T13:00:00Z"))).toEqual(
       new Date("2026-09-04T12:00:00Z"),
     );
+  });
+});
+
+describe("resolveEventModeLastHeartbeatAt", () => {
+  it("falls back to device lastSeenAt when ActivityTick is missing", () => {
+    const lastSeenAt = new Date("2026-10-13T12:58:00+05:30");
+    expect(
+      resolveEventModeLastHeartbeatAt({
+        lastActivityAt: null,
+        lastSeenAt,
+        presenceRows: [],
+      }),
+    ).toEqual(lastSeenAt);
+  });
+
+  it("uses wifi_connected / health_ping presence when ticks and lastSeen are absent", () => {
+    const wifiAt = new Date("2026-10-13T09:54:00+05:30");
+    const healthAt = new Date("2026-10-13T10:54:00+05:30");
+    expect(
+      resolveEventModeLastHeartbeatAt({
+        lastActivityAt: null,
+        lastSeenAt: null,
+        presenceRows: [
+          { at: wifiAt, type: "wifi_connected" },
+          { at: healthAt, type: "health_ping" },
+          { at: new Date("2026-10-13T11:00:00+05:30"), type: "session_suspend" },
+        ],
+      }),
+    ).toEqual(healthAt);
+  });
+
+  it("prefers the latest among tick, lastSeen, and alive presence", () => {
+    const tickAt = new Date("2026-10-13T11:00:00+05:30");
+    const lastSeenAt = new Date("2026-10-13T12:00:00+05:30");
+    const wifiAt = new Date("2026-10-13T09:54:00+05:30");
+    expect(
+      resolveEventModeLastHeartbeatAt({
+        lastActivityAt: tickAt,
+        lastSeenAt,
+        presenceRows: [{ at: wifiAt, type: "wifi_connected" }],
+      }),
+    ).toEqual(lastSeenAt);
+    expect(latestDate([null, tickAt, lastSeenAt])).toEqual(lastSeenAt);
   });
 });
 

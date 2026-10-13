@@ -1,0 +1,10 @@
+{
+  "dayKey": "2026-10-13",
+  "timezone": "Asia/Kolkata",
+  "staleMinutes": 15,
+  "startAt": "2026-10-13T09:54:00+05:30",
+  "now": "2026-10-13T12:54:00+05:30",
+  "lastSeenAt": "2026-10-13T12:58:00+05:30",
+  "wifiConnectedAt": "2026-10-13T09:54:00+05:30",
+  "notes": "Event-mode first signup: visit_start opens Visit; activity_tick is EOD-only so ActivityTick rows are empty. Day-span must use lastSeenAt/presence and must not invent startAt+15m."
+}

@@ -69,6 +69,19 @@ describe("selectHeartbeatAlertTypes", () => {
     ).toEqual(["hours_met"]);
   });
 
+  it("queues hours_met from live/yellow metTarget without requiring inOffice", () => {
+    expect(
+      selectHeartbeatAlertTypes({
+        inOffice: false,
+        oooCleared: false,
+        metTarget: true,
+        hoursStartedSent: true,
+        hoursMetSent: false,
+        monthlySnapshotSent: true,
+      }),
+    ).toEqual(["hours_met"]);
+  });
+
   it("queues ooo_cleared when office presence clears out of office", () => {
     expect(
       selectHeartbeatAlertTypes({

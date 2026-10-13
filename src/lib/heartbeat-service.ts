@@ -14,6 +14,7 @@ import {
   presenceFreshMs,
   presenceSignalInOffice,
   resolveAgentSignalMode,
+  resolveEventModeLastHeartbeatAt,
   resolveInOfficeNow,
   type AgentSignalSnapshot,
   type LivePresenceSignal,
@@ -152,17 +153,24 @@ export async function loadDaySpanContext(
     agentFirstAgentOnAt = dailySummary.firstAgentOnAt;
   }
 
-  const dayPulses = await loadDayPulseRowsForDay(userId, dayStart, dayEnd, useActivity);
+  const [dayPulses, presenceRows, latestDevice] = await Promise.all([
+    loadDayPulseRowsForDay(userId, dayStart, dayEnd, useActivity),
+    prisma.presenceTransition.findMany({
+      where: {
+        userId,
+        at: { gte: dayStart, lte: dayEnd },
+        type: { in: [...LIVE_PRESENCE_TYPES] },
+      },
+      orderBy: { at: "asc" },
+      select: { at: true, type: true, ssid: true, inOffice: true },
+    }),
+    prisma.agentDevice.findFirst({
+      where: { userId },
+      orderBy: { lastSeenAt: "desc" },
+      select: { lastSeenAt: true },
+    }),
+  ]);
   const inOfficeToday = filterInOfficeDayPulses(dayPulses, useActivity, allowlist);
-  const presenceRows = await prisma.presenceTransition.findMany({
-    where: {
-      userId,
-      at: { gte: dayStart, lte: dayEnd },
-      type: { in: [...LIVE_PRESENCE_TYPES] },
-    },
-    orderBy: { at: "asc" },
-    select: { at: true, type: true, ssid: true, inOffice: true },
-  });
   const confirmedPresenceAt = presenceRows
     .filter((row) =>
       presenceSignalInOffice({
@@ -179,7 +187,13 @@ export async function loadDaySpanContext(
   firstInOfficeHeartbeatAt = confirmedBounds.first;
   lastInOfficeHeartbeatAt = confirmedBounds.last;
   if (useActivity) {
-    lastSignalOverall = lastActivity?.at ?? null;
+    // Event mode: critical sync skips activity_tick until EOD. Day-span stale
+    // detection must also accept device lastSeenAt and wifi/health presence.
+    lastSignalOverall = resolveEventModeLastHeartbeatAt({
+      lastActivityAt: lastActivity?.at ?? null,
+      lastSeenAt: latestDevice?.lastSeenAt ?? null,
+      presenceRows,
+    });
     lastHeartbeat = lastActivity ? activityTickToSignal(lastActivity) : null;
   } else {
     lastSignalOverall = lastHeartbeatRow?.recordedAt ?? null;
@@ -296,9 +310,14 @@ async function upsertOpenVisit(
       });
       return;
     }
+    // Prefer last touch; never write endAt === startAt (zero-duration blocks reopen).
+    const gapEnd =
+      open.updatedAt && open.updatedAt.getTime() > open.startAt.getTime()
+        ? open.updatedAt
+        : new Date(open.startAt.getTime() + 1000);
     await prisma.visit.update({
       where: { id: open.id },
-      data: { endAt: open.updatedAt ?? open.startAt },
+      data: { endAt: gapEnd },
     });
   }
 
@@ -359,7 +378,12 @@ export async function closeStaleOpenVisits(
     lastSignalAt;
 
   if (checkoutAt && checkoutAt.getTime() < open.startAt.getTime()) {
-    checkoutAt = open.startAt;
+    // Do not clamp to startAt (that writes a zero-duration visit and blocks reopen).
+    if (open.updatedAt && open.updatedAt.getTime() > open.startAt.getTime()) {
+      checkoutAt = open.updatedAt;
+    } else {
+      return false;
+    }
   }
   if (checkoutAt && checkoutAt.getTime() > now.getTime()) {
     checkoutAt = now;
@@ -375,6 +399,10 @@ export async function closeStaleOpenVisits(
       staleMs: gap,
       lastHeartbeatAt: lastSignalAt,
     });
+
+  if (endAt.getTime() <= open.startAt.getTime()) {
+    return false;
+  }
 
   await prisma.visit.update({
     where: { id: open.id },

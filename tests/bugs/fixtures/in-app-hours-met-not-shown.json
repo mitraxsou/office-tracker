@@ -1,0 +1,10 @@
+{
+  "incident": "BUG-020",
+  "userLabel": "UserA",
+  "dayKey": "2026-10-13",
+  "alertType": "hours_met",
+  "deliveryChannel": "both",
+  "inAppPersisted": true,
+  "dashboardMustMountPanel": true,
+  "message": "You have completed your 5h office target for today. My Office Pulse has counted 5.0h."
+}

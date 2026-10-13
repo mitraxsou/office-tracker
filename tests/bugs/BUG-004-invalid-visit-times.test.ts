@@ -36,9 +36,11 @@ describe("BUG-004 invalid visit times / sleep checkout", () => {
     expect(heartbeat).toContain("SKIP visit_end: end before start");
   });
 
-  it("server sync code repairs inverted wifi endAt before startAt", () => {
+  it("server sync code repairs inverted or zero-duration wifi endAt", () => {
     const sync = readFileSync(path.join(process.cwd(), "src/lib/agent-sync.ts"), "utf8");
-    expect(sync).toContain("Repair same-day wifi visits that were closed with endAt before startAt");
-    expect(sync).toContain("recent.endAt.getTime() < recent.startAt.getTime()");
+    expect(sync).toContain(
+      "Repair same-day wifi visits closed with endAt before or equal to startAt",
+    );
+    expect(sync).toContain("recent.endAt.getTime() <= recent.startAt.getTime()");
   });
 });

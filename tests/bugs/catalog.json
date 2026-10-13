@@ -254,6 +254,57 @@
       "skipReason": null
     },
     {
+      "id": "BUG-018",
+      "title": "No fleet agent publish until Soumitra laptop soak confirms autoupdate",
+      "date": "2026-10",
+      "severity": "critical",
+      "area": "agent-update",
+      "reproSummary": "Shipping any agent version bump, zip, Publish-AgentScriptTxt output, or forceAgentUpdate to production pulls every laptop onto a build that can break IEX/autoupdate (see BUG-017). Current policy: keep agent changes on Soumitra's laptop only (soumitra.m.mandal@pwc.com, %LOCALAPPDATA%\\OfficeTracker → office-tracker-theta) for multi-day soak; fleet rollout is opt-in later with explicit user approval.",
+      "assertion": "Agents must not push/publish agent version bumps, agent zip, Publish-AgentScriptTxt fleet outputs, forceAgentUpdate mass flags, or version.txt bumps that ship to all users until Soumitra soak verifies BUG-017 parse, scheduled task, heartbeat posts, and soft auto-update; agent-auto-update skill must document this gate.",
+      "fixture": "fixtures/soumitra-only-agent-soak.json",
+      "testFile": "tests/bugs/BUG-018-soumitra-only-agent-soak.test.ts",
+      "relatedTests": [
+        "tests/bugs/BUG-017-agent-iex-txt-must-parse.test.ts",
+        "tests/agent-version.test.ts",
+        "tests/agent-force-update-flag.test.ts"
+      ],
+      "status": "open",
+      "skipReason": "Fleet publish blocked by policy. Laptop soak checklist is it.skip; reopen/close only after Soumitra soak + explicit rollout approval."
+    },
+    {
+      "id": "BUG-019",
+      "title": "Event-mode first signup Today bar stuck near 15 minutes",
+      "date": "2026-10",
+      "severity": "high",
+      "area": "visits",
+      "reproSummary": "Event-mode critical sync sends visit_start/wifi_* but skips activity_tick until EOD. Day-span lastHeartbeatAt came only from ActivityTick (null), so effectiveVisitEnd treated the open visit as stale and capped at startAt+agentStaleMinutes (15). Today bar showed ~15m immediately after first signup.",
+      "assertion": "resolveEventModeLastHeartbeatAt uses lastSeenAt and/or wifi_connected/health_ping when ActivityTick is empty; daySpanHoursForDay with open wifi visit and null lastHeartbeatAt equals elapsed startAt→now (not +15m); effectiveVisitEnd returns now on current day when lastHeartbeatAt is null.",
+      "fixture": "fixtures/event-mode-no-activity-tick-open-visit.json",
+      "testFile": "tests/bugs/BUG-019-event-mode-first-signup-no-tick-bar.test.ts",
+      "relatedTests": ["tests/visits.test.ts", "tests/activity-signal.test.ts"],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
+      "id": "BUG-020",
+      "title": "hours_met in-app row persisted but never shown on dashboard",
+      "date": "2026-10",
+      "severity": "high",
+      "area": "alerts",
+      "reproSummary": "hours_met wrote InAppNotification and AlertDispatch (Teams webhook ack) but InAppNotificationPanel was never mounted on the dashboard, so users with channel app/both saw no in-app completed-hours banner. Related: zero-duration closed visits (endAt === startAt) were not reopened by sync (only endAt < startAt was repaired).",
+      "assertion": "dashboard page mounts InAppNotificationPanel with listUnreadInAppNotifications; agent-sync reopens endAt <= startAt wifi visits; closeStaleOpenVisits refuses endAt === startAt.",
+      "fixture": "fixtures/in-app-hours-met-not-shown.json",
+      "testFile": "tests/bugs/BUG-020-in-app-notifications-not-mounted.test.ts",
+      "relatedTests": [
+        "tests/bugs/BUG-006-webhook-missing-ack.test.ts",
+        "tests/heartbeat-alerts.test.ts",
+        "tests/power-automate-dispatch.test.ts",
+        "tests/notification-scenarios.test.ts"
+      ],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
       "id": "CORE-001",
       "title": "Heartbeat in-office uses SSID allowlist",
       "date": "2026-01",

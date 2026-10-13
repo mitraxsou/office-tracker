@@ -74,5 +74,6 @@ describe("bugs catalog integrity", () => {
     expect(titles).toContain("webhook");
     expect(titles).toContain("once-per-day");
     expect(titles).toContain("office-tracker-theta");
+    expect(titles).toContain("soumitra laptop soak");
   });
 });

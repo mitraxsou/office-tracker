@@ -3,6 +3,7 @@ import { requireAuthenticatedUser, enforcePasswordChangeIfRequired, enforceTerms
 import { getRealCurrentUser } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { getTodaySummary, getPulseStats } from "@/lib/heartbeat-service";
+import { maybeDispatchHeartbeatAlerts } from "@/lib/heartbeat-alerts";
 import { getUserHoursTarget, getAppConfig, getEffectiveAgentStaleGraceHours } from "@/lib/app-config";
 import { getMonthlyProgress, getYearCompliance } from "@/lib/monthly-progress-server";
 import {
@@ -12,6 +13,7 @@ import {
 import { getPendingPriorComplianceMonthKeys } from "@/lib/prior-compliance";
 import { isUserOutOfOffice } from "@/lib/out-of-office";
 import { AppNav } from "@/components/AppNav";
+import { InAppNotificationPanel } from "@/components/InAppNotificationPanel";
 import { MonthlyProgressMeter } from "@/components/MonthlyProgressMeter";
 import { YearComplianceMeter } from "@/components/YearComplianceMeter";
 import { DeskClockPanel } from "@/components/dashboard/DeskClockPanel";
@@ -19,6 +21,7 @@ import { WelcomeBanner } from "@/components/dashboard/WelcomeBanner";
 import { DashboardHeroSummary } from "@/components/dashboard/DashboardHeroSummary";
 import { DashboardAlerts } from "@/components/dashboard/DashboardAlerts";
 import { DashboardDetailsPanel } from "@/components/dashboard/DashboardDetailsPanel";
+import { listUnreadInAppNotifications } from "@/lib/in-app-notifications";
 import {
   deviceRegistrationReferenceAt,
   getLastOfficeActivityAt,
@@ -76,6 +79,23 @@ export default async function DashboardPage() {
     pendingPriorComplianceMonthKeys,
   );
   const pulse = await getPulseStats(user.id, graceHours);
+  // Live/yellow hours can hit the target before the next agent sync. Evaluate
+  // hours_started / hours_met on Today load so completion is not stuck waiting.
+  if (summary.inOfficeNow || summary.metTarget) {
+    try {
+      await maybeDispatchHeartbeatAlerts({
+        userId: user.id,
+        timezone: user.timezone,
+        recordedAt: new Date(),
+        inOffice: summary.inOfficeNow,
+        hoursTarget,
+        metTarget: summary.metTarget,
+      });
+    } catch {
+      console.error("[dashboard] Failed to evaluate office notifications");
+    }
+  }
+  const unreadNotifications = await listUnreadInAppNotifications(user.id);
   const lastOfficeActivityAt = await getLastOfficeActivityAt(user.id);
   const isOutToday = await isUserOutOfOffice(user.id, summary.dayKey);
   const lastHeartbeat = summary.lastHeartbeat;
@@ -177,6 +197,8 @@ export default async function DashboardPage() {
           lastSyncedAt={lastSyncedAt}
           timezone={user.timezone}
         />
+
+        <InAppNotificationPanel initialItems={unreadNotifications} />
 
         <WelcomeBanner
           firstName={firstName}

@@ -414,6 +414,39 @@ export async function resolveAgentSignalMode(
   return { useActivity: false, lastActivity: null, lastHeartbeat, activityCount24h };
 }
 
+/** Latest non-null Date among candidates (NaN dates ignored). */
+export function latestDate(candidates: Array<Date | null | undefined>): Date | null {
+  let latest: Date | null = null;
+  for (const value of candidates) {
+    if (!(value instanceof Date) || Number.isNaN(value.getTime())) continue;
+    if (!latest || value.getTime() > latest.getTime()) latest = value;
+  }
+  return latest;
+}
+
+/**
+ * Presence types that prove the agent is alive in event mode even when
+ * ActivityTick is EOD-only (critical sync sends visit_start / wifi_* / health_ping).
+ */
+export const EVENT_MODE_ALIVE_PRESENCE_TYPES = ["wifi_connected", "health_ping"] as const;
+
+/**
+ * Day-span lastHeartbeatAt for event mode: ActivityTick when present, else
+ * device lastSeenAt and/or wifi_connected / health_ping (not ActivityTick alone).
+ */
+export function resolveEventModeLastHeartbeatAt(params: {
+  lastActivityAt: Date | null;
+  lastSeenAt: Date | null;
+  presenceRows: Array<{ at: Date; type: string }>;
+}): Date | null {
+  const alivePresenceAts = params.presenceRows
+    .filter((row) =>
+      (EVENT_MODE_ALIVE_PRESENCE_TYPES as readonly string[]).includes(row.type),
+    )
+    .map((row) => row.at);
+  return latestDate([params.lastActivityAt, params.lastSeenAt, ...alivePresenceAts]);
+}
+
 export async function getLastAgentSignalAt(userId: string): Promise<Date | null> {
   const { useActivity, lastActivity, lastHeartbeat } = await resolveAgentSignalMode(userId);
   const fromPulse = useActivity
@@ -426,11 +459,7 @@ export async function getLastAgentSignalAt(userId: string): Promise<Date | null>
     select: { lastSeenAt: true },
   });
 
-  const candidates = [fromPulse, device?.lastSeenAt].filter(
-    (value): value is Date => value instanceof Date,
-  );
-  if (candidates.length === 0) return null;
-  return new Date(Math.max(...candidates.map((value) => value.getTime())));
+  return latestDate([fromPulse, device?.lastSeenAt]);
 }
 
 /** Last agent signal at or before `lte` (any prior day), for historical stale checks. */

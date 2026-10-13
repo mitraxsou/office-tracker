@@ -99,6 +99,37 @@ describe("effectiveVisitEnd", () => {
     expect(end).toEqual(lastHeartbeatAt);
     expect(end.getTime()).toBeLessThanOrEqual(dayEnd.getTime());
   });
+
+  it("uses now on current day when lastHeartbeatAt is null (no pulse yet)", () => {
+    const dayEnd = new Date("2026-10-13T23:59:59.999+05:30");
+    const openStart = new Date("2026-10-13T09:54:00+05:30");
+    const now = new Date("2026-10-13T12:54:00+05:30");
+    const end = effectiveVisitEnd({
+      endAt: null,
+      updatedAt: openStart,
+      startAt: openStart,
+      now,
+      staleMs,
+      lastHeartbeatAt: null,
+      dayEnd,
+    });
+    expect(end).toEqual(now);
+    expect(end.getTime()).not.toBe(openStart.getTime() + staleMs);
+  });
+
+  it("keeps startAt+staleMs when lastHeartbeatAt is null without day context", () => {
+    const openStart = new Date("2026-10-13T09:54:00+05:30");
+    const now = new Date("2026-10-13T12:54:00+05:30");
+    const end = effectiveVisitEnd({
+      endAt: null,
+      updatedAt: openStart,
+      startAt: openStart,
+      now,
+      staleMs,
+      lastHeartbeatAt: null,
+    });
+    expect(end.getTime()).toBe(openStart.getTime() + staleMs);
+  });
 });
 
 describe("mergeHeartbeatsIntoVisits", () => {
@@ -369,6 +400,32 @@ describe("hours calculations", () => {
       lastHeartbeatAt: null,
     });
     expect(spanMs).toBeCloseTo(5 * ms(60), 0);
+  });
+
+  it("first open wifi visit with no ActivityTicks spans startAt to now (not +15m)", () => {
+    // Event-mode first signup: visit_start opens a visit before any activity_tick.
+    const dayStart = new Date("2026-10-13T00:00:00+05:30");
+    const dayEnd = new Date("2026-10-13T23:59:59.999+05:30");
+    const startAt = new Date("2026-10-13T09:54:00+05:30");
+    const now = new Date("2026-10-13T12:54:00+05:30");
+    const visits = [
+      {
+        id: "1",
+        startAt,
+        endAt: null,
+        source: "wifi",
+        updatedAt: startAt,
+      },
+    ];
+    const spanMs = daySpanMsForDay(visits, {
+      dayStart,
+      dayEnd,
+      now,
+      staleMs: VISIT_GAP_MS,
+      lastHeartbeatAt: null,
+    });
+    expect(spanMs).toBeCloseTo(3 * ms(60), 0);
+    expect(spanMs).not.toBeCloseTo(VISIT_GAP_MS, 0);
   });
 
   it("does not extend open visit into a future calendar day", () => {

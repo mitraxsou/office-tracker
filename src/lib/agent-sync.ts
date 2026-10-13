@@ -700,7 +700,7 @@ async function reconcileWifiVisitsFromActivity(params: {
           where: { id: open.id },
           data: { startAt: segment.start },
         });
-      } else if (open.endAt && open.endAt.getTime() < open.startAt.getTime()) {
+      } else if (open.endAt && open.endAt.getTime() <= open.startAt.getTime()) {
         await prisma.visit.update({
           where: { id: open.id },
           data: { endAt: null, updatedAt: segment.end },
@@ -719,7 +719,7 @@ async function reconcileWifiVisitsFromActivity(params: {
       orderBy: { startAt: "desc" },
     });
     if (wifiSameDay) {
-      if (wifiSameDay.endAt && wifiSameDay.endAt.getTime() < wifiSameDay.startAt.getTime()) {
+      if (wifiSameDay.endAt && wifiSameDay.endAt.getTime() <= wifiSameDay.startAt.getTime()) {
         await prisma.visit.update({
           where: { id: wifiSameDay.id },
           data: {
@@ -812,7 +812,8 @@ async function ensureOpenOfficeVisitFromActivity(params: {
     return;
   }
 
-  // Repair same-day wifi visits that were closed with endAt before startAt.
+  // Repair same-day wifi visits closed with endAt before or equal to startAt
+  // (inverted or zero-duration). Zero-duration rows block reopen by localVisitId.
   const recent = await prisma.visit.findFirst({
     where: {
       userId: params.userId,
@@ -823,7 +824,7 @@ async function ensureOpenOfficeVisitFromActivity(params: {
     },
     orderBy: { startAt: "desc" },
   });
-  if (recent?.endAt && recent.endAt.getTime() < recent.startAt.getTime()) {
+  if (recent?.endAt && recent.endAt.getTime() <= recent.startAt.getTime()) {
     await prisma.visit.update({
       where: { id: recent.id },
       data: {
@@ -840,7 +841,7 @@ async function ensureOpenOfficeVisitFromActivity(params: {
       where: { userId: params.userId, localVisitId: params.localVisitId },
     });
     if (byLocal) {
-      if (byLocal.endAt && byLocal.endAt.getTime() < byLocal.startAt.getTime()) {
+      if (byLocal.endAt && byLocal.endAt.getTime() <= byLocal.startAt.getTime()) {
         await prisma.visit.update({
           where: { id: byLocal.id },
           data: { endAt: null, updatedAt: params.eventAt },
@@ -893,7 +894,7 @@ async function reconcileAgentOpenVisit(params: {
     where: { userId: params.userId, localVisitId: params.openVisit.localVisitId },
   });
   if (existing) {
-    if (existing.endAt && existing.endAt.getTime() < existing.startAt.getTime()) {
+    if (existing.endAt && existing.endAt.getTime() <= existing.startAt.getTime()) {
       await prisma.visit.update({
         where: { id: existing.id },
         data: { endAt: null, updatedAt: new Date() },

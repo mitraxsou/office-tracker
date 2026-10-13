@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import {
   applyTheme,
   isTheme,
-  readThemeFromDocument,
+  persistTheme,
+  resolveClientTheme,
   THEME_STORAGE_KEY,
   type Theme,
 } from "@/lib/theme";
@@ -46,24 +47,36 @@ function MoonIcon() {
   );
 }
 
-type ThemeToggleProps = {
-  className?: string;
-};
-
-export function ThemeToggle({ className = "" }: ThemeToggleProps) {
+/**
+ * Re-apply stored theme after React Strict Mode (dev) clears data-theme on
+ * <html>. Production keeps the blocking init script; this is a no-op when
+ * the attribute already matches localStorage.
+ */
+function useSyncedTheme(): [Theme, boolean, (next: Theme) => void] {
   const [theme, setTheme] = useState<Theme>("dark");
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setTheme(readThemeFromDocument());
+  useLayoutEffect(() => {
+    const resolved = resolveClientTheme();
+    applyTheme(resolved);
+    setTheme(resolved);
     setMounted(true);
   }, []);
 
   function setAndPersist(next: Theme) {
     setTheme(next);
-    applyTheme(next);
-    localStorage.setItem(THEME_STORAGE_KEY, next);
+    persistTheme(next);
   }
+
+  return [theme, mounted, setAndPersist];
+}
+
+type ThemeToggleProps = {
+  className?: string;
+};
+
+export function ThemeToggle({ className = "" }: ThemeToggleProps) {
+  const [theme, mounted, setAndPersist] = useSyncedTheme();
 
   function toggle() {
     setAndPersist(theme === "dark" ? "light" : "dark");
@@ -90,19 +103,7 @@ type ThemePreferenceProps = {
 };
 
 export function ThemePreference({ className = "" }: ThemePreferenceProps) {
-  const [theme, setTheme] = useState<Theme>("dark");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setTheme(readThemeFromDocument());
-    setMounted(true);
-  }, []);
-
-  function select(next: Theme) {
-    setTheme(next);
-    applyTheme(next);
-    localStorage.setItem(THEME_STORAGE_KEY, next);
-  }
+  const [theme, mounted, setAndPersist] = useSyncedTheme();
 
   return (
     <section className={`card p-6 ${className}`}>
@@ -115,7 +116,7 @@ export function ThemePreference({ className = "" }: ThemePreferenceProps) {
           <button
             key={option}
             type="button"
-            onClick={() => select(option)}
+            onClick={() => setAndPersist(option)}
             disabled={!mounted}
             className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
               mounted && theme === option
@@ -134,8 +135,10 @@ export function ThemePreference({ className = "" }: ThemePreferenceProps) {
 export function useTheme(): Theme {
   const [theme, setTheme] = useState<Theme>("dark");
 
-  useEffect(() => {
-    setTheme(readThemeFromDocument());
+  useLayoutEffect(() => {
+    const resolved = resolveClientTheme();
+    applyTheme(resolved);
+    setTheme(resolved);
 
     function onStorage(event: StorageEvent) {
       if (event.key === THEME_STORAGE_KEY && isTheme(event.newValue)) {

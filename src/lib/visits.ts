@@ -82,6 +82,11 @@ function officeIntervalsForDay(
     : null;
 
   for (const visit of visits) {
+    // Inverted end-before-start rows are corrupt; skip. Zero-duration (endAt === startAt)
+    // stays as an anchor so later in-office heartbeats can extend the day span.
+    if (visit.endAt && visit.endAt.getTime() < visit.startAt.getTime()) {
+      continue;
+    }
     if (visit.endAt === null && !isCurrentDay) {
       // Past day: open visits only count with same-day office heartbeats (Visit-backed).
       const hbEnd = lastHb ? Math.min(lastHb.getTime(), dayEndMs) : null;
@@ -188,6 +193,7 @@ export function firstOfficeInMsForDay(
   const isCurrentDay = isCurrentCalendarDay(params.dayStart, params.dayEnd, params.now);
 
   for (const v of visits) {
+    if (v.endAt && v.endAt.getTime() < v.startAt.getTime()) continue;
     if (v.endAt === null && !isCurrentDay) {
       // Past open visit: use same-day office pulse start when present.
       if (!firstHb && !params.lastInOfficeHeartbeatAt) continue;
@@ -289,6 +295,8 @@ export function dailyOfficeHours(
  * Open visits normally end on the next out-of-office heartbeat or after a gap.
  * If the agent goes silent, infer end at last activity + staleMs.
  * When the calendar day has ended, treat the last heartbeat as logout (not "now").
+ * If lastHeartbeatAt is null on the current day, use now (never invent startAt+staleMs
+ * when there was never a pulse - event-mode first signup before any ActivityTick).
  */
 export function effectiveVisitEnd(params: {
   endAt: Date | null;
@@ -311,6 +319,15 @@ export function effectiveVisitEnd(params: {
       return params.dayEnd;
     }
     return lastActivity <= params.dayEnd ? lastActivity : params.dayEnd;
+  }
+
+  // Current day, open visit, no pulse yet: count elapsed to now (not startAt+staleMs).
+  if (
+    !params.lastHeartbeatAt &&
+    params.dayEnd &&
+    params.now.getTime() <= params.dayEnd.getTime()
+  ) {
+    return params.now;
   }
 
   const agentStale =
