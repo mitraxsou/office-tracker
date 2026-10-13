@@ -1,3 +1,5 @@
+import { describeMonthlyDayJourney } from "@/lib/monthly-progress";
+
 type MonthlyProgressMeterProps = {
   qualifyingDays: number;
   monthlyDaysTarget: number;
@@ -5,6 +7,9 @@ type MonthlyProgressMeterProps = {
   monthKey: string;
   totalHours?: number;
   compact?: boolean;
+  todayMetTarget?: boolean;
+  inOfficeNow?: boolean;
+  todayHours?: number;
 };
 
 export function MonthlyProgressMeter({
@@ -14,6 +19,9 @@ export function MonthlyProgressMeter({
   monthKey,
   totalHours,
   compact = false,
+  todayMetTarget = false,
+  inOfficeNow = false,
+  todayHours = 0,
 }: MonthlyProgressMeterProps) {
   const pct = Math.min(100, (qualifyingDays / monthlyDaysTarget) * 100);
   const remaining = Math.max(0, monthlyDaysTarget - qualifyingDays);
@@ -21,6 +29,13 @@ export function MonthlyProgressMeter({
   const monthLabel = new Date(Number(year), Number(month) - 1, 1).toLocaleString("en-IN", {
     month: "long",
     year: "numeric",
+  });
+  const journey = describeMonthlyDayJourney({
+    qualifyingDays,
+    monthlyDaysTarget,
+    todayMetTarget,
+    inOfficeNow,
+    todayHasOfficeTime: todayHours > 0,
   });
 
   return (
@@ -43,6 +58,11 @@ export function MonthlyProgressMeter({
           {metTarget ? "Target met" : `${remaining} day${remaining === 1 ? "" : "s"} to go`}
         </span>
       </div>
+      {journey.ongoingLabel ? (
+        <p className={`font-medium text-accent ${compact ? "mt-1 text-xs" : "mt-2 text-sm"}`}>
+          {journey.ongoingLabel}
+        </p>
+      ) : null}
       <p className={`text-xs text-muted ${compact ? "mt-1.5" : "mt-2"}`}>
         {compact
           ? totalHours !== undefined

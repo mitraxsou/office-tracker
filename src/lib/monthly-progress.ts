@@ -41,6 +41,89 @@ export function getMonthlyProgressState(
   return "behind";
 }
 
+/** 1 -> 1st, 2 -> 2nd, 3 -> 3rd, 4 -> 4th, 11 -> 11th, 21 -> 21st, ... */
+export function ordinalLabel(n: number): string {
+  const abs = Math.abs(Math.trunc(n));
+  const mod100 = abs % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${abs}th`;
+  switch (abs % 10) {
+    case 1:
+      return `${abs}st`;
+    case 2:
+      return `${abs}nd`;
+    case 3:
+      return `${abs}rd`;
+    default:
+      return `${abs}th`;
+  }
+}
+
+export type MonthlyDayJourney = {
+  qualifyingDays: number;
+  monthlyDaysTarget: number;
+  remainingDays: number;
+  /** Day number being worked toward right now (null when not in an active office day). */
+  ongoingDayNumber: number | null;
+  todayAlreadyQualified: boolean;
+  monthTargetMet: boolean;
+  /** Short label for the welcome strip, e.g. "5th day ongoing". */
+  ongoingLabel: string | null;
+  /** Days still needed after counting completed qualifying days. */
+  daysToGoLabel: string;
+};
+
+/**
+ * Describe which monthly office day the user is covering today, and how many remain.
+ * When they are in office (or already have office time) but have not hit today's hours
+ * target yet, today is treated as the next qualifying day in progress.
+ */
+export function describeMonthlyDayJourney(input: {
+  qualifyingDays: number;
+  monthlyDaysTarget: number;
+  todayMetTarget: boolean;
+  inOfficeNow: boolean;
+  todayHasOfficeTime: boolean;
+}): MonthlyDayJourney {
+  const qualifyingDays = Math.max(0, input.qualifyingDays);
+  const monthlyDaysTarget = Math.max(1, input.monthlyDaysTarget);
+  const remainingDays = Math.max(0, monthlyDaysTarget - qualifyingDays);
+  const monthTargetMet = qualifyingDays >= monthlyDaysTarget;
+  const todayAlreadyQualified = input.todayMetTarget;
+  const coveringToday =
+    !todayAlreadyQualified && (input.inOfficeNow || input.todayHasOfficeTime);
+
+  let ongoingDayNumber: number | null = null;
+  let ongoingLabel: string | null = null;
+
+  if (todayAlreadyQualified) {
+    ongoingDayNumber = Math.min(qualifyingDays, monthlyDaysTarget);
+    ongoingLabel =
+      ongoingDayNumber > 0
+        ? `${ordinalLabel(ongoingDayNumber)} day secured today`
+        : null;
+  } else if (coveringToday && !monthTargetMet) {
+    ongoingDayNumber = Math.min(qualifyingDays + 1, monthlyDaysTarget);
+    ongoingLabel = `${ordinalLabel(ongoingDayNumber)} day ongoing`;
+  }
+
+  const daysToGoLabel = monthTargetMet
+    ? "Monthly days target met"
+    : remainingDays === 1
+      ? "1 day to go"
+      : `${remainingDays} days to go`;
+
+  return {
+    qualifyingDays,
+    monthlyDaysTarget,
+    remainingDays,
+    ongoingDayNumber,
+    todayAlreadyQualified,
+    monthTargetMet,
+    ongoingLabel,
+    daysToGoLabel,
+  };
+}
+
 export function monthKeyInTimezone(date: Date, timezone: string): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,

@@ -186,6 +186,7 @@ export default async function DashboardPage() {
           statusInput={statusInput}
           qualifyingDays={monthlyProgress.qualifyingDays}
           monthlyDaysTarget={monthlyProgress.monthlyDaysTarget}
+          todayMetTarget={summary.metTarget}
         />
 
         <DeskClockPanel
@@ -236,6 +237,9 @@ export default async function DashboardPage() {
             metTarget={monthlyProgress.metTarget}
             monthKey={monthlyProgress.monthKey}
             totalHours={monthlyProgress.totalHours}
+            todayMetTarget={summary.metTarget}
+            inOfficeNow={summary.inOfficeNow}
+            todayHours={summary.liveHours}
             compact
           />
           <YearComplianceMeter

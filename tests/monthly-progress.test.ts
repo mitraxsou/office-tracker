@@ -7,6 +7,7 @@ import {
   dayKeysForMonth,
   dayKeysInMonthUpToToday,
   dayQualifiesForTarget,
+  describeMonthlyDayJourney,
   fiscalYearLabel,
   fiscalYearStartYear,
   getMonthlyProgressState,
@@ -18,6 +19,7 @@ import {
   monthKeysInFiscalYear,
   monthKeysInYear,
   monthKeysInYearUpToMonth,
+  ordinalLabel,
   validateMonthlyDaysTarget,
   yearFromDate,
   yearMonthStatus,
@@ -69,6 +71,60 @@ describe("getMonthlyProgressState", () => {
 
   it("marks behind when pace is below expected", () => {
     expect(getMonthlyProgressState(0, 8, 10, 30)).toBe("behind");
+  });
+});
+
+describe("ordinalLabel", () => {
+  it("uses st/nd/rd/th correctly including teens", () => {
+    expect(ordinalLabel(1)).toBe("1st");
+    expect(ordinalLabel(2)).toBe("2nd");
+    expect(ordinalLabel(3)).toBe("3rd");
+    expect(ordinalLabel(4)).toBe("4th");
+    expect(ordinalLabel(11)).toBe("11th");
+    expect(ordinalLabel(12)).toBe("12th");
+    expect(ordinalLabel(21)).toBe("21st");
+    expect(ordinalLabel(22)).toBe("22nd");
+  });
+});
+
+describe("describeMonthlyDayJourney", () => {
+  it("labels the next qualifying day as ongoing while in office before hitting 5h", () => {
+    const journey = describeMonthlyDayJourney({
+      qualifyingDays: 4,
+      monthlyDaysTarget: 8,
+      todayMetTarget: false,
+      inOfficeNow: true,
+      todayHasOfficeTime: true,
+    });
+    expect(journey.ongoingDayNumber).toBe(5);
+    expect(journey.ongoingLabel).toBe("5th day ongoing");
+    expect(journey.daysToGoLabel).toBe("4 days to go");
+  });
+
+  it("labels today as secured once the daily target is met", () => {
+    const journey = describeMonthlyDayJourney({
+      qualifyingDays: 5,
+      monthlyDaysTarget: 8,
+      todayMetTarget: true,
+      inOfficeNow: true,
+      todayHasOfficeTime: true,
+    });
+    expect(journey.ongoingDayNumber).toBe(5);
+    expect(journey.ongoingLabel).toBe("5th day secured today");
+    expect(journey.remainingDays).toBe(3);
+  });
+
+  it("hides ongoing label when not covering an office day", () => {
+    const journey = describeMonthlyDayJourney({
+      qualifyingDays: 4,
+      monthlyDaysTarget: 8,
+      todayMetTarget: false,
+      inOfficeNow: false,
+      todayHasOfficeTime: false,
+    });
+    expect(journey.ongoingDayNumber).toBeNull();
+    expect(journey.ongoingLabel).toBeNull();
+    expect(journey.daysToGoLabel).toBe("4 days to go");
   });
 });
 

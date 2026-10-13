@@ -328,3 +328,52 @@ html[data-theme="light"] .picker-input::-webkit-calendar-picker-indicator {
     opacity: 1;
   }
 }
+
+/* Monthly office-day journey strip (WelcomeBanner). */
+.month-day-track {
+  display: grid;
+  grid-template-columns: repeat(var(--month-day-count, 8), minmax(0, 1fr));
+  gap: 0.28rem;
+  align-items: center;
+}
+
+.month-day-dot {
+  display: block;
+  height: 0.45rem;
+  min-width: 0;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.month-day-dot--done {
+  background: var(--success);
+}
+
+.month-day-dot--todo {
+  background: color-mix(in srgb, var(--border) 85%, transparent);
+  opacity: 0.85;
+}
+
+.month-day-dot--ongoing {
+  background: var(--pwc-orange);
+  animation: month-day-ongoing-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes month-day-ongoing-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scaleY(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scaleY(1.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .month-day-dot--ongoing {
+    animation: none;
+    opacity: 1;
+  }
+}
