@@ -484,6 +484,18 @@ model AppConfig {
   updatedAt             DateTime @updatedAt
 }
 
+model AgentReleaseArtifact {
+  id        String   @id @default(cuid())
+  version   String
+  fileName  String
+  content   Bytes
+  sha256    String
+  createdAt DateTime @default(now())
+
+  @@unique([version, fileName])
+  @@index([version])
+}
+
 model CronJobRun {
   id            String   @id @default(cuid())
   jobName       String

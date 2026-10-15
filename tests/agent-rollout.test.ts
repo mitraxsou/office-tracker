@@ -35,6 +35,26 @@ describe("resolveAgentTargetVersion", () => {
     ).toBe("1.5.25");
   });
 
+  it("returns canary for every allowlisted email, and fleet-stable for everyone else", () => {
+    const allowlistEmails = ["soumitra.m.mandal@pwc.com", "aleyaa.canary@pwc.com"];
+    expect(
+      resolveAgentTargetVersion({
+        ...base,
+        mode: "allowlist",
+        allowlistEmails,
+        identity: { email: "aleyaa.canary@pwc.com" },
+      }),
+    ).toBe("1.5.25");
+    expect(
+      resolveAgentTargetVersion({
+        ...base,
+        mode: "allowlist",
+        allowlistEmails,
+        identity: { email: "new.user@pwc.com" },
+      }),
+    ).toBe("1.5.24");
+  });
+
   it("is case-insensitive on allowlist emails", () => {
     expect(
       resolveAgentTargetVersion({

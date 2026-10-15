@@ -10,7 +10,6 @@ type VersionDevice = {
   expectedVersion: string;
   lastSeenAt: string | null;
   status: "unknown" | "needs_update";
-  updateQueued: boolean;
 };
 
 type VersionUser = {
@@ -21,7 +20,10 @@ type VersionUser = {
 };
 
 type VersionReport = {
-  expectedVersion: string;
+  fleetStableVersion: string;
+  canaryVersion: string;
+  rolloutMode: "allowlist" | "everyone";
+  allowlistCount: number;
   deviceCount: number;
   userCount: number;
   users: VersionUser[];
@@ -30,7 +32,6 @@ type VersionReport = {
 export function AdminAgentVersionReport() {
   const [report, setReport] = useState<VersionReport | null>(null);
   const [loading, setLoading] = useState(true);
-  const [pushing, setPushing] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const response = await fetch("/api/admin/agent-version-report");
@@ -42,14 +43,16 @@ export function AdminAgentVersionReport() {
     void load();
   }, [load]);
 
-  async function queueUpdate(deviceId: string) {
-    setPushing(deviceId);
-    const response = await fetch(`/api/admin/devices/${deviceId}/agent-update`, {
-      method: "POST",
-    });
-    setPushing(null);
-    if (response.ok) await load();
-  }
+  const allowlistOnly = !report || report.rolloutMode !== "everyone";
+  const rolloutNote = !report
+    ? "Each laptop is compared to that user's target."
+    : report.rolloutMode === "everyone"
+      ? "Rollout mode is everyone, so each laptop is compared to the promoted version."
+      : "Laptops outside the allowlist are compared to fleet-stable only. Canary is not the fleet target.";
+
+  const hasUnknown = report?.users.some((user) =>
+    user.devices.some((device) => device.status === "unknown"),
+  );
 
   return (
     <section className="card p-4">
@@ -57,8 +60,12 @@ export function AdminAgentVersionReport() {
         <div>
           <h2 className="text-base font-medium">Agents not updated</h2>
           <p className="mt-1 text-xs text-muted">
-            Current agent: <code>{report?.expectedVersion ?? "..."}</code>. Version mismatches are
-            offered an automatic update during config polling.
+            Fleet-stable: <code>{report?.fleetStableVersion ?? "..."}</code>. Canary:{" "}
+            <code>{report?.canaryVersion ?? "..."}</code>
+            {allowlistOnly && report
+              ? ` (${report.allowlistCount} allowlisted user${report.allowlistCount === 1 ? "" : "s"}). `
+              : ". "}
+            {rolloutNote}
           </p>
         </div>
         <button type="button" onClick={() => void load()} className="btn-secondary px-3 py-1 text-xs">
@@ -68,13 +75,15 @@ export function AdminAgentVersionReport() {
 
       {loading && <p className="mt-3 text-sm text-muted">Checking agent versions...</p>}
       {!loading && report?.deviceCount === 0 && (
-        <p className="mt-3 text-sm text-green-400">All reporting agents are current.</p>
+        <p className="mt-3 text-sm text-green-400">
+          Every reporting laptop matches its own target.
+        </p>
       )}
       {!loading && report && report.deviceCount > 0 && (
         <>
           <p className="mt-3 text-sm text-accent">
             {report.deviceCount} laptop{report.deviceCount === 1 ? "" : "s"} across{" "}
-            {report.userCount} user{report.userCount === 1 ? "" : "s"} need attention.
+            {report.userCount} user{report.userCount === 1 ? "" : "s"} differ from their target.
           </p>
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-sm">
@@ -83,7 +92,7 @@ export function AdminAgentVersionReport() {
                   <th className="py-2 pr-3">User</th>
                   <th className="py-2 pr-3">Serial</th>
                   <th className="py-2 pr-3">Installed</th>
-                  <th className="py-2 pr-3">Expected</th>
+                  <th className="py-2 pr-3">Target</th>
                   <th className="py-2 pr-3">Last seen</th>
                   <th className="py-2">Status</th>
                 </tr>
@@ -109,23 +118,8 @@ export function AdminAgentVersionReport() {
                           ? new Date(device.lastSeenAt).toLocaleString("en-IN")
                           : "never"}
                       </td>
-                      <td className="py-2">
-                        <span className="text-accent">
-                          {device.status === "unknown" ? "Unknown version" : "Needs update"}
-                          {device.updateQueued ? " (queued)" : ""}
-                        </span>
-                        <button
-                          type="button"
-                          disabled={pushing === device.deviceId || device.updateQueued}
-                          onClick={() => void queueUpdate(device.deviceId)}
-                          className="ml-2 text-xs text-accent hover:underline disabled:opacity-50"
-                        >
-                          {pushing === device.deviceId
-                            ? "Pushing..."
-                            : device.updateQueued
-                              ? "Update pending"
-                              : "Push update"}
-                        </button>
+                      <td className="py-2 text-accent">
+                        {device.status === "unknown" ? "Unknown version" : "Needs update"}
                       </td>
                     </tr>
                   )),
@@ -134,10 +128,16 @@ export function AdminAgentVersionReport() {
             </table>
           </div>
           <p className="mt-2 text-xs text-muted">
-            Unknown version means the laptop is syncing with an older script that does not
-            report its version. Auto-repair is attempted. If it has no updater, re-run installation
-            once.
+            Target is resolved per user. A laptop already on fleet-stable is current when that user
+            is outside the allowlist.
           </p>
+          {hasUnknown && (
+            <p className="mt-1 text-xs text-muted">
+              Unknown version means the laptop has not reported a script version. Soft update
+              follows that user&apos;s target. If the laptop has no updater, re-run installation
+              once.
+            </p>
+          )}
         </>
       )}
     </section>

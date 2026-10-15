@@ -3,11 +3,13 @@ import path from "path";
 import { describe, expect, it } from "vitest";
 import { AGENT_EXTRACT_FOLDER } from "@/lib/agent-branding";
 import {
+  AGENT_CORE_DOWNLOAD_FILES,
   AGENT_DOWNLOAD_FILES,
   agentScriptFilesBaseUrl,
   agentZipEntryPath,
   isAgentDownloadFileName,
 } from "@/lib/agent-download";
+import { fleetStableFilesBaseUrl } from "@/lib/agent-release-artifacts";
 
 describe("agent download helpers", () => {
   it("recognizes allowed agent file names", () => {
@@ -19,6 +21,10 @@ describe("agent download helpers", () => {
     expect(agentScriptFilesBaseUrl("https://office-tracker-prod.vercel.app")).toBe(
       "https://office-tracker-prod.vercel.app/api/agent/files",
     );
+    expect(fleetStableFilesBaseUrl("https://office-tracker-prod.vercel.app", "1.5.26")).toBe(
+      "https://office-tracker-prod.vercel.app/api/agent/releases/1.5.26/files",
+    );
+    expect(AGENT_CORE_DOWNLOAD_FILES).not.toContain("watchdog.ps1");
   });
 
   it("places helper scripts under lib/ in the agent zip", () => {
@@ -33,7 +39,7 @@ describe("agent download helpers", () => {
       const diskPath = path.join(process.cwd(), "agent", entry);
       await expect(readFile(diskPath)).resolves.toBeDefined();
       expect(`${AGENT_EXTRACT_FOLDER}/${entry}`).toMatch(
-        /PwCOfficePulse\/(lib\/)?(setup\.ps1|agent-download\.ps1|agent-storage\.ps1|[\w.-]+)$/,
+        /PwCOfficePulse\/(lib\/|watchdog\/)?(setup\.ps1|agent-download\.ps1|agent-storage\.ps1|[\w.-]+)$/,
       );
     }
   });

@@ -705,6 +705,7 @@ export async function getTodaySummary(
     lastConfirmedOfficeAt,
     firstCheckInAt,
     inOfficeNow,
+    asOf: params.now,
     visits,
     lastHeartbeat,
     livePresence,

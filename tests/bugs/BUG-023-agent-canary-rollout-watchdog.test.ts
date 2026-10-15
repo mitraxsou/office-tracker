@@ -16,6 +16,19 @@ const catalogPath = path.join(process.cwd(), "tests/bugs/catalog.json");
 const setupPath = path.join(process.cwd(), "agent/setup.ps1");
 const watchdogPs1 = path.join(process.cwd(), "agent/watchdog/watchdog.ps1");
 const watchdogVbs = path.join(process.cwd(), "agent/watchdog/run-watchdog.vbs");
+const watchdogInstaller = path.join(
+  process.cwd(),
+  "agent/watchdog/install-watchdog.ps1",
+);
+const agentConfigRoute = path.join(
+  process.cwd(),
+  "src/app/api/agent/config/route.ts",
+);
+const rolloutRoute = path.join(
+  process.cwd(),
+  "src/app/api/admin/agent-rollout/route.ts",
+);
+const releaseSchema = path.join(process.cwd(), "prisma/schema.prisma");
 const skillPath = path.join(process.cwd(), ".cursor/skills/agent-auto-update/SKILL.md");
 
 describe("BUG-023 agent canary rollout + independent watchdog", () => {
@@ -72,14 +85,25 @@ describe("BUG-023 agent canary rollout + independent watchdog", () => {
     ).toBe(repo);
   });
 
-  it("setup registers PwCOfficePulseWatchdog and watchdog scripts exist (ASCII, no IEX heartbeat)", () => {
+  it("keeps watchdog installation separate from routine agent setup", () => {
     expect(existsSync(setupPath)).toBe(true);
     expect(existsSync(watchdogPs1)).toBe(true);
     expect(existsSync(watchdogVbs)).toBe(true);
+    expect(existsSync(watchdogInstaller)).toBe(true);
 
     const setup = readFileSync(setupPath, "utf8");
-    expect(setup).toContain("PwCOfficePulseWatchdog");
-    expect(setup).toContain("Register-WatchdogTask");
+    expect(setup).toContain("Install-WatchdogBootstrap");
+    expect(setup).toContain("SKIP independent watchdog already installed and left unchanged");
+    expect(setup).not.toContain("function Register-WatchdogTask");
+    expect(setup).not.toContain("$WatchdogTaskDescription");
+    expect(setup).not.toMatch(/Join-Path \$PSScriptRoot "watchdog/);
+
+    const installer = readFileSync(watchdogInstaller, "utf8");
+    expect(installer).toContain("PwCOfficePulseWatchdog");
+    expect(installer).toContain("Register-ScheduledTask");
+    expect(installer).toContain("New-TimeSpan -Hours 1");
+    expect(installer).toContain("SKIP existing watchdog left unchanged");
+    expect(installer).toContain("ReplaceExisting");
 
     const wd = readFileSync(watchdogPs1, "utf8");
     const wdCode = wd
@@ -89,6 +113,13 @@ describe("BUG-023 agent canary rollout + independent watchdog", () => {
     expect(wdCode).not.toMatch(/Invoke-Expression/);
     expect(wdCode).not.toMatch(/office-heartbeat\.txt/);
     expect(wdCode).toMatch(/update\.ps1/);
+    expect(wd).toContain("watchdog will not downgrade");
+    expect(wd).toContain("agentFleetStableVersion");
+    expect(wd).toContain("agentFleetStableFilesBase");
+    expect(wd).toContain("X-Agent-SHA256");
+    expect(wd).toContain("-FilesBaseOverride");
+    expect(wd).toContain("PwCOfficePulse-recovery-");
+    expect(wd).not.toMatch(/name = "watchdog\.ps1"/);
     expect(wd).not.toMatch(/[\u2014\u2013\u2018\u2019\u201C\u201D]/);
 
     const vbs = readFileSync(watchdogVbs, "utf8");
@@ -100,6 +131,21 @@ describe("BUG-023 agent canary rollout + independent watchdog", () => {
       .join("\n");
     expect(vbsCode).not.toMatch(/office-heartbeat/);
     expect(vbsCode).not.toMatch(/Invoke-Expression|IEX/i);
+
+    const configRoute = readFileSync(agentConfigRoute, "utf8");
+    expect(configRoute).toContain(
+      "agentFleetStableVersion: globalConfig.agentFleetStableVersion",
+    );
+    expect(configRoute).toContain("agentFleetStableFilesBase");
+
+    const promote = readFileSync(rolloutRoute, "utf8");
+    expect(promote).toContain("snapshotFleetStableAgentRelease(canary)");
+    expect(promote.indexOf("snapshotFleetStableAgentRelease(canary)")).toBeLessThan(
+      promote.indexOf("promoteAgentCanaryToEveryone()"),
+    );
+    expect(readFileSync(releaseSchema, "utf8")).toContain(
+      "model AgentReleaseArtifact",
+    );
   });
 
   it("agent-auto-update skill documents server canary allowlist gate", () => {

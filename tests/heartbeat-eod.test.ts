@@ -62,7 +62,7 @@ describe("closeEndOfDayOpenVisits", () => {
     expect(closed).toBe(true);
     expect(visitUpdateMock).toHaveBeenCalledWith({
       where: { id: "visit-1" },
-      data: { endAt: disconnectAt },
+      data: { endAt: disconnectAt, endSource: "inferred" },
     });
   });
 

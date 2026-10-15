@@ -12,7 +12,10 @@
     "taskName": "PwCOfficePulseWatchdog",
     "installDir": "%LOCALAPPDATA%\\OfficeTracker\\watchdog",
     "runner": "run-watchdog.vbs uses -File watchdog.ps1 (not IEX office-heartbeat.txt)",
-    "triggers": ["Daily", "AtLogOn"]
+    "triggers": ["Hourly", "AtLogOn"],
+    "target": "agentFleetStableVersion",
+    "files": "immutable AgentReleaseArtifact snapshot created during Promote to everyone",
+    "routineAgentUpdateReplacesWatchdog": false
   },
   "promote": "Admin Promote to everyone requires confirmPromote and copies canary into fleet-stable"
 }

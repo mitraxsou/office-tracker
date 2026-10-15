@@ -8,6 +8,10 @@ if (-not (Test-Path (Join-Path $agentDir "setup.ps1"))) {
 Set-Location $agentDir
 . (Join-Path $agentDir "lib\agent-download.ps1")
 
+# Never touch the real laptop install or open a visible window.
+$env:OFFICETRACKER_INSTALL_DIR = Join-Path $env:TEMP "PwCOfficePulse-smoke-$([Guid]::NewGuid().ToString('N'))"
+New-Item -ItemType Directory -Path $env:OFFICETRACKER_INSTALL_DIR -Force | Out-Null
+
 $txt = Publish-AgentScriptTxt -Ps1Path (Join-Path $agentDir "setup.ps1")
 $raw = Get-Content -Raw $txt
 if ($raw -match '^\s*param\s*\(') {
@@ -21,10 +25,12 @@ $bound = @{
 }
 # Expect auth failure on download, not a parser/bypass failure
 try {
-    Invoke-AgentScriptBypass -Ps1Path (Join-Path $agentDir "setup.ps1") -BoundVars $bound -Wait | Out-Null
-} catch {
-    if ($_.Exception.Message -notmatch '401|403|Unauthorized|WebRequest|remote server') {
-        throw
+    $exitCode = Invoke-AgentScriptBypass -Ps1Path (Join-Path $agentDir "setup.ps1") `
+        -BoundVars $bound -Hidden -Wait
+    if ($exitCode -eq 0) {
+        throw "Invalid token was accepted"
     }
+} finally {
+    Remove-Item -LiteralPath $env:OFFICETRACKER_INSTALL_DIR -Recurse -Force -ErrorAction SilentlyContinue
 }
 Write-Output "OK"

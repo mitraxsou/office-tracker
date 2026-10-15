@@ -41,6 +41,23 @@ import { formatPulseAge } from "@/lib/pulse-age";
 import { AdminPresenceTimeline } from "./AdminPresenceTimeline";
 import { MetricHelp } from "@/components/MetricHelp";
 import { ADMIN_SETTINGS_HREF } from "@/lib/admin-settings-hash";
+import type { AgentStatusDiagnostics } from "@/lib/agent-status-diagnostics";
+
+function formatStamp(iso: string | null | undefined, timezone: string): string {
+  if (!iso) return "None stored";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "None stored";
+  return date.toLocaleString("en-IN", { timeZone: timezone });
+}
+
+function yesNo(value: boolean): string {
+  return value ? "Yes" : "No";
+}
+
+function officeSsidText(officeSsid: boolean | null): string {
+  if (officeSsid === null) return "No SSID stored";
+  return officeSsid ? "Office SSID: Yes" : "Office SSID: No";
+}
 
 type UserReport = {
   user: {
@@ -102,6 +119,7 @@ type UserReport = {
       source: string;
     } | null;
   };
+  agentStatus: AgentStatusDiagnostics;
   serverAgentVersion: string;
   agentTracking?: {
     serverAgentMode: string;
@@ -598,30 +616,178 @@ export function AdminUserReport({
           </div>
         </div>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-muted">Last seen</dt>
-            <dd>
-              {data.pulse.lastHeartbeat
-                ? new Date(data.pulse.lastHeartbeat).toLocaleString("en-IN")
-                : "None"}
-            </dd>
-          </div>          <div>
-            <dt className="text-muted">Time since last activity</dt>
-            <dd>
-              {formatPulseAge({
-                minutes: data.pulse.minutesSinceLastPulse,
-                lastPulseAt: data.pulse.lastHeartbeat,
-                timezone: data.user.timezone,
-              })}
-            </dd>
+          <div className="sm:col-span-2 border-l-4 border-l-[var(--pwc-orange)] pl-3">
+            <p className="text-sm font-medium text-accent">Sync and presence times</p>
+            <p className="mt-1 text-xs text-muted">
+              Each row is a different stored event, with its own timestamp.
+            </p>
+            <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+              <div>
+                <dt className="text-muted">Last successful server sync</dt>
+                <dd>
+                  {data.agentStatus.lastSuccessfulSync ? (
+                    <>
+                      <span className="tabular-nums">
+                        {formatStamp(
+                          data.agentStatus.lastSuccessfulSync.at,
+                          data.user.timezone,
+                        )}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted">
+                        {data.agentStatus.lastSuccessfulSync.triggerLabel ??
+                          "Sync batch (no trigger stored)"}
+                        {data.agentStatus.lastSuccessfulSync.serialNumber
+                          ? ` · laptop ${data.agentStatus.lastSuccessfulSync.serialNumber}`
+                          : ""}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-muted">None recorded</span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted">Last device contact</dt>
+                <dd className="tabular-nums">
+                  {data.agentStatus.lastDeviceContactAt
+                    ? formatStamp(data.agentStatus.lastDeviceContactAt, data.user.timezone)
+                    : "None yet"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted">Last Wi-Fi/presence sample</dt>
+                <dd>
+                  {data.agentStatus.lastWifiSample ? (
+                    <>
+                      <span className="tabular-nums">
+                        {formatStamp(data.agentStatus.lastWifiSample.at, data.user.timezone)}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-muted">
+                        {data.agentStatus.lastWifiSample.sourceLabel}
+                      </span>
+                      <span className="mt-1 block text-xs">
+                        SSID:{" "}
+                        <code className="break-all">
+                          {data.agentStatus.lastWifiSample.ssid ?? "none"}
+                        </code>
+                        {" · "}
+                        <span
+                          className={
+                            data.agentStatus.lastWifiSample.officeSsid
+                              ? "rounded bg-[var(--pwc-orange-muted)] px-1.5 py-0.5 text-[var(--pwc-orange)]"
+                              : ""
+                          }
+                        >
+                          {officeSsidText(data.agentStatus.lastWifiSample.officeSsid)}
+                        </span>
+                        {" · "}
+                        Stored in-office flag: {yesNo(data.agentStatus.lastWifiSample.storedInOffice)}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-muted">None stored</span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted">Last activity tick</dt>
+                <dd>
+                  {data.agentStatus.lastActivityTick ? (
+                    <>
+                      <span className="tabular-nums">
+                        {formatStamp(data.agentStatus.lastActivityTick.at, data.user.timezone)}
+                      </span>
+                      <span className="mt-1 block text-xs">
+                        SSID:{" "}
+                        <code className="break-all">
+                          {data.agentStatus.lastActivityTick.ssid ?? "none"}
+                        </code>
+                        {" · "}
+                        <span
+                          className={
+                            data.agentStatus.lastActivityTick.officeSsid
+                              ? "rounded bg-[var(--pwc-orange-muted)] px-1.5 py-0.5 text-[var(--pwc-orange)]"
+                              : ""
+                          }
+                        >
+                          {officeSsidText(data.agentStatus.lastActivityTick.officeSsid)}
+                        </span>
+                        {" · "}
+                        In office flag: {yesNo(data.agentStatus.lastActivityTick.inOffice)}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-muted">None stored</span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted">Time since last activity tick</dt>
+                <dd>
+                  {data.agentStatus.lastActivityTick
+                    ? formatPulseAge({
+                        minutes: data.agentStatus.minutesSinceLastActivityTick,
+                        lastPulseAt: data.agentStatus.lastActivityTick.at,
+                        timezone: data.user.timezone,
+                      })
+                    : "No activity tick stored"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted">In office now</dt>
+                <dd>
+                  <span className="font-medium">{data.today.inOfficeNow ? "Yes" : "No"}</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    {data.agentStatus.inOfficeNowRule}
+                  </span>
+                  {data.agentStatus.inOfficeNowSignal ? (
+                    <span className="mt-1 block text-xs">
+                      Signal used: {data.agentStatus.inOfficeNowSignal.sourceLabel},{" "}
+                      {formatStamp(data.agentStatus.inOfficeNowSignal.at, data.user.timezone)}, SSID{" "}
+                      <code className="break-all">
+                        {data.agentStatus.inOfficeNowSignal.ssid ?? "none"}
+                      </code>
+                      ,{" "}
+                      {data.agentStatus.inOfficeNowSignal.inOffice
+                        ? "in the office"
+                        : "not in the office"}
+                      . {officeSsidText(data.agentStatus.inOfficeNowSignal.officeSsid)}.
+                    </span>
+                  ) : (
+                    <span className="mt-1 block text-xs text-muted">
+                      No live presence signal stored.
+                    </span>
+                  )}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-muted">Open office visit</dt>
+                <dd>
+                  {data.agentStatus.openVisit ? (
+                    <>
+                      <span className="tabular-nums">
+                        Open since{" "}
+                        {formatStamp(data.agentStatus.openVisit.startAt, data.user.timezone)}
+                      </span>
+                      <span className="mt-1 block text-xs">
+                        {data.agentStatus.openVisit.sourceLabel}
+                        {" · "}
+                        SSID:{" "}
+                        <code className="break-all">{data.agentStatus.openVisit.ssid ?? "none"}</code>
+                        {" · "}
+                        {officeSsidText(data.agentStatus.openVisit.officeSsid)}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-muted">None</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
           </div>
           <div>
             <dt className="text-muted">Agent uptime today</dt>
             <dd>{data.today.laptopActiveHours.toFixed(1)}h</dd>
-          </div>
-          <div>
-            <dt className="text-muted">In office now</dt>
-            <dd>{data.today.inOfficeNow ? "Yes" : "No"}</dd>
           </div>
           {data.pulse.lastSignal && (
             <div className="sm:col-span-2">
@@ -676,7 +842,7 @@ export function AdminUserReport({
                 Selected day diagnostics ({data.dayDiagnostics.dayKey})
                 <MetricHelp
                   label="Selected day diagnostics help"
-                  tooltip="Counts uploaded ticks in that calendar day. Pulses 0 before tonight's flush is expected. Last seen can still update from an hourly health ping."
+                  tooltip="Counts uploaded ticks in that calendar day. Pulses 0 before tonight's flush is expected. Device contact can still update from an hourly health ping."
                 />
               </dt>
               <dd className="text-xs space-y-1">
@@ -686,13 +852,13 @@ export function AdminUserReport({
                     ? new Date(data.dayDiagnostics.firstSignalAt).toLocaleString("en-IN", {
                         timeZone: data.user.timezone,
                       })
-                    : "—"}{" "}
+                    : "none"}{" "}
                   · Last{" "}
                   {data.dayDiagnostics.lastSignalAt
                     ? new Date(data.dayDiagnostics.lastSignalAt).toLocaleString("en-IN", {
                         timeZone: data.user.timezone,
                       })
-                    : "—"}
+                    : "none"}
                 </div>
                 <div>
                   Pulses {data.dayDiagnostics.pulseCount}
@@ -725,7 +891,7 @@ export function AdminUserReport({
               Installed agent versions
               <MetricHelp
                 label="Installed agent versions help"
-                tooltip="Device version and last successful sync (often hourly health). Not a 2-minute trail. Last seen uses Agent health grace, not tick retention."
+                tooltip="Device version and last successful sync (often hourly health). Not a 2-minute trail. Last contact uses Agent health grace, not tick retention."
               />
             </dt>
             <dd>
@@ -753,7 +919,7 @@ export function AdminUserReport({
                           ({version.note})
                         </span>
                         {" · "}
-                        last seen{" "}
+                        last contact{" "}
                         {device.lastSeenAt
                           ? new Date(device.lastSeenAt).toLocaleString("en-IN", {
                               timeZone: data.user.timezone,
@@ -814,11 +980,11 @@ export function AdminUserReport({
                 </ul>
               )}
               <p className="mt-2 text-xs text-muted">
-                Last seen uses{" "}
+                Last contact uses{" "}
                 <Link href={ADMIN_SETTINGS_HREF.agentSync} className="text-accent hover:underline">
                   Agent health grace
                 </Link>
-                , not tick retention.
+                , not tick retention. It is the laptop reaching the server, not the activity tick.
               </p>
             </dd>
           </div>

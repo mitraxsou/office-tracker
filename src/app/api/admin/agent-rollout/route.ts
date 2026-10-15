@@ -12,6 +12,7 @@ import {
 } from "@/lib/agent-rollout";
 import { getAgentVersion } from "@/lib/agent-version";
 import { logAuditEvent } from "@/lib/audit-log";
+import { snapshotFleetStableAgentRelease } from "@/lib/agent-release-artifacts";
 
 export async function GET() {
   const admin = await requireAdmin();
@@ -58,6 +59,22 @@ export async function PATCH(request: Request) {
             "Promote requires confirmPromote: true. This makes the canary version the fleet target for everyone.",
         },
         { status: 400 },
+      );
+    }
+
+    const before = await getAppConfig();
+    const canary = (before.agentCanaryVersion || getAgentVersion()).trim();
+    try {
+      await snapshotFleetStableAgentRelease(canary);
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Could not snapshot fleet-stable agent release",
+        },
+        { status: 409 },
       );
     }
 

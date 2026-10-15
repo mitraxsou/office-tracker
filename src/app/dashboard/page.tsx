@@ -128,10 +128,9 @@ export default async function DashboardPage() {
     !summary.lastHeartbeat.ssid &&
     (summary.lastHeartbeat.inOffice === true || summary.inOfficeNow);
   const openVisit = summary.visits.find((v) => v.endAt === null);
-  const confirmedThroughLabel =
-    summary.lastConfirmedOfficeAt
-      ? `Confirmed through ${formatTime(summary.lastConfirmedOfficeAt, user.timezone)}. Yellow is estimated until the next agent sync.`
-      : null;
+  const confirmedThroughLabel = summary.lastConfirmedOfficeAt
+    ? `Confirmed through ${formatTime(summary.lastConfirmedOfficeAt, user.timezone)}.`
+    : null;
   const firstCheckIn = summary.firstCheckInAt;
   const agentStatusValue = agentNeverConnected
     ? "Not connected"
@@ -232,6 +231,7 @@ export default async function DashboardPage() {
             lastSyncedLabel,
             lastSyncedTone,
             lastConfirmedOfficeAt: summary.lastConfirmedOfficeAt,
+            asOf: summary.asOf,
           }}
         />
 
@@ -250,6 +250,7 @@ export default async function DashboardPage() {
           lastOfficeActivityTone={lastOfficeActivityTone}
           confirmedThroughLabel={confirmedThroughLabel}
           lastConfirmedOfficeAt={summary.lastConfirmedOfficeAt}
+          asOf={summary.asOf}
           openVisitStartAt={openVisit?.startAt ?? null}
           openVisitSsid={openVisit?.ssid ?? null}
         />

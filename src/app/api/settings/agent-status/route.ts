@@ -8,7 +8,11 @@ import {
   resolveAgentSyncHealth,
 } from "@/lib/activity-signal";
 import { getTodaySummary, getPulseStats } from "@/lib/heartbeat-service";
-import { getUserHoursTarget, getEffectiveAgentStaleGraceHours } from "@/lib/app-config";
+import { getUserHoursTarget, getEffectiveAgentStaleGraceHours, getAppConfig } from "@/lib/app-config";
+import {
+  buildAgentStatusDiagnostics,
+  fetchAgentStatusEvidence,
+} from "@/lib/agent-status-diagnostics";
 import { isUserOutOfOffice } from "@/lib/out-of-office";
 import { dayKeyInTimezone } from "@/lib/notification-prefs";
 import { isTokenExpired } from "@/lib/token-expiry";
@@ -26,8 +30,12 @@ export async function GET() {
 
   const hoursTarget = await getUserHoursTarget(user);
   const graceHours = await getEffectiveAgentStaleGraceHours(user);
-  const summary = await getTodaySummary(user.id, user.timezone, hoursTarget, graceHours);
-  const pulse = await getPulseStats(user.id, graceHours);
+  const [summary, pulse, config, evidence] = await Promise.all([
+    getTodaySummary(user.id, user.timezone, hoursTarget, graceHours),
+    getPulseStats(user.id, graceHours),
+    getAppConfig(),
+    fetchAgentStatusEvidence(user.id),
+  ]);
   const dayKey = dayKeyInTimezone(new Date(), user.timezone);
   const isOutToday = await isUserOutOfOffice(user.id, dayKey);
 
@@ -71,6 +79,21 @@ export async function GET() {
       deviceReferenceAt,
     );
 
+  const openVisit = summary.visits.find((visit) => visit.endAt === null) ?? null;
+  const diagnostics = buildAgentStatusDiagnostics({
+    evidence,
+    devices: user.agentDevices.map((device) => ({
+      id: device.id,
+      serialNumber: device.serialNumber,
+      lastSeenAt: device.lastSeenAt,
+    })),
+    officeSsids: config.officeSsids,
+    openVisit: openVisit
+      ? { startAt: openVisit.startAt, ssid: openVisit.ssid, source: openVisit.source }
+      : null,
+    inOfficeNowSignal: summary.livePresence,
+  });
+
   return NextResponse.json({
     installStatus,
     agentHealthy: isOutToday || pulse.agentHealthy,
@@ -86,6 +109,7 @@ export async function GET() {
     showLowActivityWarning,
     minutesSinceLastPulse: pulse.minutesSinceLastPulse,
     recentPulses: pulse.recentPulses,
+    ...diagnostics,
     devices: user.agentDevices.map((d) => ({
       id: d.id,
       serialNumber: d.serialNumber,

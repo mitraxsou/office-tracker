@@ -22,6 +22,7 @@ import type { MonthlyProgressDay } from "@/lib/monthly-progress";
 import { DashboardRefreshButton } from "@/components/DashboardRefreshButton";
 import { DeskClockCalendar } from "./DeskClockCalendar";
 import { DashboardMiniStat, type StatusTone } from "@/components/dashboard/DashboardMiniStat";
+import { dashboardOfficeTimeSegments } from "@/lib/dashboard-live-hours";
 import { formatHoursHms, formatTime, idealCheckoutAt } from "@/lib/visits";
 
 const LAPTOP_TOOLTIP =
@@ -44,6 +45,8 @@ export type DeskClockTodayStats = {
   lastSyncedLabel: string;
   lastSyncedTone: StatusTone;
   lastConfirmedOfficeAt?: Date | null;
+  /** Server clock for liveHours / confirmedHours. */
+  asOf?: Date | string | null;
 };
 
 type DeskClockPanelProps = {
@@ -237,20 +240,6 @@ export function DeskClockPanel({
   );
 }
 
-function liveOfficeHoursFromStats(stats: DeskClockTodayStats, now: Date): number {
-  if (!stats.inOfficeNow) return stats.totalHours;
-  if (!stats.firstCheckIn) return stats.totalHours;
-  if (stats.lastConfirmedOfficeAt) {
-    const extra =
-      Math.max(0, now.getTime() - new Date(stats.lastConfirmedOfficeAt).getTime()) /
-      (1000 * 60 * 60);
-    return Math.max(stats.totalHours, stats.confirmedHours + extra);
-  }
-  const fromFirst =
-    Math.max(0, now.getTime() - new Date(stats.firstCheckIn).getTime()) / (1000 * 60 * 60);
-  return Math.max(stats.confirmedHours, fromFirst, stats.totalHours);
-}
-
 function DeskClockTodayStatsGrid({
   timezone,
   stats,
@@ -260,7 +249,15 @@ function DeskClockTodayStatsGrid({
   stats: DeskClockTodayStats;
   now: Date;
 }) {
-  const liveHours = liveOfficeHoursFromStats(stats, now);
+  const liveHours = dashboardOfficeTimeSegments(
+    {
+      liveHours: stats.totalHours,
+      confirmedHours: stats.confirmedHours,
+      inOfficeNow: stats.inOfficeNow,
+      asOf: stats.asOf,
+    },
+    now,
+  ).liveHours;
   const remaining = Math.max(0, stats.targetHours - liveHours);
   const metTarget = liveHours >= stats.targetHours;
   const officeHoursValue = `${formatHoursHms(liveHours)} / ${formatHoursHms(stats.targetHours)}`;

@@ -9,6 +9,7 @@
 param(
     [string]$ApiUrl,
     [string]$Token,
+    [string]$FilesBaseOverride,
     [switch]$Silent,
     [switch]$Verbose,
     [switch]$Force
@@ -44,6 +45,7 @@ if (-not (Test-Path -LiteralPath $setupPath)) {
 $bound = @{}
 if ($ApiUrl) { $bound.ApiUrl = $ApiUrl }
 if ($Token) { $bound.Token = $Token }
+if ($FilesBaseOverride) { $bound.FilesBaseOverride = $FilesBaseOverride }
 if ($Silent) { $bound.Silent = $true }
 if ($Verbose) { $bound.Verbose = $true }
 if ($Force) { $bound.Force = $true }

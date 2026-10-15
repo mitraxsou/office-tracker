@@ -84,7 +84,7 @@ describe("closeStaleOpenVisits with last confirmed pulse", () => {
     expect(closed).toBe(true);
     expect(visitUpdateMock).toHaveBeenCalledWith({
       where: { id: "visit-1" },
-      data: { endAt: lastPulse },
+      data: { endAt: lastPulse, endSource: "inferred" },
     });
   });
 });

@@ -6,7 +6,7 @@ import { resolveAgentTargetVersionFromConfig } from "@/lib/agent-rollout";
 import { getAgentVersion } from "@/lib/agent-version";
 import { extractBearerToken } from "@/lib/security";
 
-export const AGENT_DOWNLOAD_FILES = [
+export const AGENT_CORE_DOWNLOAD_FILES = [
   "install.ps1",
   "office-heartbeat.ps1",
   "uninstall.ps1",
@@ -16,7 +16,17 @@ export const AGENT_DOWNLOAD_FILES = [
   "agent-storage.ps1",
   "version.txt",
   "test-connection.ps1",
+] as const;
+
+export const WATCHDOG_DOWNLOAD_FILES = [
   "watchdog.ps1",
+  "run-watchdog.vbs",
+  "install-watchdog.ps1",
+] as const;
+
+export const AGENT_DOWNLOAD_FILES = [
+  ...AGENT_CORE_DOWNLOAD_FILES,
+  ...WATCHDOG_DOWNLOAD_FILES,
 ] as const;
 
 export type AgentDownloadFileName = (typeof AGENT_DOWNLOAD_FILES)[number];
@@ -32,12 +42,16 @@ const CONTENT_TYPES: Record<AgentDownloadFileName, string> = {
   "version.txt": "text/plain; charset=utf-8",
   "test-connection.ps1": "text/plain; charset=utf-8",
   "watchdog.ps1": "text/plain; charset=utf-8",
+  "run-watchdog.vbs": "text/plain; charset=utf-8",
+  "install-watchdog.ps1": "text/plain; charset=utf-8",
 };
 
 const FILE_PATHS: Partial<Record<AgentDownloadFileName, string>> = {
   "agent-download.ps1": "lib/agent-download.ps1",
   "agent-storage.ps1": "lib/agent-storage.ps1",
   "watchdog.ps1": "watchdog/watchdog.ps1",
+  "run-watchdog.vbs": "watchdog/run-watchdog.vbs",
+  "install-watchdog.ps1": "watchdog/install-watchdog.ps1",
 };
 
 export type AgentDownloadCaller = {

@@ -17,7 +17,7 @@ $HealthSyncIntervalMinutes = 60
 $OfficeVisitGapMinutes = 15
 # After this many minutes asleep, only trust netsh for a new office visit.
 $LongGapResumeMinutes = 30
-$AgentScriptVersion = "1.5.25"
+$AgentScriptVersion = "1.5.26"
 # Observe-only facts for last-run-summary.txt (never alters presence logic).
 $script:RunDiagFacts = @{
     VisitAction = "none"
@@ -1598,13 +1598,13 @@ function Invoke-AgentSelfUpdate([string]$ApiUrl, [string]$Token, [bool]$Force) {
         $exitCode = Invoke-AgentSetupScript -SetupScript $setupScript -ApiUrl $ApiUrl -Token $Token -Force:$Force
         $after = Get-LocalAgentVersion
         Write-Log "Auto-update finished local v$after exit=$exitCode"
-        if ($Force) {
-            if ($exitCode -eq 0) {
-                Write-Log "OK admin push clean reinstall completed"
-                return $true
-            }
-            Write-Log "WARN force reinstall setup exited with code $exitCode"
+        if ($exitCode -ne 0) {
+            Write-Log "WARN auto-update setup exited with code $exitCode"
             return $false
+        }
+        if ($Force) {
+            Write-Log "OK admin push clean reinstall completed"
+            return $true
         }
         return (Compare-AgentVersion $after $before) -gt 0
     } catch {

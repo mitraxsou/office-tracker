@@ -339,7 +339,7 @@
       "severity": "critical",
       "area": "agent-update",
       "reproSummary": "A bad agent publish with a single global version.txt could silence the fleet (IEX death) with no recovery path and no server gate to soak on Soumitra first.",
-      "assertion": "AppConfig agentRolloutMode defaults to allowlist with Soumitra; resolveAgentTargetVersion returns fleet-stable for others; setup registers PwCOfficePulseWatchdog that uses -File watchdog.ps1 and never IEX office-heartbeat.txt; promote requires confirm.",
+      "assertion": "AppConfig agentRolloutMode defaults to allowlist with Soumitra; resolveAgentTargetVersion returns fleet-stable for others; a separate installer bootstraps PwCOfficePulseWatchdog, routine agent updates leave it unchanged, and it uses -File watchdog.ps1 to repair only toward fleet-stable; promote requires confirm.",
       "fixture": "fixtures/agent-canary-rollout-watchdog.json",
       "testFile": "tests/bugs/BUG-023-agent-canary-rollout-watchdog.test.ts",
       "relatedTests": [
@@ -347,6 +347,20 @@
         "tests/bugs/BUG-017-agent-iex-txt-must-parse.test.ts",
         "tests/bugs/BUG-018-soumitra-only-agent-soak.test.ts"
       ],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
+      "id": "BUG-024",
+      "title": "Today office hours and Today's office time must share one day total",
+      "date": "2026-10",
+      "severity": "high",
+      "area": "visits",
+      "reproSummary": "First check-in 12:41 and last office activity 15:36 is a 2h 55m 3s span. A second calculator that adds time since an earlier pulse, or that drops a 50 minute gap already inside the span, disagrees with that total and with the confirmed versus estimated bar.",
+      "assertion": "Both surfaces use dashboardOfficeTimeSegments. Left office: show the finalized span (2h 55m 3s), not 2h 5m 3s, and do not keep estimating. In office: do not add a 50 minute pulse gap the span already includes; yellow is only the tail after the snapshot. Ideal checkout stays 12:41 plus 5h.",
+      "fixture": "fixtures/dashboard-live-hours-mismatch.json",
+      "testFile": "tests/bugs/BUG-024-dashboard-live-hours-mismatch.test.ts",
+      "relatedTests": ["tests/visits.test.ts"],
       "status": "guarded",
       "skipReason": null
     },

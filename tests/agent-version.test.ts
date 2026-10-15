@@ -115,6 +115,9 @@ describe("agent version", () => {
     "zip reinstall smoke test runs bypass with Force from agent folder",
     () => {
       const script = path.join(process.cwd(), "tests/fixtures/run-zip-reinstall-smoke.ps1");
+      const fixture = readFileSync(script, "utf8");
+      expect(fixture).toContain("OFFICETRACKER_INSTALL_DIR");
+      expect(fixture).toContain("-Hidden");
       const out = execSync(
         `powershell -NoProfile -ExecutionPolicy Bypass -File "${script}"`,
         { encoding: "utf8", timeout: 120_000 },
@@ -178,10 +181,11 @@ describe("agent version", () => {
     expect(installer).not.toContain("& $setupPath");
   });
 
-  it("setup.ps1 force reinstall resets local install like uninstall", () => {
+  it("setup.ps1 force repair preserves the independent watchdog", () => {
     const setup = readAgentFile("setup.ps1");
     expect(setup).toContain("function Reset-LocalAgentInstall");
-    expect(setup).toContain("Force reinstall: clearing local agent");
+    expect(setup).toContain("Force reinstall: clearing agent files while preserving independent watchdog");
+    expect(setup).toContain('"watchdog", "config.json", "logs"');
     expect(setup).toContain("$pendingForceReset = $Force");
     const downloadIdx = setup.indexOf("Download-AgentScriptsFromApp");
     const resetIdx = setup.indexOf("if ($pendingForceReset)");
@@ -203,6 +207,12 @@ describe("agent version", () => {
     expect(setup).toContain("repair missing");
     expect(setup).toContain("Downloading missing");
     expect(setup).toContain('Get-MissingAgentLayoutFiles -InstallDir $installDir');
+    expect(setup).toContain("Committed agent version $newVersion after successful setup");
+    const completeIdx = setup.lastIndexOf("Complete-Install -InstallDir");
+    const watchdogIdx = setup.lastIndexOf("Install-WatchdogBootstrap -FilesBase");
+    const commitIdx = setup.lastIndexOf("Committed agent version $newVersion");
+    expect(watchdogIdx).toBeGreaterThan(completeIdx);
+    expect(commitIdx).toBeGreaterThan(watchdogIdx);
   });
 
   it("setup.ps1 refreshes config.json on reinstall when token, apiUrl, or Force changes", () => {

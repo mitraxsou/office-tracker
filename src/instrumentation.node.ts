@@ -609,6 +609,21 @@ export async function registerNode() {
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "agentRolloutAllowlist" TEXT NOT NULL DEFAULT \'["soumitra.m.mandal@pwc.com"]\';'
     );
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "AgentReleaseArtifact" (
+        "id" TEXT NOT NULL,
+        "version" TEXT NOT NULL,
+        "fileName" TEXT NOT NULL,
+        "content" BYTEA NOT NULL,
+        "sha256" TEXT NOT NULL,
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "AgentReleaseArtifact_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "AgentReleaseArtifact_version_fileName_key" UNIQUE ("version", "fileName")
+      );
+    `);
+    await prisma.$executeRawUnsafe(
+      'CREATE INDEX IF NOT EXISTS "AgentReleaseArtifact_version_idx" ON "AgentReleaseArtifact"("version");'
+    );
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "Visit" ADD COLUMN IF NOT EXISTS "localVisitId" TEXT;'
     );

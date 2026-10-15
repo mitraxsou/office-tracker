@@ -9,6 +9,8 @@ const agentFiles = [
   "update.ps1",
   "lib/agent-storage.ps1",
   "lib/agent-download.ps1",
+  "watchdog/watchdog.ps1",
+  "watchdog/install-watchdog.ps1",
 ];
 
 function readAgent(relPath: string): string {

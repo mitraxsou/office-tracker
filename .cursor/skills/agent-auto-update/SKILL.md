@@ -53,6 +53,27 @@ If unsure whether a change would reach the fleet: confirm rollout mode is still 
 4. **Bump `agent/version.txt` and `$AgentScriptVersion` together** only when an agent script change must reach laptops **and** BUG-018 rollout is approved (or the bump is laptop-only soak with no production publish).
 5. **Soft update only runs when heartbeat can sync.** If a bad build breaks IEX, laptops cannot self-heal until someone runs **Copy update command** (or a local repair). Treat parse/IEX breakage as fleet-down.
 
+## Independent watchdog boundary
+
+`PwCOfficePulseWatchdog` is the recovery path for a broken heartbeat agent.
+
+- Routine setup, soft update, force repair, and reinstall must leave an existing
+  watchdog task and its files unchanged.
+- Setup may bootstrap the watchdog only when the watchdog task is missing.
+- The watchdog runs hourly and at logon, uses `-File watchdog.ps1`, and targets
+  `agentFleetStableVersion`, not the canary version offered to an allowlisted user.
+- The watchdog stages agent files outside the install directory, never downloads
+  or replaces itself, verifies server SHA-256 headers, and commits the agent
+  version only after setup succeeds.
+- **Promote to everyone** snapshots the reviewed core agent files into
+  `AgentReleaseArtifact`. The watchdog downloads from that immutable fleet-stable
+  snapshot so a later canary deploy cannot leak into a recovery repair.
+- A force agent repair preserves the watchdog directory. An explicit full
+  uninstall removes both tasks and the complete install directory.
+- Watchdog replacement is a separate, explicit risky operation through
+  `watchdog/install-watchdog.ps1 -ReplaceExisting`. Never add it to routine agent
+  auto-update.
+
 ## Before any agent change leaves Soumitra's laptop
 
 Run all of:

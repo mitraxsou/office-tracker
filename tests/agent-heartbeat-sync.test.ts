@@ -76,7 +76,7 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain("Refreshing setup scripts from server before");
     expect(heartbeat).toContain("OK admin push clean reinstall completed");
     expect(heartbeat).toContain("if ($Force) {");
-    expect(heartbeat).toContain("if ($exitCode -eq 0) {");
+    expect(heartbeat).toContain("if ($exitCode -ne 0) {");
     expect(heartbeat).toContain("Hourly update check (force=$force needsUpdate=$needsUpdate)");
   });
 
@@ -98,6 +98,10 @@ describe("office-heartbeat wake and sync behavior", () => {
     const ensureIdx = heartbeat.indexOf("Ensure-AgentUpdateScripts", selfUpdateIdx);
     expect(downloadIdx).toBeGreaterThan(selfUpdateIdx);
     expect(ensureIdx).toBeGreaterThan(downloadIdx);
+    expect(heartbeat).toContain("WARN auto-update setup exited with code $exitCode");
+    expect(heartbeat).toMatch(
+      /\$exitCode -ne 0[\s\S]{0,200}return \$false/,
+    );
   });
 
   it("uses config GET only for bootstrap or stale cache, not every hour", () => {
@@ -214,7 +218,7 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain("last-run-summary.txt");
     expect(heartbeat).toContain("[DIAG/");
     expect(heartbeat).toContain("===== RUN SUMMARY =====");
-    expect(heartbeat).toContain("PwC Office Pulse — last agent check");
+    expect(heartbeat).toContain("PwC Office Pulse - last agent check");
     expect(heartbeat).toContain('Write-Diag -Category "RESUME"');
     expect(heartbeat).toContain('Write-Diag -Category "SSID"');
     expect(heartbeat).toContain('Write-Diag -Category "VISIT"');

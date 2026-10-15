@@ -4,6 +4,10 @@ import { getAppConfig, getUserHoursTarget, getEffectiveAgentStaleGraceHours } fr
 import { aggregateHoursForDay, aggregateLaptopActiveForDay } from "./day-hours";
 import { getTodaySummary, getPulseStats } from "./heartbeat-service";
 import {
+  buildAgentStatusDiagnostics,
+  fetchAgentStatusEvidence,
+} from "./agent-status-diagnostics";
+import {
   activityTickToSignal,
   agentModeUsesActivityTicks,
   heartbeatToSignal,
@@ -53,8 +57,11 @@ export async function getUserReport(
   const config = await getAppConfig();
   const hoursTarget = await getUserHoursTarget(user);
   const graceHours = await getEffectiveAgentStaleGraceHours(user);
-  const today = await getTodaySummary(user.id, user.timezone, hoursTarget, graceHours);
-  const pulse = await getPulseStats(user.id, graceHours);
+  const [today, pulse, evidence] = await Promise.all([
+    getTodaySummary(user.id, user.timezone, hoursTarget, graceHours),
+    getPulseStats(user.id, graceHours),
+    fetchAgentStatusEvidence(user.id),
+  ]);
   const serverAgentVersion = getAgentVersion();
 
   const dailyTrend: Array<{
@@ -213,6 +220,8 @@ export async function getUserReport(
     };
   }
 
+  const openVisit = today.visits.find((visit) => visit.endAt === null) ?? null;
+
   return {
     user: {
       id: user.id,
@@ -246,6 +255,19 @@ export async function getUserReport(
       signalSource: useActivity ? ("activity_tick" as const) : ("heartbeat" as const),
     },
     pulse,
+    agentStatus: buildAgentStatusDiagnostics({
+      evidence,
+      devices: user.agentDevices.map((device) => ({
+        id: device.id,
+        serialNumber: device.serialNumber,
+        lastSeenAt: device.lastSeenAt,
+      })),
+      officeSsids: config.officeSsids,
+      openVisit: openVisit
+        ? { startAt: openVisit.startAt, ssid: openVisit.ssid, source: openVisit.source }
+        : null,
+      inOfficeNowSignal: today.livePresence,
+    }),
     serverAgentVersion,
     devices: user.agentDevices.map((d) => ({
       id: d.id,

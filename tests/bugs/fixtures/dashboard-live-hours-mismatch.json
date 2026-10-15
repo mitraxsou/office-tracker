@@ -1,0 +1,9 @@
+{
+  "timezone": "Asia/Kolkata",
+  "targetHours": 5,
+  "firstCheckIn": "2026-10-15T12:41:00+05:30",
+  "lastActivity": "2026-10-15T15:36:03+05:30",
+  "earlierPulse": "2026-10-15T14:46:03+05:30",
+  "pageOpenedAt": "2026-10-15T16:55:03+05:30",
+  "idealCheckout": "2026-10-15T17:41:00+05:30"
+}

@@ -17,6 +17,9 @@ if (-not (Get-Variable -Name Silent -Scope 0 -ErrorAction SilentlyContinue)) { $
 if (-not (Get-Variable -Name Verbose -Scope 0 -ErrorAction SilentlyContinue)) { $Verbose = $false }
 if (-not (Get-Variable -Name Force -Scope 0 -ErrorAction SilentlyContinue)) { $Force = $false }
 if (-not (Get-Variable -Name RequireAdmin -Scope 0 -ErrorAction SilentlyContinue)) { $RequireAdmin = $false }
+if (-not (Get-Variable -Name FilesBaseOverride -Scope 0 -ErrorAction SilentlyContinue)) {
+    $FilesBaseOverride = $null
+}
 
 if ($null -ne $args -and $args.Count -gt 0) {
     for ($i = 0; $i -lt $args.Count; $i++) {
@@ -26,6 +29,12 @@ if ($null -ne $args -and $args.Count -gt 0) {
             }
             "-Token" {
                 if ($i + 1 -lt $args.Count) { $Token = [string]$args[$i + 1]; $i++ }
+            }
+            "-FilesBaseOverride" {
+                if ($i + 1 -lt $args.Count) {
+                    $FilesBaseOverride = [string]$args[$i + 1]
+                    $i++
+                }
             }
             "-Silent" { $Silent = $true }
             "-Verbose" { $Verbose = $true }
@@ -38,12 +47,13 @@ if ($null -ne $args -and $args.Count -gt 0) {
 
 $TaskName = "PwCOfficePulse"
 $TaskDescription = "My Office Pulse - office hours tracker"
-$WatchdogTaskName = "PwCOfficePulseWatchdog"
-$WatchdogTaskDescription = "My Office Pulse - independent daily update watchdog"
 $LegacyTaskNames = @("OfficeTrackerHeartbeat", "PwCOfficePulse")
 $LegacyUpdateTaskName = "PwCOfficePulseUpdate"
 
 function Get-InstallDir {
+    if ($env:OFFICETRACKER_INSTALL_DIR) {
+        return [string]$env:OFFICETRACKER_INSTALL_DIR
+    }
     Join-Path $env:LOCALAPPDATA "OfficeTracker"
 }
 
@@ -228,7 +238,7 @@ function Copy-AgentFileWithRetry {
 }
 
 function Reset-LocalAgentInstall {
-    Write-SetupLog "Force reinstall: clearing local agent (same as uninstall.ps1)"
+    Write-SetupLog "Force reinstall: clearing agent files while preserving independent watchdog"
     Send-LifecycleUninstallFromConfig
     Stop-RunningAgentProcesses
 
@@ -247,8 +257,10 @@ function Reset-LocalAgentInstall {
 
     $userDir = Get-InstallDir
     if (Test-Path -LiteralPath $userDir) {
-        Remove-Item -LiteralPath $userDir -Recurse -Force -ErrorAction SilentlyContinue
-        Write-SetupLog "Removed $userDir"
+        Get-ChildItem -LiteralPath $userDir -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notin @("watchdog", "config.json", "logs") } |
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        Write-SetupLog "Removed agent-owned files under $userDir (watchdog preserved)"
     }
 
     $lockPath = Get-LockPath
@@ -267,9 +279,7 @@ function Get-AgentLayoutScriptFiles {
         "uninstall.ps1",
         "lib\agent-download.ps1",
         "lib\agent-storage.ps1",
-        "test-connection.ps1",
-        "watchdog\watchdog.ps1",
-        "watchdog\run-watchdog.vbs"
+        "test-connection.ps1"
     )
 }
 
@@ -300,11 +310,6 @@ function Get-AgentDownloadDestPath {
         New-Item -ItemType Directory -Path $libDir -Force | Out-Null
         return Join-Path $libDir $File
     }
-    if ($File -eq "watchdog.ps1") {
-        $wd = Join-Path $DestDir "watchdog"
-        New-Item -ItemType Directory -Path $wd -Force | Out-Null
-        return Join-Path $wd $File
-    }
     return Join-Path $DestDir $File
 }
 
@@ -333,8 +338,7 @@ function Complete-DownloadedAgentScripts {
         "version.txt",
         "test-connection.ps1",
         "agent-download.ps1",
-        "agent-storage.ps1",
-        "watchdog.ps1"
+        "agent-storage.ps1"
     )) {
         if ($files -notcontains $extra) { $files += $extra }
     }
@@ -477,6 +481,8 @@ function Install-AgentScripts {
         [string]$TargetDir
     )
     foreach ($file in $script:AgentDownloadFiles) {
+        # Commit version.txt only after task registration and watchdog bootstrap succeed.
+        if ($file -eq "version.txt") { continue }
         if ($file -eq "agent-download.ps1" -or $file -eq "agent-storage.ps1") {
             $src = Join-Path $SourceDir "lib\$file"
             if (-not (Test-Path $src)) {
@@ -490,18 +496,6 @@ function Install-AgentScripts {
             }
             continue
         }
-        if ($file -eq "watchdog.ps1") {
-            $src = Join-Path $SourceDir "watchdog\$file"
-            if (-not (Test-Path $src)) {
-                $src = Join-Path $SourceDir $file
-            }
-            if (Test-Path $src) {
-                $wd = Join-Path $TargetDir "watchdog"
-                New-Item -ItemType Directory -Path $wd -Force | Out-Null
-                Copy-AgentFileWithRetry -Source $src -Destination (Join-Path $wd $file)
-            }
-            continue
-        }
         $src = Join-Path $SourceDir $file
         if (Test-Path $src) {
             $destination = Join-Path $TargetDir $file
@@ -509,6 +503,7 @@ function Install-AgentScripts {
         }
     }
     foreach ($rel in (Get-AgentLayoutScriptFiles)) {
+        if ($rel -eq "version.txt") { continue }
         $src = Join-Path $SourceDir $rel
         if (-not (Test-Path -LiteralPath $src)) { continue }
         $destination = Join-Path $TargetDir $rel
@@ -518,69 +513,52 @@ function Install-AgentScripts {
         }
         if (-not (Test-Path -LiteralPath $destination)) {
             Copy-AgentFileWithRetry -Source $src -Destination $destination
-        } elseif ($rel -like "watchdog\*") {
-            Copy-AgentFileWithRetry -Source $src -Destination $destination
         }
     }
 }
 
-function Register-WatchdogTask {
-    param([string]$InstallDir)
-    $wdDir = Join-Path $InstallDir "watchdog"
-    if (-not (Test-Path -LiteralPath $wdDir)) {
-        New-Item -ItemType Directory -Path $wdDir -Force | Out-Null
-    }
+function Test-WatchdogInstalled {
+    $task = Get-ScheduledTask -TaskName "PwCOfficePulseWatchdog" -ErrorAction SilentlyContinue
+    return ($null -ne $task)
+}
 
-    $ps1SrcCandidates = @(
-        (Join-Path $PSScriptRoot "watchdog\watchdog.ps1"),
-        (Join-Path $InstallDir "watchdog\watchdog.ps1"),
-        (Join-Path $PSScriptRoot "watchdog.ps1")
+function Install-WatchdogBootstrap {
+    param(
+        [string]$FilesBase,
+        [string]$Token,
+        [string]$BypassSecret
     )
-    $ps1Dest = Join-Path $wdDir "watchdog.ps1"
-    foreach ($src in $ps1SrcCandidates) {
-        if (Test-Path -LiteralPath $src) {
-            Copy-AgentFileWithRetry -Source $src -Destination $ps1Dest
-            break
-        }
-    }
-    if (-not (Test-Path -LiteralPath $ps1Dest)) {
-        Write-SetupLog "WARN watchdog.ps1 missing; skipping watchdog task registration"
+    if (Test-WatchdogInstalled) {
+        Write-SetupLog "SKIP independent watchdog already installed and left unchanged"
         return
     }
 
-    $vbsSrc = Join-Path $PSScriptRoot "watchdog\run-watchdog.vbs"
-    $vbsDest = Join-Path $wdDir "run-watchdog.vbs"
-    if (Test-Path -LiteralPath $vbsSrc) {
-        Copy-AgentFileWithRetry -Source $vbsSrc -Destination $vbsDest
-    } elseif (-not (Test-Path -LiteralPath $vbsDest)) {
-        $vbsContent = @"
-Option Explicit
-Dim sh, ps1, cmd
-Set sh = CreateObject("Wscript.Shell")
-ps1 = sh.ExpandEnvironmentStrings("%LOCALAPPDATA%\OfficeTracker\watchdog\watchdog.ps1")
-cmd = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & ps1 & """"
-sh.Run cmd, 0, False
-"@
-        Set-Content -LiteralPath $vbsDest -Value $vbsContent -Encoding ASCII
-    }
-
-    $wscript = (Get-Command wscript.exe).Source
-    $actionArgs = "//B //Nologo `"$vbsDest`""
-    $action = New-ScheduledTaskAction -Execute $wscript -Argument $actionArgs
-    $daily = New-ScheduledTaskTrigger -Daily -At 9:15AM
-    $logon = New-ScheduledTaskTrigger -AtLogOn
-    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
-        -LogonType Interactive -RunLevel Limited
-    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
-        -StartWhenAvailable -MultipleInstances IgnoreNew
-
+    $bootstrapDir = Join-Path $env:TEMP "PwCOfficePulse-watchdog-$([Guid]::NewGuid().ToString('N'))"
+    New-Item -ItemType Directory -Path $bootstrapDir -Force | Out-Null
     try {
-        Register-ScheduledTask -TaskName $WatchdogTaskName -Action $action `
-            -Trigger @($daily, $logon) -Principal $principal -Settings $settings `
-            -Description $WatchdogTaskDescription -Force | Out-Null
-        Write-SetupLog "OK registered $WatchdogTaskName (daily + AtLogOn)"
-    } catch {
-        Write-SetupLog "WARN watchdog task registration failed: $($_.Exception.Message)"
+        $headers = New-AgentDownloadHeaders -Token $Token -BypassSecret $BypassSecret
+        foreach ($pair in @(
+            @{ remote = "watchdog.ps1"; local = "watchdog.ps1" },
+            @{ remote = "run-watchdog.vbs"; local = "run-watchdog.vbs" },
+            @{ remote = "install-watchdog.ps1"; local = "install-watchdog.ps1" }
+        )) {
+            $url = "$($FilesBase.TrimEnd('/'))/$($pair.remote)"
+            $dest = Join-Path $bootstrapDir $pair.local
+            Write-SetupLog "Downloading watchdog bootstrap $url"
+            Invoke-WebRequest -Uri $url -Headers $headers -OutFile $dest `
+                -UseBasicParsing -TimeoutSec 120
+            Unblock-File -LiteralPath $dest -ErrorAction SilentlyContinue
+        }
+
+        $installer = Join-Path $bootstrapDir "install-watchdog.ps1"
+        $exitCode = Invoke-AgentScriptBypass -Ps1Path $installer `
+            -BoundVars @{ SourceDir = $bootstrapDir } -Hidden -Wait
+        if ($exitCode -ne 0 -or -not (Test-WatchdogInstalled)) {
+            throw "Independent watchdog bootstrap failed (exit=$exitCode)"
+        }
+        Write-SetupLog "OK independent watchdog bootstrapped"
+    } finally {
+        Remove-Item -LiteralPath $bootstrapDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -632,15 +610,29 @@ function Install-AdminLevel {
     $localConfigDir = Get-InstallDir
     if (-not (Test-Path $localConfigDir)) { New-Item -ItemType Directory -Path $localConfigDir -Force | Out-Null }
 
-    Install-AgentScripts -SourceDir $PSScriptRoot -TargetDir $installDir
-    Install-AgentScripts -SourceDir $PSScriptRoot -TargetDir $localConfigDir
+    $sourceRoot = if ($PSScriptRoot) {
+        $PSScriptRoot
+    } elseif ($env:OFFICEPULSE_SETUP_ROOT) {
+        $env:OFFICEPULSE_SETUP_ROOT
+    } else {
+        throw "Setup source directory not found"
+    }
+    Install-AgentScripts -SourceDir $sourceRoot -TargetDir $installDir
+    Install-AgentScripts -SourceDir $sourceRoot -TargetDir $localConfigDir
     Write-AgentConfig -InstallDir $localConfigDir -ApiUrlValue $ApiUrlValue -TokenValue $TokenValue
 
     $heartbeatScript = Join-Path $installDir "office-heartbeat.ps1"
     $vbsPath = New-HiddenRunner -ScriptPath $heartbeatScript -Dir $localConfigDir
     Register-HiddenTask -VbsPath $vbsPath -InstallDir $localConfigDir
-    Register-WatchdogTask -InstallDir $localConfigDir
     Remove-LegacyUpdateTask
+    $downloadCfg = Get-AgentDownloadConfig -ApiUrl $ApiUrlValue -Token $TokenValue
+    Install-WatchdogBootstrap -FilesBase $downloadCfg.FilesBase -Token $TokenValue `
+        -BypassSecret $downloadCfg.BypassSecret
+    $sourceVersion = Join-Path $sourceRoot "version.txt"
+    if (Test-Path -LiteralPath $sourceVersion) {
+        Copy-AgentFileWithRetry -Source $sourceVersion `
+            -Destination (Join-Path $localConfigDir "version.txt")
+    }
 
     Write-Host ""
     Write-Host "My Office Pulse installed (admin / Program Files)" -ForegroundColor Green
@@ -658,7 +650,6 @@ function Complete-Install {
     Publish-InstalledAgentScripts -InstallDir $InstallDir
     $vbsPath = New-HiddenRunner -ScriptPath $heartbeatScript -Dir $InstallDir
     Register-HiddenTask -VbsPath $vbsPath -InstallDir $InstallDir
-    Register-WatchdogTask -InstallDir $InstallDir
     Remove-LegacyUpdateTask
 
     if ($ScriptsUpdated -and -not $Force) {
@@ -788,6 +779,10 @@ try {
         }
     }
     $downloadCfg = Get-AgentDownloadConfig -ApiUrl $ApiUrl -Token $Token
+    if ($FilesBaseOverride) {
+        $downloadCfg.FilesBase = $FilesBaseOverride.TrimEnd("/")
+        Write-SetupLog "Using fleet-stable recovery file source"
+    }
     $tempDir = Join-Path $env:TEMP "PwCOfficePulse-setup-$([Guid]::NewGuid().ToString('N'))"
     Download-AgentScriptsFromApp -FilesBase $downloadCfg.FilesBase -Token $Token `
         -BypassSecret $downloadCfg.BypassSecret -DestDir $tempDir `
@@ -842,6 +837,15 @@ try {
 
     Write-SetupLog "Registering scheduled task and shortcuts..."
     Complete-Install -InstallDir $installDir -IsReinstall $isReinstallForComplete -ScriptsUpdated $shouldInstallScripts
+    Write-SetupLog "Ensuring independent watchdog exists..."
+    Install-WatchdogBootstrap -FilesBase $downloadCfg.FilesBase -Token $Token `
+        -BypassSecret $downloadCfg.BypassSecret
+
+    if ($shouldInstallScripts) {
+        Copy-AgentFileWithRetry -Source $versionFile `
+            -Destination (Join-Path $installDir "version.txt")
+        Write-SetupLog "Committed agent version $newVersion after successful setup"
+    }
     Write-SetupLog "Verifying install layout..."
     Test-AgentInstallLayout -InstallDir $installDir
 

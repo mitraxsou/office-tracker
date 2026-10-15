@@ -14,6 +14,7 @@ import {
 import { API_VERSION, extractBearerToken, sanitizeSerialNumber } from "@/lib/security";
 import { AGENT_API_ROUTES, recordAgentApiHit } from "@/lib/agent-api-hits";
 import { prisma } from "@/lib/db";
+import { fleetStableFilesBaseUrl } from "@/lib/agent-release-artifacts";
 
 export async function GET(request: Request) {
   const token = extractBearerToken(request);
@@ -71,6 +72,10 @@ export async function GET(request: Request) {
       heartbeatIntervalMinutes: globalConfig.heartbeatIntervalMinutes,
       apiVersion: API_VERSION,
       agentScriptVersion,
+      agentFleetStableVersion: globalConfig.agentFleetStableVersion,
+      agentFleetStableFilesBase: appUrl
+        ? fleetStableFilesBaseUrl(appUrl, globalConfig.agentFleetStableVersion)
+        : null,
       agentScriptFilesBase: appUrl ? agentScriptFilesBaseUrl(appUrl) : null,
       vercelProtectionBypass: vercelProtectionBypassSecret(),
       forceAgentUpdate,

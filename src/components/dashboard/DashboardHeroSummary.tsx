@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { dashboardOfficeTimeSegments } from "@/lib/dashboard-live-hours";
 import { formatHoursHms, formatTime } from "@/lib/visits";
 import { toneClass, type StatusTone } from "@/components/dashboard/DashboardMiniStat";
 
@@ -19,6 +20,8 @@ type DashboardHeroSummaryProps = {
   lastOfficeActivityTone: StatusTone;
   confirmedThroughLabel: string | null;
   lastConfirmedOfficeAt?: Date | string | null;
+  /** Server clock for liveHours / confirmedHours. */
+  asOf?: Date | string | null;
   openVisitStartAt: Date | string | null;
   openVisitSsid: string | null;
 };
@@ -28,32 +31,13 @@ function asDate(value: Date | string | null): Date | null {
   return value instanceof Date ? value : new Date(value);
 }
 
-function liveHoursNow(
-  inOfficeNow: boolean,
-  firstCheckIn: Date | null,
-  lastConfirmedOfficeAt: Date | null,
-  confirmedHours: number,
-  totalHours: number,
-  now: Date,
-): number {
-  if (!inOfficeNow) return totalHours;
-  if (!firstCheckIn) return totalHours;
-  if (lastConfirmedOfficeAt) {
-    const extra =
-      Math.max(0, now.getTime() - lastConfirmedOfficeAt.getTime()) / (1000 * 60 * 60);
-    return Math.max(totalHours, confirmedHours + extra);
-  }
-  const fromFirst = Math.max(0, now.getTime() - firstCheckIn.getTime()) / (1000 * 60 * 60);
-  return Math.max(confirmedHours, fromFirst, totalHours);
-}
-
 export function DashboardHeroSummary({
   totalHours,
   confirmedHours,
   targetHours,
   metTarget: _metTarget,
   inOfficeNow,
-  firstCheckIn,
+  firstCheckIn: _firstCheckIn,
   dayKey,
   timezone,
   lastSyncedLabel,
@@ -61,12 +45,11 @@ export function DashboardHeroSummary({
   lastOfficeActivityLabel,
   lastOfficeActivityTone,
   confirmedThroughLabel,
-  lastConfirmedOfficeAt,
+  lastConfirmedOfficeAt: _lastConfirmedOfficeAt,
+  asOf,
   openVisitStartAt,
   openVisitSsid,
 }: DashboardHeroSummaryProps) {
-  const firstIn = asDate(firstCheckIn);
-  const lastConfirmed = asDate(lastConfirmedOfficeAt ?? null);
   const openVisitStart = asDate(openVisitStartAt);
   const [now, setNow] = useState(() => new Date());
 
@@ -76,17 +59,19 @@ export function DashboardHeroSummary({
     return () => window.clearInterval(id);
   }, [inOfficeNow]);
 
-  const liveHours = liveHoursNow(
-    inOfficeNow,
-    firstIn,
-    lastConfirmed,
-    confirmedHours,
-    totalHours,
+  const segments = dashboardOfficeTimeSegments(
+    {
+      liveHours: totalHours,
+      confirmedHours,
+      inOfficeNow,
+      asOf,
+    },
     now,
   );
+  const liveHours = segments.liveHours;
   const remaining = Math.max(0, targetHours - liveHours);
-  const estimatedHours = Math.max(0, liveHours - confirmedHours);
-  const confirmedPct = Math.min(100, (confirmedHours / targetHours) * 100);
+  const estimatedHours = segments.estimatedHours;
+  const confirmedPct = Math.min(100, (segments.confirmedHours / targetHours) * 100);
   const estimatedPct = Math.min(100 - confirmedPct, (estimatedHours / targetHours) * 100);
   const showEstimate = inOfficeNow && estimatedHours > 1 / 3600;
   const liveMet = liveHours >= targetHours;
@@ -105,7 +90,7 @@ export function DashboardHeroSummary({
           </p>
           {showEstimate && (
             <p className="mt-1 text-xs text-muted">
-              <span className="text-foreground">{formatHoursHms(confirmedHours)} confirmed</span>
+              <span className="text-foreground">{formatHoursHms(segments.confirmedHours)} confirmed</span>
               {" · "}
               <span className="text-[var(--pwc-yellow)]">
                 {formatHoursHms(estimatedHours)} estimated
@@ -151,12 +136,16 @@ export function DashboardHeroSummary({
       </div>
 
       {confirmedThroughLabel && (
-        <p className="mt-2 text-xs text-foreground">{confirmedThroughLabel}</p>
+        <p className="mt-2 text-xs text-foreground">
+          {confirmedThroughLabel}
+          {showEstimate ? " Yellow is estimated until the next agent sync." : ""}
+        </p>
       )}
 
       <p className="mt-2 text-[11px] text-muted">
-        {dayKey} · Orange is time confirmed by the agent. Yellow is estimated from first check-in
-        while you still look in office. The day total is final after the last agent sync.
+        {dayKey} · Orange is time confirmed by the agent. Yellow is the estimate after that
+        confirmation while you still look in office. The day total is final after the last agent
+        sync.
       </p>
     </section>
   );
