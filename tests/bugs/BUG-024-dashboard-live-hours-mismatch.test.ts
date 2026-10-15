@@ -3,6 +3,7 @@ import path from "path";
 import { describe, expect, it } from "vitest";
 import {
   dashboardOfficeTimeSegments,
+  shouldEstimateUnconfirmedOfficeTail,
   type DashboardOfficeTimeInput,
 } from "@/lib/dashboard-live-hours";
 import { formatHoursHms, formatTime, idealCheckoutAt } from "@/lib/visits";
@@ -95,6 +96,58 @@ describe("BUG-024 Today office hours and Today's office time share one day total
     expect(formatHoursHms(segments.estimatedHours)).toBe("0h 50m 0s");
     expect(formatHoursHms(segments.liveHours)).toBe("3h 45m 3s");
     expect(segments.confirmedHours + segments.estimatedHours).toBeCloseTo(segments.liveHours, 8);
+  });
+
+  it("keeps a silent laptop counting in yellow after the last confirmed signal", () => {
+    const asOf = new Date(fixture.pageOpenedAt);
+    const now = new Date(asOf.getTime() + 30 * 1000);
+    const segments = dashboardOfficeTimeSegments(
+      {
+        liveHours: hoursBetween(fixture.firstCheckIn, fixture.pageOpenedAt),
+        confirmedHours: spanHours,
+        inOfficeNow: false,
+        estimateUnconfirmedTail: true,
+        asOf,
+      },
+      now,
+    );
+
+    expect(formatHoursHms(segments.confirmedHours)).toBe("2h 55m 3s");
+    expect(segments.estimatedHours).toBeCloseTo(
+      hoursBetween(fixture.lastActivity, fixture.pageOpenedAt) + 30 / 3600,
+      5,
+    );
+    expect(segments.confirmedHours + segments.estimatedHours).toBeCloseTo(segments.liveHours, 8);
+  });
+
+  it("stops the yellow tail after an agent, manual, or admin checkout", () => {
+    const end = new Date(fixture.lastActivity);
+    expect(
+      shouldEstimateUnconfirmedOfficeTail({
+        isCurrentDay: true,
+        visits: [{ endAt: end, endSource: "inferred" }],
+      }),
+    ).toBe(true);
+    expect(
+      shouldEstimateUnconfirmedOfficeTail({
+        isCurrentDay: true,
+        visits: [{ endAt: null, endSource: null }],
+      }),
+    ).toBe(true);
+    for (const endSource of ["agent", "manual", "admin"] as const) {
+      expect(
+        shouldEstimateUnconfirmedOfficeTail({
+          isCurrentDay: true,
+          visits: [{ endAt: end, endSource }],
+        }),
+      ).toBe(false);
+    }
+    expect(
+      shouldEstimateUnconfirmedOfficeTail({
+        isCurrentDay: false,
+        visits: [{ endAt: null }],
+      }),
+    ).toBe(false);
   });
 
   it("keeps ideal checkout at first check-in plus 5 hours (05:41 pm)", () => {

@@ -11,6 +11,7 @@ type DashboardHeroSummaryProps = {
   targetHours: number;
   metTarget: boolean;
   inOfficeNow: boolean;
+  estimateUnconfirmedTail?: boolean;
   firstCheckIn: Date | string | null;
   dayKey: string;
   timezone: string;
@@ -37,6 +38,7 @@ export function DashboardHeroSummary({
   targetHours,
   metTarget: _metTarget,
   inOfficeNow,
+  estimateUnconfirmedTail = false,
   firstCheckIn: _firstCheckIn,
   dayKey,
   timezone,
@@ -54,16 +56,17 @@ export function DashboardHeroSummary({
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
-    if (!inOfficeNow) return;
+    if (!inOfficeNow && !estimateUnconfirmedTail) return;
     const id = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(id);
-  }, [inOfficeNow]);
+  }, [inOfficeNow, estimateUnconfirmedTail]);
 
   const segments = dashboardOfficeTimeSegments(
     {
       liveHours: totalHours,
       confirmedHours,
       inOfficeNow,
+      estimateUnconfirmedTail,
       asOf,
     },
     now,
@@ -73,7 +76,8 @@ export function DashboardHeroSummary({
   const estimatedHours = segments.estimatedHours;
   const confirmedPct = Math.min(100, (segments.confirmedHours / targetHours) * 100);
   const estimatedPct = Math.min(100 - confirmedPct, (estimatedHours / targetHours) * 100);
-  const showEstimate = inOfficeNow && estimatedHours > 1 / 3600;
+  const showEstimate =
+    (inOfficeNow || estimateUnconfirmedTail) && estimatedHours > 1 / 3600;
   const liveMet = liveHours >= targetHours;
 
   return (
@@ -143,9 +147,9 @@ export function DashboardHeroSummary({
       )}
 
       <p className="mt-2 text-[11px] text-muted">
-        {dayKey} · Orange is time confirmed by the agent. Yellow is the estimate after that
-        confirmation while you still look in office. The day total is final after the last agent
-        sync.
+        {dayKey} · Orange is time confirmed by the agent. Yellow keeps counting after that
+        until a checkout is confirmed. A later agent sync, or Update checkout on this day,
+        replaces the yellow time.
       </p>
     </section>
   );

@@ -23,7 +23,8 @@ import { heartbeatInOffice } from "./heartbeat-office";
 import { maybePurgeOldHeartbeats } from "./heartbeat-retention";
 import { resolveLaptopActiveForDay, laptopActiveHoursForDay, type LaptopActiveParams } from "./laptop-active";
 import { daySpanMsForDay, dayKeyInTimezone, effectiveVisitEnd, firstOfficeInMsForDay, liveOfficeMsForDay, type DaySpanParams } from "./visits";
-import { dayBoundsFromKey, getDayBounds } from "./timezone-dates";
+import { shouldEstimateUnconfirmedOfficeTail } from "./dashboard-live-hours";
+import { dayBoundsFromKey, getDayBounds, isCurrentCalendarDay } from "./timezone-dates";
 import { maybeClearOutOfOfficeOnOfficePresence } from "./out-of-office";
 import { validateVisitTimestamps } from "./visit-validation";
 import { persistRecoveredWifiVisitStarts } from "./office-visit-recovery-persist";
@@ -687,7 +688,15 @@ export async function getTodaySummary(
     checkedOutAfterPulse,
   });
 
-  const liveMs = liveOfficeMsForDay(visits, params, inOfficeNow);
+  const estimateUnconfirmedTail = shouldEstimateUnconfirmedOfficeTail({
+    isCurrentDay: isCurrentCalendarDay(params.dayStart, params.dayEnd, now),
+    visits,
+  });
+  const liveMs = liveOfficeMsForDay(
+    visits,
+    params,
+    inOfficeNow || estimateUnconfirmedTail,
+  );
   const liveHours = liveMs / (1000 * 60 * 60);
   const firstCheckInMs = firstOfficeInMsForDay(visits, params);
   const firstCheckInAt = firstCheckInMs !== null ? new Date(firstCheckInMs) : null;
@@ -705,6 +714,7 @@ export async function getTodaySummary(
     lastConfirmedOfficeAt,
     firstCheckInAt,
     inOfficeNow,
+    estimateUnconfirmedTail,
     asOf: params.now,
     visits,
     lastHeartbeat,

@@ -37,6 +37,7 @@ export type DeskClockTodayStats = {
   targetHours: number;
   metTarget: boolean;
   inOfficeNow: boolean;
+  estimateUnconfirmedTail?: boolean;
   agentStatusValue: string;
   agentStatusTone: StatusTone;
   firstCheckIn: Date | null;
@@ -254,6 +255,7 @@ function DeskClockTodayStatsGrid({
       liveHours: stats.totalHours,
       confirmedHours: stats.confirmedHours,
       inOfficeNow: stats.inOfficeNow,
+      estimateUnconfirmedTail: stats.estimateUnconfirmedTail,
       asOf: stats.asOf,
     },
     now,

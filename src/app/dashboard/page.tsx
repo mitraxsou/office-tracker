@@ -223,6 +223,7 @@ export default async function DashboardPage() {
             targetHours: summary.hoursTarget,
             metTarget: summary.metTarget,
             inOfficeNow: summary.inOfficeNow,
+            estimateUnconfirmedTail: summary.estimateUnconfirmedTail,
             agentStatusValue,
             agentStatusTone,
             firstCheckIn,
@@ -241,6 +242,7 @@ export default async function DashboardPage() {
           targetHours={summary.hoursTarget}
           metTarget={summary.metTarget}
           inOfficeNow={summary.inOfficeNow}
+          estimateUnconfirmedTail={summary.estimateUnconfirmedTail}
           firstCheckIn={firstCheckIn}
           dayKey={summary.dayKey}
           timezone={user.timezone}
