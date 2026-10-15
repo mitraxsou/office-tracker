@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/admin";
 import { enforcePasswordChangeIfRequired, enforceTermsAcceptanceIfRequired } from "@/lib/session-guards";
 import { getAppConfig } from "@/lib/app-config";
+import { prisma } from "@/lib/db";
 import { AppNav } from "@/components/AppNav";
 import { AdminSettingsForm } from "@/components/AdminSettingsForm";
 import { AdminAgentRolloutPanel } from "@/components/AdminAgentRolloutPanel";
@@ -25,13 +26,18 @@ export default async function AdminSettingsPage() {
   enforcePasswordChangeIfRequired(admin);
   await enforceTermsAcceptanceIfRequired(admin, "/admin/settings");
 
-  const [config, integrationKeys, cronJobs, databaseStats, legalDraft] = await Promise.all([
-    getAppConfig(),
-    listIntegrationApiKeys(),
-    listCronJobs(),
-    getDatabaseStats(),
-    getAdminLegalDraft(),
-  ]);
+  const [config, integrationKeys, cronJobs, databaseStats, legalDraft, rolloutUsers] =
+    await Promise.all([
+      getAppConfig(),
+      listIntegrationApiKeys(),
+      listCronJobs(),
+      getDatabaseStats(),
+      getAdminLegalDraft(),
+      prisma.user.findMany({
+        orderBy: { email: "asc" },
+        select: { email: true, name: true },
+      }),
+    ]);
 
   return (
     <>
@@ -62,6 +68,7 @@ export default async function AdminSettingsPage() {
           agentFleetStableVersion={config.agentFleetStableVersion}
           agentCanaryVersion={config.agentCanaryVersion || getAgentVersion()}
           agentRolloutAllowlistEmails={config.agentRolloutAllowlistEmails}
+          users={rolloutUsers}
         />
         <AdminComplianceExemptionControls
           complianceExemptionRequiresApproval={config.complianceExemptionRequiresApproval}
