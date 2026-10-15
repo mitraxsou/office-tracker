@@ -110,6 +110,7 @@ export default async function SettingsPage({
           showChangePassword={!showInitialPassword}
           changePasswordRequired={mustChangePassword}
           isBreakglass={isBreakglass}
+          heartbeatRetentionDays={config.heartbeatRetentionDays}
         />
       </main>
     </>

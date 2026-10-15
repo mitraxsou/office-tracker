@@ -108,7 +108,7 @@ function resolveSettingsHash(
 
   }
 
-  if (h === "diagnostics" && adminAccess) {
+  if (h === "diagnostics") {
 
     return { activeId: "diagnostics", scrollToId: "diagnostics" };
 
@@ -140,13 +140,11 @@ export function SettingsLayout({
 
     }
 
-    const ids: SettingsSectionId[] = ["agent", "account", "notifications"];
-
-    if (adminAccess) ids.push("diagnostics");
+    const ids: SettingsSectionId[] = ["agent", "account", "notifications", "diagnostics"];
 
     return ids.map((id) => ({ id, label: SECTION_LABELS[id] }));
 
-  }, [adminAccess, accountOnly]);
+  }, [accountOnly]);
 
 
 
@@ -220,7 +218,7 @@ export function SettingsLayout({
 
 
 
-        {adminAccess && sections.diagnostics != null && (
+        {sections.diagnostics != null && (
 
           <section id="diagnostics" className="scroll-mt-header space-y-6">
 

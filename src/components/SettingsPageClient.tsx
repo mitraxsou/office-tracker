@@ -16,6 +16,7 @@ import { PreferredNameSection } from "@/components/PreferredNameSection";
 import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 import { SettingsLayout } from "@/components/SettingsLayout";
 import { AgentActivityPanel } from "@/components/AgentActivityPanel";
+import { AdminPresenceTimeline } from "@/components/AdminPresenceTimeline";
 import type { UserAgentVersionSummary } from "@/lib/agent-update";
 
 type Device = EnrichedDevice;
@@ -53,6 +54,7 @@ type SettingsPageClientProps = {
   showChangePassword?: boolean;
   changePasswordRequired?: boolean;
   isBreakglass?: boolean;
+  heartbeatRetentionDays?: number;
 };
 
 export function SettingsPageClient({
@@ -78,6 +80,7 @@ export function SettingsPageClient({
   showChangePassword = true,
   changePasswordRequired = false,
   isBreakglass = false,
+  heartbeatRetentionDays = 7,
 }: SettingsPageClientProps) {
   const [devices, setDevices] = useState(initialDevices);
 
@@ -166,11 +169,19 @@ export function SettingsPageClient({
             diagnostics: lockSettings ? null : (
               <>
                 <AgentActivityPanel />
-                <AgentStatusPanel
-                  installTokens={installTokens}
-                  legacyBoundCount={legacyBoundCount}
-                  appUrl={appUrl}
+                <AdminPresenceTimeline
+                  userId=""
+                  timezone={timezone}
+                  retentionDays={heartbeatRetentionDays}
+                  forCurrentUser
                 />
+                {adminAccess && (
+                  <AgentStatusPanel
+                    installTokens={installTokens}
+                    legacyBoundCount={legacyBoundCount}
+                    appUrl={appUrl}
+                  />
+                )}
               </>
             ),
           }}

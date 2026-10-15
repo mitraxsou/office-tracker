@@ -84,6 +84,14 @@ export const GLOBAL_SEARCH_INDEX: GlobalSearchEntry[] = [
     group: "settings",
   },
   {
+    id: "settings-wifi-activity",
+    label: "Wi-Fi and sync activity",
+    description: "Your office entry, exit, Wi-Fi changes, and sync events",
+    href: "/settings#diagnostics",
+    keywords: ["wifi", "wi-fi", "ssid", "sync", "diagnostics", "presence", "timeline"],
+    group: "settings",
+  },
+  {
     id: "settings-agent-status",
     label: "Agent status",
     description: "Registered laptops and heartbeat health",

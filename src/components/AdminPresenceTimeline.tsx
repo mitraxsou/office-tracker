@@ -41,6 +41,7 @@ export function AdminPresenceTimeline({
   selectedDate = null,
   lastUploadedTicks = [],
   retentionDays = 7,
+  forCurrentUser = false,
 }: {
   userId: string;
   timezone: string;
@@ -48,6 +49,8 @@ export function AdminPresenceTimeline({
   selectedDate?: string | null;
   lastUploadedTicks?: LastUploadedTick[];
   retentionDays?: number;
+  /** Settings diagnostics: the signed-in user, not an admin lookup. */
+  forCurrentUser?: boolean;
 }) {
   const [days, setDays] = useState(7);
   const [data, setData] = useState<TimelineData | null>(null);
@@ -64,7 +67,10 @@ export function AdminPresenceTimeline({
       } else {
         qs.set("days", String(days));
       }
-      const res = await fetch(`/api/admin/users/${userId}/presence-timeline?${qs}`);
+      const path = forCurrentUser
+        ? "/api/settings/presence-timeline"
+        : `/api/admin/users/${userId}/presence-timeline`;
+      const res = await fetch(`${path}?${qs}`);
       if (!res.ok) {
         setError("Failed to load Wi-Fi activity");
         return;
@@ -77,7 +83,7 @@ export function AdminPresenceTimeline({
     } finally {
       setLoading(false);
     }
-  }, [userId, days, selectedDate]);
+  }, [userId, days, selectedDate, forCurrentUser]);
 
   useEffect(() => {
     void load();
@@ -205,7 +211,16 @@ export function AdminPresenceTimeline({
         </div>
       )}
 
-      {!compact && (
+      {!compact && forCurrentUser && (
+        <p className="mt-3 text-xs text-muted">
+          This is your laptop&apos;s office entry, exit, Wi-Fi changes, and sync events. Activity
+          ticks stay off until you turn them on. Rows are kept about {retentionDays} day
+          {retentionDays === 1 ? "" : "s"}. If a checkout looks wrong, update it on the visit or
+          ask an admin to correct the day.
+        </p>
+      )}
+
+      {!compact && !forCurrentUser && (
         <div className="mt-3 space-y-2 text-xs text-muted">
           <p>
             When to use: Visits and this table for office hours. Activity ticks after end of day

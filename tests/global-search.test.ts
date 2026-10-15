@@ -36,6 +36,9 @@ describe("global search filters", () => {
 
     const agentStatusResults = filterGlobalSearch("agent status", { isAdmin: false });
     expect(agentStatusResults.some((entry) => entry.id === "settings-agent-status")).toBe(false);
+
+    const wifiResults = filterGlobalSearch("wifi", { isAdmin: false });
+    expect(wifiResults.some((entry) => entry.id === "settings-wifi-activity")).toBe(true);
   });
 
   it("includes admin-only entries for admins", () => {
