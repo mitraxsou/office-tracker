@@ -123,6 +123,7 @@ export async function POST(request: Request) {
 
   const result = await processAgentSync({
     userId: user.id,
+    userEmail: user.email,
     userTimezone: user.timezone,
     deviceId: deviceResult.device.id,
     serialNumber,

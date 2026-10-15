@@ -106,6 +106,33 @@ function officeIntervalsForDay(
       continue;
     }
     if (visit.endAt === null && isManualSource(visit.source) && isCurrentDay) continue;
+
+    // Overnight carry into today: never invent midnight. Only count today's
+    // portion when there is confirmed office presence today.
+    const startedBeforeDay = visit.startAt.getTime() < params.dayStart.getTime();
+    if (startedBeforeDay) {
+      if (firstHbMs === null && !lastHb) continue;
+      const end = effectiveVisitEnd({
+        endAt: visit.endAt,
+        updatedAt: visit.updatedAt ?? visit.startAt,
+        startAt: visit.startAt,
+        now: params.now,
+        staleMs: params.staleMs,
+        lastHeartbeatAt: params.lastHeartbeatAt,
+        dayEnd: params.dayEnd,
+      });
+      const clippedEnd = Math.min(end.getTime(), dayEndMs);
+      const start = firstHbMs ?? (lastHb ? clipToDay(lastHb.getTime(), params.dayStart, params.dayEnd) : null);
+      if (start === null || clippedEnd < start) continue;
+      intervals.push({
+        start,
+        end: clippedEnd,
+        source: visit.source,
+        closed: visit.endAt !== null,
+      });
+      continue;
+    }
+
     const end = effectiveVisitEnd({
       endAt: visit.endAt,
       updatedAt: visit.updatedAt ?? visit.startAt,
@@ -128,26 +155,35 @@ function officeIntervalsForDay(
 
   const openVisit = visits.find((visit) => visit.endAt === null) ?? null;
   if (openVisit && isCurrentDay) {
-    const end = isManualSource(openVisit.source)
-      ? params.now
-      : effectiveVisitEnd({
-          endAt: null,
-          updatedAt: openVisit.updatedAt ?? openVisit.startAt,
-          startAt: openVisit.startAt,
-          now: params.now,
-          staleMs: params.staleMs,
-          lastHeartbeatAt: params.lastHeartbeatAt,
-          dayEnd: params.dayEnd,
+    const startedBeforeDay = openVisit.startAt.getTime() < params.dayStart.getTime();
+    // Overnight open with no office pulse today: do not paint a phantom day span.
+    if (startedBeforeDay && firstHbMs === null && !lastHb) {
+      // skip
+    } else {
+      const end = isManualSource(openVisit.source)
+        ? params.now
+        : effectiveVisitEnd({
+            endAt: null,
+            updatedAt: openVisit.updatedAt ?? openVisit.startAt,
+            startAt: openVisit.startAt,
+            now: params.now,
+            staleMs: params.staleMs,
+            lastHeartbeatAt: params.lastHeartbeatAt,
+            dayEnd: params.dayEnd,
+          });
+      const start = startedBeforeDay
+        ? (firstHbMs ??
+          (lastHb ? clipToDay(lastHb.getTime(), params.dayStart, params.dayEnd) : null))
+        : clipToDay(openVisit.startAt.getTime(), params.dayStart, params.dayEnd);
+      const endMs = Math.min(end.getTime(), dayEndMs);
+      if (start !== null && endMs >= start) {
+        intervals.push({
+          start,
+          end: endMs,
+          source: openVisit.source,
+          closed: false,
         });
-    const start = clipToDay(openVisit.startAt.getTime(), params.dayStart, params.dayEnd);
-    const endMs = Math.min(end.getTime(), dayEndMs);
-    if (start !== null && endMs >= start) {
-      intervals.push({
-        start,
-        end: endMs,
-        source: openVisit.source,
-        closed: false,
-      });
+      }
     }
   }
 
@@ -183,7 +219,11 @@ function officeIntervalsForDay(
   return intervals.map(({ start, end }) => ({ start, end }));
 }
 
-/** First clipped check-in on the day from visits; pulse may only pull earlier within staleMs. */
+/**
+ * First check-in on the day from visits.
+ * Overnight visits that started before dayStart never invent midnight; they only
+ * contribute when there is confirmed office presence today (use that pulse time).
+ */
 export function firstOfficeInMsForDay(
   visits: VisitForDaySpan[],
   params: DaySpanParams,
@@ -191,11 +231,25 @@ export function firstOfficeInMsForDay(
   const firstHb = params.firstInOfficeHeartbeatAt ?? null;
   let firstIn: number | null = null;
   const isCurrentDay = isCurrentCalendarDay(params.dayStart, params.dayEnd, params.now);
+  const dayStartMs = params.dayStart.getTime();
 
   for (const v of visits) {
     if (v.endAt && v.endAt.getTime() < v.startAt.getTime()) continue;
+    const startedBeforeDay = v.startAt.getTime() < dayStartMs;
+
+    if (startedBeforeDay) {
+      // Do not clip yesterday's start to today's midnight.
+      if (!firstHb && !params.lastInOfficeHeartbeatAt) continue;
+      const start = firstHb
+        ? clipToDay(firstHb.getTime(), params.dayStart, params.dayEnd)
+        : null;
+      if (start === null) continue;
+      if (firstIn === null || start < firstIn) firstIn = start;
+      continue;
+    }
+
     if (v.endAt === null && !isCurrentDay) {
-      // Past open visit: use same-day office pulse start when present.
+      // Past open visit on its own day: use same-day office pulse start when present.
       if (!firstHb && !params.lastInOfficeHeartbeatAt) continue;
       const start =
         (firstHb

@@ -1,6 +1,9 @@
 import { readFile } from "fs/promises";
 import path from "path";
 import { getCurrentUser, getUserByAgentToken } from "@/lib/auth";
+import { getCachedAppConfig } from "@/lib/agent-config-cache";
+import { resolveAgentTargetVersionFromConfig } from "@/lib/agent-rollout";
+import { getAgentVersion } from "@/lib/agent-version";
 import { extractBearerToken } from "@/lib/security";
 
 export const AGENT_DOWNLOAD_FILES = [
@@ -13,6 +16,7 @@ export const AGENT_DOWNLOAD_FILES = [
   "agent-storage.ps1",
   "version.txt",
   "test-connection.ps1",
+  "watchdog.ps1",
 ] as const;
 
 export type AgentDownloadFileName = (typeof AGENT_DOWNLOAD_FILES)[number];
@@ -27,11 +31,18 @@ const CONTENT_TYPES: Record<AgentDownloadFileName, string> = {
   "agent-storage.ps1": "text/plain; charset=utf-8",
   "version.txt": "text/plain; charset=utf-8",
   "test-connection.ps1": "text/plain; charset=utf-8",
+  "watchdog.ps1": "text/plain; charset=utf-8",
 };
 
 const FILE_PATHS: Partial<Record<AgentDownloadFileName, string>> = {
   "agent-download.ps1": "lib/agent-download.ps1",
   "agent-storage.ps1": "lib/agent-storage.ps1",
+  "watchdog.ps1": "watchdog/watchdog.ps1",
+};
+
+export type AgentDownloadCaller = {
+  email: string;
+  id: string;
 };
 
 /** Path inside the agent zip (matches repo layout and reinstall command). */
@@ -43,18 +54,46 @@ export function isAgentDownloadFileName(name: string): name is AgentDownloadFile
   return (AGENT_DOWNLOAD_FILES as readonly string[]).includes(name);
 }
 
-export async function authorizeAgentDownload(request: Request): Promise<boolean> {
+export async function resolveAgentDownloadCaller(
+  request: Request,
+): Promise<AgentDownloadCaller | null> {
   const sessionUser = await getCurrentUser();
-  if (sessionUser) return true;
+  if (sessionUser) {
+    return { id: sessionUser.id, email: sessionUser.email };
+  }
 
   const token = extractBearerToken(request);
-  if (!token) return false;
+  if (!token) return null;
 
   const agentUser = await getUserByAgentToken(token);
-  return Boolean(agentUser);
+  if (!agentUser) return null;
+  return { id: agentUser.id, email: agentUser.email };
 }
 
-export async function readAgentFile(name: AgentDownloadFileName): Promise<Buffer> {
+export async function authorizeAgentDownload(request: Request): Promise<boolean> {
+  return Boolean(await resolveAgentDownloadCaller(request));
+}
+
+export async function resolveCallerAgentTargetVersion(
+  caller: AgentDownloadCaller | null,
+): Promise<string> {
+  if (!caller) return getAgentVersion();
+  const config = await getCachedAppConfig();
+  return resolveAgentTargetVersionFromConfig(config, caller);
+}
+
+/**
+ * Read an agent file from the deploy tree. For version.txt, rewrite content to the
+ * caller's resolved target so non-canaries are not stamped with a canary version.
+ */
+export async function readAgentFile(
+  name: AgentDownloadFileName,
+  options?: { targetVersion?: string },
+): Promise<Buffer> {
+  if (name === "version.txt" && options?.targetVersion) {
+    return Buffer.from(`${options.targetVersion.trim()}\n`, "utf8");
+  }
+
   const agentDir = path.join(process.cwd(), "agent");
   const relativePath = FILE_PATHS[name] ?? name;
   return readFile(path.join(agentDir, relativePath));

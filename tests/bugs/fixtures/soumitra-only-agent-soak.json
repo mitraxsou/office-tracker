@@ -8,23 +8,29 @@
     "apiHost": "office-tracker-theta.vercel.app"
   },
   "forbiddenUntilExplicitRolloutApproval": [
-    "bump agent/version.txt for production/fleet",
-    "publish agent zip to production download API consumers",
-    "commit Publish-AgentScriptTxt outputs that ship via soft update to all laptops",
+    "promote agentRolloutMode to everyone without soak",
+    "set agentFleetStableVersion to a bad canary",
     "set forceAgentUpdate for the fleet / mass Push",
-    "merge/deploy agent version bumps that all devices will auto-pull"
+    "merge/deploy agent version bumps that all devices will auto-pull while mode=everyone"
   ],
   "allowedDefault": [
     "edit agent/ locally",
+    "bump version.txt while agentRolloutMode=allowlist (canary only)",
     "copy update on Soumitra laptop only",
     "verify BUG-017 IEX parse, scheduled task, heartbeat, soft auto-update on that laptop"
   ],
+  "serverGate": {
+    "agentRolloutMode": "allowlist",
+    "defaultAllowlist": ["soumitra.m.mandal@pwc.com"],
+    "fleetStablePin": "agentFleetStableVersion stays on last known-good until Promote"
+  },
   "soakChecklist": [
     "BUG-017 npm tests green",
     "scheduled task PwCOfficePulse still runs",
     "heartbeat.log has fresh START v… within ~3 minutes",
     "office-heartbeat.txt parses (no mojibake)",
-    "soft auto-update path still works when server version is newer"
+    "soft auto-update path still works when server version is newer",
+    "PwCOfficePulseWatchdog registered and logs\\watchdog.log updates"
   ],
-  "rollout": "opt-in only after explicit user approval; never automatic"
+  "rollout": "opt-in only after explicit Admin Promote to everyone (confirmPromote); never automatic"
 }

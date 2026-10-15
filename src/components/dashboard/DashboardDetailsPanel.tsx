@@ -10,6 +10,7 @@ type Visit = {
   endAt: Date | null;
   source: string;
   ssid: string | null;
+  endSource?: string | null;
 };
 
 type TabId = "visits" | "manual";
@@ -18,6 +19,8 @@ type DashboardDetailsPanelProps = {
   visits: Visit[];
   timezone: string;
   visitCount: number;
+  hoursTarget: number;
+  officeStartTime: string;
 };
 
 const TABS: { id: TabId; label: string }[] = [
@@ -29,6 +32,8 @@ export function DashboardDetailsPanel({
   visits,
   timezone,
   visitCount,
+  hoursTarget,
+  officeStartTime,
 }: DashboardDetailsPanelProps) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<TabId>("visits");
@@ -81,7 +86,14 @@ export function DashboardDetailsPanel({
             </div>
           )}
 
-          {tab === "manual" && <ManualVisitForm timezone={timezone} embedded />}
+          {tab === "manual" && (
+            <ManualVisitForm
+              timezone={timezone}
+              hoursTarget={hoursTarget}
+              officeStartTime={officeStartTime}
+              embedded
+            />
+          )}
         </div>
       )}
     </section>

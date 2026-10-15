@@ -4,8 +4,10 @@ import { enforcePasswordChangeIfRequired, enforceTermsAcceptanceIfRequired } fro
 import { getAppConfig } from "@/lib/app-config";
 import { AppNav } from "@/components/AppNav";
 import { AdminSettingsForm } from "@/components/AdminSettingsForm";
+import { AdminAgentRolloutPanel } from "@/components/AdminAgentRolloutPanel";
 import { AdminPilotControls } from "@/components/AdminPilotControls";
 import { AdminSubNav } from "@/components/AdminSubNav";
+import { getAgentVersion } from "@/lib/agent-version";
 import { AdminComplianceExemptionControls } from "@/components/AdminComplianceExemptionControls";
 import { AdminIntegrationKeys } from "@/components/AdminIntegrationKeys";
 import { AdminMaintenance } from "@/components/AdminMaintenance";
@@ -53,6 +55,13 @@ export default async function AdminSettingsPage() {
           agentMode={config.agentMode}
           fiscalYearStartMonth={config.fiscalYearStartMonth}
           fiscalYearEndMonth={config.fiscalYearEndMonth}
+        />
+        <AdminAgentRolloutPanel
+          repoVersion={getAgentVersion()}
+          agentRolloutMode={config.agentRolloutMode}
+          agentFleetStableVersion={config.agentFleetStableVersion}
+          agentCanaryVersion={config.agentCanaryVersion || getAgentVersion()}
+          agentRolloutAllowlistEmails={config.agentRolloutAllowlistEmails}
         />
         <AdminComplianceExemptionControls
           complianceExemptionRequiresApproval={config.complianceExemptionRequiresApproval}

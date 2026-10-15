@@ -317,7 +317,7 @@ async function upsertOpenVisit(
         : new Date(open.startAt.getTime() + 1000);
     await prisma.visit.update({
       where: { id: open.id },
-      data: { endAt: gapEnd },
+      data: { endAt: gapEnd, endSource: "inferred" },
     });
   }
 
@@ -341,7 +341,7 @@ async function closeOpenVisit(userId: string, at: Date) {
 
   await prisma.visit.update({
     where: { id: open.id },
-    data: { endAt: at },
+    data: { endAt: at, endSource: "agent" },
   });
 }
 
@@ -406,7 +406,7 @@ export async function closeStaleOpenVisits(
 
   await prisma.visit.update({
     where: { id: open.id },
-    data: { endAt },
+    data: { endAt, endSource: "inferred" },
   });
   return true;
 }
@@ -467,13 +467,18 @@ export async function closeEndOfDayOpenVisits(userId: string, timezone: string) 
     useActivity,
   );
 
+  // Prefer last known same-day signal. Do not invent midnight-next-day ends.
+  // If the agent later sends visit_end, endSource=inferred allows refinement.
   const fallback = open.updatedAt <= dayEnd ? open.updatedAt : open.startAt;
   const endAt = officeDisconnectAt ?? lastSignalAt ?? fallback;
   const cappedEnd = endAt > dayEnd ? dayEnd : endAt;
+  if (cappedEnd.getTime() <= open.startAt.getTime()) {
+    return false;
+  }
 
   await prisma.visit.update({
     where: { id: open.id },
-    data: { endAt: cappedEnd },
+    data: { endAt: cappedEnd, endSource: "inferred" },
   });
   return true;
 }
@@ -594,7 +599,7 @@ export async function checkOutOffice(userId: string) {
 
   return prisma.visit.update({
     where: { id: open.id },
-    data: { endAt: new Date() },
+    data: { endAt: new Date(), endSource: "manual" },
   });
 }
 

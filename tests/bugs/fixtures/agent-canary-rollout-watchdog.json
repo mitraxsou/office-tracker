@@ -1,0 +1,18 @@
+{
+  "incident": "BUG-023",
+  "policy": "server-canary-gate-plus-independent-watchdog",
+  "defaults": {
+    "agentRolloutMode": "allowlist",
+    "agentFleetStableVersion": "1.5.24",
+    "agentCanaryVersion": "1.5.25",
+    "allowlistEmails": ["soumitra.m.mandal@pwc.com"]
+  },
+  "servingModel": "deploy-tree-is-canary; fleetStableVersion gates non-canary agentScriptVersion",
+  "watchdog": {
+    "taskName": "PwCOfficePulseWatchdog",
+    "installDir": "%LOCALAPPDATA%\\OfficeTracker\\watchdog",
+    "runner": "run-watchdog.vbs uses -File watchdog.ps1 (not IEX office-heartbeat.txt)",
+    "triggers": ["Daily", "AtLogOn"]
+  },
+  "promote": "Admin Promote to everyone requires confirmPromote and copies canary into fleet-stable"
+}

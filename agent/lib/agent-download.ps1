@@ -9,7 +9,8 @@ $script:AgentDownloadFiles = @(
     "version.txt",
     "test-connection.ps1",
     "agent-download.ps1",
-    "agent-storage.ps1"
+    "agent-storage.ps1",
+    "watchdog.ps1"
 )
 
 function Get-AgentInstallDir {
@@ -238,6 +239,10 @@ function Download-AgentScriptsFromApp {
             $libDir = Join-Path $DestDir "lib"
             New-Item -ItemType Directory -Path $libDir -Force | Out-Null
             Join-Path $libDir $file
+        } elseif ($file -eq "watchdog.ps1") {
+            $wd = Join-Path $DestDir "watchdog"
+            New-Item -ItemType Directory -Path $wd -Force | Out-Null
+            Join-Path $wd $file
         } else {
             Join-Path $DestDir $file
         }

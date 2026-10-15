@@ -5,33 +5,34 @@ import {
   AGENT_PRODUCT_NAME,
   formatAgentZipDownloadFilename,
 } from "@/lib/agent-branding";
-import { getAgentVersion } from "@/lib/agent-version";
 import {
   AGENT_DOWNLOAD_FILES,
   agentZipEntryPath,
-  authorizeAgentDownload,
   readAgentFile,
+  resolveAgentDownloadCaller,
+  resolveCallerAgentTargetVersion,
 } from "@/lib/agent-download";
 
 export async function GET(request: Request) {
-  if (!(await authorizeAgentDownload(request))) {
+  const caller = await resolveAgentDownloadCaller(request);
+  if (!caller) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const version = await resolveCallerAgentTargetVersion(caller);
   const zip = new JSZip();
 
   for (const file of AGENT_DOWNLOAD_FILES) {
-    const content = await readAgentFile(file);
+    const content = await readAgentFile(file, { targetVersion: version });
     const entryPath = agentZipEntryPath(file);
     zip.file(`${AGENT_EXTRACT_FOLDER}/${entryPath}`, content);
   }
 
   zip.file(
     `${AGENT_EXTRACT_FOLDER}/README.txt`,
-    `${AGENT_PRODUCT_NAME} agent (v${getAgentVersion()})\n\n1. Extract this zip (Extract All may create a nested folder).\n2. Open PowerShell in the folder that contains setup.ps1 and a lib\\ folder (agent-download.ps1 inside lib).\n3. In Settings, copy the reinstall command and paste in that PowerShell window.\n\nOn PwC laptops Downloads is often OneDrive - PwC\\Downloads.\n`
+    `${AGENT_PRODUCT_NAME} agent (v${version})\n\n1. Extract this zip (Extract All may create a nested folder).\n2. Open PowerShell in the folder that contains setup.ps1 and a lib\\ folder (agent-download.ps1 inside lib).\n3. In Settings, copy the reinstall command and paste in that PowerShell window.\n\nOn PwC laptops Downloads is often OneDrive - PwC\\Downloads.\n`,
   );
 
-  const version = getAgentVersion();
   const zipFilename = formatAgentZipDownloadFilename(version);
   const buffer = await zip.generateAsync({ type: "nodebuffer" });
   return new NextResponse(new Uint8Array(buffer), {

@@ -236,6 +236,7 @@ export async function getUserReport(
       id: v.id,
       startAt: v.startAt.toISOString(),
       endAt: v.endAt?.toISOString() ?? null,
+      endSource: v.endSource ?? null,
       source: v.source,
       ssid: v.ssid,
     })),

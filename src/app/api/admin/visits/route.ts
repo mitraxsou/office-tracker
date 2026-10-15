@@ -136,7 +136,10 @@ export async function PATCH(request: Request) {
 
   const data: Record<string, unknown> = {};
   if (body.startAt) data.startAt = new Date(body.startAt);
-  if (body.endAt !== undefined) data.endAt = body.endAt ? new Date(body.endAt) : null;
+  if (body.endAt !== undefined) {
+    data.endAt = body.endAt ? new Date(body.endAt) : null;
+    data.endSource = body.endAt ? "admin" : null;
+  }
   if (body.ssid !== undefined) data.ssid = body.ssid;
 
   const nextStart = (data.startAt as Date | undefined) ?? existing.startAt;

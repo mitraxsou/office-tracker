@@ -3,7 +3,7 @@ import { presenceSignalInOffice } from "./activity-signal";
 import { isOfficeSsid, normalizeSsid } from "./constants";
 import { getUserHoursTarget } from "./app-config";
 import { getCachedAppConfig } from "./agent-config-cache";
-import { getAgentVersion } from "./agent-version";
+import { resolveAgentTargetVersionFromConfig } from "./agent-rollout";
 import { getDeviceForceAgentUpdate } from "./agent-update";
 import {
   agentScriptFilesBaseUrl,
@@ -24,6 +24,7 @@ import {
   loadDaySpanContext,
   maybeRunVisitMaintenance,
 } from "./heartbeat-service";
+import { canAgentRefineVisitEnd } from "./visit-end";
 import { parseAgentEventTimestamp, sanitizeSsid, sanitizeSerialNumber } from "./security";
 import { sanitizeSyncTrigger } from "./presence-timeline";
 import { randomUUID } from "crypto";
@@ -113,6 +114,7 @@ export type AgentSyncRejected = { id: string; reason: string };
 
 export async function processAgentSync(params: {
   userId: string;
+  userEmail?: string | null;
   userTimezone: string;
   deviceId: string;
   serialNumber: string;
@@ -266,7 +268,7 @@ export async function processAgentSync(params: {
           if (openOther && effectiveStartAt.getTime() >= openOther.startAt.getTime()) {
             await prisma.visit.update({
               where: { id: openOther.id },
-              data: { endAt: effectiveStartAt },
+              data: { endAt: effectiveStartAt, endSource: "inferred" },
             });
           }
 
@@ -308,6 +310,17 @@ export async function processAgentSync(params: {
             break;
           }
           if (visit.endAt) {
+            // Server may have inferred checkout while laptop was offline. Prefer
+            // the agent's exact visit_end when endSource is still refinable.
+            if (canAgentRefineVisitEnd(visit.endSource)) {
+              const timestampError = validateVisitTimestamps(visit.startAt, eventAt);
+              if (!timestampError) {
+                await prisma.visit.update({
+                  where: { id: visit.id },
+                  data: { endAt: eventAt, endSource: "agent" },
+                });
+              }
+            }
             if (localVisitId) visitIds[localVisitId] = visit.id;
             ackedEventIds.push(event.id);
             await recordAgentEvent(params.userId, params.deviceId, event, "accepted");
@@ -322,7 +335,7 @@ export async function processAgentSync(params: {
           }
           await prisma.visit.update({
             where: { id: visit.id },
-            data: { endAt: eventAt },
+            data: { endAt: eventAt, endSource: "agent" },
           });
           if (localVisitId) visitIds[localVisitId] = visit.id;
           lastEventAt = eventAt;
@@ -606,6 +619,10 @@ export async function processAgentSync(params: {
 
   const forceAgentUpdate = await getDeviceForceAgentUpdate(params.userId, params.serialNumber);
   const appUrl = params.appUrl.replace(/\/$/, "");
+  const agentScriptVersion = resolveAgentTargetVersionFromConfig(config, {
+    id: params.userId,
+    email: params.userEmail,
+  });
 
   const syncTrigger = sanitizeSyncTrigger(params.syncTrigger);
   if (syncTrigger) {
@@ -628,14 +645,14 @@ export async function processAgentSync(params: {
       inOfficeNow: Boolean(openVisitRow),
       openVisitId: openVisitRow?.id ?? null,
     },
-    agentScriptVersion: getAgentVersion(),
+    agentScriptVersion,
     forceAgentUpdate,
     config: {
       ssids: allowlist,
       hoursTarget,
       timezone: params.userTimezone,
       heartbeatIntervalMinutes: config.heartbeatIntervalMinutes,
-      agentScriptVersion: getAgentVersion(),
+      agentScriptVersion,
       forceAgentUpdate,
       agentMode: config.agentMode,
       agentScriptFilesBase: appUrl ? agentScriptFilesBaseUrl(appUrl) : null,

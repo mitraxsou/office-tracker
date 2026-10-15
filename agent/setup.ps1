@@ -38,6 +38,8 @@ if ($null -ne $args -and $args.Count -gt 0) {
 
 $TaskName = "PwCOfficePulse"
 $TaskDescription = "My Office Pulse - office hours tracker"
+$WatchdogTaskName = "PwCOfficePulseWatchdog"
+$WatchdogTaskDescription = "My Office Pulse - independent daily update watchdog"
 $LegacyTaskNames = @("OfficeTrackerHeartbeat", "PwCOfficePulse")
 $LegacyUpdateTaskName = "PwCOfficePulseUpdate"
 
@@ -265,7 +267,9 @@ function Get-AgentLayoutScriptFiles {
         "uninstall.ps1",
         "lib\agent-download.ps1",
         "lib\agent-storage.ps1",
-        "test-connection.ps1"
+        "test-connection.ps1",
+        "watchdog\watchdog.ps1",
+        "watchdog\run-watchdog.vbs"
     )
 }
 
@@ -296,6 +300,11 @@ function Get-AgentDownloadDestPath {
         New-Item -ItemType Directory -Path $libDir -Force | Out-Null
         return Join-Path $libDir $File
     }
+    if ($File -eq "watchdog.ps1") {
+        $wd = Join-Path $DestDir "watchdog"
+        New-Item -ItemType Directory -Path $wd -Force | Out-Null
+        return Join-Path $wd $File
+    }
     return Join-Path $DestDir $File
 }
 
@@ -324,7 +333,8 @@ function Complete-DownloadedAgentScripts {
         "version.txt",
         "test-connection.ps1",
         "agent-download.ps1",
-        "agent-storage.ps1"
+        "agent-storage.ps1",
+        "watchdog.ps1"
     )) {
         if ($files -notcontains $extra) { $files += $extra }
     }
@@ -480,6 +490,18 @@ function Install-AgentScripts {
             }
             continue
         }
+        if ($file -eq "watchdog.ps1") {
+            $src = Join-Path $SourceDir "watchdog\$file"
+            if (-not (Test-Path $src)) {
+                $src = Join-Path $SourceDir $file
+            }
+            if (Test-Path $src) {
+                $wd = Join-Path $TargetDir "watchdog"
+                New-Item -ItemType Directory -Path $wd -Force | Out-Null
+                Copy-AgentFileWithRetry -Source $src -Destination (Join-Path $wd $file)
+            }
+            continue
+        }
         $src = Join-Path $SourceDir $file
         if (Test-Path $src) {
             $destination = Join-Path $TargetDir $file
@@ -490,9 +512,75 @@ function Install-AgentScripts {
         $src = Join-Path $SourceDir $rel
         if (-not (Test-Path -LiteralPath $src)) { continue }
         $destination = Join-Path $TargetDir $rel
+        $destParent = Split-Path -Parent $destination
+        if ($destParent -and -not (Test-Path -LiteralPath $destParent)) {
+            New-Item -ItemType Directory -Path $destParent -Force | Out-Null
+        }
         if (-not (Test-Path -LiteralPath $destination)) {
             Copy-AgentFileWithRetry -Source $src -Destination $destination
+        } elseif ($rel -like "watchdog\*") {
+            Copy-AgentFileWithRetry -Source $src -Destination $destination
         }
+    }
+}
+
+function Register-WatchdogTask {
+    param([string]$InstallDir)
+    $wdDir = Join-Path $InstallDir "watchdog"
+    if (-not (Test-Path -LiteralPath $wdDir)) {
+        New-Item -ItemType Directory -Path $wdDir -Force | Out-Null
+    }
+
+    $ps1SrcCandidates = @(
+        (Join-Path $PSScriptRoot "watchdog\watchdog.ps1"),
+        (Join-Path $InstallDir "watchdog\watchdog.ps1"),
+        (Join-Path $PSScriptRoot "watchdog.ps1")
+    )
+    $ps1Dest = Join-Path $wdDir "watchdog.ps1"
+    foreach ($src in $ps1SrcCandidates) {
+        if (Test-Path -LiteralPath $src) {
+            Copy-AgentFileWithRetry -Source $src -Destination $ps1Dest
+            break
+        }
+    }
+    if (-not (Test-Path -LiteralPath $ps1Dest)) {
+        Write-SetupLog "WARN watchdog.ps1 missing; skipping watchdog task registration"
+        return
+    }
+
+    $vbsSrc = Join-Path $PSScriptRoot "watchdog\run-watchdog.vbs"
+    $vbsDest = Join-Path $wdDir "run-watchdog.vbs"
+    if (Test-Path -LiteralPath $vbsSrc) {
+        Copy-AgentFileWithRetry -Source $vbsSrc -Destination $vbsDest
+    } elseif (-not (Test-Path -LiteralPath $vbsDest)) {
+        $vbsContent = @"
+Option Explicit
+Dim sh, ps1, cmd
+Set sh = CreateObject("Wscript.Shell")
+ps1 = sh.ExpandEnvironmentStrings("%LOCALAPPDATA%\OfficeTracker\watchdog\watchdog.ps1")
+cmd = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & ps1 & """"
+sh.Run cmd, 0, False
+"@
+        Set-Content -LiteralPath $vbsDest -Value $vbsContent -Encoding ASCII
+    }
+
+    $wscript = (Get-Command wscript.exe).Source
+    $actionArgs = "//B //Nologo `"$vbsDest`""
+    $action = New-ScheduledTaskAction -Execute $wscript -Argument $actionArgs
+    $daily = New-ScheduledTaskTrigger -Daily -At 9:15AM
+    $logon = New-ScheduledTaskTrigger -AtLogOn
+    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
+        -LogonType Interactive -RunLevel Limited
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+        -StartWhenAvailable -MultipleInstances IgnoreNew
+
+    try {
+        Register-ScheduledTask -TaskName $WatchdogTaskName -Action $action `
+            -Trigger @($daily, $logon) -Principal $principal -Settings $settings `
+            -Description $WatchdogTaskDescription -Force | Out-Null
+        Write-SetupLog "OK registered $WatchdogTaskName (daily + AtLogOn)"
+    } catch {
+        Write-SetupLog "WARN watchdog task registration failed: $($_.Exception.Message)"
     }
 }
 
@@ -551,6 +639,7 @@ function Install-AdminLevel {
     $heartbeatScript = Join-Path $installDir "office-heartbeat.ps1"
     $vbsPath = New-HiddenRunner -ScriptPath $heartbeatScript -Dir $localConfigDir
     Register-HiddenTask -VbsPath $vbsPath -InstallDir $localConfigDir
+    Register-WatchdogTask -InstallDir $localConfigDir
     Remove-LegacyUpdateTask
 
     Write-Host ""
@@ -569,6 +658,7 @@ function Complete-Install {
     Publish-InstalledAgentScripts -InstallDir $InstallDir
     $vbsPath = New-HiddenRunner -ScriptPath $heartbeatScript -Dir $InstallDir
     Register-HiddenTask -VbsPath $vbsPath -InstallDir $InstallDir
+    Register-WatchdogTask -InstallDir $InstallDir
     Remove-LegacyUpdateTask
 
     if ($ScriptsUpdated -and -not $Force) {

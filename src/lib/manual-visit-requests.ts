@@ -1,9 +1,134 @@
 import { prisma } from "./db";
 import { logAuditEvent } from "./audit-log";
-import { DEFAULT_MANUAL_VISIT_DURATION_MINUTES } from "./constants";
+import { DEFAULT_HOURS_TARGET, DEFAULT_MANUAL_VISIT_DURATION_MINUTES } from "./constants";
 import { createManualVisit } from "./heartbeat-service";
 import { handleOfficePresenceDetected } from "./ooo-presence";
+import { DEFAULT_NOTIFICATION_PREFS, parseTimeToMinutes } from "./notification-prefs";
+import {
+  dayBoundsFromKey,
+  datetimeInTimezone,
+  dayKeyInTimezone,
+  isFutureDayKey,
+} from "./timezone-dates";
 import { validateVisitTimestamps } from "./visit-validation";
+
+const DAY_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const HH_MM_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+/** Cap how many days one mark-days submission may create. */
+export const MAX_MARK_DAYS_PER_SUBMISSION = 31;
+export const DEFAULT_MARK_DAY_START_TIME = DEFAULT_NOTIFICATION_PREFS.officeStartTime;
+
+export function isValidMarkDayKey(value: string): boolean {
+  if (!DAY_KEY_RE.test(value)) return false;
+  const month = Number(value.slice(5, 7));
+  const day = Number(value.slice(8, 10));
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const date = new Date(`${value}T12:00:00Z`);
+  return date.toISOString().slice(0, 10) === value;
+}
+
+function resolveOfficeStartTime(officeStartTime?: string | null): string {
+  if (officeStartTime && HH_MM_RE.test(officeStartTime)) return officeStartTime;
+  return DEFAULT_MARK_DAY_START_TIME;
+}
+
+function resolveHoursTarget(hoursTarget?: number | null): number {
+  if (typeof hoursTarget === "number" && Number.isFinite(hoursTarget) && hoursTarget > 0) {
+    return hoursTarget;
+  }
+  return DEFAULT_HOURS_TARGET;
+}
+
+/**
+ * Build a same-day visit window whose duration matches the user's daily hours target.
+ * Starts at officeStartTime (default 09:30); if that would run past local midnight,
+ * shifts the start earlier so the full target still fits within the day.
+ */
+export function buildMarkDayVisitedWindow(params: {
+  dayKey: string;
+  timezone: string;
+  hoursTarget: number;
+  officeStartTime?: string | null;
+}): { dayKey: string; startAt: Date; endAt: Date; durationMs: number } {
+  const hoursTarget = resolveHoursTarget(params.hoursTarget);
+  const startTime = resolveOfficeStartTime(params.officeStartTime);
+  const startMinutes = parseTimeToMinutes(startTime);
+  const startHour = Math.floor(startMinutes / 60);
+  const startMinute = startMinutes % 60;
+  const durationMs = Math.round(hoursTarget * 60 * 60 * 1000);
+
+  const { start: dayStart } = dayBoundsFromKey(params.dayKey, params.timezone);
+  // Prefer 23:59 wall time over dayBounds end (23:59:59.999 can label as the next local day).
+  const latestEnd = datetimeInTimezone(params.dayKey, 23, 59, params.timezone);
+  let startAt = datetimeInTimezone(params.dayKey, startHour, startMinute, params.timezone);
+  let endAt = new Date(startAt.getTime() + durationMs);
+
+  if (
+    endAt.getTime() > latestEnd.getTime() ||
+    dayKeyInTimezone(endAt, params.timezone) !== params.dayKey
+  ) {
+    endAt = latestEnd;
+    startAt = new Date(endAt.getTime() - durationMs);
+    if (startAt.getTime() < dayStart.getTime()) {
+      startAt = dayStart;
+      endAt = new Date(Math.min(startAt.getTime() + durationMs, latestEnd.getTime()));
+    }
+  }
+
+  return {
+    dayKey: params.dayKey,
+    startAt,
+    endAt,
+    durationMs: endAt.getTime() - startAt.getTime(),
+  };
+}
+
+export type MarkDayVisitedPlan = {
+  dayKey: string;
+  startAt: Date;
+  endAt: Date;
+  durationMs: number;
+};
+
+/** Validate and expand selected calendar days into N mark-day visit windows. */
+export function planMarkDaysVisitedRequests(params: {
+  dayKeys: string[];
+  timezone: string;
+  hoursTarget: number;
+  officeStartTime?: string | null;
+  now?: Date;
+}): { plans: MarkDayVisitedPlan[]; error?: string } {
+  const unique = [...new Set(params.dayKeys.map((k) => k.trim()).filter(Boolean))].sort();
+  if (unique.length === 0) {
+    return { plans: [], error: "Select at least one day" };
+  }
+  if (unique.length > MAX_MARK_DAYS_PER_SUBMISSION) {
+    return {
+      plans: [],
+      error: `You can mark at most ${MAX_MARK_DAYS_PER_SUBMISSION} days at once`,
+    };
+  }
+
+  const now = params.now ?? new Date();
+  const plans: MarkDayVisitedPlan[] = [];
+  for (const dayKey of unique) {
+    if (!isValidMarkDayKey(dayKey)) {
+      return { plans: [], error: `Invalid day: ${dayKey}` };
+    }
+    if (isFutureDayKey(dayKey, params.timezone, now)) {
+      return { plans: [], error: "Cannot mark future days as visited" };
+    }
+    plans.push(
+      buildMarkDayVisitedWindow({
+        dayKey,
+        timezone: params.timezone,
+        hoursTarget: params.hoursTarget,
+        officeStartTime: params.officeStartTime,
+      }),
+    );
+  }
+  return { plans };
+}
 
 /** When the user omits check-out, close the visit this many minutes after check-in. */
 export function defaultManualVisitEndAt(
@@ -174,6 +299,59 @@ export async function createManualVisitRequest(params: {
   });
 
   return { request: serializeManualVisitRequest(request) } as const;
+}
+
+/**
+ * Create one pending ManualVisitRequest per selected day, each spanning the
+ * user's daily hours target. Does not create Visit rows — admin approval required.
+ */
+export async function createMarkDaysVisitedRequests(params: {
+  userId: string;
+  dayKeys: string[];
+  timezone: string;
+  hoursTarget: number;
+  officeStartTime?: string | null;
+  message?: string | null;
+}) {
+  const planned = planMarkDaysVisitedRequests({
+    dayKeys: params.dayKeys,
+    timezone: params.timezone,
+    hoursTarget: params.hoursTarget,
+    officeStartTime: params.officeStartTime,
+  });
+  if (planned.error) {
+    return { error: planned.error, status: 400 } as const;
+  }
+
+  const message =
+    params.message?.trim().slice(0, 500) ||
+    `Marked day visited (${resolveHoursTarget(params.hoursTarget)}h target)`;
+
+  const requests: ManualVisitRequestSummary[] = [];
+  const failures: Array<{ dayKey: string; error: string }> = [];
+
+  for (const plan of planned.plans) {
+    const result = await createManualVisitRequest({
+      userId: params.userId,
+      startAt: plan.startAt,
+      endAt: plan.endAt,
+      ssid: "manual",
+      message,
+    });
+    if ("error" in result) {
+      failures.push({ dayKey: plan.dayKey, error: result.error });
+      continue;
+    }
+    requests.push(result.request);
+  }
+
+  if (requests.length === 0) {
+    const first = failures[0]?.error ?? "Failed to create mark-day requests";
+    const status = failures.some((f) => f.error.includes("pending")) ? 409 : 400;
+    return { error: first, status, failures } as const;
+  }
+
+  return { requests, failures } as const;
 }
 
 export async function resolveManualVisitRequest(params: {

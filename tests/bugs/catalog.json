@@ -319,6 +319,38 @@
       "skipReason": null
     },
     {
+      "id": "BUG-022",
+      "title": "Overnight open visit invents 12:00 am first check-in with 0h",
+      "date": "2026-10",
+      "severity": "high",
+      "area": "visits",
+      "reproSummary": "Laptop closed in office without visit_end sync left an open Visit. Next day First Check-in showed 12:00 am via clipToDay while hours stayed 0h and In office No (Gourab case).",
+      "assertion": "Overnight visits never clip to midnight without today office pulse; EOD close uses last same-day signal with endSource=inferred; agent visit_end may refine; user can PATCH checkout without approval.",
+      "fixture": "fixtures/overnight-inferred-checkout.json",
+      "testFile": "tests/bugs/BUG-022-overnight-inferred-checkout.test.ts",
+      "relatedTests": ["tests/visit-end-overnight.test.ts"],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
+      "id": "BUG-023",
+      "title": "Server canary rollout + independent daily watchdog",
+      "date": "2026-10",
+      "severity": "critical",
+      "area": "agent-update",
+      "reproSummary": "A bad agent publish with a single global version.txt could silence the fleet (IEX death) with no recovery path and no server gate to soak on Soumitra first.",
+      "assertion": "AppConfig agentRolloutMode defaults to allowlist with Soumitra; resolveAgentTargetVersion returns fleet-stable for others; setup registers PwCOfficePulseWatchdog that uses -File watchdog.ps1 and never IEX office-heartbeat.txt; promote requires confirm.",
+      "fixture": "fixtures/agent-canary-rollout-watchdog.json",
+      "testFile": "tests/bugs/BUG-023-agent-canary-rollout-watchdog.test.ts",
+      "relatedTests": [
+        "tests/agent-rollout.test.ts",
+        "tests/bugs/BUG-017-agent-iex-txt-must-parse.test.ts",
+        "tests/bugs/BUG-018-soumitra-only-agent-soak.test.ts"
+      ],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
       "id": "CORE-001",
       "title": "Heartbeat in-office uses SSID allowlist",
       "date": "2026-01",

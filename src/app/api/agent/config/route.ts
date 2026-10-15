@@ -5,7 +5,7 @@ import {
   AGENT_CONFIG_CACHE_CONTROL,
   getCachedAppConfig,
 } from "@/lib/agent-config-cache";
-import { getAgentVersion } from "@/lib/agent-version";
+import { resolveAgentTargetVersionFromConfig } from "@/lib/agent-rollout";
 import { getDeviceForceAgentUpdate } from "@/lib/agent-update";
 import {
   agentScriptFilesBaseUrl,
@@ -58,6 +58,11 @@ export async function GET(request: Request) {
     console.error("[agent-config] Failed to record API hit");
   }
 
+  const agentScriptVersion = resolveAgentTargetVersionFromConfig(globalConfig, {
+    id: user.id,
+    email: user.email,
+  });
+
   return NextResponse.json(
     {
       ssids: globalConfig.officeSsids,
@@ -65,7 +70,7 @@ export async function GET(request: Request) {
       timezone: user.timezone,
       heartbeatIntervalMinutes: globalConfig.heartbeatIntervalMinutes,
       apiVersion: API_VERSION,
-      agentScriptVersion: getAgentVersion(),
+      agentScriptVersion,
       agentScriptFilesBase: appUrl ? agentScriptFilesBaseUrl(appUrl) : null,
       vercelProtectionBypass: vercelProtectionBypassSecret(),
       forceAgentUpdate,

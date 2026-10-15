@@ -6,6 +6,7 @@ import { getTodaySummary, getPulseStats } from "@/lib/heartbeat-service";
 import { maybeDispatchHeartbeatAlerts } from "@/lib/heartbeat-alerts";
 import { getUserHoursTarget, getAppConfig, getEffectiveAgentStaleGraceHours } from "@/lib/app-config";
 import { getMonthlyProgress, getYearCompliance } from "@/lib/monthly-progress-server";
+import { getNotificationPrefs } from "@/lib/notification-prefs-server";
 import {
   getApprovedExemptionsForUser,
   getPendingExemptionMonthKeys,
@@ -48,6 +49,7 @@ export default async function DashboardPage() {
 
   const config = await getAppConfig();
   const hoursTarget = await getUserHoursTarget(user);
+  const notificationPrefs = await getNotificationPrefs(user.id);
   const graceHours = await getEffectiveAgentStaleGraceHours(user);
   const summary = await getTodaySummary(
     user.id,
@@ -297,6 +299,8 @@ export default async function DashboardPage() {
           visits={summary.visits}
           timezone={user.timezone}
           visitCount={summary.visits.length}
+          hoursTarget={hoursTarget}
+          officeStartTime={notificationPrefs.officeStartTime}
         />
 
         <p className="text-xs text-muted">

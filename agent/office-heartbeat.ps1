@@ -17,7 +17,7 @@ $HealthSyncIntervalMinutes = 60
 $OfficeVisitGapMinutes = 15
 # After this many minutes asleep, only trust netsh for a new office visit.
 $LongGapResumeMinutes = 30
-$AgentScriptVersion = "1.5.24"
+$AgentScriptVersion = "1.5.25"
 # Observe-only facts for last-run-summary.txt (never alters presence logic).
 $script:RunDiagFacts = @{
     VisitAction = "none"

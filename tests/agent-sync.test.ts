@@ -51,6 +51,10 @@ vi.mock("@/lib/agent-config-cache", () => ({
     heartbeatIntervalMinutes: 5,
     agentStaleMinutes: 15,
     agentMode: "events",
+    agentRolloutMode: "everyone",
+    agentFleetStableVersion: "1.3.2",
+    agentCanaryVersion: "1.3.2",
+    agentRolloutAllowlistEmails: ["soumitra.m.mandal@pwc.com"],
   }),
 }));
 vi.mock("@/lib/agent-version", () => ({
@@ -643,7 +647,7 @@ describe("processAgentSync session_resume", () => {
     expect(result.rejected).toEqual([]);
     expect(visitUpdateMock).toHaveBeenCalledWith({
       where: { id: "visit-1" },
-      data: { endAt: disconnectAt },
+      data: { endAt: disconnectAt, endSource: "agent" },
     });
     expect(maybeRunVisitMaintenanceMock).toHaveBeenCalled();
   });

@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
-import { getAgentVersion } from "@/lib/agent-version";
 import {
   agentFileContentType,
-  authorizeAgentDownload,
   isAgentDownloadFileName,
   readAgentFile,
+  resolveAgentDownloadCaller,
+  resolveCallerAgentTargetVersion,
 } from "@/lib/agent-download";
 
 type RouteContext = { params: Promise<{ name: string }> };
 
 export async function GET(request: Request, context: RouteContext) {
-  if (!(await authorizeAgentDownload(request))) {
+  const caller = await resolveAgentDownloadCaller(request);
+  if (!caller) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -19,12 +20,13 @@ export async function GET(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const content = await readAgentFile(name);
+  const targetVersion = await resolveCallerAgentTargetVersion(caller);
+  const content = await readAgentFile(name, { targetVersion });
   return new NextResponse(new Uint8Array(content), {
     headers: {
       "Content-Type": agentFileContentType(name),
       "Content-Disposition": `attachment; filename="${name}"`,
-      "X-Agent-Version": getAgentVersion(),
+      "X-Agent-Version": targetVersion,
       "Cache-Control": "private, no-cache",
     },
   });

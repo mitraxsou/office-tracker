@@ -1,7 +1,7 @@
 # My Office Pulse uninstaller. No admin for default user-level install.
 
 $ErrorActionPreference = "Stop"
-$LegacyTaskNames = @("OfficeTrackerHeartbeat", "PwCOfficePulse", "PwCOfficePulseUpdate")
+$LegacyTaskNames = @("OfficeTrackerHeartbeat", "PwCOfficePulse", "PwCOfficePulseUpdate", "PwCOfficePulseWatchdog")
 $LegacyStartupShortcuts = @("OfficeTrackerHeartbeat.lnk", "PwC Office Pulse.lnk", "My Office Pulse.lnk")
 
 function Write-UninstallLog([string]$Message) {

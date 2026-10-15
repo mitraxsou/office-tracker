@@ -472,6 +472,11 @@ model AppConfig {
   agentStaleMinutes     Int      @default(15)
   agentStaleGraceHours  Int      @default(24)
   agentMode             String   @default("events")
+  // Controlled agent rollout: allowlist (canary) vs everyone. Default allowlist = BUG-018.
+  agentRolloutMode          String   @default("allowlist")
+  agentFleetStableVersion   String   @default("1.5.24")
+  agentCanaryVersion        String   @default("")
+  agentRolloutAllowlist     String   @default("[\"soumitra.m.mandal@pwc.com\"]")
   complianceExemptionRequiresApproval Boolean @default(true)
   pilotStartMonthKey    String   @default("2026-09")
   fiscalYearStartMonth  Int      @default(4)
@@ -580,6 +585,8 @@ model Visit {
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   startAt       DateTime
   endAt         DateTime?
+  /** How endAt was set: agent | inferred | manual | admin. Null while open or legacy. */
+  endSource     String?
   source        String    @default("wifi")
   ssid          String?
   localVisitId  String?

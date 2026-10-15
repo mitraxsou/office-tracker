@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, getSessionUserId } from "@/lib/auth";
-import { createManualVisitRequest } from "@/lib/manual-visit-requests";
+import { getUserHoursTarget } from "@/lib/app-config";
+import {
+  createManualVisitRequest,
+  createMarkDaysVisitedRequests,
+} from "@/lib/manual-visit-requests";
+import { getNotificationPrefs } from "@/lib/notification-prefs-server";
 import { prisma } from "@/lib/db";
 
 export async function GET() {
@@ -40,11 +45,52 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { startAt?: string; endAt?: string; ssid?: string | null; message?: string | null };
+  let body: {
+    mode?: string;
+    startAt?: string;
+    endAt?: string;
+    dayKeys?: string[];
+    ssid?: string | null;
+    message?: string | null;
+  };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const mode = body.mode === "markDays" ? "markDays" : "timed";
+
+  if (mode === "markDays") {
+    const dayKeys = Array.isArray(body.dayKeys)
+      ? body.dayKeys.filter((k): k is string => typeof k === "string")
+      : [];
+    const [hoursTarget, prefs] = await Promise.all([
+      getUserHoursTarget(user),
+      getNotificationPrefs(user.id),
+    ]);
+    const result = await createMarkDaysVisitedRequests({
+      userId: user.id,
+      dayKeys,
+      timezone: user.timezone,
+      hoursTarget,
+      officeStartTime: prefs.officeStartTime,
+      message: body.message,
+    });
+    if ("error" in result) {
+      return NextResponse.json(
+        { error: result.error, failures: result.failures ?? [] },
+        { status: result.status },
+      );
+    }
+    return NextResponse.json(
+      {
+        requests: result.requests,
+        failures: result.failures,
+        mode: "markDays",
+      },
+      { status: 201 },
+    );
   }
 
   const { startAt, endAt, ssid, message } = body;
@@ -101,7 +147,7 @@ export async function DELETE(request: Request) {
   const denied = deleteVisitDeniedReason(existing, userId);
   if (denied) {
     const status = existing.userId !== userId ? 403 : 400;
-    return NextResponse.json({ error: denied }, { status });
+    return NextResponse.json({ error: denied }, { status: status });
   }
 
   await prisma.visit.delete({ where: { id } });

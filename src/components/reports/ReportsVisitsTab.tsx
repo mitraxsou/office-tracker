@@ -12,6 +12,7 @@ type VisitJson = {
   endAt: string | null;
   source: string;
   ssid: string | null;
+  endSource?: string | null;
 };
 
 type VisitRow = {
@@ -20,6 +21,7 @@ type VisitRow = {
   endAt: Date | null;
   source: string;
   ssid: string | null;
+  endSource?: string | null;
 };
 
 function parseVisits(rows: VisitJson[]): VisitRow[] {
@@ -29,6 +31,7 @@ function parseVisits(rows: VisitJson[]): VisitRow[] {
     endAt: v.endAt ? new Date(v.endAt) : null,
     source: v.source,
     ssid: v.ssid,
+    endSource: v.endSource ?? null,
   }));
 }
 

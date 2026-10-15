@@ -20,29 +20,29 @@ A bad agent ship can silence every laptop: the task still "runs" (wscript exits 
 
 ## BUG-018 - Soumitra-only / no fleet push (default)
 
-Until the user **explicitly** approves fleet rollout, agent updates are **limited to Soumitra only** (Soumitra's laptop) for testing.
+Until the user **explicitly** approves fleet rollout (Admin **Promote to everyone**), there is **no production / fleet agent publish**: updates stay on the canary allowlist (default: Soumitra only).
 
 **Soak owner:** `soumitra.m.mandal@pwc.com` - local agent at `%LOCALAPPDATA%\OfficeTracker` pointing at `office-tracker-theta` (Hobby prod).
 
+**Server gate (BUG-023):** `AppConfig.agentRolloutMode` defaults to **`allowlist`**. Sync/config/`agentScriptVersion` use `resolveAgentTargetVersion`: allowlisted users get canary (repo `version.txt` / `agentCanaryVersion`); everyone else gets `agentFleetStableVersion`. Do **not** set mode to `everyone` or promote without soak.
+
 ### NEVER do (without explicit user approval to roll out)
 
-- Push or deploy agent **version bumps** that all devices will auto-pull
-- Publish **agent zip** / download artifacts meant for the fleet
-- Ship **`Publish-AgentScriptTxt`** outputs that soft-update reaches every laptop
-- Set **`forceAgentUpdate`** (admin Push) for the fleet or mass devices
-- Bump **`agent/version.txt`** / `$AgentScriptVersion` in a commit/deploy that production serves to everyone
-- Treat "merge to production" or "Vercel deploy" of agent changes as routine
+- Call **Promote to everyone** / set `agentRolloutMode=everyone` without soak
+- Set **`forceAgentUpdate`** (admin Push) for the fleet or mass devices during canary soak
+- Point `agentFleetStableVersion` at an unproven canary
+- Treat "merge to production" as automatic fleet agent rollout (version gate must stay allowlist)
 
 Laptop-only / Soumitra-only testing is the **default**. Rollout is **opt-in later**, never automatic.
 
 ### Allowed without fleet publish
 
 - Edit `agent/` locally in the repo
+- Bump `agent/version.txt` / `$AgentScriptVersion` while **`agentRolloutMode=allowlist`** and fleet-stable stays pinned (only canary pulls)
 - Apply updates on Soumitra's laptop only (Copy update command / local install path)
-- Run BUG-017 and related tests locally
-- Keep changes unpushed or behind a branch that does **not** publish a new agent version to production consumers
+- Run BUG-017 / BUG-023 and related tests locally
 
-If unsure whether a change would reach the fleet: **do not push**. Ask the user.
+If unsure whether a change would reach the fleet: confirm rollout mode is still **allowlist** and fleet-stable is unchanged. Ask the user before promoting.
 
 ## Non-negotiable rules (BUG-017 parse safety)
 

@@ -598,10 +598,25 @@ export async function registerNode() {
       'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "agentMode" TEXT NOT NULL DEFAULT \'events\';'
     );
     await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "agentRolloutMode" TEXT NOT NULL DEFAULT \'allowlist\';'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "agentFleetStableVersion" TEXT NOT NULL DEFAULT \'1.5.24\';'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "agentCanaryVersion" TEXT NOT NULL DEFAULT \'\';'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "agentRolloutAllowlist" TEXT NOT NULL DEFAULT \'["soumitra.m.mandal@pwc.com"]\';'
+    );
+    await prisma.$executeRawUnsafe(
       'ALTER TABLE "Visit" ADD COLUMN IF NOT EXISTS "localVisitId" TEXT;'
     );
     await prisma.$executeRawUnsafe(
       'ALTER TABLE "Visit" ADD COLUMN IF NOT EXISTS "deviceId" TEXT;'
+    );
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "Visit" ADD COLUMN IF NOT EXISTS "endSource" TEXT;'
     );
     await prisma.$executeRawUnsafe(
       'CREATE INDEX IF NOT EXISTS "Visit_userId_localVisitId_idx" ON "Visit"("userId", "localVisitId");'

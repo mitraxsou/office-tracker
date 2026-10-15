@@ -17,6 +17,16 @@ import {
   hasHeartbeatAllowlistMismatches,
 } from "./ssid-backfill";
 import { invalidateAgentConfigCache } from "./agent-config-cache";
+import {
+  DEFAULT_AGENT_FLEET_STABLE_VERSION,
+  DEFAULT_AGENT_ROLLOUT_ALLOWLIST,
+  DEFAULT_AGENT_ROLLOUT_MODE,
+  normalizeAgentRolloutAllowlist,
+  normalizeAgentRolloutMode,
+  parseAgentRolloutAllowlist,
+  type AgentRolloutMode,
+} from "./agent-rollout";
+import { getAgentVersion } from "./agent-version";
 
 export const DEFAULT_PENDING_TOKEN_TTL_DAYS = 7;
 export const DEFAULT_HEARTBEAT_RETENTION_DAYS = 7;
@@ -94,6 +104,11 @@ export type AppConfigData = {
   agentStaleMinutes: number;
   agentStaleGraceHours: number;
   agentMode: string;
+  agentRolloutMode: AgentRolloutMode;
+  agentFleetStableVersion: string;
+  /** Empty means use repo agent/version.txt as canary. */
+  agentCanaryVersion: string;
+  agentRolloutAllowlistEmails: string[];
   complianceExemptionRequiresApproval: boolean;
   pilotStartMonthKey: string;
   fiscalYearStartMonth: number;
@@ -138,6 +153,10 @@ export async function ensureAppConfig(): Promise<AppConfigData> {
           pilotStartMonthKey: resolvePilotStartMonthKey(),
           fiscalYearStartMonth: DEFAULT_FISCAL_YEAR_START_MONTH,
           fiscalYearEndMonth: DEFAULT_FISCAL_YEAR_END_MONTH,
+          agentRolloutMode: DEFAULT_AGENT_ROLLOUT_MODE,
+          agentFleetStableVersion: DEFAULT_AGENT_FLEET_STABLE_VERSION,
+          agentCanaryVersion: "",
+          agentRolloutAllowlist: JSON.stringify([...DEFAULT_AGENT_ROLLOUT_ALLOWLIST]),
         },
       });
     } else {
@@ -190,6 +209,20 @@ export async function updateAppConfig(data: Partial<AppConfigData>) {
   if (data.fiscalYearStartMonth !== undefined) update.fiscalYearStartMonth = data.fiscalYearStartMonth;
   if (data.fiscalYearEndMonth !== undefined) update.fiscalYearEndMonth = data.fiscalYearEndMonth;
   if (data.agentMode !== undefined) update.agentMode = data.agentMode;
+  if (data.agentRolloutMode !== undefined) {
+    update.agentRolloutMode = normalizeAgentRolloutMode(data.agentRolloutMode);
+  }
+  if (data.agentFleetStableVersion !== undefined) {
+    update.agentFleetStableVersion = data.agentFleetStableVersion.trim();
+  }
+  if (data.agentCanaryVersion !== undefined) {
+    update.agentCanaryVersion = data.agentCanaryVersion.trim();
+  }
+  if (data.agentRolloutAllowlistEmails !== undefined) {
+    update.agentRolloutAllowlist = JSON.stringify(
+      normalizeAgentRolloutAllowlist(data.agentRolloutAllowlistEmails),
+    );
+  }
 
   const config = await prisma.appConfig.update({
     where: { id: CONFIG_ID },
@@ -197,6 +230,17 @@ export async function updateAppConfig(data: Partial<AppConfigData>) {
   });
   invalidateAgentConfigCache();
   return parseConfig(config);
+}
+
+/** Promote current canary to fleet-wide (BUG-018 explicit approval). */
+export async function promoteAgentCanaryToEveryone(): Promise<AppConfigData> {
+  const current = await ensureAppConfig();
+  const canary = (current.agentCanaryVersion || getAgentVersion()).trim();
+  return updateAppConfig({
+    agentRolloutMode: "everyone",
+    agentFleetStableVersion: canary,
+    agentCanaryVersion: canary,
+  });
 }
 
 export async function getUserHoursTarget(user: { hoursTarget: number | null }) {
@@ -250,6 +294,10 @@ function parseConfig(config: {
   agentStaleMinutes?: number;
   agentStaleGraceHours?: number;
   agentMode?: string;
+  agentRolloutMode?: string;
+  agentFleetStableVersion?: string;
+  agentCanaryVersion?: string;
+  agentRolloutAllowlist?: string;
   complianceExemptionRequiresApproval?: boolean;
   pilotStartMonthKey?: string;
   fiscalYearStartMonth?: number;
@@ -280,6 +328,12 @@ function parseConfig(config: {
     agentStaleMinutes: config.agentStaleMinutes ?? DEFAULT_AGENT_STALE_MINUTES,
     agentStaleGraceHours: config.agentStaleGraceHours ?? DEFAULT_AGENT_STALE_GRACE_HOURS,
     agentMode: config.agentMode ?? "events",
+    agentRolloutMode: normalizeAgentRolloutMode(config.agentRolloutMode),
+    agentFleetStableVersion:
+      (config.agentFleetStableVersion || DEFAULT_AGENT_FLEET_STABLE_VERSION).trim() ||
+      DEFAULT_AGENT_FLEET_STABLE_VERSION,
+    agentCanaryVersion: (config.agentCanaryVersion ?? "").trim(),
+    agentRolloutAllowlistEmails: parseAgentRolloutAllowlist(config.agentRolloutAllowlist),
     complianceExemptionRequiresApproval: config.complianceExemptionRequiresApproval ?? true,
     pilotStartMonthKey: resolvePilotStartMonthKey(config.pilotStartMonthKey),
     fiscalYearStartMonth: fiscalYear.startMonth,

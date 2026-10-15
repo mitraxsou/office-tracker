@@ -1,0 +1,8 @@
+{
+  "scenario": "Laptop closed in office without visit_end sync; open visit leaks into next day",
+  "badFirstCheckIn": "12:00 am",
+  "expectedFirstCheckInWithoutTodayPulse": null,
+  "endSourceOnEodClose": "inferred",
+  "userSelfCorrectPath": "/api/visits/[id]/checkout",
+  "agentRefineAllowedWhen": ["inferred", null]
+}
