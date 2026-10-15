@@ -5,7 +5,7 @@ import {
   IN_APP_AUTO_DISMISS_MS,
   isAutoDismissInAppType,
   type InAppNotificationView,
-} from "@/lib/in-app-notifications";
+} from "@/lib/in-app-notification-ui";
 
 const TITLES: Record<string, string> = {
   absent: "No Wi-Fi name",

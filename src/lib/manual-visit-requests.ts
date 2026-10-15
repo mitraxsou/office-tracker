@@ -339,7 +339,10 @@ export async function createMarkDaysVisitedRequests(params: {
       message,
     });
     if ("error" in result) {
-      failures.push({ dayKey: plan.dayKey, error: result.error });
+      failures.push({
+        dayKey: plan.dayKey,
+        error: result.error ?? "Failed to create mark-day request",
+      });
       continue;
     }
     requests.push(result.request);

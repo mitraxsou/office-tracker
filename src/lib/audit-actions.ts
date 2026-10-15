@@ -296,6 +296,14 @@ export const AUDIT_ACTION_GUIDE: Record<AuditAction, AuditActionGuide> = {
     label: "Manual visit denied",
     summary: "An admin denied a manual visit request.",
   },
+  agent_rollout_update: {
+    label: "Agent rollout settings updated",
+    summary: "Canary mode, fleet-stable/canary versions, or allowlist emails were changed.",
+  },
+  agent_rollout_promote_everyone: {
+    label: "Agent canary promoted to everyone",
+    summary: "Canary version was copied to fleet-stable and rollout mode set to everyone.",
+  },
   "account_access.approved": {
     label: "Account access approved",
     summary: "An admin approved a pending account-access request.",

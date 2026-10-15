@@ -73,6 +73,8 @@ export type AuditAction =
   | "manual_visit_request"
   | "manual_visit_approve"
   | "manual_visit_reject"
+  | "agent_rollout_update"
+  | "agent_rollout_promote_everyone"
   | "account_access.approved"
   | "account_access.rejected";
 
