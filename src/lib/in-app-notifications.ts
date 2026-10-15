@@ -9,6 +9,23 @@ export type InAppNotificationView = {
   createdAt: string;
 };
 
+/** Informational alerts that auto-dismiss on Today after a short delay. */
+export const AUTO_DISMISS_IN_APP_TYPES = [
+  "hours_started",
+  "hours_met",
+  "monthly_snapshot",
+  "ooo_cleared",
+] as const;
+
+export type AutoDismissInAppType = (typeof AUTO_DISMISS_IN_APP_TYPES)[number];
+
+/** Delay before success-style banners mark themselves read on Today. */
+export const IN_APP_AUTO_DISMISS_MS = 12_000;
+
+export function isAutoDismissInAppType(type: string): boolean {
+  return (AUTO_DISMISS_IN_APP_TYPES as readonly string[]).includes(type);
+}
+
 export async function persistInAppAlert(alert: IntegrationAlert): Promise<boolean> {
   const existing = await prisma.inAppNotification.findUnique({
     where: {
@@ -75,4 +92,15 @@ export async function dismissInAppNotification(userId: string, id: string) {
     data: { readAt: new Date() },
   });
   return true;
+}
+
+/** Soft-read every unread in-app row for the user. Returns how many were updated. */
+export async function dismissAllUnreadInAppNotifications(
+  userId: string,
+): Promise<number> {
+  const result = await prisma.inAppNotification.updateMany({
+    where: { userId, readAt: null },
+    data: { readAt: new Date() },
+  });
+  return result.count;
 }

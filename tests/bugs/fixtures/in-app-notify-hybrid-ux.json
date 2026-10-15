@@ -1,0 +1,12 @@
+{
+  "autoDismissTypes": [
+    "hours_started",
+    "hours_met",
+    "monthly_snapshot",
+    "ooo_cleared"
+  ],
+  "urgentTypes": ["absent", "stale", "behind", "custom"],
+  "autoDismissMs": 12000,
+  "clearAllPath": "/api/settings/in-app-notifications",
+  "singleDismissPathPrefix": "/api/settings/in-app-notifications/"
+}

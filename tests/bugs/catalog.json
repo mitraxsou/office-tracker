@@ -305,6 +305,20 @@
       "skipReason": null
     },
     {
+      "id": "BUG-021",
+      "title": "Today in-app banners overwhelm users with per-item dismiss only",
+      "date": "2026-10",
+      "severity": "medium",
+      "area": "alerts",
+      "reproSummary": "After mounting InAppNotificationPanel (BUG-020), success alerts (hours_started, hours_met, etc.) stacked with reminders and each required a manual Dismiss click.",
+      "assertion": "Success types auto-dismiss after 12s (soft-read); urgent types stay; Clear all dismisses all unread via POST /api/settings/in-app-notifications.",
+      "fixture": "fixtures/in-app-notify-hybrid-ux.json",
+      "testFile": "tests/bugs/BUG-021-in-app-notify-hybrid-ux.test.ts",
+      "relatedTests": ["tests/in-app-notifications.test.ts"],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
       "id": "CORE-001",
       "title": "Heartbeat in-office uses SSID allowlist",
       "date": "2026-01",

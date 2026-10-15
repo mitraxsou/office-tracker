@@ -34,6 +34,7 @@ describe("BUG-020 in-app hours_met not shown on dashboard", () => {
     );
     expect(panel).toContain(fixture.alertType);
     expect(panel).toContain("/api/settings/in-app-notifications/");
+    expect(panel).toContain("Clear all");
   });
 
   it("server sync reopens zero-duration wifi visits (endAt <= startAt)", () => {

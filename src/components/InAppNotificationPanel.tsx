@@ -1,7 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import type { InAppNotificationView } from "@/lib/in-app-notifications";
+import { useEffect, useState } from "react";
+import {
+  IN_APP_AUTO_DISMISS_MS,
+  isAutoDismissInAppType,
+  type InAppNotificationView,
+} from "@/lib/in-app-notifications";
 
 const TITLES: Record<string, string> = {
   absent: "No Wi-Fi name",
@@ -14,6 +18,13 @@ const TITLES: Record<string, string> = {
   custom: "Message from admin",
 };
 
+async function postDismiss(id: string): Promise<boolean> {
+  const response = await fetch(`/api/settings/in-app-notifications/${id}`, {
+    method: "POST",
+  });
+  return response.ok;
+}
+
 export function InAppNotificationPanel({
   initialItems,
 }: {
@@ -21,21 +32,66 @@ export function InAppNotificationPanel({
 }) {
   const [items, setItems] = useState(initialItems);
   const [dismissing, setDismissing] = useState<string | null>(null);
+  const [clearingAll, setClearingAll] = useState(false);
+
+  useEffect(() => {
+    const successIds = initialItems
+      .filter((item) => isAutoDismissInAppType(item.type))
+      .map((item) => item.id);
+    if (successIds.length === 0) return;
+
+    const timers = successIds.map((id) =>
+      window.setTimeout(() => {
+        void (async () => {
+          const ok = await postDismiss(id);
+          if (!ok) return;
+          setItems((current) => current.filter((item) => item.id !== id));
+        })();
+      }, IN_APP_AUTO_DISMISS_MS),
+    );
+
+    return () => {
+      for (const timer of timers) window.clearTimeout(timer);
+    };
+  }, [initialItems]);
 
   if (items.length === 0) return null;
 
   async function dismiss(id: string) {
     setDismissing(id);
-    const response = await fetch(`/api/settings/in-app-notifications/${id}`, {
-      method: "POST",
-    });
+    const ok = await postDismiss(id);
     setDismissing(null);
-    if (!response.ok) return;
+    if (!ok) return;
     setItems((current) => current.filter((item) => item.id !== id));
   }
 
+  async function clearAll() {
+    setClearingAll(true);
+    const response = await fetch("/api/settings/in-app-notifications", {
+      method: "POST",
+    });
+    setClearingAll(false);
+    if (!response.ok) return;
+    setItems([]);
+  }
+
+  const busy = clearingAll || dismissing !== null;
+
   return (
     <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted">
+          Success alerts clear after a few seconds. Reminders stay until you dismiss them.
+        </p>
+        <button
+          type="button"
+          onClick={() => void clearAll()}
+          disabled={busy}
+          className="shrink-0 text-xs font-medium text-[var(--pwc-orange)] hover:text-[var(--pwc-orange-hover)] disabled:opacity-50"
+        >
+          {clearingAll ? "Clearing..." : "Clear all"}
+        </button>
+      </div>
       {items.map((item) => (
         <div
           key={item.id}
@@ -50,8 +106,8 @@ export function InAppNotificationPanel({
             </div>
             <button
               type="button"
-              onClick={() => dismiss(item.id)}
-              disabled={dismissing === item.id}
+              onClick={() => void dismiss(item.id)}
+              disabled={busy}
               className="shrink-0 text-xs text-muted hover:text-[var(--foreground)] disabled:opacity-50"
             >
               {dismissing === item.id ? "Dismissing..." : "Dismiss"}
