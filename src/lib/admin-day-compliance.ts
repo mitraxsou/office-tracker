@@ -11,6 +11,7 @@ import {
 } from "./activity-signal";
 import { getAppConfig, getEffectiveAgentStaleGraceHours, getUserHoursTarget } from "./app-config";
 import {
+  closeEndOfDayOpenVisits,
   filterInOfficeDayPulses,
   loadDayPulseRowsForDay,
   type DayPulseRow,
@@ -156,6 +157,8 @@ export function userAttendedOnDay(input: {
       continue;
     }
     const end = visit.endAt.getTime();
+    // Ghost zero-span leftovers must not pad the attended roster.
+    if (end <= start) continue;
     if (start <= input.dayEnd.getTime() && end >= input.dayStart.getTime()) return true;
   }
   return false;
@@ -242,7 +245,10 @@ export function computeUserDayComplianceRow(input: {
   useActivity: boolean;
   officeSsids: string[];
   hoursTarget: number;
+  /** Agent health grace (hours). Not used for Visit day-span / first-in math. */
   graceHours: number;
+  /** Visit gap / day-span stale window — must match Today (`agentStaleMinutes`). */
+  staleMs: number;
   now?: Date;
 }): AdminDayUserRow {
   const { user, dayKey } = input;
@@ -273,7 +279,7 @@ export function computeUserDayComplianceRow(input: {
     dayStart,
     dayEnd,
     now,
-    staleMs: input.graceHours * 60 * 60 * 1000,
+    staleMs: input.staleMs,
     lastHeartbeatAt: input.lastHeartbeatBeforeDayEnd,
     firstInOfficeHeartbeatAt,
     lastInOfficeHeartbeatAt,
@@ -347,6 +353,21 @@ export function computeUserDayComplianceRow(input: {
   };
 }
 
+/** Close prior-day open visits so Admin day math matches Today (EOD before eval). */
+export async function closeOvernightOpenVisitsForUsers(
+  users: Array<{ id: string; timezone: string }>,
+): Promise<void> {
+  await Promise.all(
+    users.map(async (user) => {
+      try {
+        await closeEndOfDayOpenVisits(user.id, user.timezone);
+      } catch (err) {
+        console.error(`[admin-day] EOD close failed for ${user.id}`, err);
+      }
+    }),
+  );
+}
+
 export async function evaluateUserDayCompliance(input: {
   user: ComplianceUser;
   dayKey: string;
@@ -363,8 +384,12 @@ export async function evaluateUserDayCompliance(input: {
   ]);
   const agentMode = input.agentMode ?? config.agentMode;
   const useActivity = input.useActivity ?? agentModeUsesActivityTicks(agentMode);
+  const staleMs = config.agentStaleMinutes * 60 * 1000;
   const { start: dayStart, end: dayEnd } = dayBoundsFromKey(dayKey, user.timezone);
   const now = new Date();
+
+  // Match Today: close overnight leftovers before reading visits for the day.
+  await closeEndOfDayOpenVisits(user.id, user.timezone);
 
   const lastHeartbeatBeforeDayEnd =
     input.lastHeartbeatBeforeDayEnd !== undefined
@@ -405,6 +430,7 @@ export async function evaluateUserDayCompliance(input: {
     officeSsids: config.officeSsids,
     hoursTarget,
     graceHours,
+    staleMs,
     now,
   });
 }
@@ -416,6 +442,7 @@ export async function getAdminDayCompliance(
   const config = await getAppConfig();
   const useActivity = agentModeUsesActivityTicks(config.agentMode);
   const officeSsids = config.officeSsids;
+  const staleMs = config.agentStaleMinutes * 60 * 1000;
 
   const users = await prisma.user.findMany({
     orderBy: { email: "asc" },
@@ -441,6 +468,9 @@ export async function getAdminDayCompliance(
     );
     return emptyFutureDayCompliance(dayKey, users, hoursTargets);
   }
+
+  // Match Today: close overnight leftovers before bulk visit read.
+  await closeOvernightOpenVisitsForUsers(users);
 
   const userIds = users.map((u) => u.id);
   const userBounds = users.map((user) => {
@@ -583,6 +613,7 @@ export async function getAdminDayCompliance(
       officeSsids,
       hoursTarget: hoursTargets[index] ?? 0,
       graceHours: graceHoursList[index] ?? maxGraceHours,
+      staleMs,
       now,
     });
   });

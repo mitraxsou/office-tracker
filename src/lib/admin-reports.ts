@@ -1,4 +1,5 @@
 import {
+  closeOvernightOpenVisitsForUsers,
   computeUserDayComplianceRow,
   evaluateUserDayCompliance,
   getAdminDayCompliance,
@@ -41,6 +42,7 @@ type UserCalendarPreload = {
   hadInstalledDevice: boolean;
   hoursTarget: number;
   graceHours: number;
+  staleMs: number;
   useActivity: boolean;
   oooRanges: Array<{ startDate: string; endDate: string }>;
   visits: VisitForDaySpan[];
@@ -63,9 +65,13 @@ async function preloadUserCalendarData(
   users: CalendarUserRow[],
   monthKey: string,
   useActivity: boolean,
+  staleMs: number,
 ): Promise<UserCalendarPreload[]> {
   const bounds = monthBoundsFromKey(monthKey, "Asia/Kolkata");
   const userIds = users.map((u) => u.id);
+
+  // Match Today / Admin day: close overnight leftovers before reading visits.
+  await closeOvernightOpenVisitsForUsers(users);
 
   const [oooRows, visitRows, pulseRows] = await Promise.all([
     prisma.userOutOfOffice.findMany({
@@ -143,6 +149,7 @@ async function preloadUserCalendarData(
       }),
       hoursTarget: await getUserHoursTarget(user),
       graceHours: await getEffectiveAgentStaleGraceHours(user),
+      staleMs,
       useActivity,
       oooRanges: oooByUser.get(user.id) ?? [],
       visits: visitsByUser.get(user.id) ?? [],
@@ -158,6 +165,7 @@ export async function getAdminOrgCalendarDays(
   const monthDayKeys = allDayKeysInMonth(monthKey);
   const config = await getAppConfig();
   const useActivity = agentModeUsesActivityTicks(config.agentMode);
+  const staleMs = config.agentStaleMinutes * 60 * 1000;
 
   const users = await prisma.user.findMany({
     orderBy: { email: "asc" },
@@ -173,7 +181,7 @@ export async function getAdminOrgCalendarDays(
     },
   });
 
-  const preloaded = await preloadUserCalendarData(users, monthKey, useActivity);
+  const preloaded = await preloadUserCalendarData(users, monthKey, useActivity, staleMs);
   const now = new Date();
 
   const days: AdminOrgCalendarDay[] = monthDayKeys.map((dayKey) => {
@@ -211,6 +219,7 @@ export async function getAdminOrgCalendarDays(
         officeSsids: config.officeSsids,
         hoursTarget: ctx.hoursTarget,
         graceHours: ctx.graceHours,
+        staleMs: ctx.staleMs,
         now,
       });
       if (row.attended) totalAttendedHours += row.hours;

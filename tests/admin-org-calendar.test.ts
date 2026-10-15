@@ -99,6 +99,7 @@ describe("computeUserDayComplianceRow OOO override", () => {
       officeSsids: ["OfficeConnect"],
       hoursTarget: 5,
       graceHours: 24,
+      staleMs: 15 * 60 * 1000,
     });
 
     expect(row.attended).toBe(true);
@@ -119,6 +120,7 @@ describe("computeUserDayComplianceRow OOO override", () => {
       officeSsids: ["OfficeConnect"],
       hoursTarget: 5,
       graceHours: 24,
+      staleMs: 15 * 60 * 1000,
     });
 
     expect(row.attended).toBe(false);
@@ -146,6 +148,7 @@ describe("computeUserDayComplianceRow OOO override", () => {
       officeSsids: ["OfficeConnect"],
       hoursTarget: 5,
       graceHours: 24,
+      staleMs: 15 * 60 * 1000,
       now: new Date("2026-09-08T12:00:00+05:30"),
     });
 
@@ -167,6 +170,7 @@ describe("computeUserDayComplianceRow OOO override", () => {
       officeSsids: ["OfficeConnect"],
       hoursTarget: 5,
       graceHours: 24,
+      staleMs: 15 * 60 * 1000,
     });
 
     expect(row.status).toBe("no_visit");
@@ -192,6 +196,7 @@ describe("computeUserDayComplianceRow OOO override", () => {
       officeSsids: ["OfficeConnect"],
       hoursTarget: 5,
       graceHours: 24,
+      staleMs: 15 * 60 * 1000,
     });
 
     expect(row.attended).toBe(false);
@@ -231,6 +236,7 @@ describe("computeUserDayComplianceRow OOO override", () => {
       officeSsids: ["OfficeConnect"],
       hoursTarget: 5,
       graceHours: 24,
+      staleMs: 15 * 60 * 1000,
     });
 
     expect(row.attended).toBe(true);
@@ -251,6 +257,7 @@ describe("computeUserDayComplianceRow OOO override", () => {
       officeSsids: ["OfficeConnect"],
       hoursTarget: 5,
       graceHours: 24,
+      staleMs: 15 * 60 * 1000,
     });
 
     expect(row.agentStaleOnDay).toBe(false);
@@ -278,6 +285,7 @@ describe("computeUserDayComplianceRow OOO override", () => {
       officeSsids: ["OfficeConnect"],
       hoursTarget: 5,
       graceHours: 24,
+      staleMs: 15 * 60 * 1000,
       now: new Date("2026-09-08T12:00:00+05:30"),
     });
 

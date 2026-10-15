@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  computeUserDayComplianceRow,
   isAgentStaleForReporting,
   isWeekendDay,
   resolveDayUserStatus,
@@ -217,6 +218,23 @@ describe("userAttendedOnDay", () => {
       }),
     ).toBe(true);
   });
+
+  it("does not count ghost zero-span closed visits as attended", () => {
+    expect(
+      userAttendedOnDay({
+        visits: [
+          {
+            startAt: new Date("2026-09-04T14:37:00+05:30"),
+            endAt: new Date("2026-09-04T14:37:00+05:30"),
+          },
+        ],
+        dayStart,
+        dayEnd,
+        inOfficeHeartbeats: [],
+        totalMs: 0,
+      }),
+    ).toBe(false);
+  });
 });
 
 describe("resolveDayUserStatus", () => {
@@ -372,5 +390,128 @@ describe("isAgentStaleForReporting", () => {
     expect(isAgentStaleForReporting("2026-09-06", true)).toBe(false);
     expect(isAgentStaleForReporting("2026-09-04", true)).toBe(true);
     expect(isAgentStaleForReporting("2026-09-04", false)).toBe(false);
+  });
+});
+
+describe("Admin day In/Out aligns with Today day-span staleMs", () => {
+  const user = {
+    id: "soumitra",
+    email: "soumitra.m.mandal@pwc.com",
+    name: "soumitro",
+    timezone: "Asia/Kolkata",
+    hoursTarget: 5,
+    agentStaleGraceHours: 24,
+    agentDeregisteredAt: null,
+  };
+  const dayKey = "2026-10-15";
+  const now = new Date("2026-10-15T15:20:00+05:30");
+  const afternoonIn = new Date("2026-10-15T13:35:00+05:30");
+  const earlyPulse = new Date("2026-10-15T00:52:00+05:30");
+  const agentStaleMs = 15 * 60 * 1000;
+  const graceAsStaleMs = 24 * 60 * 60 * 1000;
+  const baseInput = {
+    user,
+    dayKey,
+    hadInstalledDevice: true,
+    lastHeartbeatBeforeDayEnd: now,
+    ooo: false,
+    useActivity: false,
+    officeSsids: ["OfficeConnect"],
+    hoursTarget: 5,
+    graceHours: 24,
+    now,
+  } as const;
+
+  it("does not pull firstIn back to a 12:52am pulse when using agentStaleMinutes", () => {
+    const visits = [
+      {
+        id: "afternoon",
+        source: "wifi",
+        ssid: "OfficeConnect",
+        startAt: afternoonIn,
+        endAt: null,
+        updatedAt: afternoonIn,
+      },
+    ];
+    const dayPulses = [
+      { at: earlyPulse, ssid: "OfficeConnect", inOffice: true },
+      { at: afternoonIn, ssid: "OfficeConnect", inOffice: true },
+    ];
+
+    // Bug: Admin used graceHours (~24h) as staleMs, so firstIn snapped to midnight pulse.
+    const broken = computeUserDayComplianceRow({
+      ...baseInput,
+      visits,
+      dayPulses,
+      staleMs: graceAsStaleMs,
+    });
+    expect(new Date(broken.firstInAt!).getTime()).toBe(earlyPulse.getTime());
+    expect(broken.hours).toBeGreaterThan(12);
+
+    const fixed = computeUserDayComplianceRow({
+      ...baseInput,
+      visits,
+      dayPulses,
+      staleMs: agentStaleMs,
+    });
+    expect(new Date(fixed.firstInAt!).getTime()).toBe(afternoonIn.getTime());
+    expect(fixed.hours).toBeLessThan(3);
+    expect(fixed.lastOutAt).toBeNull();
+  });
+
+  it("after overnight EOD close, only today's open visit remains for firstIn/lastOut", () => {
+    // Production filters with visitsOverlappingDay — prior-day closed visits are gone.
+    const row = computeUserDayComplianceRow({
+      ...baseInput,
+      visits: [
+        {
+          id: "afternoon",
+          source: "wifi",
+          ssid: "OfficeConnect",
+          startAt: afternoonIn,
+          endAt: null,
+          updatedAt: afternoonIn,
+        },
+      ],
+      dayPulses: [
+        { at: earlyPulse, ssid: "OfficeConnect", inOffice: true },
+        { at: afternoonIn, ssid: "OfficeConnect", inOffice: true },
+      ],
+      staleMs: agentStaleMs,
+    });
+
+    expect(new Date(row.firstInAt!).getTime()).toBe(afternoonIn.getTime());
+    expect(row.hours).toBeLessThan(3);
+    expect(row.lastOutAt).toBeNull();
+    expect(row.attended).toBe(true);
+  });
+
+  it("keeps lastOut null while an open visit is on the current day", () => {
+    const row = computeUserDayComplianceRow({
+      ...baseInput,
+      visits: [
+        {
+          id: "closed",
+          source: "wifi",
+          ssid: "OfficeConnect",
+          startAt: new Date("2026-10-15T12:41:00+05:30"),
+          endAt: new Date("2026-10-15T13:42:00+05:30"),
+        },
+        {
+          id: "open",
+          source: "wifi",
+          ssid: "OfficeConnect",
+          startAt: afternoonIn,
+          endAt: null,
+        },
+      ],
+      dayPulses: [{ at: afternoonIn, ssid: "OfficeConnect", inOffice: true }],
+      staleMs: agentStaleMs,
+    });
+
+    expect(row.lastOutAt).toBeNull();
+    expect(new Date(row.firstInAt!).getTime()).toBe(
+      new Date("2026-10-15T12:41:00+05:30").getTime(),
+    );
   });
 });
