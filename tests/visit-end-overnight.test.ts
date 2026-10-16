@@ -100,6 +100,47 @@ describe("overnight visit first check-in (no midnight invent)", () => {
     expect(daySpanHoursForDay(visits, params)).toBeLessThan(1);
     expect(daySpanHoursForDay(visits, params)).toBeGreaterThan(0);
   });
+
+  it("starts Today at afternoon re-enter, not overnight spill ending at midnight", () => {
+    const now = new Date("2026-10-16T16:00:00+05:30");
+    const { start: dayStart, end: dayEnd } = dayBoundsFromKey("2026-10-16", TZ);
+    const reenter = new Date("2026-10-16T14:55:00+05:30");
+    const visits: VisitForDaySpan[] = [
+      {
+        id: "overnight-eod",
+        startAt: new Date("2026-10-15T14:37:00+05:30"),
+        endAt: new Date("2026-10-16T00:00:00+05:30"),
+        source: "wifi",
+        updatedAt: new Date("2026-10-16T00:00:00+05:30"),
+      },
+      {
+        id: "overnight-spill",
+        startAt: new Date("2026-10-15T14:37:00+05:30"),
+        endAt: new Date("2026-10-16T00:18:00+05:30"),
+        source: "wifi",
+        updatedAt: new Date("2026-10-16T00:18:00+05:30"),
+      },
+      {
+        id: "afternoon",
+        startAt: reenter,
+        endAt: new Date("2026-10-16T14:58:00+05:30"),
+        source: "wifi",
+        updatedAt: new Date("2026-10-16T14:58:00+05:30"),
+      },
+    ];
+    const params = {
+      dayStart,
+      dayEnd,
+      now,
+      staleMs: STALE_MS,
+      lastHeartbeatAt: reenter,
+      firstInOfficeHeartbeatAt: new Date("2026-10-16T00:00:30+05:30"),
+      lastInOfficeHeartbeatAt: reenter,
+    };
+    expect(firstOfficeInMsForDay(visits, params)).toBe(reenter.getTime());
+    expect(daySpanHoursForDay(visits, params)).toBeLessThan(1);
+    expect(daySpanHoursForDay(visits, params)).toBeGreaterThan(0);
+  });
 });
 
 describe("visit end provenance", () => {

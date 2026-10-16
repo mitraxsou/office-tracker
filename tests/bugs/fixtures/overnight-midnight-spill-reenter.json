@@ -1,0 +1,16 @@
+{
+  "timezone": "Asia/Kolkata",
+  "dayKey": "2026-10-16",
+  "overnightSpill": {
+    "startAt": "2026-10-15T14:37:00+05:30",
+    "endAt": "2026-10-16T00:18:00+05:30"
+  },
+  "overnightSpillMidnight": {
+    "startAt": "2026-10-15T14:37:00+05:30",
+    "endAt": "2026-10-16T00:00:00+05:30"
+  },
+  "afternoonReenter": {
+    "startAt": "2026-10-16T14:55:00+05:30",
+    "endAt": "2026-10-16T14:58:00+05:30"
+  }
+}

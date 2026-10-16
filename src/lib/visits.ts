@@ -39,11 +39,24 @@ export function visitDurationMs(visit: VisitPoint, now = new Date()): number {
   return Math.max(0, end.getTime() - visit.startAt.getTime());
 }
 
+function hasLaterReenterAfterGap(
+  sorted: VisitForDaySpan[],
+  visitId: string,
+  afterMs: number,
+): boolean {
+  return sorted.some(
+    (other) =>
+      other.id !== visitId &&
+      other.startAt.getTime() >= afterMs + MIDNIGHT_ROLLOVER_AWAY_GAP_MS,
+  );
+}
+
 /**
- * Drop short wifi visits that start just after local midnight when a later
- * same-day visit begins after a long away gap. Those stubs come from day-rollover
- * auto visit_start while still on office Wi-Fi before sleep; Today should start
- * at the real re-enter (wake / Wi-Fi enter), not at 12:00 am.
+ * Drop wifi visits whose only "Today" signal is a midnight spill when a later
+ * same-day re-enter exists after a long away gap:
+ * - NEW_DAY stubs that start just after local midnight, or
+ * - overnight visits that started yesterday and ended shortly after midnight.
+ * Today should start at the real re-enter, not 12:00 am (sleep gap must not count).
  */
 export function filterMidnightRolloverStubVisits(
   visits: VisitForDaySpan[],
@@ -51,6 +64,7 @@ export function filterMidnightRolloverStubVisits(
 ): VisitForDaySpan[] {
   if (visits.length < 2) return visits;
   const dayStartMs = dayStart.getTime();
+  const earlyMorningEnd = dayStartMs + MIDNIGHT_ROLLOVER_END_WINDOW_MS;
   const sorted = [...visits].sort(
     (a, b) => a.startAt.getTime() - b.startAt.getTime(),
   );
@@ -58,23 +72,25 @@ export function filterMidnightRolloverStubVisits(
 
   for (const visit of sorted) {
     if (isManualSource(visit.source)) continue;
-    const startMs = visit.startAt.getTime();
-    if (
-      startMs < dayStartMs ||
-      startMs > dayStartMs + MIDNIGHT_ROLLOVER_START_WINDOW_MS
-    ) {
-      continue;
-    }
     if (!visit.endAt) continue;
+    const startMs = visit.startAt.getTime();
     const endMs = visit.endAt.getTime();
-    if (endMs > dayStartMs + MIDNIGHT_ROLLOVER_END_WINDOW_MS) continue;
 
-    const laterReenter = sorted.some(
-      (other) =>
-        other.id !== visit.id &&
-        other.startAt.getTime() >= endMs + MIDNIGHT_ROLLOVER_AWAY_GAP_MS,
-    );
-    if (laterReenter) dropIds.add(visit.id);
+    const isMidnightStub =
+      startMs >= dayStartMs &&
+      startMs <= dayStartMs + MIDNIGHT_ROLLOVER_START_WINDOW_MS &&
+      endMs <= earlyMorningEnd;
+
+    // Overnight carry that only spills a little past midnight before sleep.
+    const isOvernightMidnightSpill =
+      startMs < dayStartMs &&
+      endMs >= dayStartMs &&
+      endMs <= earlyMorningEnd;
+
+    if (!isMidnightStub && !isOvernightMidnightSpill) continue;
+    if (hasLaterReenterAfterGap(sorted, visit.id, endMs)) {
+      dropIds.add(visit.id);
+    }
   }
 
   if (dropIds.size === 0) return visits;
