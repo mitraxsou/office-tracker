@@ -1,0 +1,16 @@
+{
+  "timezone": "Asia/Kolkata",
+  "dayKey": "2026-10-16",
+  "midnightStub": {
+    "startAt": "2026-10-16T00:00:00+05:30",
+    "endAt": "2026-10-16T00:18:06+05:30"
+  },
+  "afternoonReenter": {
+    "startAt": "2026-10-16T14:55:06+05:30",
+    "endAt": "2026-10-16T14:58:51+05:30"
+  },
+  "agentMustContain": [
+    "NEW_DAY defer visit_start until resume or Wi-Fi enter",
+    "$deferNewDayVisitStart"
+  ]
+}

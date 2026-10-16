@@ -239,6 +239,21 @@ export function presenceFreshMs(useActivityTicks: boolean, agentStaleMs: number)
   return DEFAULT_EVENT_MODE_STALE_MINUTES * 60 * 1000;
 }
 
+/**
+ * Gap used when Today / sync closes a silent open visit.
+ * Must match presence freshness so event-mode hourly health syncs do not
+ * infer checkout between pings.
+ */
+export function visitMaintenanceGapMs(
+  agentMode: string | null | undefined,
+  agentStaleMinutes: number,
+): number {
+  return presenceFreshMs(
+    agentModeUsesActivityTicks(agentMode),
+    agentStaleMinutes * 60 * 1000,
+  );
+}
+
 /** SSID allowlist wins when the snapshot includes a network name. */
 export function presenceSignalInOffice(params: {
   ssid: string | null;

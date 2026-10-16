@@ -27,10 +27,58 @@ export type HeartbeatPoint = {
 
 const MS_PER_HOUR = 1000 * 60 * 60;
 const MS_PER_DAY = 24 * MS_PER_HOUR;
+/** NEW_DAY auto reopen usually lands in the first half hour after local midnight. */
+const MIDNIGHT_ROLLOVER_START_WINDOW_MS = 30 * 60 * 1000;
+/** Stub visits from that reopen end well before morning (sleep shortly after midnight). */
+const MIDNIGHT_ROLLOVER_END_WINDOW_MS = 3 * 60 * 60 * 1000;
+/** After the stub, a multi-hour gap means sleep/away, not a short lunch. */
+const MIDNIGHT_ROLLOVER_AWAY_GAP_MS = 2 * 60 * 60 * 1000;
 
 export function visitDurationMs(visit: VisitPoint, now = new Date()): number {
   const end = visit.endAt ?? now;
   return Math.max(0, end.getTime() - visit.startAt.getTime());
+}
+
+/**
+ * Drop short wifi visits that start just after local midnight when a later
+ * same-day visit begins after a long away gap. Those stubs come from day-rollover
+ * auto visit_start while still on office Wi-Fi before sleep; Today should start
+ * at the real re-enter (wake / Wi-Fi enter), not at 12:00 am.
+ */
+export function filterMidnightRolloverStubVisits(
+  visits: VisitForDaySpan[],
+  dayStart: Date,
+): VisitForDaySpan[] {
+  if (visits.length < 2) return visits;
+  const dayStartMs = dayStart.getTime();
+  const sorted = [...visits].sort(
+    (a, b) => a.startAt.getTime() - b.startAt.getTime(),
+  );
+  const dropIds = new Set<string>();
+
+  for (const visit of sorted) {
+    if (isManualSource(visit.source)) continue;
+    const startMs = visit.startAt.getTime();
+    if (
+      startMs < dayStartMs ||
+      startMs > dayStartMs + MIDNIGHT_ROLLOVER_START_WINDOW_MS
+    ) {
+      continue;
+    }
+    if (!visit.endAt) continue;
+    const endMs = visit.endAt.getTime();
+    if (endMs > dayStartMs + MIDNIGHT_ROLLOVER_END_WINDOW_MS) continue;
+
+    const laterReenter = sorted.some(
+      (other) =>
+        other.id !== visit.id &&
+        other.startAt.getTime() >= endMs + MIDNIGHT_ROLLOVER_AWAY_GAP_MS,
+    );
+    if (laterReenter) dropIds.add(visit.id);
+  }
+
+  if (dropIds.size === 0) return visits;
+  return visits.filter((visit) => !dropIds.has(visit.id));
 }
 
 export type VisitForDaySpan = VisitPoint & {
@@ -71,6 +119,7 @@ function officeIntervalsForDay(
   visits: VisitForDaySpan[],
   params: DaySpanParams,
 ): Array<{ start: number; end: number }> {
+  const dayVisits = filterMidnightRolloverStubVisits(visits, params.dayStart);
   const dayEndMs = params.dayEnd.getTime();
   const isCurrentDay = isCurrentCalendarDay(params.dayStart, params.dayEnd, params.now);
   // Confirmed allowlisted office only. Never fall back to any agent sync.
@@ -81,7 +130,7 @@ function officeIntervalsForDay(
     ? clipToDay(params.firstInOfficeHeartbeatAt.getTime(), params.dayStart, params.dayEnd)
     : null;
 
-  for (const visit of visits) {
+  for (const visit of dayVisits) {
     // Inverted end-before-start rows are corrupt; skip. Zero-duration (endAt === startAt)
     // stays as an anchor so later in-office heartbeats can extend the day span.
     if (visit.endAt && visit.endAt.getTime() < visit.startAt.getTime()) {
@@ -153,7 +202,7 @@ function officeIntervalsForDay(
     });
   }
 
-  const openVisit = visits.find((visit) => visit.endAt === null) ?? null;
+  const openVisit = dayVisits.find((visit) => visit.endAt === null) ?? null;
   if (openVisit && isCurrentDay) {
     const startedBeforeDay = openVisit.startAt.getTime() < params.dayStart.getTime();
     // Overnight open with no office pulse today: do not paint a phantom day span.
@@ -223,17 +272,20 @@ function officeIntervalsForDay(
  * First check-in on the day from visits.
  * Overnight visits that started before dayStart never invent midnight; they only
  * contribute when there is confirmed office presence today (use that pulse time).
+ * Short NEW_DAY midnight stubs before a long sleep are ignored when a later
+ * re-enter exists (Today starts at that enter, not 12:00 am).
  */
 export function firstOfficeInMsForDay(
   visits: VisitForDaySpan[],
   params: DaySpanParams,
 ): number | null {
+  const dayVisits = filterMidnightRolloverStubVisits(visits, params.dayStart);
   const firstHb = params.firstInOfficeHeartbeatAt ?? null;
   let firstIn: number | null = null;
   const isCurrentDay = isCurrentCalendarDay(params.dayStart, params.dayEnd, params.now);
   const dayStartMs = params.dayStart.getTime();
 
-  for (const v of visits) {
+  for (const v of dayVisits) {
     if (v.endAt && v.endAt.getTime() < v.startAt.getTime()) continue;
     const startedBeforeDay = v.startAt.getTime() < dayStartMs;
 

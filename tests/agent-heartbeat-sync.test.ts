@@ -60,7 +60,8 @@ describe("office-heartbeat wake and sync behavior", () => {
 
   it("queues visit_start on new calendar day when still on office Wi-Fi", () => {
     expect(heartbeat).toContain("$dayRolledOver");
-    expect(heartbeat).toContain("NEW_DAY visit_start on office Wi-Fi");
+    expect(heartbeat).toContain("NEW_DAY defer visit_start until resume or Wi-Fi enter");
+    expect(heartbeat).toContain("$deferNewDayVisitStart");
     expect(heartbeat).toContain("Start-LocalVisit -SyncState $syncState -Ssid $ssid");
   });
 

@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.32";
+export const APP_VERSION = "1.5.33";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,18 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-16",
+    userBullets: [
+      "If the laptop stays on office Wi-Fi past midnight then sleeps, Today starts when you wake and re-enter, not at 12:00 am.",
+      "Yesterday still ends at local midnight; the sleep gap overnight is not counted as office hours.",
+    ],
+    adminBullets: [
+      "Server drops short midnight NEW_DAY stub visits when a later same-day re-enter exists after a long gap (BUG-026).",
+      "Agent 1.5.33 defers NEW_DAY visit_start until resume or Wi-Fi enter (canary soak; fleet-stable stays 1.5.24).",
+    ],
+  },
+  {
+    version: "1.5.32",
     date: "2026-10-07",
     userBullets: [
       "Agent 1.5.24 fixes a crash after the 1.5.23 update where the scheduled task stopped writing logs (special dash character in the last-run summary).",

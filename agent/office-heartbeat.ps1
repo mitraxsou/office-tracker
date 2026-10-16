@@ -17,7 +17,7 @@ $HealthSyncIntervalMinutes = 60
 $OfficeVisitGapMinutes = 15
 # After this many minutes asleep, only trust netsh for a new office visit.
 $LongGapResumeMinutes = 30
-$AgentScriptVersion = "1.5.26"
+$AgentScriptVersion = "1.5.33"
 # Observe-only facts for last-run-summary.txt (never alters presence logic).
 $script:RunDiagFacts = @{
     VisitAction = "none"
@@ -2012,7 +2012,14 @@ if ($longGapResume) {
 }
 $hasOpenVisit = [bool](Get-OpenVisitFromState $syncState)
 Write-Log "presence method=$ssidMethod isOffice=$isOfficeNow hasSsid=$([bool]$ssid) openVisit=$hasOpenVisit ssidChanged=pending"
-if ($isOfficeNow -and -not $hasOpenVisit) {
+# Day rollover already closed yesterday at local midnight. Do not open Today just
+# because the laptop is still on office Wi-Fi. Wait for wake/resume or a Wi-Fi
+# enter so sleep-after-midnight does not invent a 12:00 am first check-in.
+$deferNewDayVisitStart = $dayRolledOver -and -not $isResumeRun
+if ($isOfficeNow -and -not $hasOpenVisit -and $deferNewDayVisitStart) {
+    Write-Log "NEW_DAY defer visit_start until resume or Wi-Fi enter (still on office SSID)"
+    Write-Diag -Category "VISIT" -Message "deferred new-day visit_start until resume or Wi-Fi enter ssid=$ssid"
+} elseif ($isOfficeNow -and -not $hasOpenVisit) {
     $hoursTarget = 5
     if ($serverConfig -and $null -ne $serverConfig.hoursTarget) {
         $hoursTarget = [double]$serverConfig.hoursTarget
@@ -2020,10 +2027,7 @@ if ($isOfficeNow -and -not $hasOpenVisit) {
     $syncState = Start-LocalVisit -SyncState $syncState -Ssid $ssid -HoursTarget $hoursTarget `
         -ServerConfig $serverConfig -DayKey $dayKey -TimezoneId $timezone
     $script:RunDiagFacts.VisitAction = "started"
-    if ($dayRolledOver) {
-        Write-Log "NEW_DAY visit_start on office Wi-Fi"
-        Write-Diag -Category "VISIT" -Message "started new office visit (new calendar day) ssid=$ssid"
-    } elseif ($isResumeRun) {
+    if ($isResumeRun) {
         Write-Log "RESUME visit_start on office Wi-Fi after sleep checkout"
         Write-Diag -Category "VISIT" -Message "started new office visit after resume ssid=$ssid method=$ssidMethod"
     } else {

@@ -1,0 +1,41 @@
+{
+  "description": "Event-mode office health_ping 42 minutes ago; visit closed as inferred a few seconds after that pulse. In office must stay Yes.",
+  "agentMode": "events",
+  "agentStaleMinutes": 15,
+  "eventModeFreshMinutes": 70,
+  "minutesSinceOfficeHealthPing": 42,
+  "officeSsid": "pwcglb.com",
+  "visitEndSource": "inferred",
+  "scenarios": {
+    "inferredCloseAfterOfficePulse": {
+      "hasOpenVisit": false,
+      "openVisitManual": false,
+      "openVisitRecent": false,
+      "openVisitAfterPulse": false,
+      "pulseRecent": true,
+      "lastPulseInOffice": true,
+      "checkedOutAfterPulse": false,
+      "expectedInOfficeNow": true
+    },
+    "agentCheckoutAfterOfficePulse": {
+      "hasOpenVisit": false,
+      "openVisitManual": false,
+      "openVisitRecent": false,
+      "openVisitAfterPulse": false,
+      "pulseRecent": true,
+      "lastPulseInOffice": true,
+      "checkedOutAfterPulse": true,
+      "expectedInOfficeNow": false
+    },
+    "manualCheckoutAfterOfficePulse": {
+      "hasOpenVisit": false,
+      "openVisitManual": false,
+      "openVisitRecent": false,
+      "openVisitAfterPulse": false,
+      "pulseRecent": true,
+      "lastPulseInOffice": true,
+      "checkedOutAfterPulse": true,
+      "expectedInOfficeNow": false
+    }
+  }
+}

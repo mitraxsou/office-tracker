@@ -16,6 +16,7 @@ import {
   resolveAgentSignalMode,
   resolveEventModeLastHeartbeatAt,
   resolveInOfficeNow,
+  visitMaintenanceGapMs,
   type AgentSignalSnapshot,
   type LivePresenceSignal,
 } from "./activity-signal";
@@ -23,7 +24,10 @@ import { heartbeatInOffice } from "./heartbeat-office";
 import { maybePurgeOldHeartbeats } from "./heartbeat-retention";
 import { resolveLaptopActiveForDay, laptopActiveHoursForDay, type LaptopActiveParams } from "./laptop-active";
 import { daySpanMsForDay, dayKeyInTimezone, effectiveVisitEnd, firstOfficeInMsForDay, liveOfficeMsForDay, type DaySpanParams } from "./visits";
-import { shouldEstimateUnconfirmedOfficeTail } from "./dashboard-live-hours";
+import {
+  isDefinitiveCheckoutSource,
+  shouldEstimateUnconfirmedOfficeTail,
+} from "./dashboard-live-hours";
 import { dayBoundsFromKey, getDayBounds, isCurrentCalendarDay } from "./timezone-dates";
 import { maybeClearOutOfOfficeOnOfficePresence } from "./out-of-office";
 import { validateVisitTimestamps } from "./visit-validation";
@@ -114,8 +118,15 @@ export async function loadDaySpanContext(
   const config = await getAppConfig();
   const allowlist = config.officeSsids;
   const staleMs = config.agentStaleMinutes * 60 * 1000;
+  // Event-mode agents sync about once an hour. Do not pass the 15-minute
+  // heartbeat gap into visit cleanup or Today will infer checkout between
+  // health pings and flip In office to No while still on office Wi-Fi.
   if (!options?.skipMaintenance) {
-    await maybeRunVisitMaintenance(userId, timezone, staleMs);
+    await maybeRunVisitMaintenance(
+      userId,
+      timezone,
+      visitMaintenanceGapMs(config.agentMode, config.agentStaleMinutes),
+    );
     try {
       await persistRecoveredWifiVisitStarts(userId, timezone);
     } catch {
@@ -667,16 +678,23 @@ export async function getTodaySummary(
     (pulseAt === null || openVisitAt.getTime() > pulseAt.getTime());
 
   let checkedOutAt: Date | null = null;
+  let checkedOutSource: string | null = null;
   for (const visit of visits) {
     if (!visit.endAt) continue;
-    if (!checkedOutAt || visit.endAt > checkedOutAt) checkedOutAt = visit.endAt;
+    if (!checkedOutAt || visit.endAt > checkedOutAt) {
+      checkedOutAt = visit.endAt;
+      checkedOutSource = visit.endSource ?? null;
+    }
   }
+  // Inferred silence closes must not override a recent office Wi-Fi signal.
+  // Only agent, manual, or admin checkout means the user left.
   const checkedOutAfterPulse =
     !openVisit &&
     checkedOutAt !== null &&
     pulseAt !== null &&
     livePresence?.inOffice === true &&
-    checkedOutAt.getTime() > pulseAt.getTime();
+    checkedOutAt.getTime() > pulseAt.getTime() &&
+    isDefinitiveCheckoutSource(checkedOutSource);
 
   const inOfficeNow = resolveInOfficeNow({
     hasOpenVisit: Boolean(openVisit),

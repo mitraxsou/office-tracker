@@ -365,6 +365,40 @@
       "skipReason": null
     },
     {
+      "id": "BUG-025",
+      "title": "Event-mode inferred checkout flips In office to No while still on office Wi-Fi",
+      "date": "2026-10",
+      "severity": "high",
+      "area": "visits",
+      "reproSummary": "Events-mode agent synced office health_ping (pwcglb.com) about 42 minutes ago. Today visit cleanup used the 15-minute heartbeat gap, inferred checkout just after that pulse, and checkedOutAfterPulse made In office No while yellow still estimated.",
+      "assertion": "visitMaintenanceGapMs uses 70 minutes in events mode; inferred endSource is not a definitive checkout; resolveInOfficeNow stays Yes for a recent office pulse after an inferred close; agent/manual/admin checkout still yields No.",
+      "fixture": "fixtures/event-mode-inferred-checkout-in-office.json",
+      "testFile": "tests/bugs/BUG-025-event-mode-inferred-checkout-in-office.test.ts",
+      "relatedTests": [
+        "tests/activity-signal.test.ts",
+        "tests/close-stale-visit-pulse.test.ts"
+      ],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
+      "id": "BUG-026",
+      "title": "Midnight NEW_DAY visit_start before sleep invents 12:00 am first check-in and 15h day",
+      "date": "2026-10",
+      "severity": "high",
+      "area": "visits",
+      "reproSummary": "Laptop stayed on pwcglb.com past midnight; agent closed yesterday then auto-started Today at 12:00 am, slept ~12:18 am, woke ~2:55 pm and entered again. Dashboard showed first check-in 12:00 am and ~15h (sleep gap counted).",
+      "assertion": "filterMidnightRolloverStubVisits drops the midnight stub when a later re-enter exists after a long gap; firstOfficeInMsForDay and day span start at the afternoon enter. Agent defers NEW_DAY visit_start until resume or Wi-Fi enter.",
+      "fixture": "fixtures/midnight-rollover-sleep-reenter.json",
+      "testFile": "tests/bugs/BUG-026-midnight-rollover-sleep-reenter.test.ts",
+      "relatedTests": [
+        "tests/visit-end-overnight.test.ts",
+        "tests/agent-heartbeat-sync.test.ts"
+      ],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
       "id": "CORE-001",
       "title": "Heartbeat in-office uses SSID allowlist",
       "date": "2026-01",

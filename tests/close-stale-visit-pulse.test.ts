@@ -87,4 +87,44 @@ describe("closeStaleOpenVisits with last confirmed pulse", () => {
       data: { endAt: lastPulse, endSource: "inferred" },
     });
   });
+
+  it("does not close an event-mode visit after 20 minutes of silence", async () => {
+    const now = Date.now();
+    visitFindFirstMock.mockResolvedValue({
+      id: "visit-1",
+      startAt: new Date(now - 4 * 60 * 60 * 1000),
+      updatedAt: new Date(now - 4 * 60 * 60 * 1000),
+      endAt: null,
+    });
+    getLastAgentSignalAtMock.mockResolvedValue(new Date(now - 20 * 60 * 1000));
+
+    const closed = await closeStaleOpenVisits("user-1", undefined, {
+      lastConfirmedPulseAt: new Date(now - 20 * 60 * 1000),
+    });
+
+    expect(closed).toBe(false);
+    expect(visitUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it("closes an event-mode visit after more than 70 minutes of silence", async () => {
+    const now = Date.now();
+    const lastPulse = new Date(now - 71 * 60 * 1000);
+    visitFindFirstMock.mockResolvedValue({
+      id: "visit-1",
+      startAt: new Date(now - 4 * 60 * 60 * 1000),
+      updatedAt: new Date(now - 4 * 60 * 60 * 1000),
+      endAt: null,
+    });
+    getLastAgentSignalAtMock.mockResolvedValue(lastPulse);
+
+    const closed = await closeStaleOpenVisits("user-1", undefined, {
+      lastConfirmedPulseAt: lastPulse,
+    });
+
+    expect(closed).toBe(true);
+    expect(visitUpdateMock).toHaveBeenCalledWith({
+      where: { id: "visit-1" },
+      data: { endAt: lastPulse, endSource: "inferred" },
+    });
+  });
 });

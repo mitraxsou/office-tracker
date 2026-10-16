@@ -15,6 +15,7 @@ import {
   presenceSignalInOffice,
   resolveInOfficeNow,
   shouldUseActivityTicks,
+  visitMaintenanceGapMs,
 } from "../src/lib/activity-signal";
 
 describe("expectedTicksPerDay", () => {
@@ -120,6 +121,12 @@ describe("presence freshness", () => {
 
   it("keeps legacy heartbeats on the short stale gap", () => {
     expect(presenceFreshMs(false, 15 * 60 * 1000)).toBe(15 * 60 * 1000);
+  });
+
+  it("uses the same gap for visit maintenance as for In office freshness", () => {
+    expect(visitMaintenanceGapMs("events", 15)).toBe(70 * 60 * 1000);
+    expect(visitMaintenanceGapMs(undefined, 15)).toBe(70 * 60 * 1000);
+    expect(visitMaintenanceGapMs("heartbeat", 15)).toBe(15 * 60 * 1000);
   });
 
   it("recomputes office presence from the SSID when the snapshot has one", () => {

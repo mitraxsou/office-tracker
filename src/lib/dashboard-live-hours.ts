@@ -30,6 +30,13 @@ export type DashboardOfficeTimeInput = {
 
 const DEFINITIVE_CHECKOUT_SOURCES = new Set(["agent", "manual", "admin"]);
 
+/** Agent, manual, or admin checkout. Inferred silence closes do not count. */
+export function isDefinitiveCheckoutSource(
+  endSource: string | null | undefined,
+): boolean {
+  return DEFINITIVE_CHECKOUT_SOURCES.has(endSource ?? "");
+}
+
 /**
  * Same calendar day, and the latest visit is still open or was only inferred
  * from a silent laptop. A real checkout stops the yellow tail.
@@ -52,7 +59,7 @@ export function shouldEstimateUnconfirmedOfficeTail(input: {
     }
   }
   if (latestEnd === 0) return true;
-  return !DEFINITIVE_CHECKOUT_SOURCES.has(latestSource ?? "");
+  return !isDefinitiveCheckoutSource(latestSource);
 }
 
 export type DashboardOfficeTimeSegments = {
