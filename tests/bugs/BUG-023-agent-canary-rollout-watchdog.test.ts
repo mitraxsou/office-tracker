@@ -104,6 +104,9 @@ describe("BUG-023 agent canary rollout + independent watchdog", () => {
     expect(installer).toContain("New-TimeSpan -Hours 1");
     expect(installer).toContain("SKIP existing watchdog left unchanged");
     expect(installer).toContain("ReplaceExisting");
+    // BUG-028: AtLogOn must bind -User or IEX bypass registers a hollow task.
+    expect(installer).toContain("New-ScheduledTaskTrigger -AtLogOn -User");
+    expect(installer).toContain("Watchdog scheduled task was not registered");
 
     const wd = readFileSync(watchdogPs1, "utf8");
     const wdCode = wd

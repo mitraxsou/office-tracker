@@ -1,0 +1,9 @@
+{
+  "incident": "BUG-028",
+  "summary": "New-ScheduledTaskTrigger -AtLogOn without -User made Register-ScheduledTask return success under Invoke-AgentScriptBypass/IEX while no PwCOfficePulseWatchdog task persisted. setup.ps1 then refused to commit version.txt, freezing soft auto-update.",
+  "fix": {
+    "atLogOnBindsUser": true,
+    "verifyTaskAfterRegister": true,
+    "setupCommitsVersionEvenIfWatchdogWarns": true
+  }
+}

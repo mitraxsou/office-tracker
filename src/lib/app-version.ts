@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.33";
+export const APP_VERSION = "1.5.34";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,16 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-16",
+    userBullets: [
+      "Agent auto-update no longer gets stuck when the recovery watchdog task fails to register.",
+    ],
+    adminBullets: [
+      "BUG-028: watchdog AtLogOn trigger binds -User so Register-ScheduledTask persists under IEX bypass; setup warns and still commits version if bootstrap fails (canary soak; fleet-stable stays 1.5.24).",
+    ],
+  },
+  {
+    version: "1.5.33",
     date: "2026-10-16",
     userBullets: [
       "If the laptop stays on office Wi-Fi past midnight then sleeps, Today starts when you wake and re-enter, not at 12:00 am.",

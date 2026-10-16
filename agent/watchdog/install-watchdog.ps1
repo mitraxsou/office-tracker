@@ -106,23 +106,50 @@ try {
     $hourly = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
         -RepetitionInterval (New-TimeSpan -Hours 1) `
         -RepetitionDuration (New-TimeSpan -Days 3650)
-    $logon = New-ScheduledTaskTrigger -AtLogOn
+    # AtLogOn without -User can return a hollow success under NonInteractive/IEX
+    # (Register-ScheduledTask reports OK but no task is persisted). Always bind User.
+    $logonUser = $env:USERNAME
+    $logon = $null
+    if ($logonUser) {
+        try {
+            $logon = New-ScheduledTaskTrigger -AtLogOn -User $logonUser
+        } catch {
+            $logon = $null
+            Write-WatchdogInstallLog "WARN AtLogOn trigger unavailable: $($_.Exception.Message)"
+        }
+    }
     $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME `
         -LogonType Interactive -RunLevel Limited
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries `
         -DontStopIfGoingOnBatteries -StartWhenAvailable -MultipleInstances IgnoreNew
 
-    try {
-        Register-ScheduledTask -TaskName $TaskName -Action $action `
-            -Trigger @($hourly, $logon) -Principal $principal -Settings $settings `
-            -Description $TaskDescription -Force | Out-Null
-    } catch {
+    $mode = "hourly"
+    if ($logon) {
+        try {
+            Register-ScheduledTask -TaskName $TaskName -Action $action `
+                -Trigger @($hourly, $logon) -Principal $principal -Settings $settings `
+                -Description $TaskDescription -Force | Out-Null
+            if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) {
+                $mode = "hourly + logon"
+            }
+        } catch {
+            Write-WatchdogInstallLog "WARN dual-trigger register failed: $($_.Exception.Message)"
+        }
+    }
+    # Verify persistence: dual-trigger without -User used to log OK with no task.
+    $installed = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+    if (-not $installed) {
         Register-ScheduledTask -TaskName $TaskName -Action $action `
             -Trigger $hourly -Principal $principal -Settings $settings `
             -Description $TaskDescription -Force | Out-Null
+        $installed = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
+        $mode = "hourly"
+    }
+    if (-not $installed) {
+        throw "Watchdog scheduled task was not registered"
     }
 
-    Write-WatchdogInstallLog "OK installed independent watchdog (hourly + logon when supported)"
+    Write-WatchdogInstallLog "OK installed independent watchdog ($mode)"
     exit 0
 } catch {
     Write-WatchdogInstallLog "ERROR $($_.Exception.Message)"

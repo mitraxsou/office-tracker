@@ -208,6 +208,7 @@ describe("agent version", () => {
     expect(setup).toContain("Downloading missing");
     expect(setup).toContain('Get-MissingAgentLayoutFiles -InstallDir $installDir');
     expect(setup).toContain("Committed agent version $newVersion after successful setup");
+    expect(setup).toContain("WARN continuing so agent version can commit");
     const completeIdx = setup.lastIndexOf("Complete-Install -InstallDir");
     const watchdogIdx = setup.lastIndexOf("Install-WatchdogBootstrap -FilesBase");
     const commitIdx = setup.lastIndexOf("Committed agent version $newVersion");

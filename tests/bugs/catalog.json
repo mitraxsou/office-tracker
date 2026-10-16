@@ -393,7 +393,43 @@
       "testFile": "tests/bugs/BUG-026-midnight-rollover-sleep-reenter.test.ts",
       "relatedTests": [
         "tests/visit-end-overnight.test.ts",
-        "tests/agent-heartbeat-sync.test.ts"
+        "tests/agent-heartbeat-sync.test.ts",
+        "tests/bugs/BUG-027-overnight-midnight-spill-reenter.test.ts"
+      ],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
+      "id": "BUG-027",
+      "title": "Overnight visit ending just after midnight invents 12:00 am first check-in and 16h day",
+      "date": "2026-10",
+      "severity": "high",
+      "area": "visits",
+      "reproSummary": "Shubham: visits started previous afternoon, closed at 12:00 am / 12:18 am, then afternoon re-enter ~2:55 pm. Today showed first check-in 12:00 am and ~16h because day span bridges midnight spill to last activity.",
+      "assertion": "filterMidnightRolloverStubVisits drops overnight wifi visits whose end falls in the early-morning window when a later same-day re-enter exists after a long gap; first check-in and day span start at the afternoon enter.",
+      "fixture": "fixtures/overnight-midnight-spill-reenter.json",
+      "testFile": "tests/bugs/BUG-027-overnight-midnight-spill-reenter.test.ts",
+      "relatedTests": [
+        "tests/bugs/BUG-026-midnight-rollover-sleep-reenter.test.ts",
+        "tests/visit-end-overnight.test.ts"
+      ],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
+      "id": "BUG-028",
+      "title": "Watchdog AtLogOn hollow register freezes soft auto-update",
+      "date": "2026-10",
+      "severity": "critical",
+      "area": "agent-update",
+      "reproSummary": "Soft update ran Install-WatchdogBootstrap via Invoke-AgentScriptBypass. New-ScheduledTaskTrigger -AtLogOn without -User made Register-ScheduledTask return success with no persisted PwCOfficePulseWatchdog task. setup then refused to commit version.txt (exit 1), so canary (and any fleet build with this setup) stayed stuck behind the server target.",
+      "assertion": "install-watchdog.ps1 uses AtLogOn -User, verifies Get-ScheduledTask after register (hourly fallback), and setup.ps1 warns but still commits version.txt if watchdog bootstrap fails.",
+      "fixture": "fixtures/watchdog-atlogon-hollow-register.json",
+      "testFile": "tests/bugs/BUG-028-watchdog-atlogon-hollow-register.test.ts",
+      "relatedTests": [
+        "tests/bugs/BUG-023-agent-canary-rollout-watchdog.test.ts",
+        "tests/agent-version.test.ts",
+        "tests/agent-ps51-compat.test.ts"
       ],
       "status": "guarded",
       "skipReason": null
