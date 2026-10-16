@@ -44,7 +44,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
           <p className="text-sm text-muted">
             {APP_NAME} counts time you spend in the office toward your daily hours target (5 hours in the pilot).
             Visits build from the Windows agent on approved office Wi-Fi, manual check-in, or admin corrections.
-            You are not expected to be in office every day — home days simply do not add office hours.
+            You are not expected to be in office every day - home days simply do not add office hours.
           </p>
           <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
             <li>
@@ -347,7 +347,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             <div>
               <p className="font-medium">Wrong or missing Wi-Fi name (SSID)</p>
               <p className="mt-1 text-muted">
-                At home or on Ethernet, a missing Wi-Fi name is normal when Status is Healthy — no action needed.
+                At home or on Ethernet, a missing Wi-Fi name is normal when Status is Healthy - no action needed.
                 On site, the agent reads your WLAN name via netsh (IT may block Location). During captive portal
                 sign-in, Windows may briefly show <code>pwcglb.com</code> instead of <code>ExternalConnect</code>.
                 Wait for Wi-Fi to settle or use <strong>Check in</strong> on Today.
@@ -425,7 +425,7 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
             </li>
             <li>
               Healthy agent + working from home is expected. Alerts on Today are for install/sync problems or office
-              detection failures on site — not for skipping an office day.
+              detection failures on site - not for skipping an office day.
             </li>
           </ul>
         </section>

@@ -34,7 +34,7 @@ export function AgentHealthBanner({
         <p className="font-medium text-amber-400">Agent sync looks incomplete</p>
         <p className="mt-1 text-sm text-muted">
           Your laptop has not sent enough activity recently for a healthy sync check. This is not
-          about working from home — office days are optional. If Status still says Healthy, you can
+          about working from home - office days are optional. If Status still says Healthy, you can
           ignore this. Otherwise update the agent from Settings.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">

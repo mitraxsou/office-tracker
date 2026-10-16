@@ -54,7 +54,7 @@ export function RecentHeartbeats({
                   {new Date(p.recordedAt).toLocaleString("en-IN", { timeZone: timezone })}
                 </td>
                 <td className="py-2 pr-3">{p.inOffice ? "Yes" : "No"}</td>
-                <td className="py-2 font-mono text-xs">{p.ssid ?? "—"}</td>
+                <td className="py-2 font-mono text-xs">{p.ssid ?? "-"}</td>
               </tr>
             ))}
           </tbody>

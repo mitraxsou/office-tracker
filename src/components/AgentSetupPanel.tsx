@@ -67,7 +67,7 @@ export function AgentSetupPanel({
         <p className="mb-4 text-sm text-muted">
           One flow for every laptop: download the agent zip, extract it, open PowerShell in that
           folder, and run your <strong>reinstall command</strong>. It installs the{" "}
-          <strong>latest version from this server</strong>—first install, routine update, or fixing a
+          <strong>latest version from this server</strong> - first install, routine update, or fixing a
           corrupted agent. Use <strong>PowerShell</strong>, not Command Prompt. No admin required.
         </p>
 

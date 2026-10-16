@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 
-/** Users must submit a removal request — admins approve in Admin → Corrections. */
+/** Users must submit a removal request - admins approve in Admin → Corrections. */
 export async function DELETE() {
   const user = await getCurrentUser();
   if (!user) {

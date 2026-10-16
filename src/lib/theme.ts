@@ -29,7 +29,7 @@ export function readStoredTheme(): Theme | null {
  * Resolve theme from the same sources as themeInitScript.
  * Prefer localStorage (survives React Strict Mode clearing data-theme on
  * <html> in dev), then system preference, then dark.
- * Do not trust the document attribute — Strict Mode remounts reset it to the
+ * Do not trust the document attribute - Strict Mode remounts reset it to the
  * server JSX default.
  */
 export function resolveClientTheme(): Theme {

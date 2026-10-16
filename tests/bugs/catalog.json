@@ -435,6 +435,20 @@
       "skipReason": null
     },
     {
+      "id": "BUG-029",
+      "title": "Em dash / en dash reintroduced in UI or repo copy",
+      "date": "2026-10",
+      "severity": "medium",
+      "area": "core",
+      "reproSummary": "Update banner and other UI strings used Unicode em dash (U+2014), e.g. 'update required - install' rendered with a fancy dash. Same glyphs break agent IEX when they land in published .txt (BUG-017).",
+      "assertion": "Scanned paths (src, agent, tests, skills, docs, scripts, README) contain neither U+2014 nor U+2013; AgentVersionUpdateBanner uses ASCII 'update required - install'.",
+      "fixture": null,
+      "testFile": "tests/bugs/BUG-029-no-em-dash-in-repo.test.ts",
+      "relatedTests": ["tests/bugs/BUG-017-agent-iex-txt-must-parse.test.ts"],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
       "id": "CORE-001",
       "title": "Heartbeat in-office uses SSID allowlist",
       "date": "2026-01",

@@ -58,7 +58,7 @@ export function DashboardAlerts({
         <p className="text-sm font-medium text-amber-400">Office Wi-Fi name missing</p>
         <p className="mt-0.5 text-xs text-muted">
           The agent thinks you are in office but did not read a Wi-Fi name. If you are on site, wait
-          for the next sync or add a <strong>manual visit</strong>. Working from home is fine — no
+          for the next sync or add a <strong>manual visit</strong>. Working from home is fine - no
           action needed when you are not in office.
         </p>
       </CompactAlert>,

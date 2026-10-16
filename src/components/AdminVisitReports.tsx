@@ -248,7 +248,7 @@ export function AdminVisitReports() {
             {r.visit && (
               <p className="mt-2 text-sm text-muted">
                 Visit (current): {formatSnapshotTime(r.visit.startAt)}
-                {r.visit.endAt ? ` – ${formatSnapshotTime(r.visit.endAt)}` : " – open"} ·{" "}
+                {r.visit.endAt ? ` - ${formatSnapshotTime(r.visit.endAt)}` : " - open"} ·{" "}
                 {r.visit.source}
                 {r.visit.ssid ? ` · ${r.visit.ssid}` : ""}
               </p>
@@ -258,8 +258,8 @@ export function AdminVisitReports() {
               <p className="mt-1 text-sm text-muted">
                 Visit (at report): {formatSnapshotTime(r.visitSnapshot.startAt)}
                 {r.visitSnapshot.endAt
-                  ? ` – ${formatSnapshotTime(r.visitSnapshot.endAt)}`
-                  : " – open"}
+                  ? ` - ${formatSnapshotTime(r.visitSnapshot.endAt)}`
+                  : " - open"}
               </p>
             )}
 

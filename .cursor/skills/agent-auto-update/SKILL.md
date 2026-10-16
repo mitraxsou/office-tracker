@@ -46,7 +46,7 @@ If unsure whether a change would reach the fleet: confirm rollout mode is still 
 
 ## Non-negotiable rules (BUG-017 parse safety)
 
-1. **ASCII-only strings in agent scripts that become `.txt`.** No em dash (`—` U+2014), en dash (`–` U+2013), smart quotes, or other non-ASCII punctuation in `agent/**/*.ps1` (comments and user-facing summary lines included). Use `-`, commas, or parentheses.
+1. **ASCII-only strings in agent scripts that become `.txt`.** No em dash (U+2014), en dash (U+2013), smart quotes, or other non-ASCII punctuation in `agent/**/*.ps1` (comments and user-facing summary lines included). Use ASCII `-`, commas, or parentheses. See **no-em-dash** skill.
 2. **`Publish-AgentScriptTxt` must read and write UTF-8.**
    `Get-Content -LiteralPath $Ps1Path -Raw -Encoding UTF8` then `Set-Content ... -Encoding UTF8` in [`agent/lib/agent-download.ps1`](agent/lib/agent-download.ps1).
 3. **Task runner path stays:** `run-heartbeat.vbs` → `Get-Content` `office-heartbeat.txt` → `Invoke-Expression`. Do not switch the fleet to `-File office-heartbeat.ps1` without a versioned migration plan.

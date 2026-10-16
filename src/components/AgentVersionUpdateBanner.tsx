@@ -20,7 +20,7 @@ function AgentZipReinstallSteps({ serverVersion }: { serverVersion: string }) {
         <a href="/api/agent/download" className="text-accent hover:underline">
           <code>{zipName}</code>
         </a>{" "}
-        (agent <strong>v{serverVersion}</strong>) from this site — or use the same download on{" "}
+        (agent <strong>v{serverVersion}</strong>) from this site - or use the same download on{" "}
         <Link href="/settings#install" className="text-accent hover:underline">
           Settings → Install
         </Link>
@@ -61,7 +61,7 @@ export function AgentVersionUpdateBanner({
     return (
       <div className="rounded-lg border border-[var(--pwc-orange)]/50 bg-[var(--pwc-orange-muted)] px-3 py-2.5">
         <p className="text-sm font-medium text-[var(--pwc-orange)]">
-          {AGENT_PRODUCT_NAME} update required — install{" "}
+          {AGENT_PRODUCT_NAME} update required - install{" "}
           <strong>v{summary.serverVersion}</strong>
         </p>
         <p className="mt-0.5 text-xs text-muted">
@@ -83,7 +83,7 @@ export function AgentVersionUpdateBanner({
       </p>
       <p className="mt-1 text-sm text-muted">
         The server expects agent <strong>v{summary.serverVersion}</strong>. Use the zip download and
-        reinstall command below — do not rely on background auto-update. The reinstall command
+        reinstall command below - do not rely on background auto-update. The reinstall command
         clears the previous install and sets up the current version.
       </p>
       {versionLines.length > 0 && (
@@ -95,7 +95,7 @@ export function AgentVersionUpdateBanner({
       )}
       <AgentZipReinstallSteps serverVersion={summary.serverVersion} />
       <Link href="/settings#install" className="btn-primary mt-3 inline-block px-4 py-2 text-sm">
-        Open Settings — copy reinstall command
+        Open Settings - copy reinstall command
       </Link>
     </div>
   );

@@ -63,7 +63,7 @@ export async function updateNotificationPrefs(
   }
   if (data.graceMinutes !== undefined) {
     if (data.graceMinutes < 0 || data.graceMinutes > 180) {
-      throw new Error("graceMinutes must be 0–180");
+      throw new Error("graceMinutes must be 0-180");
     }
     update.graceMinutes = data.graceMinutes;
   }
@@ -96,7 +96,7 @@ export async function updateNotificationPrefs(
   }
   if (data.behindHoursMinExpected !== undefined) {
     if (data.behindHoursMinExpected < 0 || data.behindHoursMinExpected > 12) {
-      throw new Error("behindHoursMinExpected must be 0–12");
+      throw new Error("behindHoursMinExpected must be 0-12");
     }
     update.behindHoursMinExpected = data.behindHoursMinExpected;
   }

@@ -4,7 +4,7 @@
   Remove misconfigured Vercel env vars (DATABASE_URL_* prefix) via REST API.
 
 .DESCRIPTION
-  Uses curl.exe (Windows system cert store) — works on PwC laptops where
+  Uses curl.exe (Windows system cert store) - works on PwC laptops where
   `npx vercel login` fails with corporate SSL inspection errors.
 
   Requires a personal access token from https://vercel.com/account/tokens
@@ -79,7 +79,7 @@ function Resolve-ProjectConfig {
             }
         }
         catch {
-            Write-Warn "Could not read $linkFile — set VERCEL_PROJECT_ID manually."
+            Write-Warn "Could not read $linkFile - set VERCEL_PROJECT_ID manually."
         }
     }
 
@@ -266,7 +266,7 @@ function Should-RemoveEnvVar([object]$EnvVar) {
                 $reason = "DATABASE_URL value is not a postgresql:// URL"
             }
             else {
-                $reason = "DATABASE_URL has no readable value (likely invalid — remove and reconnect Storage)"
+                $reason = "DATABASE_URL has no readable value (likely invalid - remove and reconnect Storage)"
             }
         }
         elseif (Test-ShellLikeValue $value) {
@@ -283,7 +283,7 @@ function Should-RemoveEnvVar([object]$EnvVar) {
 
 # --- main ---
 
-Write-Info "Vercel env cleanup — remove misconfigured DATABASE_URL_* vars"
+Write-Info "Vercel env cleanup - remove misconfigured DATABASE_URL_* vars"
 Write-Host ""
 
 $config = Resolve-ProjectConfig -ProjectId $ProjectId -TeamId $TeamId
@@ -320,7 +320,7 @@ foreach ($ev in $envVars) {
 }
 
 if ($toRemove.Count -eq 0) {
-    Write-Success "Nothing to delete — no DATABASE_URL_* prefixed vars or invalid DATABASE_URL found."
+    Write-Success "Nothing to delete - no DATABASE_URL_* prefixed vars or invalid DATABASE_URL found."
     Write-Host ""
     Write-Info "Current keys (sample):"
     $envVars | ForEach-Object { [string]$_.key } | Sort-Object -Unique | ForEach-Object { Write-Host "  - $_" }
@@ -329,18 +329,18 @@ if ($toRemove.Count -eq 0) {
 
 Write-Warn "Will remove $($toRemove.Count) env var record(s):"
 foreach ($item in $toRemove) {
-    Write-Host "  - $($item.Key) [$($item.Target)] — $($item.Reason) (id: $($item.Id))"
+    Write-Host "  - $($item.Key) [$($item.Target)] - $($item.Reason) (id: $($item.Id))"
 }
 Write-Host ""
 
 if ($WhatIfPreference) {
-    Write-Warn "WhatIf mode — no changes made."
+    Write-Warn "WhatIf mode - no changes made."
     exit 0
 }
 
 $ids = @($toRemove | ForEach-Object { $_.Id } | Where-Object { $_ })
 if ($ids.Count -eq 0) {
-    Write-Err "Matched vars have no IDs — cannot delete."
+    Write-Err "Matched vars have no IDs - cannot delete."
     exit 1
 }
 
@@ -353,7 +353,7 @@ try {
     $result = Invoke-VercelCurl -Method DELETE -Path $deletePath -Body $body
 }
 catch {
-    Write-Warn "Batch delete failed — trying one-by-one (DELETE /v9/projects/.../env/{id})..."
+    Write-Warn "Batch delete failed - trying one-by-one (DELETE /v9/projects/.../env/{id})..."
     $deleted = 0
     $failed = 0
     foreach ($item in $toRemove) {
@@ -389,12 +389,12 @@ $stillBad = $remainingKeys | Where-Object { $_ -like "DATABASE_URL_*" }
 Write-Host ""
 Write-Info "Remaining keys ($($remainingKeys.Count)):"
 foreach ($key in $remainingKeys) {
-    $marker = if ($expectedGood -contains $key) { " (Storage — OK)" } else { "" }
+    $marker = if ($expectedGood -contains $key) { " (Storage - OK)" } else { "" }
     Write-Host "  - $key$marker"
 }
 
 if ($stillBad) {
-    Write-Warn "Some DATABASE_URL_* vars still present — re-run or delete manually in dashboard."
+    Write-Warn "Some DATABASE_URL_* vars still present - re-run or delete manually in dashboard."
 }
 
 $missingPostgres = $expectedGood | Where-Object { $_ -notin $remainingKeys }

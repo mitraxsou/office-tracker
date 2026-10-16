@@ -175,7 +175,7 @@ export function VisitList({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-medium">
-                    {formatTime(start, timezone)} –{" "}
+                    {formatTime(start, timezone)} -{" "}
                     {end ? formatTime(end, timezone) : "now"}
                   </p>
                   <p className="text-sm text-muted">

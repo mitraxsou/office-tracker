@@ -113,14 +113,14 @@ export async function PATCH(request: Request) {
 
   if (body.pendingTokenTtlDays !== undefined) {
     if (body.pendingTokenTtlDays < 1 || body.pendingTokenTtlDays > 90) {
-      return NextResponse.json({ error: "pendingTokenTtlDays must be 1–90" }, { status: 400 });
+      return NextResponse.json({ error: "pendingTokenTtlDays must be 1-90" }, { status: 400 });
     }
     update.pendingTokenTtlDays = body.pendingTokenTtlDays;
   }
 
   if (body.heartbeatRetentionDays !== undefined) {
     if (body.heartbeatRetentionDays < 1 || body.heartbeatRetentionDays > 30) {
-      return NextResponse.json({ error: "heartbeatRetentionDays must be 1–30" }, { status: 400 });
+      return NextResponse.json({ error: "heartbeatRetentionDays must be 1-30" }, { status: 400 });
     }
     update.heartbeatRetentionDays = body.heartbeatRetentionDays;
   }

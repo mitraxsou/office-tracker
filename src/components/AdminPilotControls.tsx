@@ -97,7 +97,7 @@ export function AdminPilotControls({
               When on (default for the pilot), colleagues sign in with a PwC email OTP and get an
               account on first verify, including an agent install token. When off, existing users
               can still OTP sign-in, and new people use{" "}
-              <strong>Request an account</strong> on the login page — you approve or reject under
+              <strong>Request an account</strong> on the login page - you approve or reject under
               Admin → Account requests. This is separate from ALLOW_REGISTRATION in Vercel (legacy
               password register only).
             </p>

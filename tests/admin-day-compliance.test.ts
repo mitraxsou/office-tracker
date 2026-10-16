@@ -460,7 +460,7 @@ describe("Admin day In/Out aligns with Today day-span staleMs", () => {
   });
 
   it("after overnight EOD close, only today's open visit remains for firstIn/lastOut", () => {
-    // Production filters with visitsOverlappingDay — prior-day closed visits are gone.
+    // Production filters with visitsOverlappingDay - prior-day closed visits are gone.
     const row = computeUserDayComplianceRow({
       ...baseInput,
       visits: [

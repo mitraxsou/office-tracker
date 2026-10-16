@@ -16,7 +16,7 @@ Internal pilot: track **≥5 hours/day in office** on PwC laptops, with a defaul
 ```
 Windows agent (PwC Office Pulse) → POST /api/heartbeat → Neon Postgres (Vercel)
 Web dashboard ← session cookie              Admin /admin ← role=admin
-Config: GET /api/agent/config (Bearer token) — SSIDs & hours target server-side only
+Config: GET /api/agent/config (Bearer token) - SSIDs & hours target server-side only
 ```
 
 - **Local dev:** Postgres via `.env.local`, `npm run dev` → http://localhost:3000
@@ -24,8 +24,8 @@ Config: GET /api/agent/config (Bearer token) — SSIDs & hours target server-sid
 - **Prod (Hobby):** `production` → `office-tracker` → https://office-tracker-theta.vercel.app
 - **Dev (Enterprise CDTR):** `dev` → `office-tracker-dev-9824` → https://office-tracker-dev-9824.vercel.app (same Neon as Hobby dev)
 - **Prod (Enterprise CDTR):** `production` → `office-tracker-prod` → https://office-tracker-prod.vercel.app (same Neon as Hobby prod)
-- **Enterprise env sync:** `.\scripts\sync-enterprise-env.ps1 -Profile dev|prod` — see `scripts/vercel-env-setup.md` and `docs/deploy-branches.md`
-- **SSO bypass for agent updates:** `.\scripts\setup-automation-bypass.ps1 -SyncEnv` — sets `VERCEL_AUTOMATION_BYPASS_SECRET` on both Enterprise projects; clients use header `x-vercel-protection-bypass`
+- **Enterprise env sync:** `.\scripts\sync-enterprise-env.ps1 -Profile dev|prod` - see `scripts/vercel-env-setup.md` and `docs/deploy-branches.md`
+- **SSO bypass for agent updates:** `.\scripts\setup-automation-bypass.ps1 -SyncEnv` - sets `VERCEL_AUTOMATION_BYPASS_SECRET` on both Enterprise projects; clients use header `x-vercel-protection-bypass`
 - **Workflow:** PR to `dev`, then PR `dev` → `production`. GitHub default branch is `dev`. See `docs/deploy-branches.md`
 - **Do not** reuse `lsc-impact-analyser-dashboard` Vercel project or point dev at prod Postgres
 
@@ -66,7 +66,7 @@ Normalize before send: strip ` (Unauthenticated)`, band suffixes (` 2`, ` 5`), a
 
 **Install UX:** Users download agent zip from Settings (`GET /api/agent/download`, session required). **Copy install command** and **Copy update command** embed token + `NEXT_PUBLIC_APP_URL` with relative `.\install.ps1` / `.\update.ps1`. Commands must run from the extract folder (PowerShell, not cmd.exe). Downloads on PwC laptops is often `OneDrive - PwC\Downloads`; zip `PwCOfficePulse-agent` may nest `PwCOfficePulse`.
 
-**Setup Int32 / corrupt `version.txt`:** If update fails with `Cannot convert value "000…" to type System.Int32`, dump and remove `%LOCALAPPDATA%\OfficeTracker\version.txt`, then re-paste the update command — see `docs/agent-setup-recovery.md`. Agent **1.5.2+** hardens version compare, removes script-level `param()` from `setup.ps1`, and uses `Invoke-AgentScriptBypass` so `$ApiUrl` / `$Token` are not nulled on fresh install.
+**Setup Int32 / corrupt `version.txt`:** If update fails with `Cannot convert value "000…" to type System.Int32`, dump and remove `%LOCALAPPDATA%\OfficeTracker\version.txt`, then re-paste the update command - see `docs/agent-setup-recovery.md`. Agent **1.5.2+** hardens version compare, removes script-level `param()` from `setup.ps1`, and uses `Invoke-AgentScriptBypass` so `$ApiUrl` / `$Token` are not nulled on fresh install.
 
 **Auto-update hard gate (BUG-017):** The scheduled task runs `office-heartbeat.txt` via `Invoke-Expression`, not `-File .ps1`. Any `agent/` change that breaks `.txt` parse stops sync and further soft updates for the fleet. Follow the **agent-auto-update** skill: ASCII-only punctuation in agent scripts, `Publish-AgentScriptTxt` UTF-8 read/write, bump `agent/version.txt` with `$AgentScriptVersion`, run `tests/bugs/BUG-017-agent-iex-txt-must-parse.test.ts` before any publish.
 
@@ -81,8 +81,8 @@ Normalize before send: strip ` (Unauthenticated)`, band suffixes (` 2`, ` 5`), a
 - Quick **Check in** / **Check out** when auto-detect fails
 
 ### Admin (`role=admin`)
-- `/admin` — all users, compliance charts, visit corrections, device removal
-- `/admin/settings` — global hours target, monthly office days target, office SSIDs
+- `/admin` - all users, compliance charts, visit corrections, device removal
+- `/admin/settings` - global hours target, monthly office days target, office SSIDs
 - Audit log on admin actions
 
 **Breakglass admin:** env vars `BREAKGLASS_EMAIL` + `BREAKGLASS_PASSWORD` only (not hardcoded in source). Local dev example in `.env.local`.
@@ -104,7 +104,7 @@ See [reference.md](reference.md) for env vars and API routes.
 ## UI / copy / code style
 
 - PwC colors: orange `#FD5108`, dark `#1A1A1A` / `#2D2D2D`. For muted washes, accent rails, chips, buttons, light/dark alphas, and when not to invent hues, use the **pwc-colors** skill (`.cursor/skills/pwc-colors/SKILL.md`)
-- **No em dashes (—) anywhere** in the repo: user-facing copy, comments, commit messages, error strings, docs, or UI labels. Use a hyphen (`-`), comma, colon, or parentheses instead.
+- **No em dash (U+2014) or en dash (U+2013)** anywhere in the repo. Follow the **no-em-dash** skill (`.cursor/skills/no-em-dash/SKILL.md`). Use ASCII hyphen (`-`), comma, colon, or parentheses instead.
 - No ChatGPT tone ("seamlessly", "leverage", "robust")
 - Direct internal IT voice; verb-first buttons ("Copy install command", "Check in")
 - Do not tell users to enable Location when IT has disabled it; mention alternate SSID detection

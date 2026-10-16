@@ -33,7 +33,7 @@ export function timezoneOptionsForUser(currentTimezone: string) {
   return USER_TIMEZONE_OPTIONS;
 }
 
-/** PwC office Wi-Fi SSIDs — all denote in-office for auto-detection */
+/** PwC office Wi-Fi SSIDs - all denote in-office for auto-detection */
 export const DEFAULT_OFFICE_SSIDS = ["OfficeConnect", "ExternalConnect", "pwcglb.com"];
 
 export function parseDefaultSsidsFromEnv(): string[] {

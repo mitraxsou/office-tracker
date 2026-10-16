@@ -187,7 +187,7 @@ export function UserCorrectionRequests() {
                   {r.visit && (
                     <p className="mt-1 text-sm text-muted">
                       Visit: {formatSnapshotTime(r.visit.startAt)}
-                      {r.visit.endAt ? ` – ${formatSnapshotTime(r.visit.endAt)}` : " – open"} ·{" "}
+                      {r.visit.endAt ? ` - ${formatSnapshotTime(r.visit.endAt)}` : " - open"} ·{" "}
                       {r.visit.source}
                     </p>
                   )}

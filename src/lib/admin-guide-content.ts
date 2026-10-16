@@ -844,7 +844,7 @@ export const ADMIN_GUIDE_SECTIONS: GuideSection[] = [
       {
         type: "links",
         items: [
-          { href: "/admin/settings#diagnostic-retention", label: "Diagnostic retention (keep ticks 1–30 days)" },
+          { href: "/admin/settings#diagnostic-retention", label: "Diagnostic retention (keep ticks 1-30 days)" },
           { href: "/admin/settings#agent-sync", label: "Agent health grace and visit gap" },
           { href: "/admin/settings#cron-jobs", label: "purge-heartbeats cron" },
           { href: "/admin/settings#data-maintenance", label: "Data maintenance (manual older purge)" },

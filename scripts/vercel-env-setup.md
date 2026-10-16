@@ -31,19 +31,19 @@ Use the **Vercel REST API** with a token created in the browser. The cleanup scr
 2. Click **Create Token**.
 3. Name it e.g. `office-tracker-env-cleanup`.
 4. Scope: full account access (or at least project env read/write).
-5. Copy the token — shown once.
+5. Copy the token - shown once.
 
 Do **not** commit the token or add it to `.env` files in git.
 
 ## 2. Find your project ID
 
-**Option A — Dashboard URL**
+**Option A - Dashboard URL**
 
 1. Open [vercel.com/dashboard](https://vercel.com/dashboard).
 2. Open project **office-tracker**.
-3. **Settings → General → Project ID** — copy `prj_...`.
+3. **Settings → General → Project ID** - copy `prj_...`.
 
-**Option B — Settings URL**
+**Option B - Settings URL**
 
 ```text
 https://vercel.com/<team-or-user>/office-tracker/settings
@@ -51,7 +51,7 @@ https://vercel.com/<team-or-user>/office-tracker/settings
 
 Project ID is on the General settings page.
 
-**Option C — Linked repo**
+**Option C - Linked repo**
 
 If you previously ran `npx vercel link` on a machine without SSL issues, `.vercel/project.json` contains `projectId` and `orgId` (team). The script reads this automatically.
 
@@ -62,7 +62,7 @@ From the repo root in **PowerShell**:
 ```powershell
 cd "C:\Users\smandal089\OneDrive - PwC\Documents\Cursor\OfficeTracker"
 
-# Paste token (session only — not saved to disk)
+# Paste token (session only - not saved to disk)
 $env:VERCEL_TOKEN = "your_token_here"
 
 # Optional if not in .vercel/project.json
@@ -94,14 +94,14 @@ $env:VERCEL_TEAM_ID = "team_xxxxxxxxxxxxxxxx"
 | `POSTGRES_URL_NON_POOLING` | Vercel Storage → Postgres |
 | `AUTH_SECRET`, `NEXT_PUBLIC_APP_URL`, … | Manual project vars |
 
-## 4. Reconnect Storage (dashboard — required)
+## 4. Reconnect Storage (dashboard - required)
 
 The API can **delete** env vars; it cannot re-link Storage. After cleanup:
 
 1. Vercel project → **Storage** tab.
 2. Select your **Postgres** database (Neon).
 3. **Connect to Project** (or **Disconnect** then reconnect).
-4. When asked for **env var prefix**, leave it **blank** — do **not** enter `DATABASE_URL`.
+4. When asked for **env var prefix**, leave it **blank** - do **not** enter `DATABASE_URL`.
 5. Confirm these appear under **Settings → Environment Variables** (no prefix):
    - `POSTGRES_URL`
    - `POSTGRES_PRISMA_URL`
@@ -139,12 +139,12 @@ curl.exe -sS `
 
 ```powershell
 $env:NODE_EXTRA_CA_CERTS = "C:\Users\smandal089\OneDrive - PwC\Documents\Cursor\OfficeTracker\.certs\pwc-proxy.pem"
-$env:VERCEL_TOKEN = "your_token_here"   # session only — do not commit
+$env:VERCEL_TOKEN = "your_token_here"   # session only - do not commit
 npx vercel whoami
 npx vercel env pull .env.vercel.local
 ```
 
-**Persistent (optional):** Windows → Environment Variables → User → `NODE_EXTRA_CA_CERTS` = path to `.certs\pwc-proxy.pem`. Keep `VERCEL_TOKEN` as a session variable or Windows user env var — **not** in `.env` (that file is for the Next.js app).
+**Persistent (optional):** Windows → Environment Variables → User → `NODE_EXTRA_CA_CERTS` = path to `.certs\pwc-proxy.pem`. Keep `VERCEL_TOKEN` as a session variable or Windows user env var - **not** in `.env` (that file is for the Next.js app).
 
 Do **not** set `NODE_TLS_REJECT_UNAUTHORIZED=0` unless you accept disabling all TLS checks.
 
@@ -211,10 +211,10 @@ Re-run `.\scripts\sync-enterprise-env.ps1` whenever you rotate `AUTH_SECRET` or 
 
 | Error | Fix |
 |-------|-----|
-| `401 Unauthorized` | Token expired or wrong — create a new token |
-| `403 Forbidden` | Token lacks access — use account token or team member with env permissions |
+| `401 Unauthorized` | Token expired or wrong - create a new token |
+| `403 Forbidden` | Token lacks access - use account token or team member with env permissions |
 | `404 Project not found` | Wrong `VERCEL_PROJECT_ID` or missing `VERCEL_TEAM_ID` for team projects |
-| `curl.exe failed` | Corporate proxy blocking `api.vercel.com` — try from personal network or ask IT |
+| `curl.exe failed` | Corporate proxy blocking `api.vercel.com` - try from personal network or ask IT |
 | Vars deleted but app still broken | Reconnect Storage (step 4) and redeploy |
 | Enterprise build: `POSTGRES_PRISMA_URL` not found | Run `sync-enterprise-env.ps1`, then redeploy |
-| Enterprise URL redirects to Vercel SSO | Expected for protected Enterprise deployments — open in browser while signed into PwC Vercel |
+| Enterprise URL redirects to Vercel SSO | Expected for protected Enterprise deployments - open in browser while signed into PwC Vercel |

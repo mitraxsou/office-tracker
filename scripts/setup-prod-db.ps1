@@ -15,7 +15,7 @@
 
 .PARAMETER TryEnvPull
   After clearing VERCEL_TOKEN, run `npx vercel env pull .env.vercel.local`.
-  Skipped by default — use when CLI login/token works.
+  Skipped by default - use when CLI login/token works.
 
 .EXAMPLE
   .\scripts\setup-prod-db.ps1
@@ -100,7 +100,7 @@ function Test-PostgresEnvFile {
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $repoRoot
 
-Write-Info "PwC Office Pulse — production DB setup"
+Write-Info "PwC Office Pulse - production DB setup"
 Write-Host ""
 
 if ($env:VERCEL_TOKEN) {

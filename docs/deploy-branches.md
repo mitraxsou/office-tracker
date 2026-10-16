@@ -124,8 +124,8 @@ The legacy `main` branch is frozen at the same commit as `dev` / `production` wh
 | `office-tracker` production branch | `production` (API: `link.productionBranch`) |
 | `office-tracker-dev` production branch | `dev` |
 | GitHub default branch | `dev` |
-| Dev URL | https://office-tracker-dev.vercel.app/login — Ready |
-| Prod URL | https://office-tracker-theta.vercel.app/login — Ready |
+| Dev URL | https://office-tracker-dev.vercel.app/login - Ready |
+| Prod URL | https://office-tracker-theta.vercel.app/login - Ready |
 | Prod DB vars | Production scope only (no Preview credentials) |
 | Dev DB | Separate Neon (`office-tracker-dev-db`) |
 

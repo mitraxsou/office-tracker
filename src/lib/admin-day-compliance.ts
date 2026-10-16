@@ -247,7 +247,7 @@ export function computeUserDayComplianceRow(input: {
   hoursTarget: number;
   /** Agent health grace (hours). Not used for Visit day-span / first-in math. */
   graceHours: number;
-  /** Visit gap / day-span stale window — must match Today (`agentStaleMinutes`). */
+  /** Visit gap / day-span stale window - must match Today (`agentStaleMinutes`). */
   staleMs: number;
   now?: Date;
 }): AdminDayUserRow {

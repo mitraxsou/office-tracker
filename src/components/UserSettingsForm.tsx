@@ -288,7 +288,7 @@ export function UserSettingsForm({
                     {d.forceAgentUpdate && (
                       <span className="text-amber-300">
                         {" "}
-                        · admin requested update — use zip + reinstall below
+                        · admin requested update - use zip + reinstall below
                       </span>
                     )}
                   </span>

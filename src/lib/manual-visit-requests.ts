@@ -303,7 +303,7 @@ export async function createManualVisitRequest(params: {
 
 /**
  * Create one pending ManualVisitRequest per selected day, each spanning the
- * user's daily hours target. Does not create Visit rows — admin approval required.
+ * user's daily hours target. Does not create Visit rows - admin approval required.
  */
 export async function createMarkDaysVisitedRequests(params: {
   userId: string;

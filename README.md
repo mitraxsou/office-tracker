@@ -109,9 +109,9 @@ If Vercel shows vars like `DATABASE_URL_POSTGRES_URL`, `DATABASE_URL_DATABASE_UR
 1. Vercel project → **Settings** → **Environment Variables**
 2. **Delete** every var starting with `DATABASE_URL_` that came from Storage (e.g. `DATABASE_URL_POSTGRES_URL`, `DATABASE_URL_DATABASE_URL`, `DATABASE_URL_UNPOOLED`, …)
 
-   **Bulk delete (no CLI login):** use [scripts/vercel-env-setup.md](scripts/vercel-env-setup.md) and `scripts/cleanup-vercel-env.ps1` with a [Vercel API token](https://vercel.com/account/tokens) — works on PwC laptops where `vercel login` fails SSL inspection.
+   **Bulk delete (no CLI login):** use [scripts/vercel-env-setup.md](scripts/vercel-env-setup.md) and `scripts/cleanup-vercel-env.ps1` with a [Vercel API token](https://vercel.com/account/tokens) - works on PwC laptops where `vercel login` fails SSL inspection.
 3. **Storage** tab → select your Postgres database → **Connect to Project**
-4. When prompted for env var prefix, leave it **blank** (default) — do **not** enter `DATABASE_URL`
+4. When prompted for env var prefix, leave it **blank** (default) - do **not** enter `DATABASE_URL`
 5. Confirm these appear (no prefix): `POSTGRES_URL`, `POSTGRES_PRISMA_URL`, `POSTGRES_URL_NON_POOLING`
 6. **Redeploy** (Deployments → … → Redeploy)
 
@@ -141,22 +141,22 @@ If Vercel shows vars like `DATABASE_URL_POSTGRES_URL`, `DATABASE_URL_DATABASE_UR
 
 ### 3. Initialize database
 
-**When PwC firewall blocks Neon (port 5432 / Prisma P1001) — run setup on Vercel deploy:**
+**When PwC firewall blocks Neon (port 5432 / Prisma P1001) - run setup on Vercel deploy:**
 
 1. Vercel project → **Settings** → **Environment Variables**
 2. Add **`RUN_DB_SETUP_ON_DEPLOY`** = **`true`** for **Production** only
 3. Confirm **`BREAKGLASS_EMAIL`** and **`BREAKGLASS_PASSWORD`** are already set (seed creates the admin user)
 4. **Deployments** → latest deployment → **⋯** → **Redeploy** (or push a commit to `main`)
-5. Watch build logs for `RUN_DB_SETUP_ON_DEPLOY=true — running prisma db push and seed`
+5. Watch build logs for `RUN_DB_SETUP_ON_DEPLOY=true - running prisma db push and seed`
 6. After a successful deploy, sign in at your production URL with breakglass credentials → `/admin`
 7. During **pilot testing**, it is safe to leave `RUN_DB_SETUP_ON_DEPLOY=true` for multiple deploys. Each build runs `prisma db push` (applies schema changes) and `seed` (ensures breakglass admin + default AppConfig). This does **not** wipe users, visits, heartbeats, or audit data unless a schema change is breaking (rare during pilot). Seed resets AppConfig defaults (hours target, SSIDs, registration toggle) on every run.
 8. When the pilot is stable, **remove** `RUN_DB_SETUP_ON_DEPLOY` or set it to **`false`** so normal deploys skip push/seed. Minor schema fixes (e.g. new columns) also run automatically at server startup via `src/instrumentation.ts`.
 
 This runs during `npm run build` on Vercel (which can reach Neon). Local `npm run db:push` / `db:seed` are unchanged for machines that can connect.
 
-**Alternative — manual env copy on a machine that can reach Neon:**
+**Alternative - manual env copy on a machine that can reach Neon:**
 
-**Recommended (manual env copy — works when `vercel env pull` fails on PwC laptops):**
+**Recommended (manual env copy - works when `vercel env pull` fails on PwC laptops):**
 
 1. In Vercel: **Storage** → your Postgres database → **`.env.local` tab**  
    Copy `POSTGRES_PRISMA_URL` and `POSTGRES_URL_NON_POOLING`.  
@@ -165,7 +165,7 @@ This runs during `npm run build` on Vercel (which can reach Neon). Local `npm ru
 
 ```powershell
 Copy-Item .env.vercel.local.example .env.vercel.local
-# Edit .env.vercel.local — paste the two POSTGRES_* URLs (keep quotes)
+# Edit .env.vercel.local - paste the two POSTGRES_* URLs (keep quotes)
 notepad .env.vercel.local
 ```
 
@@ -183,7 +183,7 @@ npm run db:push
 npm run db:seed
 ```
 
-**Optional — Vercel CLI pull** (only if `vercel login` / token works):
+**Optional - Vercel CLI pull** (only if `vercel login` / token works):
 
 ```powershell
 Remove-Item Env:VERCEL_TOKEN -ErrorAction SilentlyContinue
@@ -193,7 +193,7 @@ npx vercel env pull .env.vercel.local
 
 If pull fails with `You defined "--token", but its contents are invalid`, a bad `VERCEL_TOKEN` is still set in PowerShell from an earlier attempt. Clear it with `Remove-Item Env:VERCEL_TOKEN -ErrorAction SilentlyContinue` and retry, or skip pull and use manual copy above.
 
-For local Neon dev, set `DATABASE_URL` or `POSTGRES_PRISMA_URL` in `.env.local` — `scripts/ensure-postgres-env.mjs` loads `.env`, `.env.local`, and `.env.vercel.local`, maps legacy names, and passes resolved vars to Prisma.
+For local Neon dev, set `DATABASE_URL` or `POSTGRES_PRISMA_URL` in `.env.local` - `scripts/ensure-postgres-env.mjs` loads `.env`, `.env.local`, and `.env.vercel.local`, maps legacy names, and passes resolved vars to Prisma.
 
 **Do not run raw `npx prisma db push`.** Prisma only reads `.env`, not `.env.vercel.local`. Use `npm run db:push`, `.\scripts\setup-prod-db.ps1`, or `node scripts/prisma-with-env.mjs db push`.
 
@@ -255,7 +255,7 @@ npm run build
 | Startup shortcut | `PwC Office Pulse.lnk` |
 | Current agent | `1.5.17` (`agent/version.txt`) |
 
-**Sync shape (1.5.17+):** local pulse every ~2 minutes on disk only; immediate sync for office enter/exit, Wi-Fi changes, sleep/wake, and hours-target met; one compact `health_ping` per hour (keeps `lastSeen` / Healthy status); activity ticks + daily summary flush on true day rollover (not every local pulse). Working from home is fine — office hours only accrue on allowlisted office SSIDs.
+**Sync shape (1.5.17+):** local pulse every ~2 minutes on disk only; immediate sync for office enter/exit, Wi-Fi changes, sleep/wake, and hours-target met; one compact `health_ping` per hour (keeps `lastSeen` / Healthy status); activity ticks + daily summary flush on true day rollover (not every local pulse). Working from home is fine - office hours only accrue on allowlisted office SSIDs.
 
 Help / release notes in the app: `/help#whats-new`.
 

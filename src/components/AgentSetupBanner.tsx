@@ -6,7 +6,7 @@ export function AgentSetupBanner({ ssidMissing }: { ssidMissing?: boolean }) {
       <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-4 py-4">
         <p className="font-medium text-amber-400">Wi-Fi SSID not detected</p>
         <p className="mt-1 text-sm text-muted">
-          Common at home or on Ethernet — no action needed if you are not in office. If you are on
+          Common at home or on Ethernet - no action needed if you are not in office. If you are on
           site and hours are missing, wait for the next agent sync or add a manual visit on Today.
           The agent also tries <code>Get-NetConnectionProfile</code> when Location is blocked.
         </p>

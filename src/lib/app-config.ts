@@ -66,7 +66,7 @@ export function logAppConfigSchemaDriftIfNeeded(err: unknown): boolean {
 
   console.error(
     "[app-config] Database schema is behind the app (missing AppConfig.allowRegistration).\n" +
-      "Fix now — Neon SQL Editor (fastest, no redeploy):\n" +
+      "Fix now - Neon SQL Editor (fastest, no redeploy):\n" +
       '  ALTER TABLE "AppConfig" ADD COLUMN IF NOT EXISTS "allowRegistration" BOOLEAN NOT NULL DEFAULT false;\n' +
       "Or redeploy with RUN_DB_SETUP_ON_DEPLOY=true on Vercel. Startup also auto-adds this column when missing."
   );
