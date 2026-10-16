@@ -21,7 +21,9 @@ vi.mock("@/lib/app-config", () => ({
 import { GET } from "@/app/api/admin/agent-version-report/route";
 import { getAgentVersion } from "@/lib/agent-version";
 import {
+  buildAgentVersionAdminReport,
   buildAgentVersionAttentionReport,
+  buildAgentVersionFleetReport,
   type AgentVersionReportConfig,
   type AgentVersionReportDeviceInput,
 } from "@/lib/agent-version-report";
@@ -211,6 +213,67 @@ describe("buildAgentVersionAttentionReport", () => {
   });
 });
 
+describe("buildAgentVersionFleetReport", () => {
+  it("lists every laptop with current, needs_update, and unknown statuses", () => {
+    const report = buildAgentVersionFleetReport({
+      config: allowlistConfig,
+      devices: [
+        device({
+          id: "soumitra",
+          email: "soumitra.m.mandal@pwc.com",
+          agentScriptVersion: "1.5.25",
+        }),
+        device({
+          id: "fleet-current",
+          email: "new.user@pwc.com",
+          agentScriptVersion: "1.5.24",
+        }),
+        device({
+          id: "fleet-behind",
+          email: "other.user@pwc.com",
+          agentScriptVersion: "1.5.23",
+        }),
+        device({
+          id: "unknown",
+          email: "quiet.user@pwc.com",
+          agentScriptVersion: null,
+          lastSeenAt: null,
+        }),
+      ],
+    });
+
+    expect(report.totalDevices).toBe(4);
+    expect(report.currentCount).toBe(2);
+    expect(report.needsUpdateCount).toBe(1);
+    expect(report.unknownCount).toBe(1);
+    expect(report.devices.find((row) => row.email === "new.user@pwc.com")?.status).toBe(
+      "current",
+    );
+    expect(report.devices.find((row) => row.email === "other.user@pwc.com")?.status).toBe(
+      "needs_update",
+    );
+    expect(
+      report.devices.find((row) => row.email === "soumitra.m.mandal@pwc.com")?.onAllowlist,
+    ).toBe(true);
+  });
+
+  it("includes the fleet list on the admin report payload", () => {
+    const report = buildAgentVersionAdminReport({
+      config: allowlistConfig,
+      devices: [
+        device({
+          id: "fleet",
+          email: "new.user@pwc.com",
+          agentScriptVersion: "1.5.24",
+        }),
+      ],
+    });
+    expect(report.deviceCount).toBe(0);
+    expect(report.fleet.totalDevices).toBe(1);
+    expect(report.fleet.devices[0].status).toBe("current");
+  });
+});
+
 describe("GET /api/admin/agent-version-report", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -257,6 +320,13 @@ describe("GET /api/admin/agent-version-report", () => {
     expect(body.users).toHaveLength(1);
     expect(body.users[0].email).toBe("soumitra.m.mandal@pwc.com");
     expect(body.users[0].devices[0].expectedVersion).toBe("1.5.25");
+    expect(body.fleet.totalDevices).toBe(2);
+    expect(body.fleet.currentCount).toBe(1);
+    expect(body.fleet.needsUpdateCount).toBe(1);
+    expect(body.fleet.devices.map((row: { email: string }) => row.email)).toEqual([
+      "new.user@pwc.com",
+      "soumitra.m.mandal@pwc.com",
+    ]);
     expect(body.users[0].devices[0].updateQueued).toBeUndefined();
     expect(mocks.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -266,7 +336,7 @@ describe("GET /api/admin/agent-version-report", () => {
   });
 });
 
-describe("Agents not updated panel copy", () => {
+describe("Agent status panel copy", () => {
   const component = readFileSync(
     path.join(process.cwd(), "src/components/AdminAgentVersionReport.tsx"),
     "utf8",
@@ -277,10 +347,12 @@ describe("Agents not updated panel copy", () => {
   );
 
   it("does not present the repo version as the current agent for every laptop", () => {
+    expect(component).toContain("Agent status");
     expect(component).toContain("Fleet-stable:");
     expect(component).toContain("Canary:");
     expect(component).toContain("Canary is not the fleet target.");
-    expect(component).toContain("Every reporting laptop matches its own target.");
+    expect(component).toContain("Showing");
+    expect(component).toContain("Page");
     expect(component).not.toContain("Current agent");
     expect(component).not.toContain("Push update");
     expect(component).not.toContain("queueUpdate");
@@ -288,7 +360,7 @@ describe("Agents not updated panel copy", () => {
     expect(component).not.toContain("forceAgentUpdate");
     expect(component).not.toMatch(/\u2014|\u2013/);
     expect(route).not.toContain("getAgentVersion");
-    expect(route).toContain("buildAgentVersionAttentionReport");
+    expect(route).toContain("buildAgentVersionAdminReport");
     expect(route).not.toMatch(/\u2014|\u2013/);
   });
 });

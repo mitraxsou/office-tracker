@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 import { getAppConfig } from "@/lib/app-config";
-import { buildAgentVersionAttentionReport } from "@/lib/agent-version-report";
+import { buildAgentVersionAdminReport } from "@/lib/agent-version-report";
 
 export async function GET() {
   const admin = await requireAdmin();
@@ -19,5 +19,5 @@ export async function GET() {
     orderBy: [{ user: { email: "asc" } }, { serialNumber: "asc" }],
   });
 
-  return NextResponse.json(buildAgentVersionAttentionReport({ config, devices }));
+  return NextResponse.json(buildAgentVersionAdminReport({ config, devices }));
 }
