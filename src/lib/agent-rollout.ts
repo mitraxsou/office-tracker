@@ -75,12 +75,20 @@ export type ResolveAgentTargetVersionInput = {
 };
 
 /**
+ * Canary is always the deploy-tree agent version. Stored AppConfig.agentCanaryVersion
+ * is ignored for targeting so Admin does not need to edit canary after each bump.
+ */
+export function effectiveAgentCanaryVersion(repoVersion?: string): string {
+  return (repoVersion ?? getAgentVersion()).trim() || getAgentVersion();
+}
+
+/**
  * Resolve the agent script version this user/device should run.
  * Used by sync, /api/agent/config, files, zip, and the laptop watchdog.
  */
 export function resolveAgentTargetVersion(input: ResolveAgentTargetVersionInput): string {
   const repoVersion = (input.repoVersion ?? getAgentVersion()).trim();
-  const canary = (input.canaryVersion || repoVersion).trim() || repoVersion;
+  const canary = effectiveAgentCanaryVersion(repoVersion);
   const fleetStable =
     (input.fleetStableVersion || DEFAULT_AGENT_FLEET_STABLE_VERSION).trim() ||
     DEFAULT_AGENT_FLEET_STABLE_VERSION;
@@ -109,7 +117,7 @@ export function resolveAgentTargetVersionFromConfig(
   return resolveAgentTargetVersion({
     mode: config.agentRolloutMode,
     fleetStableVersion: config.agentFleetStableVersion,
-    canaryVersion: config.agentCanaryVersion,
+    canaryVersion: effectiveAgentCanaryVersion(),
     allowlistEmails: config.agentRolloutAllowlistEmails,
     identity,
   });

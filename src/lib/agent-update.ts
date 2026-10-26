@@ -1,4 +1,6 @@
 import { prisma } from "./db";
+import { getCachedAppConfig } from "./agent-config-cache";
+import { resolveAgentTargetVersionFromConfig } from "./agent-rollout";
 import { compareAgentVersions, getAgentVersion } from "./agent-version";
 
 export function isDeviceAgentVersionStale(
@@ -23,7 +25,10 @@ export type UserAgentVersionSummary = {
   devices: UserAgentVersionDeviceRow[];
 };
 
-/** Active laptops that should run the server’s current agent bundle. */
+/**
+ * Active laptops vs this user's resolved agent target (canary for allowlist soak,
+ * fleet-stable for everyone else). Do not pass raw repo version for fleet users.
+ */
 export function getUserAgentVersionSummary(
   devices: Array<{
     serialNumber: string;
@@ -31,8 +36,9 @@ export function getUserAgentVersionSummary(
     forceAgentUpdate: boolean;
     uninstalledAt: Date | null;
   }>,
+  targetVersion: string = getAgentVersion(),
 ): UserAgentVersionSummary {
-  const serverVersion = getAgentVersion();
+  const serverVersion = targetVersion.trim() || getAgentVersion();
   const active = devices.filter((d) => d.uninstalledAt === null);
   const rows: UserAgentVersionDeviceRow[] = active.map((d) => {
     const stale = isDeviceAgentVersionStale(d.agentScriptVersion, serverVersion);
@@ -80,8 +86,15 @@ export async function recordDeviceScriptVersion(
   serialNumber: string,
   scriptVersion: string,
 ) {
-  const serverVersion = getAgentVersion();
-  const upToDate = compareAgentVersions(scriptVersion, serverVersion) === 0;
+  const [user, config] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { email: true } }),
+    getCachedAppConfig(),
+  ]);
+  const targetVersion = resolveAgentTargetVersionFromConfig(config, {
+    id: userId,
+    email: user?.email,
+  });
+  const upToDate = compareAgentVersions(scriptVersion, targetVersion) === 0;
 
   await prisma.agentDevice.update({
     where: { userId_serialNumber: { userId, serialNumber } },

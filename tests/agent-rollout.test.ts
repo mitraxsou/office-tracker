@@ -1,11 +1,15 @@
+import { readFileSync } from "fs";
+import path from "path";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_AGENT_FLEET_STABLE_VERSION,
   DEFAULT_AGENT_ROLLOUT_ALLOWLIST,
+  effectiveAgentCanaryVersion,
   isAgentRolloutAllowlisted,
   normalizeAgentRolloutAllowlist,
   resolveAgentTargetVersion,
 } from "@/lib/agent-rollout";
+import { getAgentVersion } from "@/lib/agent-version";
 
 describe("resolveAgentTargetVersion", () => {
   const base = {
@@ -86,6 +90,27 @@ describe("resolveAgentTargetVersion", () => {
     ).toBe("1.5.25");
   });
 
+  it("ignores a stale stored canary string and always tracks repo for allowlisted users", () => {
+    expect(
+      resolveAgentTargetVersion({
+        ...base,
+        canaryVersion: "9.9.9",
+        repoVersion: "1.5.35",
+        mode: "allowlist",
+        identity: { email: "soumitra.m.mandal@pwc.com" },
+      }),
+    ).toBe("1.5.35");
+    expect(
+      resolveAgentTargetVersion({
+        ...base,
+        canaryVersion: "9.9.9",
+        repoVersion: "1.5.35",
+        mode: "allowlist",
+        identity: { email: "other.user@pwc.com" },
+      }),
+    ).toBe("1.5.24");
+  });
+
   it("defaults fleet-stable when empty string", () => {
     expect(
       resolveAgentTargetVersion({
@@ -128,5 +153,27 @@ describe("agent rollout allowlist helpers", () => {
         [...DEFAULT_AGENT_ROLLOUT_ALLOWLIST],
       ),
     ).toBe(false);
+  });
+});
+
+describe("canary auto-tracks deploy version", () => {
+  it("effectiveAgentCanaryVersion always equals repo / given deploy version", () => {
+    expect(effectiveAgentCanaryVersion("1.5.35")).toBe("1.5.35");
+    expect(effectiveAgentCanaryVersion()).toBe(getAgentVersion());
+  });
+
+  it("Admin UI and PATCH do not accept a manual canary edit", () => {
+    const panel = readFileSync(
+      path.join(process.cwd(), "src/components/AdminAgentRolloutPanel.tsx"),
+      "utf8",
+    );
+    const route = readFileSync(
+      path.join(process.cwd(), "src/app/api/admin/agent-rollout/route.ts"),
+      "utf8",
+    );
+    expect(panel).toContain("Always matches the repo / deploy agent version");
+    expect(panel).not.toMatch(/setCanary\(/);
+    expect(route).toContain("ignore manual agentCanaryVersion");
+    expect(route).not.toMatch(/update\.agentCanaryVersion\s*=/);
   });
 });

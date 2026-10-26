@@ -25,7 +25,7 @@ export function AdminAgentRolloutPanel({
   repoVersion,
   agentRolloutMode,
   agentFleetStableVersion,
-  agentCanaryVersion,
+  agentCanaryVersion: _agentCanaryVersion,
   agentRolloutAllowlistEmails,
   users,
 }: Props) {
@@ -34,7 +34,7 @@ export function AdminAgentRolloutPanel({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<"allowlist" | "everyone">(agentRolloutMode);
   const [fleetStable, setFleetStable] = useState(agentFleetStableVersion);
-  const [canary, setCanary] = useState(agentCanaryVersion || repoVersion);
+  const canary = repoVersion;
   const [selectedEmails, setSelectedEmails] = useState<string[]>(() =>
     agentRolloutAllowlistEmails.map(normalizeEmail).filter(Boolean),
   );
@@ -119,7 +119,6 @@ export function AdminAgentRolloutPanel({
       body: JSON.stringify({
         agentRolloutMode: mode,
         agentFleetStableVersion: fleetStable.trim(),
-        agentCanaryVersion: canary.trim(),
         agentRolloutAllowlistEmails: selectedEmails,
       }),
     });
@@ -134,7 +133,6 @@ export function AdminAgentRolloutPanel({
     const data = await res.json();
     setMode(data.agentRolloutMode);
     setFleetStable(data.agentFleetStableVersion);
-    setCanary(data.agentCanaryVersion);
     setSelectedEmails(
       ((data.agentRolloutAllowlistEmails as string[]) ?? []).map(normalizeEmail),
     );
@@ -170,10 +168,9 @@ export function AdminAgentRolloutPanel({
     const data = await res.json();
     setMode(data.agentRolloutMode);
     setFleetStable(data.agentFleetStableVersion);
-    setCanary(data.agentCanaryVersion);
     setConfirmPromote(false);
     setPromoteMessage(
-      `Promoted canary ${data.agentCanaryVersion} to everyone. Fleet-stable is now ${data.agentFleetStableVersion}.`,
+      `Promoted canary ${data.agentCanaryVersion ?? repoVersion} to everyone. Fleet-stable is now ${data.agentFleetStableVersion}.`,
     );
     router.refresh();
   }
@@ -224,19 +221,15 @@ export function AdminAgentRolloutPanel({
               placeholder="1.5.24"
             />
           </label>
-          <label className="block text-sm">
+          <div className="block text-sm">
             <span className="text-muted">Canary version</span>
-            <input
-              type="text"
-              value={canary}
-              onChange={(e) => setCanary(e.target.value)}
-              className="mt-1 w-full rounded-lg border px-3 py-2 font-mono"
-              placeholder={repoVersion}
-            />
+            <p className="mt-1 rounded-lg border border-[var(--border)] bg-[var(--background)]/40 px-3 py-2 font-mono">
+              {canary}
+            </p>
             <span className="mt-1 block text-xs text-muted">
-              Empty on save is allowed via API; UI defaults to repo version.
+              Always matches the repo / deploy agent version. No manual edit after each bump.
             </span>
-          </label>
+          </div>
         </div>
 
         <div className="block text-sm">

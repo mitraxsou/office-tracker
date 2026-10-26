@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import {
   agentFileContentType,
   isAgentDownloadFileName,
-  readAgentFile,
+  readAgentFilePreferringArtifact,
   resolveAgentDownloadCaller,
-  resolveCallerAgentTargetVersion,
+  resolveRequestedAgentDownloadVersion,
 } from "@/lib/agent-download";
 
 type RouteContext = { params: Promise<{ name: string }> };
@@ -20,8 +20,13 @@ export async function GET(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const targetVersion = await resolveCallerAgentTargetVersion(caller);
-  const content = await readAgentFile(name, { targetVersion });
+  const requested = new URL(request.url).searchParams.get("version");
+  const resolved = await resolveRequestedAgentDownloadVersion(caller, requested);
+  if (!resolved.ok) {
+    return NextResponse.json({ error: resolved.error }, { status: resolved.status });
+  }
+  const targetVersion = resolved.version;
+  const content = await readAgentFilePreferringArtifact(name, targetVersion);
   return new NextResponse(new Uint8Array(content), {
     headers: {
       "Content-Type": agentFileContentType(name),

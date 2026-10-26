@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin";
 import { prisma } from "@/lib/db";
 import { getTodaySummary } from "@/lib/heartbeat-service";
-import { getUserHoursTarget } from "@/lib/app-config";
+import { getAppConfig, getUserHoursTarget } from "@/lib/app-config";
 import {
   createUserByAdmin,
   summarizeAgentTokens,
@@ -10,7 +10,7 @@ import {
 import { revokeExpiredPendingTokens } from "@/lib/token-expiry";
 import { logAuditEvent } from "@/lib/audit-log";
 import { buildInstallCommand, buildUpdateCommand } from "@/lib/agent-branding";
-import { getAgentVersion } from "@/lib/agent-version";
+import { resolveAgentTargetVersionFromConfig } from "@/lib/agent-rollout";
 import { isDeviceAgentVersionStale } from "@/lib/agent-update";
 import {
   buildUserSearchWhere,
@@ -40,7 +40,11 @@ async function summarizeUser(user: {
   }>;
   agentTokens: Parameters<typeof summarizeAgentTokens>[0];
 }) {
-  const serverAgentVersion = getAgentVersion();
+  const config = await getAppConfig();
+  const serverAgentVersion = resolveAgentTargetVersionFromConfig(config, {
+    id: user.id,
+    email: user.email,
+  });
   const hoursTarget = await getUserHoursTarget(user);
   const summary = await getTodaySummary(user.id, user.timezone, hoursTarget);
   return {

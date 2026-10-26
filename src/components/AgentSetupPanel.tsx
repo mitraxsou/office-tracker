@@ -12,7 +12,6 @@ import {
   buildUninstallCommand,
   defaultInstallScriptDir,
 } from "@/lib/agent-branding";
-import { copyToClipboard } from "@/lib/clipboard";
 import type { InstallTokenForUser } from "@/lib/install-token-types";
 import {
   InstallTokenCommands,
@@ -20,6 +19,7 @@ import {
 } from "@/components/InstallTokenCommands";
 import { AgentVersionUpdateBanner } from "@/components/AgentVersionUpdateBanner";
 import type { UserAgentVersionSummary } from "@/lib/agent-update";
+import type { AgentDownloadVersionOption } from "@/lib/agent-download";
 
 type AgentSetupPanelProps = {
   appUrl: string;
@@ -28,6 +28,7 @@ type AgentSetupPanelProps = {
   localDevAgentPath?: string | null;
   adminAccess?: boolean;
   agentVersionSummary?: UserAgentVersionSummary | null;
+  downloadVersionOptions?: AgentDownloadVersionOption[];
 };
 
 export function AgentSetupPanel({
@@ -37,17 +38,28 @@ export function AgentSetupPanel({
   localDevAgentPath,
   adminAccess = false,
   agentVersionSummary = null,
+  downloadVersionOptions = [],
 }: AgentSetupPanelProps) {
-  const [copyError, setCopyError] = useState<string | null>(null);
+  const recommendedVersion =
+    downloadVersionOptions.find((option) => option.recommended)?.version ??
+    agentVersionSummary?.serverVersion ??
+    null;
+  const [selectedVersion, setSelectedVersion] = useState<string | null>(
+    recommendedVersion,
+  );
 
   const isLocalDev = appUrl.includes("localhost") || appUrl.includes("127.0.0.1");
   const scriptDir = defaultInstallScriptDir(isLocalDev ? localDevAgentPath : null);
   const startupPath = `%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\${AGENT_STARTUP_SHORTCUT}`;
   const showRefreshCallout = needsRefreshInstallCommands(installTokens, legacyBoundCount);
-  const serverAgentVersion = agentVersionSummary?.serverVersion ?? null;
-  const zipDownloadName = serverAgentVersion
-    ? formatAgentZipDownloadFilename(serverAgentVersion)
+  const activeVersion = selectedVersion || recommendedVersion;
+  const zipDownloadName = activeVersion
+    ? formatAgentZipDownloadFilename(activeVersion)
     : "PwCOfficePulse-agent-v….zip";
+  const downloadHref = activeVersion
+    ? `/api/agent/download?version=${encodeURIComponent(activeVersion)}`
+    : "/api/agent/download";
+  const showVersionPicker = downloadVersionOptions.length > 1;
 
   const zipUninstallCommand = useMemo(
     () => buildUninstallCommand(isLocalDev ? scriptDir : undefined),
@@ -67,8 +79,9 @@ export function AgentSetupPanel({
         <p className="mb-4 text-sm text-muted">
           One flow for every laptop: download the agent zip, extract it, open PowerShell in that
           folder, and run your <strong>reinstall command</strong>. It installs the{" "}
-          <strong>latest version from this server</strong> - first install, routine update, or fixing a
-          corrupted agent. Use <strong>PowerShell</strong>, not Command Prompt. No admin required.
+          <strong>version recommended for your account</strong> - first install, routine update, or
+          fixing a corrupted agent. Use <strong>PowerShell</strong>, not Command Prompt. No admin
+          required.
         </p>
 
         {agentVersionSummary?.needsUpdate && (
@@ -99,14 +112,35 @@ export function AgentSetupPanel({
             <span className="font-medium">Download and extract the agent zip</span>
             <p className="mt-1 text-muted">
               Download <code>{zipDownloadName}</code>
-              {serverAgentVersion ? ` (agent v${serverAgentVersion})` : ""} from your laptop card
-              below or{" "}
-              <a href="/api/agent/download" className="text-accent hover:underline">
+              {activeVersion ? ` (agent v${activeVersion})` : ""} from your laptop card below or{" "}
+              <a href={downloadHref} className="text-accent hover:underline">
                 download here
               </a>
               . Extract so you have a folder with <code>setup.ps1</code> and <code>lib\</code>{" "}
               (often <code>{AGENT_DOWNLOAD_FOLDER}</code>; OneDrive Downloads may differ).
             </p>
+            {showVersionPicker && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <label htmlFor="agent-download-version" className="text-xs text-muted">
+                  Available builds
+                </label>
+                <select
+                  id="agent-download-version"
+                  className="rounded-md border border-[var(--border)] bg-[var(--background)] px-2 py-1.5 text-xs"
+                  value={activeVersion ?? ""}
+                  onChange={(event) => setSelectedVersion(event.target.value)}
+                >
+                  {downloadVersionOptions.map((option) => (
+                    <option key={option.version} value={option.version}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <a href={downloadHref} className="btn-secondary px-3 py-1.5 text-xs">
+                  Download selected
+                </a>
+              </div>
+            )}
           </li>
           <li>
             <span className="font-medium">Open PowerShell in that folder</span>
@@ -125,7 +159,7 @@ export function AgentSetupPanel({
               <InstallTokenCommands
                 installTokens={installTokens}
                 legacyBoundCount={legacyBoundCount}
-                serverAgentVersion={serverAgentVersion}
+                serverAgentVersion={recommendedVersion}
               />
             </div>
           </li>
@@ -183,10 +217,6 @@ export function AgentSetupPanel({
           </div>
         </dl>
       </section>
-
-      {copyError && (
-        <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{copyError}</p>
-      )}
     </div>
   );
 }

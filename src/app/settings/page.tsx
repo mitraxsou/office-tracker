@@ -22,6 +22,8 @@ import { PriorComplianceSettings } from "@/components/PriorComplianceSettings";
 import { AGENT_PRODUCT_NAME } from "@/lib/agent-branding";
 import { needsPriorComplianceOnboarding } from "@/lib/prior-compliance";
 import { getUserAgentVersionSummary } from "@/lib/agent-update";
+import { resolveAgentTargetVersionFromConfig } from "@/lib/agent-rollout";
+import { listAvailableAgentDownloadVersions } from "@/lib/agent-download";
 
 export default async function SettingsPage({
   searchParams,
@@ -45,7 +47,18 @@ export default async function SettingsPage({
     sessionInstallToken,
   );
   const enrichedDevices = await getEnrichedDevicesForUser(user.id);
-  const agentVersionSummary = getUserAgentVersionSummary(user.agentDevices);
+  const agentTargetVersion = resolveAgentTargetVersionFromConfig(config, {
+    id: user.id,
+    email: user.email,
+  });
+  const agentVersionSummary = getUserAgentVersionSummary(
+    user.agentDevices,
+    agentTargetVersion,
+  );
+  const { options: downloadVersionOptions } = await listAvailableAgentDownloadVersions({
+    id: user.id,
+    email: user.email,
+  });
   const timezoneRequestState = await getUserTimezoneRequestState(user.id);
   const profileChangeState = await getUserProfileChangeRequestState(user.id);
   const isBreakglass = isBreakglassEmail(user.email);
@@ -96,6 +109,7 @@ export default async function SettingsPage({
           isWelcome={params.welcome === "1"}
           devices={enrichedDevices}
           agentVersionSummary={agentVersionSummary}
+          downloadVersionOptions={downloadVersionOptions}
           installTokens={installTokens}
           legacyBoundCount={legacyBoundCount}
           localDevAgentPath={localDevAgentPath}

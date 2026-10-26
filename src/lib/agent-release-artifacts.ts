@@ -65,3 +65,20 @@ export async function readFleetStableAgentFile(
     sha256: artifact.sha256,
   };
 }
+
+/** Distinct agent versions stored as release snapshots (newest first). */
+export async function listAgentReleaseArtifactVersions(): Promise<string[]> {
+  const rows = await prisma.agentReleaseArtifact.findMany({
+    select: { version: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+  });
+  const seen = new Set<string>();
+  const versions: string[] = [];
+  for (const row of rows) {
+    const version = row.version.trim();
+    if (!version || seen.has(version)) continue;
+    seen.add(version);
+    versions.push(version);
+  }
+  return versions;
+}

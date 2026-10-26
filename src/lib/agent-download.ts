@@ -2,8 +2,11 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { getCurrentUser, getUserByAgentToken } from "@/lib/auth";
 import { getCachedAppConfig } from "@/lib/agent-config-cache";
-import { resolveAgentTargetVersionFromConfig } from "@/lib/agent-rollout";
-import { getAgentVersion } from "@/lib/agent-version";
+import {
+  DEFAULT_AGENT_FLEET_STABLE_VERSION,
+  resolveAgentTargetVersionFromConfig,
+} from "@/lib/agent-rollout";
+import { compareAgentVersions, getAgentVersion } from "@/lib/agent-version";
 import { extractBearerToken } from "@/lib/security";
 
 export const AGENT_CORE_DOWNLOAD_FILES = [
@@ -59,6 +62,12 @@ export type AgentDownloadCaller = {
   id: string;
 };
 
+export type AgentDownloadVersionOption = {
+  version: string;
+  label: string;
+  recommended: boolean;
+};
+
 /** Path inside the agent zip (matches repo layout and reinstall command). */
 export function agentZipEntryPath(name: AgentDownloadFileName): string {
   return FILE_PATHS[name] ?? name;
@@ -97,6 +106,106 @@ export async function resolveCallerAgentTargetVersion(
 }
 
 /**
+ * Build the download picker list from known versions only (target, repo, fleet-stable,
+ * and any snapshotted release artifacts). Does not invent historical builds.
+ */
+export function buildAgentDownloadVersionOptions(input: {
+  targetVersion: string;
+  repoVersion: string;
+  fleetStableVersion: string;
+  artifactVersions: string[];
+}): AgentDownloadVersionOption[] {
+  const target = input.targetVersion.trim();
+  const repo = input.repoVersion.trim();
+  const fleet =
+    input.fleetStableVersion.trim() || DEFAULT_AGENT_FLEET_STABLE_VERSION;
+  const versions = new Set<string>();
+  for (const raw of [target, repo, fleet, ...input.artifactVersions]) {
+    const version = raw.trim();
+    if (version) versions.add(version);
+  }
+
+  const sorted = [...versions].sort((a, b) => {
+    if (a === target) return -1;
+    if (b === target) return 1;
+    return compareAgentVersions(b, a);
+  });
+
+  return sorted.map((version) => {
+    const recommended = version === target;
+    let kind: string;
+    if (recommended) {
+      kind = "Recommended (your target)";
+    } else if (version === fleet) {
+      kind = "Fleet-stable";
+    } else if (version === repo) {
+      kind = "Latest";
+    } else {
+      kind = "Archived";
+    }
+    return {
+      version,
+      label: `${kind} - v${version}`,
+      recommended,
+    };
+  });
+}
+
+export async function listAvailableAgentDownloadVersions(
+  caller: AgentDownloadCaller,
+): Promise<{ recommended: string; options: AgentDownloadVersionOption[] }> {
+  const config = await getCachedAppConfig();
+  const repoVersion = getAgentVersion();
+  const fleetStableVersion =
+    config.agentFleetStableVersion.trim() || DEFAULT_AGENT_FLEET_STABLE_VERSION;
+  const targetVersion = resolveAgentTargetVersionFromConfig(config, caller);
+  // Dynamic import avoids a circular load with agent-release-artifacts.
+  const { listAgentReleaseArtifactVersions } = await import(
+    "./agent-release-artifacts"
+  );
+  const artifactVersions = await listAgentReleaseArtifactVersions();
+  const options = buildAgentDownloadVersionOptions({
+    targetVersion,
+    repoVersion,
+    fleetStableVersion,
+    artifactVersions,
+  });
+  return { recommended: targetVersion, options };
+}
+
+export function isAllowedAgentDownloadVersion(
+  requested: string,
+  options: AgentDownloadVersionOption[],
+): boolean {
+  const version = requested.trim();
+  if (!version) return false;
+  return options.some((option) => option.version === version);
+}
+
+/**
+ * Resolve zip/file download version: default = caller's target; optional ?version=
+ * must be in the allowlist (target, repo, fleet-stable, or a stored artifact).
+ */
+export async function resolveRequestedAgentDownloadVersion(
+  caller: AgentDownloadCaller,
+  requested: string | null | undefined,
+): Promise<{ ok: true; version: string } | { ok: false; status: 400; error: string }> {
+  const { recommended, options } = await listAvailableAgentDownloadVersions(caller);
+  if (requested == null || !requested.trim()) {
+    return { ok: true, version: recommended };
+  }
+  const version = requested.trim();
+  if (!isAllowedAgentDownloadVersion(version, options)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "Unknown or unavailable agent version",
+    };
+  }
+  return { ok: true, version };
+}
+
+/**
  * Read an agent file from the deploy tree. For version.txt, rewrite content to the
  * caller's resolved target so non-canaries are not stamped with a canary version.
  */
@@ -111,6 +220,24 @@ export async function readAgentFile(
   const agentDir = path.join(process.cwd(), "agent");
   const relativePath = FILE_PATHS[name] ?? name;
   return readFile(path.join(agentDir, relativePath));
+}
+
+/**
+ * Prefer an AgentReleaseArtifact body when present for core files; otherwise
+ * fall back to the deploy tree (with version.txt rewritten to the requested version).
+ */
+export async function readAgentFilePreferringArtifact(
+  name: AgentDownloadFileName,
+  version: string,
+): Promise<Buffer> {
+  const { isAgentCoreFileName, readFleetStableAgentFile } = await import(
+    "./agent-release-artifacts"
+  );
+  if (isAgentCoreFileName(name)) {
+    const artifact = await readFleetStableAgentFile(version, name);
+    if (artifact) return artifact.content;
+  }
+  return readAgentFile(name, { targetVersion: version });
 }
 
 export function agentFileContentType(name: AgentDownloadFileName): string {

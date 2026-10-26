@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   requireAdmin: vi.fn(),
   findMany: vi.fn(),
   getAppConfig: vi.fn(),
+  /** Canary always tracks deploy version; pin for report unit tests. */
+  getAgentVersion: vi.fn(() => "1.5.25"),
 }));
 
 vi.mock("@/lib/admin", () => ({ requireAdmin: mocks.requireAdmin }));
@@ -17,6 +19,13 @@ vi.mock("@/lib/db", () => ({
 vi.mock("@/lib/app-config", () => ({
   getAppConfig: mocks.getAppConfig,
 }));
+vi.mock("@/lib/agent-version", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/agent-version")>();
+  return {
+    ...actual,
+    getAgentVersion: mocks.getAgentVersion,
+  };
+});
 
 import { GET } from "@/app/api/admin/agent-version-report/route";
 import { getAgentVersion } from "@/lib/agent-version";

@@ -248,4 +248,21 @@ describe("agent version", () => {
     expect(stale.needsUpdate).toBe(true);
     expect(stale.outdatedDeviceCount).toBe(1);
   });
+
+  it("treats fleet users as current when on their target even if repo is newer", () => {
+    const summary = getUserAgentVersionSummary(
+      [
+        {
+          serialNumber: "FLEET-1",
+          agentScriptVersion: "1.5.24",
+          forceAgentUpdate: false,
+          uninstalledAt: null,
+        },
+      ],
+      "1.5.24",
+    );
+    expect(summary.serverVersion).toBe("1.5.24");
+    expect(summary.needsUpdate).toBe(false);
+    expect(summary.outdatedDeviceCount).toBe(0);
+  });
 });

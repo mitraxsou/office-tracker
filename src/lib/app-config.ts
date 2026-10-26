@@ -232,10 +232,9 @@ export async function updateAppConfig(data: Partial<AppConfigData>) {
   return parseConfig(config);
 }
 
-/** Promote current canary to fleet-wide (BUG-018 explicit approval). */
+/** Promote current canary (deploy-tree version) to fleet-wide (BUG-018 explicit approval). */
 export async function promoteAgentCanaryToEveryone(): Promise<AppConfigData> {
-  const current = await ensureAppConfig();
-  const canary = (current.agentCanaryVersion || getAgentVersion()).trim();
+  const canary = getAgentVersion().trim();
   return updateAppConfig({
     agentRolloutMode: "everyone",
     agentFleetStableVersion: canary,

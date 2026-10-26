@@ -16,7 +16,7 @@ import { summarizeAgentTokens } from "./auth";
 import { getLifecycleEventsForUser } from "./agent-lifecycle";
 import { revokeExpiredPendingTokens } from "./token-expiry";
 import { roundHoursToMinute } from "./visits";
-import { getAgentVersion } from "./agent-version";
+import { resolveAgentTargetVersionFromConfig } from "./agent-rollout";
 import { isDeviceAgentVersionStale } from "./agent-update";
 import { getDeviceAgentApiHitTotals, getUserAgentApiHitTotals, getUserAgentApiHitsForDay } from "./agent-api-hits";
 import { dayBoundsFromKey } from "./timezone-dates";
@@ -62,7 +62,10 @@ export async function getUserReport(
     getPulseStats(user.id, graceHours),
     fetchAgentStatusEvidence(user.id),
   ]);
-  const serverAgentVersion = getAgentVersion();
+  const serverAgentVersion = resolveAgentTargetVersionFromConfig(config, {
+    id: user.id,
+    email: user.email,
+  });
 
   const dailyTrend: Array<{
     date: string;

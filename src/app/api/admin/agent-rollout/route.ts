@@ -21,11 +21,12 @@ export async function GET() {
   }
 
   const config = await getAppConfig();
+  const repoVersion = getAgentVersion();
   return NextResponse.json({
-    repoVersion: getAgentVersion(),
+    repoVersion,
     agentRolloutMode: config.agentRolloutMode,
     agentFleetStableVersion: config.agentFleetStableVersion,
-    agentCanaryVersion: config.agentCanaryVersion || getAgentVersion(),
+    agentCanaryVersion: repoVersion,
     agentRolloutAllowlistEmails: config.agentRolloutAllowlistEmails,
   });
 }
@@ -62,8 +63,7 @@ export async function PATCH(request: Request) {
       );
     }
 
-    const before = await getAppConfig();
-    const canary = (before.agentCanaryVersion || getAgentVersion()).trim();
+    const canary = getAgentVersion().trim();
     try {
       await snapshotFleetStableAgentRelease(canary);
     } catch (error) {
@@ -84,7 +84,7 @@ export async function PATCH(request: Request) {
       action: "agent_rollout_promote_everyone",
       details: {
         agentFleetStableVersion: config.agentFleetStableVersion,
-        agentCanaryVersion: config.agentCanaryVersion,
+        agentCanaryVersion: canary,
         agentRolloutMode: config.agentRolloutMode,
       },
     });
@@ -92,10 +92,10 @@ export async function PATCH(request: Request) {
     return NextResponse.json({
       ok: true,
       promoted: true,
-      repoVersion: getAgentVersion(),
+      repoVersion: canary,
       agentRolloutMode: config.agentRolloutMode,
       agentFleetStableVersion: config.agentFleetStableVersion,
-      agentCanaryVersion: config.agentCanaryVersion || getAgentVersion(),
+      agentCanaryVersion: canary,
       agentRolloutAllowlistEmails: config.agentRolloutAllowlistEmails,
     });
   }
@@ -122,16 +122,7 @@ export async function PATCH(request: Request) {
     update.agentFleetStableVersion = body.agentFleetStableVersion.trim();
   }
 
-  if (body.agentCanaryVersion !== undefined) {
-    if (typeof body.agentCanaryVersion !== "string") {
-      return NextResponse.json({ error: "Invalid agentCanaryVersion" }, { status: 400 });
-    }
-    const trimmed = body.agentCanaryVersion.trim();
-    if (trimmed && !isValidAgentVersionString(trimmed)) {
-      return NextResponse.json({ error: "Invalid agentCanaryVersion" }, { status: 400 });
-    }
-    update.agentCanaryVersion = trimmed;
-  }
+  // Canary always tracks the deploy-tree version; ignore manual agentCanaryVersion.
 
   if (body.agentRolloutAllowlistEmails !== undefined) {
     if (!Array.isArray(body.agentRolloutAllowlistEmails)) {
@@ -153,12 +144,13 @@ export async function PATCH(request: Request) {
     details: update as Record<string, unknown>,
   });
 
+  const repoVersion = getAgentVersion();
   return NextResponse.json({
     ok: true,
-    repoVersion: getAgentVersion(),
+    repoVersion,
     agentRolloutMode: config.agentRolloutMode,
     agentFleetStableVersion: config.agentFleetStableVersion,
-    agentCanaryVersion: config.agentCanaryVersion || getAgentVersion(),
+    agentCanaryVersion: repoVersion,
     agentRolloutAllowlistEmails: config.agentRolloutAllowlistEmails,
   });
 }

@@ -7,7 +7,9 @@ import {
   AGENT_DOWNLOAD_FILES,
   agentScriptFilesBaseUrl,
   agentZipEntryPath,
+  buildAgentDownloadVersionOptions,
   isAgentDownloadFileName,
+  isAllowedAgentDownloadVersion,
 } from "@/lib/agent-download";
 import { fleetStableFilesBaseUrl } from "@/lib/agent-release-artifacts";
 
@@ -42,5 +44,35 @@ describe("agent download helpers", () => {
         /PwCOfficePulse\/(lib\/|watchdog\/)?(setup\.ps1|agent-download\.ps1|agent-storage\.ps1|[\w.-]+)$/,
       );
     }
+  });
+
+  it("lists only known download versions and labels target / fleet / latest / archived", () => {
+    const options = buildAgentDownloadVersionOptions({
+      targetVersion: "1.5.24",
+      repoVersion: "1.5.35",
+      fleetStableVersion: "1.5.24",
+      artifactVersions: ["1.5.24", "1.5.20"],
+    });
+    expect(options.map((o) => o.version)).toEqual(["1.5.24", "1.5.35", "1.5.20"]);
+    expect(options[0]).toMatchObject({
+      version: "1.5.24",
+      recommended: true,
+      label: "Recommended (your target) - v1.5.24",
+    });
+    expect(options.find((o) => o.version === "1.5.35")?.label).toBe("Latest - v1.5.35");
+    expect(options.find((o) => o.version === "1.5.20")?.label).toBe("Archived - v1.5.20");
+    expect(isAllowedAgentDownloadVersion("1.5.24", options)).toBe(true);
+    expect(isAllowedAgentDownloadVersion("1.5.20", options)).toBe(true);
+    expect(isAllowedAgentDownloadVersion("9.9.9", options)).toBe(false);
+  });
+
+  it("does not invent versions beyond target, repo, fleet-stable, and artifacts", () => {
+    const options = buildAgentDownloadVersionOptions({
+      targetVersion: "1.5.35",
+      repoVersion: "1.5.35",
+      fleetStableVersion: "1.5.24",
+      artifactVersions: [],
+    });
+    expect(options.map((o) => o.version).sort()).toEqual(["1.5.24", "1.5.35"]);
   });
 });

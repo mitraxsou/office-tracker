@@ -18,6 +18,7 @@ import { SettingsLayout } from "@/components/SettingsLayout";
 import { AgentActivityPanel } from "@/components/AgentActivityPanel";
 import { AdminPresenceTimeline } from "@/components/AdminPresenceTimeline";
 import type { UserAgentVersionSummary } from "@/lib/agent-update";
+import type { AgentDownloadVersionOption } from "@/lib/agent-download";
 
 type Device = EnrichedDevice;
 
@@ -40,6 +41,7 @@ type SettingsPageClientProps = {
   isWelcome?: boolean;
   devices: Device[];
   agentVersionSummary: UserAgentVersionSummary;
+  downloadVersionOptions?: AgentDownloadVersionOption[];
   installTokens: InstallTokenForUser[];
   legacyBoundCount: number;
   localDevAgentPath?: string | null;
@@ -66,6 +68,7 @@ export function SettingsPageClient({
   isWelcome,
   devices: initialDevices,
   agentVersionSummary,
+  downloadVersionOptions = [],
   installTokens,
   legacyBoundCount,
   localDevAgentPath,
@@ -151,6 +154,7 @@ export function SettingsPageClient({
                   localDevAgentPath={localDevAgentPath}
                   adminAccess={adminAccess}
                   agentVersionSummary={agentVersionSummary}
+                  downloadVersionOptions={downloadVersionOptions}
                 />
                 <UserSettingsForm
                   {...sharedFormProps}

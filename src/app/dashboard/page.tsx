@@ -22,6 +22,7 @@ import { WelcomeBanner } from "@/components/dashboard/WelcomeBanner";
 import { DashboardHeroSummary } from "@/components/dashboard/DashboardHeroSummary";
 import { DashboardAlerts } from "@/components/dashboard/DashboardAlerts";
 import { DashboardDetailsPanel } from "@/components/dashboard/DashboardDetailsPanel";
+import { DashboardSyncRefresh } from "@/components/dashboard/DashboardSyncRefresh";
 import { listUnreadInAppNotifications } from "@/lib/in-app-notifications";
 import {
   deviceRegistrationReferenceAt,
@@ -32,6 +33,8 @@ import {
 import { formatLastHeartbeat, formatTime } from "@/lib/visits";
 import { formatPulseAge } from "@/lib/pulse-age";
 import { getUserAgentVersionSummary } from "@/lib/agent-update";
+import { resolveAgentTargetVersionFromConfig } from "@/lib/agent-rollout";
+import { loadTodaySyncRevisionForUser } from "@/lib/today-sync-revision";
 import {
   firstNameFromSession,
   greetingPeriodForHour,
@@ -111,7 +114,14 @@ export default async function DashboardPage() {
     expectedPulsesPerDay: pulse.expectedPulsesPerDay,
     deviceReferenceAt,
   });
-  const agentVersionSummary = getUserAgentVersionSummary(user.agentDevices);
+  const agentTargetVersion = resolveAgentTargetVersionFromConfig(config, {
+    id: user.id,
+    email: user.email,
+  });
+  const agentVersionSummary = getUserAgentVersionSummary(
+    user.agentDevices,
+    agentTargetVersion,
+  );
   const agentNeverConnected = user.agentDevices.length === 0 || !lastSyncedAt;
   const agentStale =
     !isOutToday &&
@@ -182,11 +192,13 @@ export default async function DashboardPage() {
     ...statusInput,
     period: greetingPeriod,
   });
+  const syncRevision = await loadTodaySyncRevisionForUser(user.id, user.agentDevices);
 
   return (
     <>
       <AppNav />
       <main className="mx-auto max-w-5xl space-y-4 px-4 py-6">
+        <DashboardSyncRefresh initialRevision={syncRevision} />
         <DashboardAlerts
           agentNeverConnected={agentNeverConnected}
           ssidMissing={ssidMissing}

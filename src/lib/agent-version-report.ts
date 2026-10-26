@@ -2,8 +2,8 @@ import { isDeviceAgentVersionStale } from "@/lib/agent-update";
 import {
   DEFAULT_AGENT_FLEET_STABLE_VERSION,
   DEFAULT_AGENT_ROLLOUT_ALLOWLIST,
+  effectiveAgentCanaryVersion,
   isAgentRolloutAllowlisted,
-  resolveAgentTargetVersion,
   resolveAgentTargetVersionFromConfig,
   type AgentRolloutMode,
 } from "@/lib/agent-rollout";
@@ -94,18 +94,8 @@ function displayFleetStable(config: AgentVersionReportConfig): string {
 }
 
 /** Version an allowlisted user is told to run. Not the fleet target. */
-export function displayCanaryVersion(config: AgentVersionReportConfig): string {
-  const allowlist =
-    config.agentRolloutAllowlistEmails.length > 0
-      ? config.agentRolloutAllowlistEmails
-      : [...DEFAULT_AGENT_ROLLOUT_ALLOWLIST];
-  return resolveAgentTargetVersion({
-    mode: "allowlist",
-    fleetStableVersion: config.agentFleetStableVersion,
-    canaryVersion: config.agentCanaryVersion,
-    allowlistEmails: allowlist,
-    identity: { email: allowlist[0] },
-  });
+export function displayCanaryVersion(_config: AgentVersionReportConfig): string {
+  return effectiveAgentCanaryVersion();
 }
 
 export function buildAgentVersionFleetReport(params: {

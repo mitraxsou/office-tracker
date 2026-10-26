@@ -8,9 +8,9 @@ import {
 import {
   AGENT_DOWNLOAD_FILES,
   agentZipEntryPath,
-  readAgentFile,
+  readAgentFilePreferringArtifact,
   resolveAgentDownloadCaller,
-  resolveCallerAgentTargetVersion,
+  resolveRequestedAgentDownloadVersion,
 } from "@/lib/agent-download";
 
 export async function GET(request: Request) {
@@ -19,11 +19,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const version = await resolveCallerAgentTargetVersion(caller);
+  const requested = new URL(request.url).searchParams.get("version");
+  const resolved = await resolveRequestedAgentDownloadVersion(caller, requested);
+  if (!resolved.ok) {
+    return NextResponse.json({ error: resolved.error }, { status: resolved.status });
+  }
+  const version = resolved.version;
   const zip = new JSZip();
 
   for (const file of AGENT_DOWNLOAD_FILES) {
-    const content = await readAgentFile(file, { targetVersion: version });
+    const content = await readAgentFilePreferringArtifact(file, version);
     const entryPath = agentZipEntryPath(file);
     zip.file(`${AGENT_EXTRACT_FOLDER}/${entryPath}`, content);
   }
