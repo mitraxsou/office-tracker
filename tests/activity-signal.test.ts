@@ -232,6 +232,14 @@ describe("sync freshness helpers", () => {
     ).toEqual(newer);
   });
 
+  it("accepts lastSeenAt-only rows (Today sync revision)", () => {
+    const older = new Date("2026-09-12T10:00:00Z");
+    const newer = new Date("2026-09-13T10:00:00Z");
+    expect(
+      latestDeviceLastSeenAt([{ lastSeenAt: older }, { lastSeenAt: newer }]),
+    ).toEqual(newer);
+  });
+
   it("computes minutes since a timestamp", () => {
     const now = new Date("2026-09-13T12:00:00Z");
     const at = new Date("2026-09-13T11:30:00Z");

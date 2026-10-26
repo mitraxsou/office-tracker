@@ -104,8 +104,9 @@ export function isLowActivityCount(
   return pulsesLast24h < threshold;
 }
 
-export function latestDeviceLastSeenAt(
-  devices: AgentDeviceReference[],
+/** Max lastSeenAt across devices. Only needs lastSeenAt (not full AgentDeviceReference). */
+export function latestDeviceLastSeenAt<T extends { lastSeenAt: Date | null }>(
+  devices: readonly T[],
 ): Date | null {
   let latest: Date | null = null;
   for (const device of devices) {
