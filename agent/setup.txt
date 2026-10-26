@@ -626,8 +626,12 @@ function Install-AdminLevel {
     Register-HiddenTask -VbsPath $vbsPath -InstallDir $localConfigDir
     Remove-LegacyUpdateTask
     $downloadCfg = Get-AgentDownloadConfig -ApiUrl $ApiUrlValue -Token $TokenValue
-    Install-WatchdogBootstrap -FilesBase $downloadCfg.FilesBase -Token $TokenValue `
-        -BypassSecret $downloadCfg.BypassSecret
+    try {
+        Install-WatchdogBootstrap -FilesBase $downloadCfg.FilesBase -Token $TokenValue `
+            -BypassSecret $downloadCfg.BypassSecret
+    } catch {
+        Write-Host "WARN independent watchdog bootstrap failed: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
     $sourceVersion = Join-Path $sourceRoot "version.txt"
     if (Test-Path -LiteralPath $sourceVersion) {
         Copy-AgentFileWithRetry -Source $sourceVersion `
@@ -838,8 +842,15 @@ try {
     Write-SetupLog "Registering scheduled task and shortcuts..."
     Complete-Install -InstallDir $installDir -IsReinstall $isReinstallForComplete -ScriptsUpdated $shouldInstallScripts
     Write-SetupLog "Ensuring independent watchdog exists..."
-    Install-WatchdogBootstrap -FilesBase $downloadCfg.FilesBase -Token $Token `
-        -BypassSecret $downloadCfg.BypassSecret
+    try {
+        Install-WatchdogBootstrap -FilesBase $downloadCfg.FilesBase -Token $Token `
+            -BypassSecret $downloadCfg.BypassSecret
+    } catch {
+        # Never freeze soft updates on a watchdog glitch (BUG-028). Heartbeat task
+        # already registered above; retry bootstrap on the next update check.
+        Write-SetupLog "WARN independent watchdog bootstrap failed: $($_.Exception.Message)"
+        Write-SetupLog "WARN continuing so agent version can commit; next update retries watchdog"
+    }
 
     if ($shouldInstallScripts) {
         Copy-AgentFileWithRetry -Source $versionFile `
