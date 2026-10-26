@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { VisitList } from "@/components/VisitList";
 import { MonthReportToolbar } from "@/components/reports/ReportToolbar";
 import { currentMonthKey } from "@/lib/month-range";
-import { formatDate } from "@/lib/visits";
+import { formatDate, formatHours, totalHoursFromVisits } from "@/lib/visits";
 
 type VisitJson = {
   id: string;
@@ -145,12 +145,24 @@ export function ReportsVisitsTab() {
       )}
       {!loading &&
         !error &&
-        dayKeys.map((day) => (
-          <section key={day} className="card p-6">
-            <h2 className="mb-4 font-medium text-accent">{day}</h2>
-            <VisitList visits={grouped[day] ?? []} timezone={timezone} />
-          </section>
-        ))}
+        dayKeys.map((day) => {
+          const dayVisits = grouped[day] ?? [];
+          const dayTotalHours = totalHoursFromVisits(dayVisits);
+          return (
+            <section key={day} className="card p-6">
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <h2 className="font-medium text-accent">{day}</h2>
+                <div className="shrink-0 text-right">
+                  <p className="text-lg font-semibold tabular-nums text-[var(--pwc-orange)]">
+                    {formatHours(dayTotalHours)}
+                  </p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted">Day total</p>
+                </div>
+              </div>
+              <VisitList visits={dayVisits} timezone={timezone} />
+            </section>
+          );
+        })}
     </div>
   );
 }
