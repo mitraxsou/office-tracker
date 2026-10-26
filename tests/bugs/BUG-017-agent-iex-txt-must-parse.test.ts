@@ -55,12 +55,16 @@ describe("BUG-017 agent IEX .txt runner must keep parsing after every ship", () 
     expect(heartbeat).toContain(`$AgentScriptVersion = "${version}"`);
   });
 
-  it("Publish-AgentScriptTxt UTF-8 round-trip leaves shipping heartbeat .txt parseable", () => {
-    const output = execFileSync(
-      "powershell.exe",
-      ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", fixtureScript],
-      { encoding: "utf8", timeout: 60_000 },
-    );
-    expect(output).toContain("BUG017_OK");
-  });
+  it(
+    "Publish-AgentScriptTxt UTF-8 round-trip leaves shipping heartbeat .txt parseable",
+    () => {
+      const output = execFileSync(
+        "powershell.exe",
+        ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", fixtureScript],
+        { encoding: "utf8", timeout: 60_000 },
+      );
+      expect(output).toContain("BUG017_OK");
+    },
+    60_000,
+  );
 });

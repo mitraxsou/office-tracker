@@ -1,0 +1,14 @@
+{
+  "suspendLocal": "2026-10-16 19:30:02",
+  "suspendUtc": "2026-10-16T14:00:02.7751182Z",
+  "mustContainInOrder": [
+    "Invoke-ResumeOfficeSleepCheckout -SyncState $syncState -ServerConfig $serverConfig",
+    "Maybe-EnqueueDailySummary -SyncState $syncState -DayKey $dayKey -TimezoneId $timezone"
+  ],
+  "mustContain": [
+    "Sleep checkout must run BEFORE NEW_DAY leftover close",
+    "SLEEP checkout office ssid=",
+    "SLEEP session_suspend office ssid="
+  ],
+  "agentVersion": "1.5.35"
+}

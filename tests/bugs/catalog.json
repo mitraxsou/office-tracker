@@ -449,6 +449,20 @@
       "skipReason": null
     },
     {
+      "id": "BUG-030",
+      "title": "Long-gap resume NEW_DAY close steals sleep checkout suspendAt",
+      "date": "2026-10",
+      "severity": "high",
+      "area": "agent-update",
+      "reproSummary": "Soumitra: in office until ~19:30 on 2026-10-16, lid closed, opened laptop 2026-10-26. Resume logged NEW_DAY closed leftover then SLEEP checkout at 19:30, but only one visit_end synced - NEW_DAY had already closed at day-end 23:59 so sleep found no open visit. Portal did not get checkout at real suspend time.",
+      "assertion": "Invoke-ResumeOfficeSleepCheckout runs before Maybe-EnqueueDailySummary so visit_end uses suspendAt; sleep log distinguishes closed visit vs suspend-only.",
+      "fixture": "fixtures/resume-sleep-checkout-before-new-day.json",
+      "testFile": "tests/bugs/BUG-030-resume-sleep-checkout-before-new-day.test.ts",
+      "relatedTests": ["tests/agent-heartbeat-sync.test.ts"],
+      "status": "guarded",
+      "skipReason": null
+    },
+    {
       "id": "CORE-001",
       "title": "Heartbeat in-office uses SSID allowlist",
       "date": "2026-01",

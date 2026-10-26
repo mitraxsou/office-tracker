@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.34";
+export const APP_VERSION = "1.5.35";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,16 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-26",
+    userBullets: [
+      "After a long laptop sleep, office checkout uses the time you closed the lid, not midnight.",
+    ],
+    adminBullets: [
+      "BUG-030: resume sleep checkout runs before NEW_DAY leftover close so visit_end keeps suspendAt (canary soak; fleet-stable stays 1.5.24).",
+    ],
+  },
+  {
+    version: "1.5.34",
     date: "2026-10-16",
     userBullets: [
       "Agent auto-update no longer gets stuck when the recovery watchdog task fails to register.",

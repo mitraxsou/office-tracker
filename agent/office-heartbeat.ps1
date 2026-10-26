@@ -17,7 +17,7 @@ $HealthSyncIntervalMinutes = 60
 $OfficeVisitGapMinutes = 15
 # After this many minutes asleep, only trust netsh for a new office visit.
 $LongGapResumeMinutes = 30
-$AgentScriptVersion = "1.5.34"
+$AgentScriptVersion = "1.5.35"
 # Observe-only facts for last-run-summary.txt (never alters presence logic).
 $script:RunDiagFacts = @{
     VisitAction = "none"
@@ -969,6 +969,7 @@ function Invoke-ResumeOfficeSleepCheckout {
     # Always UTC (Z) so visit_end is comparable to Get-NowIso visit_start timestamps.
     $suspendAtIso = $SuspendAt.ToUniversalTime().ToString("o")
     $open = Get-OpenVisitFromState $SyncState
+    $closedVisit = $false
     if ($open) {
         $skipEnd = $false
         try {
@@ -983,16 +984,22 @@ function Invoke-ResumeOfficeSleepCheckout {
         }
         if (-not $skipEnd) {
             $SyncState = End-LocalVisit -SyncState $SyncState -EndAt $suspendAtIso -PreviousSsid $LastKnownSsid
+            $closedVisit = -not (Get-OpenVisitFromState $SyncState)
         }
     }
     Add-QueuedEvent -Type "session_suspend" -Fields @{
         ssid = $LastKnownSsid
         gapMinutes = $ResumeGapMin
     } -At $suspendAtIso
-    Write-Log "SLEEP checkout office ssid=$LastKnownSsid at $suspendAtIso (gap ${ResumeGapMin}m)"
-    Write-Diag -Category "VISIT" -Message "sleep checkout closed office visit ssid=$LastKnownSsid at=$suspendAtIso gapMin=$ResumeGapMin"
-    $script:RunDiagFacts.VisitAction = "ended"
-    return @{ syncState = $SyncState; handled = $true; suspendAtIso = $suspendAtIso }
+    if ($closedVisit) {
+        Write-Log "SLEEP checkout office ssid=$LastKnownSsid at $suspendAtIso (gap ${ResumeGapMin}m)"
+        Write-Diag -Category "VISIT" -Message "sleep checkout closed office visit ssid=$LastKnownSsid at=$suspendAtIso gapMin=$ResumeGapMin"
+        $script:RunDiagFacts.VisitAction = "ended"
+    } else {
+        Write-Log "SLEEP session_suspend office ssid=$LastKnownSsid at $suspendAtIso (gap ${ResumeGapMin}m; no open visit to close)"
+        Write-Diag -Category "VISIT" -Message "sleep suspend only ssid=$LastKnownSsid at=$suspendAtIso gapMin=$ResumeGapMin openVisit=false"
+    }
+    return @{ syncState = $SyncState; handled = $true; suspendAtIso = $suspendAtIso; closedVisit = $closedVisit }
 }
 
 function Update-VisitBoundaries {
@@ -1965,18 +1972,21 @@ $presence = Get-PresenceState
 $previousSsid = $presence.ssid
 $syncState = Get-SyncState
 $previousDayKey = if ($syncState.dayKey) { [string]$syncState.dayKey } else { $null }
-$syncState = Maybe-EnqueueDailySummary -SyncState $syncState -DayKey $dayKey -TimezoneId $timezone
-$dayRolledOver = $previousDayKey -and $previousDayKey -ne $dayKey
-if ($dayRolledOver) { $script:RunDiagFacts.DayRolledOver = $true }
 
-# Sleep checkout must run before starting a new visit. Otherwise day-rollover /
-# resume can open a visit at "now" and then close it with an older suspendAt
-# (endAt before startAt).
+# Sleep checkout must run BEFORE NEW_DAY leftover close. Otherwise a multi-day
+# resume closes the open visit at calendar day-end (23:59) first, then sleep
+# checkout finds no open visit and the real suspend time (laptop lid) never
+# becomes visit_end. Also run before starting a new visit so suspendAt cannot
+# land after a fresh visit_start (endAt before startAt).
 if ($isResumeRun -and $suspendAtTime) {
     $sleepCheckout = Invoke-ResumeOfficeSleepCheckout -SyncState $syncState -ServerConfig $serverConfig `
         -LastKnownSsid $previousSsid -SuspendAt $suspendAtTime -ResumeGapMin $resumeGapMin
     $syncState = $sleepCheckout.syncState
 }
+
+$syncState = Maybe-EnqueueDailySummary -SyncState $syncState -DayKey $dayKey -TimezoneId $timezone
+$dayRolledOver = $previousDayKey -and $previousDayKey -ne $dayKey
+if ($dayRolledOver) { $script:RunDiagFacts.DayRolledOver = $true }
 
 $isOfficeNow = Test-IsOfficeSsid -Ssid $ssid -ServerConfig $serverConfig
 $longGapResume = $isResumeRun -and ($null -ne $resumeGapMin) -and ($resumeGapMin -ge $LongGapResumeMinutes)
