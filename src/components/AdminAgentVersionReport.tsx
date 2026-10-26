@@ -301,8 +301,8 @@ export function AdminAgentVersionReport() {
         )}
 
         <p className="text-xs text-muted">
-          Target is resolved per user. A laptop already on fleet-stable is current when that user
-          is outside the allowlist.
+          Target is resolved per user. A laptop already on fleet-stable, or ahead of that target,
+          is current when that user is outside the allowlist.
         </p>
         {(report?.fleet.unknownCount ?? 0) > 0 && (
           <p className="text-xs text-muted">

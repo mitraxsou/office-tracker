@@ -5,6 +5,6 @@
   "alertType": "hours_met",
   "deliveryChannel": "both",
   "inAppPersisted": true,
-  "dashboardMustMountPanel": true,
+  "appNavMustMountBell": true,
   "message": "You have completed your 5h office target for today. My Office Pulse has counted 5.0h."
 }

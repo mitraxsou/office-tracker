@@ -120,7 +120,6 @@ describe("buildAgentVersionAttentionReport", () => {
     expect(emailsIn(report)).toEqual([
       "soumitra.m.mandal@pwc.com",
       "other.user@pwc.com",
-      "ahead.user@pwc.com",
       "quiet.user@pwc.com",
     ]);
 
@@ -133,14 +132,59 @@ describe("buildAgentVersionAttentionReport", () => {
     expect(behind.devices[0].expectedVersion).toBe("1.5.24");
     expect(behind.devices[0].status).toBe("needs_update");
 
-    const onCanaryByMistake = report.users.find((user) => user.email === "ahead.user@pwc.com")!;
-    expect(onCanaryByMistake.devices[0].expectedVersion).toBe("1.5.24");
+    // Fleet user on canary (ahead of fleet-stable) is current, not Needs update.
+    expect(emailsIn(report)).not.toContain("ahead.user@pwc.com");
 
     const unknown = report.users.find((user) => user.email === "quiet.user@pwc.com")!;
     expect(unknown.devices[0].status).toBe("unknown");
     expect(unknown.devices[0].expectedVersion).toBe("1.5.24");
     expect(unknown.devices[0].installedVersion).toBeNull();
     expect(unknown.devices[0].lastSeenAt).toBeNull();
+  });
+
+  it("marks Satadal/Shubham style ahead-of-fleet laptops as current, not Needs update", () => {
+    const report = buildAgentVersionAdminReport({
+      config: allowlistConfig,
+      devices: [
+        device({
+          id: "shubham",
+          email: "shubham.user@pwc.com",
+          agentScriptVersion: "1.5.34",
+          user: {
+            id: "user-shubham",
+            email: "shubham.user@pwc.com",
+            name: "Shubham",
+          },
+        }),
+        device({
+          id: "satadal",
+          email: "satadal.user@pwc.com",
+          agentScriptVersion: "1.5.26",
+          user: {
+            id: "user-satadal",
+            email: "satadal.user@pwc.com",
+            name: "Satadal",
+          },
+        }),
+        device({
+          id: "behind",
+          email: "behind.user@pwc.com",
+          agentScriptVersion: "1.5.23",
+        }),
+      ],
+    });
+
+    const shubham = report.fleet.devices.find((row) => row.email === "shubham.user@pwc.com")!;
+    expect(shubham.expectedVersion).toBe("1.5.24");
+    expect(shubham.status).toBe("current");
+
+    const satadal = report.fleet.devices.find((row) => row.email === "satadal.user@pwc.com")!;
+    expect(satadal.expectedVersion).toBe("1.5.24");
+    expect(satadal.status).toBe("current");
+
+    expect(report.fleet.currentCount).toBe(2);
+    expect(report.fleet.needsUpdateCount).toBe(1);
+    expect(emailsIn(report)).toEqual(["behind.user@pwc.com"]);
   });
 
   it("is empty when every laptop matches its own target, even if canary is ahead", () => {
@@ -238,6 +282,11 @@ describe("buildAgentVersionFleetReport", () => {
           agentScriptVersion: "1.5.24",
         }),
         device({
+          id: "fleet-ahead",
+          email: "ahead.user@pwc.com",
+          agentScriptVersion: "1.5.34",
+        }),
+        device({
           id: "fleet-behind",
           email: "other.user@pwc.com",
           agentScriptVersion: "1.5.23",
@@ -251,11 +300,14 @@ describe("buildAgentVersionFleetReport", () => {
       ],
     });
 
-    expect(report.totalDevices).toBe(4);
-    expect(report.currentCount).toBe(2);
+    expect(report.totalDevices).toBe(5);
+    expect(report.currentCount).toBe(3);
     expect(report.needsUpdateCount).toBe(1);
     expect(report.unknownCount).toBe(1);
     expect(report.devices.find((row) => row.email === "new.user@pwc.com")?.status).toBe(
+      "current",
+    );
+    expect(report.devices.find((row) => row.email === "ahead.user@pwc.com")?.status).toBe(
       "current",
     );
     expect(report.devices.find((row) => row.email === "other.user@pwc.com")?.status).toBe(
@@ -360,6 +412,7 @@ describe("Agent status panel copy", () => {
     expect(component).toContain("Fleet-stable:");
     expect(component).toContain("Canary:");
     expect(component).toContain("Canary is not the fleet target.");
+    expect(component).toContain("or ahead of that target");
     expect(component).toContain("Showing");
     expect(component).toContain("Page");
     expect(component).not.toContain("Current agent");

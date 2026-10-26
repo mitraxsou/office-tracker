@@ -14,7 +14,6 @@ import {
 import { getPendingPriorComplianceMonthKeys } from "@/lib/prior-compliance";
 import { isUserOutOfOffice } from "@/lib/out-of-office";
 import { AppNav } from "@/components/AppNav";
-import { InAppNotificationPanel } from "@/components/InAppNotificationPanel";
 import { MonthlyProgressMeter } from "@/components/MonthlyProgressMeter";
 import { YearComplianceMeter } from "@/components/YearComplianceMeter";
 import { DeskClockPanel } from "@/components/dashboard/DeskClockPanel";
@@ -23,7 +22,6 @@ import { DashboardHeroSummary } from "@/components/dashboard/DashboardHeroSummar
 import { DashboardAlerts } from "@/components/dashboard/DashboardAlerts";
 import { DashboardDetailsPanel } from "@/components/dashboard/DashboardDetailsPanel";
 import { DashboardSyncRefresh } from "@/components/dashboard/DashboardSyncRefresh";
-import { listUnreadInAppNotifications } from "@/lib/in-app-notifications";
 import {
   deviceRegistrationReferenceAt,
   getLastOfficeActivityAt,
@@ -100,7 +98,6 @@ export default async function DashboardPage() {
       console.error("[dashboard] Failed to evaluate office notifications");
     }
   }
-  const unreadNotifications = await listUnreadInAppNotifications(user.id);
   const lastOfficeActivityAt = await getLastOfficeActivityAt(user.id);
   const isOutToday = await isUserOutOfOffice(user.id, summary.dayKey);
   const lastHeartbeat = summary.lastHeartbeat;
@@ -210,8 +207,6 @@ export default async function DashboardPage() {
           lastSyncedAt={lastSyncedAt}
           timezone={user.timezone}
         />
-
-        <InAppNotificationPanel initialItems={unreadNotifications} />
 
         <WelcomeBanner
           firstName={firstName}

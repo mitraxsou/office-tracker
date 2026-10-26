@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { updateMany, findFirst, update } = vi.hoisted(() => ({
+const { updateMany, findFirst, update, findMany } = vi.hoisted(() => ({
   updateMany: vi.fn(),
   findFirst: vi.fn(),
   update: vi.fn(),
+  findMany: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -13,10 +14,14 @@ vi.mock("@/lib/db", () => ({
       findFirst,
       update,
       findUnique: vi.fn(),
-      findMany: vi.fn(),
+      findMany,
       create: vi.fn(),
     },
   },
+}));
+
+vi.mock("../src/lib/timezone-dates", () => ({
+  dayKeyInTimezone: () => "2026-10-26",
 }));
 
 import {
@@ -24,7 +29,9 @@ import {
   IN_APP_AUTO_DISMISS_MS,
   dismissAllUnreadInAppNotifications,
   dismissInAppNotification,
+  dismissUnreadInAppNotificationsNotForDay,
   isAutoDismissInAppType,
+  listTodayUnreadInAppNotifications,
 } from "../src/lib/in-app-notifications";
 
 describe("in-app notification auto-dismiss types", () => {
@@ -91,5 +98,71 @@ describe("dismissInAppNotification", () => {
       where: { id: "n1" },
       data: { readAt: expect.any(Date) },
     });
+  });
+});
+
+describe("dismissUnreadInAppNotificationsNotForDay", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("soft-reads unread rows whose dayKey is not today", async () => {
+    updateMany.mockResolvedValue({ count: 2 });
+    const count = await dismissUnreadInAppNotificationsNotForDay(
+      "user-1",
+      "2026-10-26",
+    );
+    expect(count).toBe(2);
+    expect(updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: "user-1",
+        readAt: null,
+        NOT: { dayKey: "2026-10-26" },
+      },
+      data: { readAt: expect.any(Date) },
+    });
+  });
+});
+
+describe("listTodayUnreadInAppNotifications", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("prunes other days then returns only today's unread", async () => {
+    updateMany.mockResolvedValue({ count: 1 });
+    findMany.mockResolvedValue([
+      {
+        id: "n-today",
+        type: "hours_started",
+        dayKey: "2026-10-26",
+        message: "Office Wi-Fi detected.",
+        createdAt: new Date("2026-10-26T08:00:00.000Z"),
+      },
+    ]);
+
+    const rows = await listTodayUnreadInAppNotifications("user-1", "Asia/Kolkata");
+    expect(updateMany).toHaveBeenCalledWith({
+      where: {
+        userId: "user-1",
+        readAt: null,
+        NOT: { dayKey: "2026-10-26" },
+      },
+      data: { readAt: expect.any(Date) },
+    });
+    expect(findMany).toHaveBeenCalledWith({
+      where: { userId: "user-1", readAt: null, dayKey: "2026-10-26" },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
+    expect(rows).toEqual([
+      {
+        id: "n-today",
+        type: "hours_started",
+        dayKey: "2026-10-26",
+        message: "Office Wi-Fi detected.",
+        createdAt: "2026-10-26T08:00:00.000Z",
+      },
+    ]);
   });
 });

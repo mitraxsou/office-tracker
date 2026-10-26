@@ -13,7 +13,9 @@ import { isAdmin } from "@/lib/admin";
 import { APP_NAME } from "@/lib/agent-branding";
 import { APP_VERSION } from "@/lib/app-version";
 import { getAdminInbox } from "@/lib/admin-inbox";
+import { listTodayUnreadInAppNotifications } from "@/lib/in-app-notifications";
 import { AdminNotificationCorner } from "@/components/AdminNotificationCorner";
+import { UserNotificationCorner } from "@/components/UserNotificationCorner";
 import { AdminImpersonatePicker } from "@/components/AdminImpersonatePicker";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { OfficePulseLogo } from "@/components/OfficePulseLogo";
@@ -78,6 +80,10 @@ export async function AppNav() {
 
   const adminAccess = isAdmin(realUser ?? user);
   const inbox = adminAccess ? await getAdminInbox() : null;
+  const userNotifications = await listTodayUnreadInAppNotifications(
+    user.id,
+    user.timezone,
+  );
   const displayName = user.name ?? user.email;
 
   const primaryNavLinks: NavLink[] = [
@@ -109,15 +115,17 @@ export async function AppNav() {
     </form>
   );
 
-  const adminToolsDesktop = (
+  const notificationToolsDesktop = (
     <>
+      <UserNotificationCorner initialItems={userNotifications} />
       {inbox && <AdminNotificationCorner total={inbox.total} items={inbox.items} />}
       {adminAccess && !impersonation && <AdminImpersonatePicker />}
     </>
   );
 
-  const adminToolsMobile = (
+  const notificationToolsMobile = (
     <>
+      <UserNotificationCorner initialItems={userNotifications} placement="drawer" />
       {inbox && (
         <AdminNotificationCorner
           total={inbox.total}
@@ -148,7 +156,7 @@ export async function AppNav() {
 
           <div className="hidden min-w-0 items-center gap-2 md:flex md:gap-3">
             <GlobalSearch isAdmin={adminAccess} />
-            {adminToolsDesktop}
+            {notificationToolsDesktop}
             <ThemeToggle />
             <AppNavUserMenu
               displayName={displayName}
@@ -167,7 +175,7 @@ export async function AppNav() {
               userName={displayName}
               userEmail={user.email}
               version={APP_VERSION}
-              adminTools={adminToolsMobile}
+              adminTools={notificationToolsMobile}
               logoutForm={logoutForm}
             />
           </div>

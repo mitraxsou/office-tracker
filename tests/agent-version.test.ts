@@ -62,11 +62,39 @@ describe("agent version", () => {
     expect(heartbeat).not.toContain("return $Force -or ((Compare-AgentVersion $after $before) -gt 0)");
   });
 
-  it("treats missing or different versions as needing update", () => {
+  it("treats missing or behind versions as needing update, not ahead", () => {
     expect(isDeviceAgentVersionStale(null, "1.2.7")).toBe(true);
     expect(isDeviceAgentVersionStale("1.2.6", "1.2.7")).toBe(true);
-    expect(isDeviceAgentVersionStale("1.2.8", "1.2.7")).toBe(true);
+    expect(isDeviceAgentVersionStale("1.2.8", "1.2.7")).toBe(false);
     expect(isDeviceAgentVersionStale("1.2.7", "1.2.7")).toBe(false);
+  });
+
+  it("treats fleet users ahead of fleet-stable as current (Shubham/Satadal style)", () => {
+    expect(isDeviceAgentVersionStale("1.5.34", "1.5.24")).toBe(false);
+    expect(isDeviceAgentVersionStale("1.5.26", "1.5.24")).toBe(false);
+    expect(isDeviceAgentVersionStale("1.5.24", "1.5.24")).toBe(false);
+    expect(isDeviceAgentVersionStale("1.5.23", "1.5.24")).toBe(true);
+
+    const ahead = getUserAgentVersionSummary(
+      [
+        {
+          serialNumber: "SHUBHAM-1",
+          agentScriptVersion: "1.5.34",
+          forceAgentUpdate: false,
+          uninstalledAt: null,
+        },
+        {
+          serialNumber: "SATADAL-1",
+          agentScriptVersion: "1.5.26",
+          forceAgentUpdate: false,
+          uninstalledAt: null,
+        },
+      ],
+      "1.5.24",
+    );
+    expect(ahead.needsUpdate).toBe(false);
+    expect(ahead.outdatedDeviceCount).toBe(0);
+    expect(ahead.devices.every((d) => d.stale === false)).toBe(true);
   });
 
   it("uses accurate wording for agents that never reported", () => {

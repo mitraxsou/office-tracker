@@ -3,12 +3,18 @@ import { getCachedAppConfig } from "./agent-config-cache";
 import { resolveAgentTargetVersionFromConfig } from "./agent-rollout";
 import { compareAgentVersions, getAgentVersion } from "./agent-version";
 
+/**
+ * True when the laptop has not reported a version, or reported is behind the
+ * resolved target. Ahead of target (e.g. leftover canary on a fleet user) is
+ * not stale: soft update never downgrades, and Admin Agent status treats that
+ * as current.
+ */
 export function isDeviceAgentVersionStale(
   reportedVersion: string | null | undefined,
   serverVersion = getAgentVersion(),
 ): boolean {
   if (!reportedVersion) return true;
-  return compareAgentVersions(serverVersion, reportedVersion) !== 0;
+  return compareAgentVersions(serverVersion, reportedVersion) > 0;
 }
 
 export type UserAgentVersionDeviceRow = {
@@ -94,7 +100,7 @@ export async function recordDeviceScriptVersion(
     id: userId,
     email: user?.email,
   });
-  const upToDate = compareAgentVersions(scriptVersion, targetVersion) === 0;
+  const upToDate = compareAgentVersions(scriptVersion, targetVersion) >= 0;
 
   await prisma.agentDevice.update({
     where: { userId_serialNumber: { userId, serialNumber } },

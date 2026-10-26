@@ -32,16 +32,16 @@ describe("BUG-021 in-app notify hybrid UX (auto-dismiss + clear all)", () => {
     }
   });
 
-  it("panel schedules auto-dismiss and offers Clear all", () => {
-    const panel = readFileSync(
-      path.join(process.cwd(), "src/components/InAppNotificationPanel.tsx"),
+  it("bell schedules auto-dismiss and offers Clear all", () => {
+    const corner = readFileSync(
+      path.join(process.cwd(), "src/components/UserNotificationCorner.tsx"),
       "utf8",
     );
-    expect(panel).toContain("IN_APP_AUTO_DISMISS_MS");
-    expect(panel).toContain("isAutoDismissInAppType");
-    expect(panel).toContain("Clear all");
-    expect(panel).toContain(fixture.clearAllPath);
-    expect(panel).toContain(fixture.singleDismissPathPrefix);
+    expect(corner).toContain("IN_APP_AUTO_DISMISS_MS");
+    expect(corner).toContain("isAutoDismissInAppType");
+    expect(corner).toContain("Clear all");
+    expect(corner).toContain(fixture.clearAllPath);
+    expect(corner).toContain(fixture.singleDismissPathPrefix);
   });
 
   it("dismiss-all API route marks all unread read", () => {

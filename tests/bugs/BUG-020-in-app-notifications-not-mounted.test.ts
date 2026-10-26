@@ -10,31 +10,41 @@ const fixture = JSON.parse(
 ) as {
   alertType: string;
   deliveryChannel: string;
-  dashboardMustMountPanel: boolean;
+  appNavMustMountBell: boolean;
 };
 
 describe("BUG-020 in-app hours_met not shown on dashboard", () => {
-  it("dashboard mounts InAppNotificationPanel with unread rows", () => {
+  it("AppNav mounts user notification bell with today's unread", () => {
+    const appNav = readFileSync(
+      path.join(process.cwd(), "src/components/AppNav.tsx"),
+      "utf8",
+    );
     const dashboard = readFileSync(
       path.join(process.cwd(), "src/app/dashboard/page.tsx"),
       "utf8",
     );
-    expect(fixture.dashboardMustMountPanel).toBe(true);
-    expect(dashboard).toContain("InAppNotificationPanel");
-    expect(dashboard).toContain("listUnreadInAppNotifications");
-    expect(dashboard).toContain("<InAppNotificationPanel");
+    expect(fixture.appNavMustMountBell).toBe(true);
+    expect(appNav).toContain("UserNotificationCorner");
+    expect(appNav).toContain("listTodayUnreadInAppNotifications");
+    expect(appNav).toContain("<UserNotificationCorner");
+    expect(dashboard).not.toContain("InAppNotificationPanel");
+    expect(dashboard).not.toContain("listUnreadInAppNotifications");
     // Live/yellow completion can fire on Today load before unread rows are listed.
     expect(dashboard).toContain("maybeDispatchHeartbeatAlerts");
   });
 
-  it("panel component still dismisses via settings API", () => {
-    const panel = readFileSync(
-      path.join(process.cwd(), "src/components/InAppNotificationPanel.tsx"),
+  it("bell component dismisses via settings API and titles include hours_met", () => {
+    const corner = readFileSync(
+      path.join(process.cwd(), "src/components/UserNotificationCorner.tsx"),
       "utf8",
     );
-    expect(panel).toContain(fixture.alertType);
-    expect(panel).toContain("/api/settings/in-app-notifications/");
-    expect(panel).toContain("Clear all");
+    const titles = readFileSync(
+      path.join(process.cwd(), "src/lib/in-app-notification-ui.ts"),
+      "utf8",
+    );
+    expect(titles).toContain(fixture.alertType);
+    expect(corner).toContain("/api/settings/in-app-notifications/");
+    expect(corner).toContain("Clear all");
   });
 
   it("server sync reopens zero-duration wifi visits (endAt <= startAt)", () => {

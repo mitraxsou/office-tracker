@@ -1,10 +1,13 @@
 import { prisma } from "./db";
 import type { IntegrationAlert } from "./integration-alerts";
 import type { InAppNotificationView } from "./in-app-notification-ui";
+import { dayKeyInTimezone } from "./timezone-dates";
 
 export {
   AUTO_DISMISS_IN_APP_TYPES,
   IN_APP_AUTO_DISMISS_MS,
+  IN_APP_NOTIFICATION_TITLES,
+  inAppNotificationTitle,
   isAutoDismissInAppType,
   type AutoDismissInAppType,
   type InAppNotificationView,
@@ -49,11 +52,32 @@ export async function createInAppNotification(data: {
   return prisma.inAppNotification.create({ data });
 }
 
+/** Soft-read unread rows that are not for the given calendar day. */
+export async function dismissUnreadInAppNotificationsNotForDay(
+  userId: string,
+  todayDayKey: string,
+): Promise<number> {
+  const result = await prisma.inAppNotification.updateMany({
+    where: {
+      userId,
+      readAt: null,
+      NOT: { dayKey: todayDayKey },
+    },
+    data: { readAt: new Date() },
+  });
+  return result.count;
+}
+
 export async function listUnreadInAppNotifications(
   userId: string,
+  options?: { dayKey?: string },
 ): Promise<InAppNotificationView[]> {
   const rows = await prisma.inAppNotification.findMany({
-    where: { userId, readAt: null },
+    where: {
+      userId,
+      readAt: null,
+      ...(options?.dayKey ? { dayKey: options.dayKey } : {}),
+    },
     orderBy: { createdAt: "desc" },
     take: 20,
   });
@@ -64,6 +88,18 @@ export async function listUnreadInAppNotifications(
     message: row.message,
     createdAt: row.createdAt.toISOString(),
   }));
+}
+
+/**
+ * Prune stale unread (other days), then return today's unread for the header bell.
+ */
+export async function listTodayUnreadInAppNotifications(
+  userId: string,
+  timezone: string,
+): Promise<InAppNotificationView[]> {
+  const todayDayKey = dayKeyInTimezone(new Date(), timezone);
+  await dismissUnreadInAppNotificationsNotForDay(userId, todayDayKey);
+  return listUnreadInAppNotifications(userId, { dayKey: todayDayKey });
 }
 
 export async function dismissInAppNotification(userId: string, id: string) {
