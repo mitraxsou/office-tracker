@@ -52,6 +52,7 @@ describe("agent download helpers", () => {
       repoVersion: "1.5.35",
       fleetStableVersion: "1.5.24",
       artifactVersions: ["1.5.24", "1.5.20"],
+      includeRepoCanary: true,
     });
     expect(options.map((o) => o.version)).toEqual(["1.5.24", "1.5.35", "1.5.20"]);
     expect(options[0]).toMatchObject({
@@ -66,12 +67,38 @@ describe("agent download helpers", () => {
     expect(isAllowedAgentDownloadVersion("9.9.9", options)).toBe(false);
   });
 
+  it("omits deploy canary Latest for fleet users (includeRepoCanary false)", () => {
+    const options = buildAgentDownloadVersionOptions({
+      targetVersion: "1.5.24",
+      repoVersion: "1.5.35",
+      fleetStableVersion: "1.5.24",
+      artifactVersions: ["1.5.20"],
+      includeRepoCanary: false,
+    });
+    expect(options.map((o) => o.version)).toEqual(["1.5.24", "1.5.20"]);
+    expect(isAllowedAgentDownloadVersion("1.5.35", options)).toBe(false);
+    expect(isAllowedAgentDownloadVersion("1.5.24", options)).toBe(true);
+  });
+
+  it("still includes repo when it is the caller's resolved target (canary soak)", () => {
+    const options = buildAgentDownloadVersionOptions({
+      targetVersion: "1.5.35",
+      repoVersion: "1.5.35",
+      fleetStableVersion: "1.5.24",
+      artifactVersions: [],
+      includeRepoCanary: false,
+    });
+    expect(options.map((o) => o.version).sort()).toEqual(["1.5.24", "1.5.35"]);
+    expect(options.find((o) => o.version === "1.5.35")?.recommended).toBe(true);
+  });
+
   it("does not invent versions beyond target, repo, fleet-stable, and artifacts", () => {
     const options = buildAgentDownloadVersionOptions({
       targetVersion: "1.5.35",
       repoVersion: "1.5.35",
       fleetStableVersion: "1.5.24",
       artifactVersions: [],
+      includeRepoCanary: true,
     });
     expect(options.map((o) => o.version).sort()).toEqual(["1.5.24", "1.5.35"]);
   });

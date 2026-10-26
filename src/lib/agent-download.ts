@@ -4,6 +4,7 @@ import { getCurrentUser, getUserByAgentToken } from "@/lib/auth";
 import { getCachedAppConfig } from "@/lib/agent-config-cache";
 import {
   DEFAULT_AGENT_FLEET_STABLE_VERSION,
+  isAgentRolloutAllowlisted,
   resolveAgentTargetVersionFromConfig,
 } from "@/lib/agent-rollout";
 import { compareAgentVersions, getAgentVersion } from "@/lib/agent-version";
@@ -106,23 +107,35 @@ export async function resolveCallerAgentTargetVersion(
 }
 
 /**
- * Build the download picker list from known versions only (target, repo, fleet-stable,
- * and any snapshotted release artifacts). Does not invent historical builds.
+ * Build the download picker list from known versions only (target, fleet-stable,
+ * artifacts, and optionally deploy canary / Latest). Does not invent historical builds.
+ *
+ * Repo/canary "Latest" is only listed when includeRepoCanary is true (allowlisted
+ * soak users or rollout mode everyone). Fleet users stay on target + fleet + artifacts.
  */
 export function buildAgentDownloadVersionOptions(input: {
   targetVersion: string;
   repoVersion: string;
   fleetStableVersion: string;
   artifactVersions: string[];
+  /** When false, omit deploy canary unless it is already the user's target or fleet pin. */
+  includeRepoCanary?: boolean;
 }): AgentDownloadVersionOption[] {
   const target = input.targetVersion.trim();
   const repo = input.repoVersion.trim();
   const fleet =
     input.fleetStableVersion.trim() || DEFAULT_AGENT_FLEET_STABLE_VERSION;
+  const includeRepoCanary = input.includeRepoCanary === true;
   const versions = new Set<string>();
-  for (const raw of [target, repo, fleet, ...input.artifactVersions]) {
+  const add = (raw: string) => {
     const version = raw.trim();
     if (version) versions.add(version);
+  };
+  add(target);
+  add(fleet);
+  for (const raw of input.artifactVersions) add(raw);
+  if (includeRepoCanary || repo === target || repo === fleet) {
+    add(repo);
   }
 
   const sorted = [...versions].sort((a, b) => {
@@ -159,6 +172,9 @@ export async function listAvailableAgentDownloadVersions(
   const fleetStableVersion =
     config.agentFleetStableVersion.trim() || DEFAULT_AGENT_FLEET_STABLE_VERSION;
   const targetVersion = resolveAgentTargetVersionFromConfig(config, caller);
+  const includeRepoCanary =
+    config.agentRolloutMode === "everyone" ||
+    isAgentRolloutAllowlisted(caller, config.agentRolloutAllowlistEmails);
   // Dynamic import avoids a circular load with agent-release-artifacts.
   const { listAgentReleaseArtifactVersions } = await import(
     "./agent-release-artifacts"
@@ -169,6 +185,7 @@ export async function listAvailableAgentDownloadVersions(
     repoVersion,
     fleetStableVersion,
     artifactVersions,
+    includeRepoCanary,
   });
   return { recommended: targetVersion, options };
 }
@@ -184,7 +201,8 @@ export function isAllowedAgentDownloadVersion(
 
 /**
  * Resolve zip/file download version: default = caller's target; optional ?version=
- * must be in the allowlist (target, repo, fleet-stable, or a stored artifact).
+ * must be in that caller's available list (target, fleet-stable, artifacts; deploy
+ * canary / Latest only for soak allowlist or rollout mode everyone).
  */
 export async function resolveRequestedAgentDownloadVersion(
   caller: AgentDownloadCaller,
