@@ -482,7 +482,7 @@
       "date": "2026-01",
       "severity": "high",
       "area": "core",
-      "reproSummary": "Pilot policy: users need >=5 hours in office per day toward monthly days.",
+      "reproSummary": "Pilot policy: daily hours target defaults to 5h for hours_met / under-target alerts. Monthly office days count on any visit presence.",
       "assertion": "DEFAULT_HOURS_TARGET is 5; dayQualifiesForTarget uses that threshold shape.",
       "fixture": "fixtures/core-hours-target.json",
       "testFile": "tests/bugs/CORE-002-five-hour-target.test.ts",

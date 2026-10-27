@@ -234,18 +234,18 @@ describe("notification scenarios", () => {
       expect(dispatchUserAlerts).toHaveBeenCalledWith("user-1", ["hours_met"]);
     });
 
-    it("dashboard Today load evaluates alerts from liveHours before listing in-app rows", () => {
+    it("dashboard Today load evaluates alerts from liveHours; nav lists unread in-app rows", () => {
       const dashboard = readFileSync(
         path.join(process.cwd(), "src/app/dashboard/page.tsx"),
         "utf8",
       );
+      const nav = readFileSync(path.join(process.cwd(), "src/components/AppNav.tsx"), "utf8");
       expect(dashboard).toContain("maybeDispatchHeartbeatAlerts");
       expect(dashboard).toContain("metTarget: summary.metTarget");
       expect(dashboard).toContain("summary.inOfficeNow || summary.metTarget");
-      const alertIdx = dashboard.indexOf("maybeDispatchHeartbeatAlerts");
-      const unreadIdx = dashboard.indexOf("listUnreadInAppNotifications");
-      expect(alertIdx).toBeGreaterThan(-1);
-      expect(unreadIdx).toBeGreaterThan(alertIdx);
+      expect(dashboard.indexOf("maybeDispatchHeartbeatAlerts")).toBeGreaterThan(-1);
+      // Unread in-app rows mount from AppNav (shared layout), after Today can fire alerts.
+      expect(nav).toContain("listTodayUnreadInAppNotifications");
     });
   });
 

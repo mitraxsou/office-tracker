@@ -6,6 +6,7 @@ import {
   countOfficeVisitDays,
   dayKeysForMonth,
   dayKeysInMonthUpToToday,
+  dayCountsAsVisited,
   dayQualifiesForTarget,
   describeMonthlyDayJourney,
   fiscalYearLabel,
@@ -43,12 +44,14 @@ describe("validateMonthlyDaysTarget", () => {
 });
 
 describe("countQualifyingDays", () => {
-  it("counts days meeting the hours target", () => {
+  it("counts days with any office presence toward the monthly goal", () => {
     const hours = [5, 4.9, 6, 0, 5];
-    expect(countQualifyingDays(hours, 5)).toBe(3);
+    expect(countQualifyingDays(hours, 5)).toBe(4);
+    expect(dayCountsAsVisited(4.9)).toBe(true);
+    expect(dayCountsAsVisited(0)).toBe(false);
   });
 
-  it("treats exact target as qualifying", () => {
+  it("keeps hours-met separate from monthly day counting", () => {
     expect(dayQualifiesForTarget(5, 5)).toBe(true);
     expect(dayQualifiesForTarget(4.99, 5)).toBe(false);
   });
@@ -88,20 +91,33 @@ describe("ordinalLabel", () => {
 });
 
 describe("describeMonthlyDayJourney", () => {
-  it("labels the next qualifying day as ongoing while in office before hitting 5h", () => {
+  it("labels the next day as ongoing while in office before any hours are logged", () => {
     const journey = describeMonthlyDayJourney({
       qualifyingDays: 4,
       monthlyDaysTarget: 8,
       todayMetTarget: false,
       inOfficeNow: true,
-      todayHasOfficeTime: true,
+      todayHasOfficeTime: false,
     });
     expect(journey.ongoingDayNumber).toBe(5);
     expect(journey.ongoingLabel).toBe("5th day ongoing");
     expect(journey.daysToGoLabel).toBe("4 days to go");
   });
 
-  it("labels today as secured once the daily target is met", () => {
+  it("secures today once any office presence is logged, even under 5h", () => {
+    const journey = describeMonthlyDayJourney({
+      qualifyingDays: 5,
+      monthlyDaysTarget: 8,
+      todayMetTarget: false,
+      inOfficeNow: true,
+      todayHasOfficeTime: true,
+    });
+    expect(journey.ongoingDayNumber).toBe(5);
+    expect(journey.ongoingLabel).toBe("5th day secured today");
+    expect(journey.remainingDays).toBe(3);
+  });
+
+  it("labels today as secured once the daily hours target is met", () => {
     const journey = describeMonthlyDayJourney({
       qualifyingDays: 5,
       monthlyDaysTarget: 8,
@@ -155,14 +171,14 @@ describe("dayKeysForMonth", () => {
 });
 
 describe("monthDayKeysFromTrend", () => {
-  it("counts qualifying days within a month from trend data", () => {
+  it("counts presence days within a month from trend data toward the monthly goal", () => {
     const trend = [
       { date: "2026-09-01", totalHours: 5 },
       { date: "2026-09-02", totalHours: 3 },
       { date: "2026-08-31", totalHours: 6 },
     ];
     const result = monthDayKeysFromTrend(trend, "2026-09", 5);
-    expect(result.qualifyingDays).toBe(1);
+    expect(result.qualifyingDays).toBe(2);
     expect(result.officeVisitDays).toBe(2);
     expect(result.daysInRange).toBe(2);
     expect(result.daysInMonth).toBe(30);

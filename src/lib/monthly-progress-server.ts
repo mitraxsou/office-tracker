@@ -6,6 +6,7 @@ import {
   countExemptQualifyingDays,
   countOfficeVisitDays,
   countQualifyingDays,
+  dayCountsAsVisited,
   dayKeysForMonth,
   dayKeysInMonthUpToToday,
   dayQualifiesForTarget,
@@ -38,7 +39,7 @@ export async function getMonthlyProgress(
     dayKeys.map((dayKey) => aggregateHoursForDay(userId, timezone, dayKey)),
   );
   const qualifyingDayKeys = new Set(
-    dayKeys.filter((_, index) => dayQualifiesForTarget(dailyHours[index] ?? 0, hoursTarget)),
+    dayKeys.filter((_, index) => dayCountsAsVisited(dailyHours[index] ?? 0)),
   );
   const qualifyingDays = qualifyingDayKeys.size;
   const exemptDayKeysInMonth =
@@ -76,6 +77,7 @@ export async function getMonthlyProgress(
     days: dayKeys.map((dayKey, i) => ({
       dayKey,
       hours: Math.round((dailyHours[i] ?? 0) * 10) / 10,
+      // Per-day hours-met badge (5h); monthly day count uses presence above.
       metTarget: dayQualifiesForTarget(dailyHours[i] ?? 0, hoursTarget),
     })),
   };
@@ -140,7 +142,7 @@ export async function getYearCompliance(
       );
       const hasOfficeData = dailyHours.some((hours) => hours > 0);
       const qualifyingDayKeys = new Set(
-        dayKeys.filter((_, index) => dayQualifiesForTarget(dailyHours[index] ?? 0, hoursTarget)),
+        dayKeys.filter((_, index) => dayCountsAsVisited(dailyHours[index] ?? 0)),
       );
       const qualifyingDays = qualifyingDayKeys.size;
       const exemptDayKeysInMonth = exemptions.dayKeys.filter((dayKey) =>

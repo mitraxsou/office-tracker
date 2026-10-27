@@ -76,7 +76,8 @@ export type AuditAction =
   | "agent_rollout_update"
   | "agent_rollout_promote_everyone"
   | "account_access.approved"
-  | "account_access.rejected";
+  | "account_access.rejected"
+  | "day_presence_recompute";
 
 export async function logAuditEvent(params: {
   actorId: string;

@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.35";
+export const APP_VERSION = "1.5.36";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,19 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-27",
+    userBullets: [
+      "A day counts toward your monthly office-days goal when you visit the office, even if you are under the 5h daily hours target.",
+      "Overnight visits that check out the next day count both calendar days; hours split at local midnight.",
+      "The 5h daily target still drives hours met, remaining hours, and under-target alerts.",
+    ],
+    adminBullets: [
+      "Monthly qualifying days use office presence (hours > 0). dayQualifiesForTarget / hours_met stay on the 5h path.",
+      "POST /api/admin/day-presence/recompute recomputes DailySummary from Visit history on Vercel (do not run against prod DB from local).",
+    ],
+  },
+  {
+    version: "1.5.35",
     date: "2026-10-26",
     userBullets: [
       "After a long laptop sleep, office checkout uses the time you closed the lid, not midnight.",

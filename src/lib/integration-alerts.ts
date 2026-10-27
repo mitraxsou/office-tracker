@@ -172,7 +172,7 @@ function buildMonthlySnapshotMessage(input: {
   const projected = Math.min(input.monthlyDaysTarget, completed + 1);
   const remainingAfterToday = Math.max(0, input.monthlyDaysTarget - projected);
   const noun = remainingAfterToday === 1 ? "day" : "days";
-  return `Monthly office snapshot for ${monthLabel}: ${completed} of ${input.monthlyDaysTarget} days completed. If you complete today's ${input.hoursTarget}h target, you will be at ${projected} of ${input.monthlyDaysTarget}, with ${remainingAfterToday} more office ${noun} to go this month.`;
+  return `Monthly office snapshot for ${monthLabel}: ${completed} of ${input.monthlyDaysTarget} days completed. If you visit the office today, you will be at ${projected} of ${input.monthlyDaysTarget}, with ${remainingAfterToday} more office ${noun} to go this month. Your daily ${input.hoursTarget}h hours target is tracked separately.`;
 }
 
 function buildOooClearedMessage(): string {
@@ -372,8 +372,9 @@ async function evaluateUserAlerts(
       undefined,
       approvedExemptions,
     );
-    // Same live day total as hours_met so wording cannot disagree in one batch.
-    const todayMetTarget = summary.metTarget;
+    // Day counted = any office presence today; hours_met stays on the 5h path.
+    const todayDayCounted =
+      summary.metTarget || summary.liveHours > 0 || summary.confirmedHours > 0;
     const deliveryChannel = channelForAlert(prefs, "monthly_snapshot");
     alerts.push({
       ...base,
@@ -384,7 +385,7 @@ async function evaluateUserAlerts(
         qualifyingDays: monthlyProgress.qualifyingDays,
         monthlyDaysTarget: monthlyProgress.monthlyDaysTarget,
         remainingDays: monthlyProgress.remainingDays,
-        todayMetTarget,
+        todayMetTarget: todayDayCounted,
         hoursTarget,
       }),
       deliveryChannel,

@@ -116,15 +116,15 @@ export function MonthlyReportSection({
     <div id="month-overview" className="scroll-mt-20 space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
-          label="Days met target"
+          label="Office days counted"
           value={`${progress.qualifyingDays} / ${progress.monthlyDaysTarget}`}
-          tooltip={`Days this month with at least ${hoursTarget}h in office. Monthly goal is ${progress.monthlyDaysTarget} such days.`}
+          tooltip={`Days this month with any office visit. Monthly goal is ${progress.monthlyDaysTarget} visit days. The ${hoursTarget}h daily target is tracked separately for hours met.`}
           tone={monthlyTone}
         />
         <KpiCard
-          label="Office days"
-          value={`${progress.officeVisitDays} / ${progress.daysInMonth}`}
-          tooltip={`Days with any office visit or logged hours this month, even if below the ${hoursTarget}h daily target.`}
+          label="Days met hours"
+          value={`${dailyTrend.filter((d) => d.metTarget).length} / ${progress.daysInMonth}`}
+          tooltip={`Days this month with at least ${hoursTarget}h in office. Under-target days still count as office days above.`}
           tone="neutral"
         />
         <KpiCard

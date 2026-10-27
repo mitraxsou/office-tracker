@@ -172,10 +172,24 @@ function officeIntervalsForDay(
     }
     if (visit.endAt === null && isManualSource(visit.source) && isCurrentDay) continue;
 
-    // Overnight carry into today: never invent midnight. Only count today's
-    // portion when there is confirmed office presence today.
+    // Overnight / multi-day: closed visits split at timezone midnight (day1
+    // through dayEnd, day2 from dayStart to checkout). Open overnight visits
+    // never invent midnight without confirmed office presence today (BUG-022).
     const startedBeforeDay = visit.startAt.getTime() < params.dayStart.getTime();
     if (startedBeforeDay) {
+      if (visit.endAt) {
+        const clippedEnd = Math.min(visit.endAt.getTime(), dayEndMs);
+        const start = params.dayStart.getTime();
+        // Exact midnight checkout belongs to the previous day only.
+        if (clippedEnd <= start) continue;
+        intervals.push({
+          start,
+          end: clippedEnd,
+          source: visit.source,
+          closed: true,
+        });
+        continue;
+      }
       if (firstHbMs === null && !lastHb) continue;
       const end = effectiveVisitEnd({
         endAt: visit.endAt,
@@ -187,13 +201,14 @@ function officeIntervalsForDay(
         dayEnd: params.dayEnd,
       });
       const clippedEnd = Math.min(end.getTime(), dayEndMs);
+      // Open carry: start at first confirmed pulse today, never invent midnight alone.
       const start = firstHbMs ?? (lastHb ? clipToDay(lastHb.getTime(), params.dayStart, params.dayEnd) : null);
       if (start === null || clippedEnd < start) continue;
       intervals.push({
         start,
         end: clippedEnd,
         source: visit.source,
-        closed: visit.endAt !== null,
+        closed: false,
       });
       continue;
     }
@@ -286,7 +301,8 @@ function officeIntervalsForDay(
 
 /**
  * First check-in on the day from visits.
- * Overnight visits that started before dayStart never invent midnight; they only
+ * Closed overnight visits that checkout after midnight start at dayStart (hour split).
+ * Open overnight visits that started before dayStart never invent midnight; they only
  * contribute when there is confirmed office presence today (use that pulse time).
  * Short NEW_DAY midnight stubs before a long sleep are ignored when a later
  * re-enter exists (Today starts at that enter, not 12:00 am).
@@ -306,7 +322,13 @@ export function firstOfficeInMsForDay(
     const startedBeforeDay = v.startAt.getTime() < dayStartMs;
 
     if (startedBeforeDay) {
-      // Do not clip yesterday's start to today's midnight.
+      if (v.endAt) {
+        // Closed overnight: geometric midnight split for today's portion.
+        if (v.endAt.getTime() <= dayStartMs) continue;
+        if (firstIn === null || dayStartMs < firstIn) firstIn = dayStartMs;
+        continue;
+      }
+      // Open overnight: Do not clip yesterday's start to today's midnight without a pulse.
       if (!firstHb && !params.lastInOfficeHeartbeatAt) continue;
       const start = firstHb
         ? clipToDay(firstHb.getTime(), params.dayStart, params.dayEnd)

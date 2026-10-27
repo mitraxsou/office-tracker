@@ -141,6 +141,46 @@ describe("overnight visit first check-in (no midnight invent)", () => {
     expect(daySpanHoursForDay(visits, params)).toBeLessThan(1);
     expect(daySpanHoursForDay(visits, params)).toBeGreaterThan(0);
   });
+
+  it("splits a closed overnight visit at midnight so both calendar days get hours", () => {
+    const day1Key = "2026-10-14";
+    const day2Key = "2026-10-15";
+    const { start: day1Start, end: day1End } = dayBoundsFromKey(day1Key, TZ);
+    const { start: day2Start, end: day2End } = dayBoundsFromKey(day2Key, TZ);
+    const checkIn = new Date("2026-10-14T22:00:00+05:30");
+    const checkOut = new Date("2026-10-15T02:00:00+05:30");
+    const visits: VisitForDaySpan[] = [
+      {
+        id: "overnight",
+        startAt: checkIn,
+        endAt: checkOut,
+        source: "manual",
+        updatedAt: checkOut,
+      },
+    ];
+    const day1Params = {
+      dayStart: day1Start,
+      dayEnd: day1End,
+      now: checkOut,
+      staleMs: STALE_MS,
+      lastHeartbeatAt: checkOut,
+      firstInOfficeHeartbeatAt: checkIn,
+      lastInOfficeHeartbeatAt: day1End,
+    };
+    const day2Params = {
+      dayStart: day2Start,
+      dayEnd: day2End,
+      now: checkOut,
+      staleMs: STALE_MS,
+      lastHeartbeatAt: checkOut,
+      firstInOfficeHeartbeatAt: day2Start,
+      lastInOfficeHeartbeatAt: checkOut,
+    };
+    // Day1: 22:00 -> 23:59:59.999 (~2h). Day2: 00:00 -> 02:00 (2h).
+    expect(daySpanHoursForDay(visits, day1Params)).toBeCloseTo(2, 1);
+    expect(daySpanHoursForDay(visits, day2Params)).toBeCloseTo(2, 1);
+    expect(firstOfficeInMsForDay(visits, day2Params)).toBe(day2Start.getTime());
+  });
 });
 
 describe("visit end provenance", () => {

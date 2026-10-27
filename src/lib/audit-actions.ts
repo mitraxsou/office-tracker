@@ -148,6 +148,11 @@ export const AUDIT_ACTION_GUIDE: Record<AuditAction, AuditActionGuide> = {
     label: "Data maintenance purge",
     summary: "An admin ran Data maintenance and deleted old rows from a chosen table.",
   },
+  day_presence_recompute: {
+    label: "Day presence recomputed",
+    summary:
+      "An admin recomputed DailySummary office presence from Visit history so under-target visit days count toward the monthly office-days goal.",
+  },
   timezone_change_request: {
     label: "Timezone change requested",
     summary: "The user asked to change their reporting timezone.",

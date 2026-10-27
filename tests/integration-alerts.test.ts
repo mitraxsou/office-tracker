@@ -91,8 +91,10 @@ describe("integration alert messages", () => {
       hoursTarget: 5,
     });
     expect(msg).toContain("5 of 8 days completed");
+    expect(msg).toContain("If you visit the office today");
     expect(msg).toContain("you will be at 6 of 8");
     expect(msg).toContain("2 more office days");
+    expect(msg).toContain("5h hours target is tracked separately");
   });
 
   it("builds a completed monthly snapshot without projecting another day", () => {

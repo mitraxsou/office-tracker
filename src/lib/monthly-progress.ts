@@ -14,16 +14,30 @@ export function validateMonthlyDaysTarget(value: unknown): number | null {
   return value;
 }
 
+/**
+ * Hours-met for a calendar day: reached the daily office-hours target (default 5h).
+ * Used for hours_met alerts, day badges, and under-target "behind" hours checks.
+ * Monthly office-day counting uses {@link dayCountsAsVisited} instead.
+ */
 export function dayQualifiesForTarget(hours: number, hoursTarget: number): boolean {
   return hours >= hoursTarget;
 }
 
-export function countQualifyingDays(dailyHours: number[], hoursTarget: number): number {
-  return dailyHours.filter((hours) => dayQualifiesForTarget(hours, hoursTarget)).length;
+/** Day counted toward the monthly office-days goal: any real office presence that day. */
+export function dayCountsAsVisited(hours: number): boolean {
+  return hours > 0;
+}
+
+/**
+ * Count days that count toward the monthly office-days goal (presence, not hours target).
+ * `hoursTarget` is accepted for call-site compatibility and ignored.
+ */
+export function countQualifyingDays(dailyHours: number[], _hoursTarget?: number): number {
+  return dailyHours.filter((hours) => dayCountsAsVisited(hours)).length;
 }
 
 export function countOfficeVisitDays(dailyHours: number[]): number {
-  return dailyHours.filter((hours) => hours > 0).length;
+  return dailyHours.filter((hours) => dayCountsAsVisited(hours)).length;
 }
 
 export type MonthlyProgressState = "met" | "on_track" | "behind";
@@ -74,8 +88,8 @@ export type MonthlyDayJourney = {
 
 /**
  * Describe which monthly office day the user is covering today, and how many remain.
- * When they are in office (or already have office time) but have not hit today's hours
- * target yet, today is treated as the next qualifying day in progress.
+ * Any office presence today secures the day toward the monthly goal (hours target is separate).
+ * When they are in office but still have no counted office time, today is the next day in progress.
  */
 export function describeMonthlyDayJourney(input: {
   qualifyingDays: number;
@@ -88,7 +102,8 @@ export function describeMonthlyDayJourney(input: {
   const monthlyDaysTarget = Math.max(1, input.monthlyDaysTarget);
   const remainingDays = Math.max(0, monthlyDaysTarget - qualifyingDays);
   const monthTargetMet = qualifyingDays >= monthlyDaysTarget;
-  const todayAlreadyQualified = input.todayMetTarget;
+  // Presence counts the day; hours met also implies the day is secured.
+  const todayAlreadyQualified = input.todayHasOfficeTime || input.todayMetTarget;
   const coveringToday =
     !todayAlreadyQualified && (input.inOfficeNow || input.todayHasOfficeTime);
 

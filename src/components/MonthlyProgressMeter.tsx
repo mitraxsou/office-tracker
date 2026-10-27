@@ -67,8 +67,8 @@ export function MonthlyProgressMeter({
         {compact
           ? totalHours !== undefined
             ? `${totalHours.toFixed(1)}h total this month`
-            : "Days meeting daily hours target"
-          : "A day counts when you meet the daily hours target in office."}
+            : "Days with any office visit"
+          : "A day counts when you visit the office, even if under the daily hours target."}
         {!compact && totalHours !== undefined && (
           <>
             {" "}

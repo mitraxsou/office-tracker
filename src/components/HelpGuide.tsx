@@ -42,7 +42,8 @@ export function HelpGuide({ isLoggedIn, isAdmin }: HelpGuideProps) {
         <section id="overview" className="card scroll-mt-header space-y-3 p-6">
           <h2 className="text-lg font-medium">What it does</h2>
           <p className="text-sm text-muted">
-            {APP_NAME} counts time you spend in the office toward your daily hours target (5 hours in the pilot).
+            {APP_NAME} tracks office visits toward your monthly office-days goal (any visit that day counts),
+            and separately tracks time toward your daily hours target (5 hours in the pilot).
             Visits build from the Windows agent on approved office Wi-Fi, manual check-in, or admin corrections.
             You are not expected to be in office every day - home days simply do not add office hours.
           </p>
