@@ -19,15 +19,10 @@ import { roundHoursToMinute } from "./visits";
 import { resolveAgentTargetVersionFromConfig } from "./agent-rollout";
 import { isDeviceAgentVersionStale } from "./agent-update";
 import { getDeviceAgentApiHitTotals, getUserAgentApiHitTotals, getUserAgentApiHitsForDay } from "./agent-api-hits";
-import { dayBoundsFromKey } from "./timezone-dates";
+import { dayBoundsFromKey, dayKeyInTimezone } from "./timezone-dates";
 
 function dayKeyForTimezone(date: Date, timezone: string) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
+  return dayKeyInTimezone(date, timezone);
 }
 
 function addDays(date: Date, days: number) {
@@ -73,13 +68,12 @@ export async function getUserReport(
     laptopActiveHours: number;
     metTarget: boolean;
   }> = [];
-  const cursor = new Date(from);
-  cursor.setHours(0, 0, 0, 0);
-  const end = new Date(to);
-  end.setHours(23, 59, 59, 999);
-
-  while (cursor <= end) {
-    const key = dayKeyForTimezone(cursor, user.timezone);
+  // Walk local calendar day keys (not UTC Date.setHours), so IST months do not
+  // pick up Sep 30 / Nov 1 or skip days when the server runs in UTC.
+  let dayKey = dayKeyForTimezone(from, user.timezone);
+  const lastDayKey = dayKeyForTimezone(to, user.timezone);
+  while (dayKey <= lastDayKey) {
+    const key = dayKey;
     const [hours, laptopHours] = await Promise.all([
       aggregateHoursForDay(user.id, user.timezone, key),
       aggregateLaptopActiveForDay(user.id, user.timezone, key),
@@ -90,7 +84,10 @@ export async function getUserReport(
       laptopActiveHours: roundHoursToMinute(laptopHours),
       metTarget: hours >= hoursTarget,
     });
-    cursor.setDate(cursor.getDate() + 1);
+    const { end: dayEnd } = dayBoundsFromKey(key, user.timezone);
+    const nextKey = dayKeyForTimezone(new Date(dayEnd.getTime() + 1), user.timezone);
+    if (nextKey <= key) break;
+    dayKey = nextKey;
   }
 
   const visits = await prisma.visit.findMany({

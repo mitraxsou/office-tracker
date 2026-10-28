@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.37";
+export const APP_VERSION = "1.5.38";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,18 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-29",
+    userBullets: [
+      "Office days counted on Reports now matches the chart and calendar (same presence days).",
+      "Short office visits under 0.1h show as minutes on the calendar instead of amber 0h.",
+    ],
+    adminBullets: [
+      "Presence uses minute-rounded hours so sub-minute overnight spills no longer inflate qualifying days vs dailyTrend.",
+      "Reports dailyTrend walks local day keys (not UTC setHours) to avoid month-bound skew on Vercel.",
+    ],
+  },
+  {
+    version: "1.5.37",
     date: "2026-10-29",
     userBullets: [
       "Reports Visits now lists each calendar day with office presence, including the next day after an overnight checkout.",

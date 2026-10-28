@@ -5,8 +5,15 @@ import {
   calendarWeeksForMonth,
   dailyTrendMap,
 } from "@/lib/month-range";
+import { dayCountsAsVisited } from "@/lib/monthly-progress";
 import { dayBoundsFromKey } from "@/lib/timezone-dates";
-import { formatHours, formatTime, roundHours, visitsForDay, type VisitPoint } from "@/lib/visits";
+import {
+  formatCalendarHours,
+  formatHours,
+  formatTime,
+  visitsForDay,
+  type VisitPoint,
+} from "@/lib/visits";
 
 export type VisitCalendarDay = {
   date: string;
@@ -112,7 +119,8 @@ export function VisitCalendar({
                   const met = summary?.metTarget ?? false;
                   const isSelected = selectedDate === cell.dayKey;
                   const isToday = todayKey === cell.dayKey;
-                  const hasVisits = hours > 0;
+                  const hasVisits = dayCountsAsVisited(hours);
+                  const hoursLabel = formatCalendarHours(hours);
 
                   return (
                     <td key={ci} className={`${cellHeight} border border-[var(--border)] p-0.5 align-top`}>
@@ -123,7 +131,7 @@ export function VisitCalendar({
                         }
                         aria-pressed={isSelected}
                         aria-current={isToday ? "date" : undefined}
-                        aria-label={`${cell.dayKey}${hasVisits ? `, ${roundHours(hours)} hours` : ", no visits"}${met ? ", target met" : ""}${isToday ? ", today" : ""}${isSelected ? ", selected" : ""}`}
+                        aria-label={`${cell.dayKey}${hasVisits ? `, ${hoursLabel}` : ", no visits"}${met ? ", target met" : ""}${isToday ? ", today" : ""}${isSelected ? ", selected" : ""}`}
                         className={`flex h-full w-full flex-col rounded-md text-left transition-colors ${compact ? "p-1" : "p-1.5"} ${
                           isSelected
                             ? "bg-[var(--pwc-orange)]/20 ring-2 ring-[var(--pwc-orange)]"
@@ -148,7 +156,7 @@ export function VisitCalendar({
                                 met ? "text-green-400" : "text-accent"
                               }`}
                             >
-                              {roundHours(hours)}h
+                              {hoursLabel}
                             </span>
                             {!compact && (
                               <span

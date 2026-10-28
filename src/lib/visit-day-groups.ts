@@ -1,3 +1,4 @@
+import { dayCountsAsVisited } from "./monthly-progress";
 import { dayBoundsFromKey } from "./timezone-dates";
 import {
   clipVisitToDay,
@@ -105,7 +106,7 @@ export function buildVisitDayGroups(
     // Fallback when visits are empty but daily hours exist (e.g. trend-only).
     if (dayKeys.size === 0) {
       for (const day of dailyTrend) {
-        if (day.totalHours > 0) dayKeys.add(day.date);
+        if (dayCountsAsVisited(day.totalHours)) dayKeys.add(day.date);
       }
     }
   }
@@ -150,6 +151,12 @@ export function buildVisitDayGroups(
         hasOpenVisit,
       };
     })
-    .filter((group) => group.totalHours > 0 || group.visits.length > 0)
+    // Presence days only (same rule as Office days counted). Keep a selected
+    // day even when empty so the day filter workspace still opens.
+    .filter(
+      (group) =>
+        dayCountsAsVisited(group.totalHours) ||
+        (selectedDate != null && group.dayKey === selectedDate),
+    )
     .sort((a, b) => b.dayKey.localeCompare(a.dayKey));
 }

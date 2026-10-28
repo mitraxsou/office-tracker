@@ -51,6 +51,11 @@ describe("countQualifyingDays", () => {
     expect(dayCountsAsVisited(0)).toBe(false);
   });
 
+  it("does not count sub-minute raw hours that reports round to 0", () => {
+    expect(dayCountsAsVisited(10 / 3600)).toBe(false);
+    expect(countQualifyingDays([5, 10 / 3600, 0, 1], 5)).toBe(2);
+  });
+
   it("keeps hours-met separate from monthly day counting", () => {
     expect(dayQualifiesForTarget(5, 5)).toBe(true);
     expect(dayQualifiesForTarget(4.99, 5)).toBe(false);

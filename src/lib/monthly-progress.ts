@@ -4,6 +4,7 @@ import {
   fiscalYearStartYear,
   monthKeysInFiscalYear,
 } from "./fiscal-year";
+import { roundHoursToMinute } from "./visits";
 
 export { fiscalYearLabel, fiscalYearStartYear, monthKeysInFiscalYear } from "./fiscal-year";
 
@@ -23,9 +24,13 @@ export function dayQualifiesForTarget(hours: number, hoursTarget: number): boole
   return hours >= hoursTarget;
 }
 
-/** Day counted toward the monthly office-days goal: any real office presence that day. */
+/**
+ * Day counted toward the monthly office-days goal: real office presence that day.
+ * Uses minute rounding so sub-minute phantom slices (e.g. overnight checkout 1s past
+ * midnight) do not inflate "Office days counted" above what Reports charts show.
+ */
 export function dayCountsAsVisited(hours: number): boolean {
-  return hours > 0;
+  return roundHoursToMinute(hours) > 0;
 }
 
 /**
@@ -38,6 +43,17 @@ export function countQualifyingDays(dailyHours: number[], _hoursTarget?: number)
 
 export function countOfficeVisitDays(dailyHours: number[]): number {
   return dailyHours.filter((hours) => dayCountsAsVisited(hours)).length;
+}
+
+/** Presence days from a dailyTrend payload (optionally limited to one month). */
+export function countPresenceDaysFromTrend(
+  dailyTrend: Array<{ date: string; totalHours: number }>,
+  monthKey?: string,
+): number {
+  return dailyTrend.filter(
+    (d) =>
+      (!monthKey || d.date.startsWith(monthKey)) && dayCountsAsVisited(d.totalHours),
+  ).length;
 }
 
 export type MonthlyProgressState = "met" | "on_track" | "behind";

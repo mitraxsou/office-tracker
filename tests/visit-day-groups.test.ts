@@ -85,6 +85,27 @@ describe("buildVisitDayGroups", () => {
     expect(dailyTrend.filter((d) => d.totalHours > 0)).toHaveLength(3);
   });
 
+  it("drops visit-overlap days with zero countable hours so Visits matches Office days", () => {
+    const visits = [
+      {
+        id: "overnight",
+        // Ends 20s after IST midnight on Oct 15 - visit overlaps day 2 but hours round to 0.
+        startAt: "2026-10-14T16:30:00.000Z",
+        endAt: "2026-10-14T18:30:20.000Z",
+        source: "wifi",
+        ssid: null,
+      },
+    ];
+    const dailyTrend = [
+      { date: "2026-10-14", totalHours: 2, metTarget: false },
+      { date: "2026-10-15", totalHours: 0, metTarget: false },
+    ];
+    const groups = buildVisitDayGroups(visits, dailyTrend, TZ, {
+      now: new Date("2026-10-15T12:00:00+05:30"),
+    });
+    expect(groups.map((g) => g.dayKey)).toEqual(["2026-10-14"]);
+  });
+
   it("filters to the selected local day including overnight second day", () => {
     const visits = [
       {

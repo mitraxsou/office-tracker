@@ -7,7 +7,10 @@ import {
   type DailyHoursPoint,
 } from "@/components/reports/ReportCharts";
 import { VisitCalendar } from "@/components/reports/VisitCalendar";
-import type { MonthlyProgressState } from "@/lib/monthly-progress";
+import {
+  countPresenceDaysFromTrend,
+  type MonthlyProgressState,
+} from "@/lib/monthly-progress";
 import { formatHours } from "@/lib/visits";
 import { formatPulseAge } from "@/lib/pulse-age";
 
@@ -111,16 +114,19 @@ export function MonthlyReportSection({
   const agentTone: KpiTone = pulse.agentHealthy ? "success" : "danger";
   const pulseTimeline = pulse.pulseTimeline24h ?? Array(24).fill(0);
   const agentLabel = agentHealthLabel ?? (pulse.agentHealthy ? "Healthy" : "Stale");
-  const presenceDays = dailyTrend.filter((d) => d.totalHours > 0).length;
-  const hoursMetDays = dailyTrend.filter((d) => d.metTarget).length;
+  // KPI, chart caption, and calendar share this presence count from dailyTrend.
+  const presenceDays = countPresenceDaysFromTrend(dailyTrend, monthKey);
+  const hoursMetDays = dailyTrend.filter(
+    (d) => d.date.startsWith(monthKey) && d.metTarget,
+  ).length;
 
   return (
     <div id="month-overview" className="scroll-mt-20 space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           label="Office days counted"
-          value={`${progress.qualifyingDays} / ${progress.monthlyDaysTarget}`}
-          tooltip={`Days this month with any office visit. Monthly goal is ${progress.monthlyDaysTarget} visit days. The ${hoursTarget}h daily target is tracked separately for hours met.`}
+          value={`${presenceDays} / ${progress.monthlyDaysTarget}`}
+          tooltip={`Days this month with office presence (same days as the chart and calendar below). Monthly goal is ${progress.monthlyDaysTarget} visit days. The ${hoursTarget}h daily target is tracked separately for hours met.`}
           tone={monthlyTone}
         />
         <KpiCard

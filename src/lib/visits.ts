@@ -578,6 +578,20 @@ export function formatHours(hours: number): string {
   return `${h}h ${m}m`;
 }
 
+/**
+ * Compact calendar cell label. Never shows "0h" when there is still countable
+ * presence (sub-0.1h days show as minutes instead).
+ */
+export function formatCalendarHours(hours: number): string {
+  const safe = Number.isFinite(hours) ? Math.max(0, hours) : 0;
+  const tenths = roundHours(safe);
+  if (tenths > 0) return `${tenths}h`;
+  if (roundHoursToMinute(safe) > 0 || safe > 0) {
+    return `${Math.max(1, Math.round(safe * 60))}m`;
+  }
+  return "0h";
+}
+
 /** Live dashboard durations: hours, minutes, and seconds. */
 export function formatHoursHms(hours: number): string {
   const safe = Number.isFinite(hours) ? Math.max(0, hours) : 0;
