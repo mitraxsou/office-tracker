@@ -1,39 +1,25 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { dayKeyInTimezone, formatHours, formatTime, formatVisitDurationLabel, visitHasInvalidTimestamps } from "@/lib/visits";
-
-type VisitRow = {
-  id: string;
-  startAt: string;
-  endAt: string | null;
-  source: string;
-  ssid: string | null;
-};
-
-type DayTrend = {
-  date: string;
-  totalHours: number;
-  metTarget: boolean;
-};
+import {
+  buildVisitDayGroups,
+  type VisitDayGroupVisit,
+  type VisitDayTrend,
+} from "@/lib/visit-day-groups";
+import {
+  formatHours,
+  formatTime,
+  formatVisitDurationLabel,
+  visitHasInvalidTimestamps,
+} from "@/lib/visits";
 
 type GroupedVisitListProps = {
-  visits: VisitRow[];
-  dailyTrend: DayTrend[];
+  visits: VisitDayGroupVisit[];
+  dailyTrend: VisitDayTrend[];
   timezone: string;
   hoursTarget: number;
   selectedDate?: string | null;
   onSelectDate?: (date: string | null) => void;
-};
-
-type DayGroup = {
-  dayKey: string;
-  visits: VisitRow[];
-  totalHours: number;
-  metTarget: boolean;
-  firstIn: Date | null;
-  lastOut: Date | null;
-  hasOpenVisit: boolean;
 };
 
 function formatDayLabel(dayKey: string, timezone: string): string {
@@ -46,47 +32,6 @@ function formatDayLabel(dayKey: string, timezone: string): string {
   }).format(date);
 }
 
-function buildDayGroups(
-  visits: VisitRow[],
-  dailyTrend: DayTrend[],
-  timezone: string,
-): DayGroup[] {
-  const trendByDate = new Map(dailyTrend.map((day) => [day.date, day]));
-  const byDay = new Map<string, VisitRow[]>();
-
-  for (const visit of visits) {
-    const dayKey = dayKeyInTimezone(new Date(visit.startAt), timezone);
-    const rows = byDay.get(dayKey) ?? [];
-    rows.push(visit);
-    byDay.set(dayKey, rows);
-  }
-
-  return Array.from(byDay.entries())
-    .map(([dayKey, dayVisits]) => {
-      const sorted = [...dayVisits].sort(
-        (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
-      );
-      const firstIn = sorted[0] ? new Date(sorted[0].startAt) : null;
-      const ends = sorted
-        .map((visit) => (visit.endAt ? new Date(visit.endAt) : null))
-        .filter((value): value is Date => value !== null);
-      const hasOpenVisit = sorted.some((visit) => visit.endAt === null);
-      const lastOut = ends.length > 0 ? new Date(Math.max(...ends.map((date) => date.getTime()))) : null;
-      const trend = trendByDate.get(dayKey);
-
-      return {
-        dayKey,
-        visits: sorted,
-        totalHours: trend?.totalHours ?? 0,
-        metTarget: trend?.metTarget ?? false,
-        firstIn,
-        lastOut,
-        hasOpenVisit,
-      };
-    })
-    .sort((a, b) => b.dayKey.localeCompare(a.dayKey));
-}
-
 export function GroupedVisitList({
   visits,
   dailyTrend,
@@ -96,8 +41,11 @@ export function GroupedVisitList({
   onSelectDate,
 }: GroupedVisitListProps) {
   const groups = useMemo(
-    () => buildDayGroups(visits, dailyTrend, timezone),
-    [visits, dailyTrend, timezone],
+    () =>
+      buildVisitDayGroups(visits, dailyTrend, timezone, {
+        selectedDate: selectedDate ?? null,
+      }),
+    [visits, dailyTrend, timezone, selectedDate],
   );
   const [expandedDays, setExpandedDays] = useState<Set<string>>(() =>
     selectedDate ? new Set([selectedDate]) : new Set(),
@@ -128,6 +76,11 @@ export function GroupedVisitList({
 
   return (
     <div className="space-y-3">
+      <p className="text-xs text-muted">
+        {groups.length} day{groups.length === 1 ? "" : "s"} with office presence
+        {selectedDate ? ` (filtered to ${selectedDate})` : ""}. Overnight visits
+        that cross midnight appear on both calendar days.
+      </p>
       {groups.map((group) => {
         const expanded = expandedDays.has(group.dayKey) || selectedDate === group.dayKey;
         const isSelected = selectedDate === group.dayKey;
@@ -181,39 +134,46 @@ export function GroupedVisitList({
 
             {expanded && (
               <div className="border-t border-[var(--border)] bg-[var(--background)]/50 px-4 py-3">
-                <ul className="space-y-2">
-                  {group.visits.map((visit) => {
-                    const start = new Date(visit.startAt);
-                    const end = visit.endAt ? new Date(visit.endAt) : null;
-                    const row = { startAt: start, endAt: end };
-                    const invalid = visitHasInvalidTimestamps(row);
-                    const hoursLabel = formatVisitDurationLabel(row);
+                {group.visits.length === 0 ? (
+                  <p className="text-sm text-muted">
+                    Hours counted from overnight presence with no separate visit start
+                    this day.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {group.visits.map((visit) => {
+                      const start = new Date(visit.startAt);
+                      const end = visit.endAt ? new Date(visit.endAt) : null;
+                      const row = { startAt: start, endAt: end };
+                      const invalid = visitHasInvalidTimestamps(row);
+                      const hoursLabel = formatVisitDurationLabel(row);
 
-                    return (
-                      <li
-                        key={visit.id}
-                        className="flex items-start justify-between gap-3 rounded-md border border-[var(--border)] px-3 py-2"
-                      >
-                        <div>
-                          <p className="text-sm font-medium">
-                            {formatTime(start, timezone)} -{" "}
-                            {end ? formatTime(end, timezone) : "open"}
-                          </p>
-                          <p className="text-xs text-muted">
-                            {visit.source === "manual" ? "Manual" : "Wi-Fi"}
-                            {visit.ssid ? ` · ${visit.ssid}` : ""}
-                            {invalid ? " · end before start" : ""}
-                          </p>
-                        </div>
-                        <span
-                          className={`text-sm font-medium ${invalid ? "text-red-400" : "text-muted"}`}
+                      return (
+                        <li
+                          key={`${visit.id}-${visit.startAt}`}
+                          className="flex items-start justify-between gap-3 rounded-md border border-[var(--border)] px-3 py-2"
                         >
-                          {hoursLabel}
-                        </span>
-                      </li>
-                    );
-                  })}
-                </ul>
+                          <div>
+                            <p className="text-sm font-medium">
+                              {formatTime(start, timezone)} -{" "}
+                              {end ? formatTime(end, timezone) : "open"}
+                            </p>
+                            <p className="text-xs text-muted">
+                              {visit.source === "manual" ? "Manual" : "Wi-Fi"}
+                              {visit.ssid ? ` · ${visit.ssid}` : ""}
+                              {invalid ? " · end before start" : ""}
+                            </p>
+                          </div>
+                          <span
+                            className={`text-sm font-medium ${invalid ? "text-red-400" : "text-muted"}`}
+                          >
+                            {hoursLabel}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
             )}
           </div>

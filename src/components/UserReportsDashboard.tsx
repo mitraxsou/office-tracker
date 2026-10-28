@@ -8,6 +8,7 @@ import { MonthReportToolbar } from "@/components/reports/ReportToolbar";
 import { MonthlyReportSection } from "@/components/reports/MonthlyReportSection";
 import { currentMonthKey } from "@/lib/month-range";
 import type { MonthlyProgressState } from "@/lib/monthly-progress";
+import { visitOverlapsLocalDay } from "@/lib/visit-day-groups";
 
 type UserReportData = {
   user: { timezone: string; hoursTarget: number };
@@ -76,11 +77,15 @@ export function UserReportsDashboard({
   const filteredVisits = useMemo(() => {
     if (!data) return [];
     let rows = data.visits;
-    if (selectedDate) {
-      rows = rows.filter((v) => v.startAt.startsWith(selectedDate));
-    }
     if (visitFilter !== "all") {
       rows = rows.filter((v) => v.source === visitFilter);
+    }
+    // Date filter uses local-day overlap (not UTC ISO prefix) so overnight
+    // second days still show when a calendar day is selected.
+    if (selectedDate) {
+      rows = rows.filter((v) =>
+        visitOverlapsLocalDay(v, selectedDate, data.user.timezone),
+      );
     }
     return rows;
   }, [data, selectedDate, visitFilter]);

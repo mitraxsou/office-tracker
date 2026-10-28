@@ -129,8 +129,8 @@ export function VisitCalendar({
                             ? "bg-[var(--pwc-orange)]/20 ring-2 ring-[var(--pwc-orange)]"
                             : hasVisits
                               ? met
-                                ? "bg-green-500/10 hover:bg-green-500/15"
-                                : "bg-[var(--pwc-orange)]/5 hover:bg-[var(--pwc-orange)]/10"
+                                ? "bg-green-500/15 hover:bg-green-500/20"
+                                : "bg-amber-500/15 hover:bg-amber-500/20"
                               : "hover:bg-[var(--border)]/40"
                         } ${isToday && !isSelected ? "ring-1 ring-[var(--pwc-orange)]/50" : ""}`}
                       >
@@ -175,9 +175,10 @@ export function VisitCalendar({
 
       {!compact && (
         <p className="text-xs text-muted">
-          Green = daily target met ({hoursTarget}h). Orange tint = visits but below target. Daily
-          total is first check-in to last check-out (gaps count). Last in-office activity can extend
-          a wifi session unless you checked out manually. Click a day for visit details.
+          Green = daily target met ({hoursTarget}h). Amber tint = visits but below target (still
+          counts as an office day). Daily total is first check-in to last check-out (gaps count).
+          Last in-office activity can extend a wifi session unless you checked out manually. Click
+          a day for visit details.
         </p>
       )}
 

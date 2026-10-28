@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.36";
+export const APP_VERSION = "1.5.37";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,17 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-29",
+    userBullets: [
+      "Reports Visits now lists each calendar day with office presence, including the next day after an overnight checkout.",
+      "Summary calendar and chart captions show how many presence days vs 5h days, so Office days counted matches what you see below.",
+    ],
+    adminBullets: [
+      "GroupedVisitList groups by local-day overlap (not visit start UTC prefix), aligning Visits with presence-based qualifying days.",
+    ],
+  },
+  {
+    version: "1.5.36",
     date: "2026-10-27",
     userBullets: [
       "A day counts toward your monthly office-days goal when you visit the office, even if you are under the 5h daily hours target.",

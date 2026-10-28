@@ -111,6 +111,8 @@ export function MonthlyReportSection({
   const agentTone: KpiTone = pulse.agentHealthy ? "success" : "danger";
   const pulseTimeline = pulse.pulseTimeline24h ?? Array(24).fill(0);
   const agentLabel = agentHealthLabel ?? (pulse.agentHealthy ? "Healthy" : "Stale");
+  const presenceDays = dailyTrend.filter((d) => d.totalHours > 0).length;
+  const hoursMetDays = dailyTrend.filter((d) => d.metTarget).length;
 
   return (
     <div id="month-overview" className="scroll-mt-20 space-y-4">
@@ -123,7 +125,7 @@ export function MonthlyReportSection({
         />
         <KpiCard
           label="Days met hours"
-          value={`${dailyTrend.filter((d) => d.metTarget).length} / ${progress.daysInMonth}`}
+          value={`${hoursMetDays} / ${progress.daysInMonth}`}
           tooltip={`Days this month with at least ${hoursTarget}h in office. Under-target days still count as office days above.`}
           tone="neutral"
         />
@@ -175,7 +177,9 @@ export function MonthlyReportSection({
               height={220}
             />
             <p className="mt-2 text-[11px] text-muted">
-              Orange bars meet the daily target. Amber bars are below target. Click a bar to
+              {presenceDays} day{presenceDays === 1 ? "" : "s"} with office presence ·{" "}
+              {hoursMetDays} met the {hoursTarget}h target. Orange bars meet the daily
+              target. Amber bars are below target (still counted above). Click a bar to
               {dayWorkspaceMode ? " open that day." : " filter visits."}
             </p>
           </div>
@@ -194,6 +198,10 @@ export function MonthlyReportSection({
               showInlineDayDetail={!dayWorkspaceMode}
               todayKey={todayKey}
             />
+            <p className="mt-2 text-[11px] text-muted">
+              Green = met {hoursTarget}h. Amber tint = visited but under {hoursTarget}h
+              (still counts toward office days). Empty = no office time that day.
+            </p>
           </div>
         </div>
 
