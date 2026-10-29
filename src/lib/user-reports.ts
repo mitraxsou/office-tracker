@@ -93,7 +93,7 @@ export async function getUserReport(
   const visits = await prisma.visit.findMany({
     where: {
       userId,
-      startAt: { lte: end },
+      startAt: { lte: to },
       OR: [{ endAt: null }, { endAt: { gte: from } }],
     },
     orderBy: { startAt: "desc" },
@@ -129,7 +129,7 @@ export async function getUserReport(
         await prisma.activityTick.findMany({
           where: dayBounds
             ? { userId, at: { gte: dayBounds.start, lte: dayBounds.end } }
-            : { userId, at: { gte: from, lte: end } },
+            : { userId, at: { gte: from, lte: to } },
           orderBy: { at: "desc" },
           take: dayBounds ? 800 : 100,
           select: { id: true, at: true, inOffice: true, ssid: true },
@@ -149,7 +149,7 @@ export async function getUserReport(
         await prisma.heartbeat.findMany({
           where: dayBounds
             ? { userId, recordedAt: { gte: dayBounds.start, lte: dayBounds.end } }
-            : { userId, recordedAt: { gte: from, lte: end } },
+            : { userId, recordedAt: { gte: from, lte: to } },
           orderBy: { recordedAt: "desc" },
           take: 100,
           select: {
