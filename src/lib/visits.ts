@@ -147,9 +147,9 @@ function officeIntervalsForDay(
     : null;
 
   for (const visit of dayVisits) {
-    // Inverted end-before-start rows are corrupt; skip. Zero-duration (endAt === startAt)
-    // stays as an anchor so later in-office heartbeats can extend the day span.
-    if (visit.endAt && visit.endAt.getTime() < visit.startAt.getTime()) {
+    // Inverted or zero-duration closed rows are not presence. Do not keep them as
+    // anchors: a later in-office heartbeat would stretch 0h 0m into a phantom day.
+    if (visit.endAt && visit.endAt.getTime() <= visit.startAt.getTime()) {
       continue;
     }
     if (visit.endAt === null && !isCurrentDay) {
@@ -182,6 +182,8 @@ function officeIntervalsForDay(
         const start = params.dayStart.getTime();
         // Exact midnight checkout belongs to the previous day only.
         if (clippedEnd <= start) continue;
+        // Sub-minute midnight spill must not count as a second office day.
+        if (roundHoursToMinute((clippedEnd - start) / MS_PER_HOUR) === 0) continue;
         intervals.push({
           start,
           end: clippedEnd,
@@ -225,6 +227,13 @@ function officeIntervalsForDay(
     const clippedEnd = Math.min(end.getTime(), dayEndMs);
     const start = clipToDay(visit.startAt.getTime(), params.dayStart, params.dayEnd);
     if (start === null || clippedEnd < start) continue;
+    // Closed sub-minute slices (incl. midnight spill) must not become heartbeat hosts.
+    if (
+      visit.endAt &&
+      roundHoursToMinute((clippedEnd - start) / MS_PER_HOUR) === 0
+    ) {
+      continue;
+    }
     intervals.push({
       start,
       end: clippedEnd,
@@ -318,13 +327,19 @@ export function firstOfficeInMsForDay(
   const dayStartMs = params.dayStart.getTime();
 
   for (const v of dayVisits) {
-    if (v.endAt && v.endAt.getTime() < v.startAt.getTime()) continue;
+    if (v.endAt && v.endAt.getTime() <= v.startAt.getTime()) continue;
     const startedBeforeDay = v.startAt.getTime() < dayStartMs;
 
     if (startedBeforeDay) {
       if (v.endAt) {
         // Closed overnight: geometric midnight split for today's portion.
         if (v.endAt.getTime() <= dayStartMs) continue;
+        // Ignore sub-minute spill so first-in is not midnight from a phantom slice.
+        if (
+          roundHoursToMinute((v.endAt.getTime() - dayStartMs) / MS_PER_HOUR) === 0
+        ) {
+          continue;
+        }
         if (firstIn === null || dayStartMs < firstIn) firstIn = dayStartMs;
         continue;
       }
@@ -614,6 +629,23 @@ export function visitHasInvalidTimestamps(visit: {
   endAt: Date | null;
 }): boolean {
   return Boolean(visit.endAt && visit.endAt.getTime() < visit.startAt.getTime());
+}
+
+/**
+ * Real office session for Activity lists and session counts.
+ * Open visits always qualify. Closed visits need at least one minute after
+ * minute-rounding (same bar as {@link dayCountsAsVisited}); 0h 0m estimated
+ * checkouts and other sub-minute phantoms do not.
+ */
+export function visitCountsAsOfficeSession(
+  visit: { startAt: Date; endAt: Date | null },
+  now = new Date(),
+): boolean {
+  if (!visit.endAt) return true;
+  if (visit.endAt.getTime() <= visit.startAt.getTime()) return false;
+  const hours =
+    Math.max(0, visit.endAt.getTime() - visit.startAt.getTime()) / MS_PER_HOUR;
+  return roundHoursToMinute(hours) > 0;
 }
 
 /** Duration label that surfaces corrupted end-before-start rows instead of 0h 0m. */

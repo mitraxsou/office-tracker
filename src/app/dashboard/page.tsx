@@ -28,7 +28,7 @@ import {
   latestDeviceLastSeenAt,
   resolveAgentSyncHealth,
 } from "@/lib/activity-signal";
-import { formatLastHeartbeat, formatTime } from "@/lib/visits";
+import { formatLastHeartbeat, formatTime, visitCountsAsOfficeSession } from "@/lib/visits";
 import { formatPulseAge } from "@/lib/pulse-age";
 import { getUserAgentVersionSummary } from "@/lib/agent-update";
 import { resolveAgentTargetVersionFromConfig } from "@/lib/agent-rollout";
@@ -135,6 +135,12 @@ export default async function DashboardPage() {
     !summary.lastHeartbeat.ssid &&
     (summary.lastHeartbeat.inOffice === true || summary.inOfficeNow);
   const openVisit = summary.visits.find((v) => v.endAt === null);
+  const sessionVisits = summary.visits.filter((visit) =>
+    visitCountsAsOfficeSession({
+      startAt: visit.startAt,
+      endAt: visit.endAt,
+    }),
+  );
   const confirmedThroughLabel = summary.lastConfirmedOfficeAt
     ? `Confirmed through ${formatTime(summary.lastConfirmedOfficeAt, user.timezone)}.`
     : null;
@@ -306,9 +312,9 @@ export default async function DashboardPage() {
         )}
 
         <DashboardDetailsPanel
-          visits={summary.visits}
+          visits={sessionVisits}
           timezone={user.timezone}
-          visitCount={summary.visits.length}
+          visitCount={sessionVisits.length}
           hoursTarget={hoursTarget}
           officeStartTime={notificationPrefs.officeStartTime}
         />

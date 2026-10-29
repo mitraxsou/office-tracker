@@ -10,6 +10,7 @@ import {
   formatHours,
   formatTime,
   formatVisitDurationLabel,
+  visitCountsAsOfficeSession,
   visitHasInvalidTimestamps,
 } from "@/lib/visits";
 
@@ -141,7 +142,14 @@ export function GroupedVisitList({
                   </p>
                 ) : (
                   <ul className="space-y-2">
-                    {group.visits.map((visit) => {
+                    {group.visits
+                      .filter((visit) =>
+                        visitCountsAsOfficeSession({
+                          startAt: new Date(visit.startAt),
+                          endAt: visit.endAt ? new Date(visit.endAt) : null,
+                        }),
+                      )
+                      .map((visit) => {
                       const start = new Date(visit.startAt);
                       const end = visit.endAt ? new Date(visit.endAt) : null;
                       const row = { startAt: start, endAt: end };

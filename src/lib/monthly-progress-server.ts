@@ -140,7 +140,7 @@ export async function getYearCompliance(
       const dailyHours = await Promise.all(
         dayKeys.map((dayKey) => aggregateHoursForDay(userId, timezone, dayKey)),
       );
-      const hasOfficeData = dailyHours.some((hours) => hours > 0);
+      const hasOfficeData = dailyHours.some((hours) => dayCountsAsVisited(hours));
       const qualifyingDayKeys = new Set(
         dayKeys.filter((_, index) => dayCountsAsVisited(dailyHours[index] ?? 0)),
       );

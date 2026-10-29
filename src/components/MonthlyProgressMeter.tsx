@@ -1,4 +1,7 @@
-import { describeMonthlyDayJourney } from "@/lib/monthly-progress";
+import {
+  dayCountsAsVisited,
+  describeMonthlyDayJourney,
+} from "@/lib/monthly-progress";
 
 type MonthlyProgressMeterProps = {
   qualifyingDays: number;
@@ -35,7 +38,7 @@ export function MonthlyProgressMeter({
     monthlyDaysTarget,
     todayMetTarget,
     inOfficeNow,
-    todayHasOfficeTime: todayHours > 0,
+    todayHasOfficeTime: dayCountsAsVisited(todayHours),
   });
 
   return (

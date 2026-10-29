@@ -52,4 +52,18 @@ describe("presence-based monthly day counting", () => {
     expect(journey.todayAlreadyQualified).toBe(true);
     expect(journey.ongoingLabel).toBe("3rd day secured today");
   });
+
+  it("does not secure today on raw sub-minute hours that round away", () => {
+    const subMinute = 20 / 3600;
+    expect(dayCountsAsVisited(subMinute)).toBe(false);
+    const journey = describeMonthlyDayJourney({
+      qualifyingDays: 9,
+      monthlyDaysTarget: 8,
+      todayMetTarget: false,
+      inOfficeNow: false,
+      todayHasOfficeTime: dayCountsAsVisited(subMinute),
+    });
+    expect(journey.todayAlreadyQualified).toBe(false);
+    expect(journey.ongoingLabel).toBeNull();
+  });
 });

@@ -3,6 +3,8 @@ import { dayBoundsFromKey } from "../src/lib/timezone-dates";
 import {
   daySpanHoursForDay,
   firstOfficeInMsForDay,
+  formatVisitDurationLabel,
+  visitCountsAsOfficeSession,
   type VisitForDaySpan,
 } from "../src/lib/visits";
 import {
@@ -193,5 +195,73 @@ describe("visit end provenance", () => {
     expect(canUserSelfCorrectVisitEnd("admin")).toBe(false);
     expect(inferredCheckoutNotice("inferred")).toMatch(/estimated/i);
     expect(inferredCheckoutNotice("agent")).toBeNull();
+  });
+});
+
+describe("zero-duration and sub-minute estimated visits", () => {
+  it("does not treat 0h 0m closed visits as office sessions", () => {
+    const at = new Date("2026-10-29T15:41:00+05:30");
+    expect(
+      visitCountsAsOfficeSession({ startAt: at, endAt: at }),
+    ).toBe(false);
+    expect(formatVisitDurationLabel({ startAt: at, endAt: at })).toBe("0h 0m");
+  });
+
+  it("keeps a 1-minute closed visit as a real session with minute label", () => {
+    const start = new Date("2026-10-29T15:41:00+05:30");
+    const end = new Date("2026-10-29T15:42:00+05:30");
+    expect(visitCountsAsOfficeSession({ startAt: start, endAt: end })).toBe(true);
+    expect(formatVisitDurationLabel({ startAt: start, endAt: end })).toBe("0h 1m");
+  });
+
+  it("does not let a zero-duration visit become presence via later heartbeat", () => {
+    const now = new Date("2026-10-29T16:00:00+05:30");
+    const { start: dayStart, end: dayEnd } = dayBoundsFromKey("2026-10-29", TZ);
+    const phantomAt = new Date("2026-10-29T15:41:00+05:30");
+    const laterPulse = new Date("2026-10-29T15:55:00+05:30");
+    const visits: VisitForDaySpan[] = [
+      {
+        id: "zero",
+        startAt: phantomAt,
+        endAt: phantomAt,
+        source: "wifi",
+        updatedAt: phantomAt,
+      },
+    ];
+    const params = {
+      dayStart,
+      dayEnd,
+      now,
+      staleMs: STALE_MS,
+      lastHeartbeatAt: laterPulse,
+      firstInOfficeHeartbeatAt: phantomAt,
+      lastInOfficeHeartbeatAt: laterPulse,
+    };
+    expect(daySpanHoursForDay(visits, params)).toBe(0);
+    expect(firstOfficeInMsForDay(visits, params)).toBeNull();
+  });
+
+  it("does not invent a second day from a 20-second midnight spill", () => {
+    const { start: dayStart, end: dayEnd } = dayBoundsFromKey("2026-10-16", TZ);
+    const visits: VisitForDaySpan[] = [
+      {
+        id: "spill",
+        startAt: new Date("2026-10-15T18:00:00+05:30"),
+        endAt: new Date("2026-10-16T00:00:20+05:30"),
+        source: "wifi",
+        updatedAt: new Date("2026-10-16T00:00:20+05:30"),
+      },
+    ];
+    const params = {
+      dayStart,
+      dayEnd,
+      now: new Date("2026-10-16T12:00:00+05:30"),
+      staleMs: STALE_MS,
+      lastHeartbeatAt: new Date("2026-10-16T00:00:20+05:30"),
+      firstInOfficeHeartbeatAt: dayStart,
+      lastInOfficeHeartbeatAt: new Date("2026-10-16T00:00:20+05:30"),
+    };
+    expect(daySpanHoursForDay(visits, params)).toBe(0);
+    expect(firstOfficeInMsForDay(visits, params)).toBeNull();
   });
 });

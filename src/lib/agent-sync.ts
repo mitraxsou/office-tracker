@@ -265,10 +265,22 @@ export async function processAgentSync(params: {
             where: { userId: params.userId, endAt: null, deviceId: params.deviceId },
             orderBy: { startAt: "desc" },
           });
-          if (openOther && effectiveStartAt.getTime() >= openOther.startAt.getTime()) {
+          if (openOther && effectiveStartAt.getTime() > openOther.startAt.getTime()) {
             await prisma.visit.update({
               where: { id: openOther.id },
               data: { endAt: effectiveStartAt, endSource: "inferred" },
+            });
+          } else if (openOther) {
+            // Same-second (or earlier) start: never write endAt === startAt.
+            // Zero-duration estimated rows block reopen and show as 0h 0m sessions.
+            const touch = openOther.updatedAt;
+            const safeEnd =
+              touch && touch.getTime() > openOther.startAt.getTime()
+                ? touch
+                : new Date(openOther.startAt.getTime() + 1000);
+            await prisma.visit.update({
+              where: { id: openOther.id },
+              data: { endAt: safeEnd, endSource: "inferred" },
             });
           }
 

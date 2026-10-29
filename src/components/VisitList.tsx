@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatTime, formatVisitDurationLabel, visitHasInvalidTimestamps } from "@/lib/visits";
+import {
+  formatTime,
+  formatVisitDurationLabel,
+  visitCountsAsOfficeSession,
+  visitHasInvalidTimestamps,
+} from "@/lib/visits";
 import { DEFAULT_TIMEZONE } from "@/lib/constants";
 import {
   canUserSelfCorrectVisitEnd,
@@ -59,7 +64,14 @@ export function VisitList({
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  if (visits.length === 0) {
+  const sessionVisits = visits.filter((visit) =>
+    visitCountsAsOfficeSession({
+      startAt: asDate(visit.startAt),
+      endAt: visit.endAt ? asDate(visit.endAt) : null,
+    }),
+  );
+
+  if (sessionVisits.length === 0) {
     return <p className="text-sm text-muted">No visits recorded.</p>;
   }
 
@@ -152,7 +164,7 @@ export function VisitList({
         <p className="mb-3 rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-400">{actionSuccess}</p>
       )}
       <ul className="divide-y divide-[var(--border)]">
-        {visits.map((visit) => {
+        {sessionVisits.map((visit) => {
           const start = asDate(visit.startAt);
           const end = visit.endAt ? asDate(visit.endAt) : null;
           const invalid = visitHasInvalidTimestamps({

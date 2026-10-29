@@ -8,7 +8,10 @@ import {
   welcomeStatusLine,
   type WelcomeStatusInput,
 } from "@/lib/welcome-greeting";
-import { describeMonthlyDayJourney } from "@/lib/monthly-progress";
+import {
+  dayCountsAsVisited,
+  describeMonthlyDayJourney,
+} from "@/lib/monthly-progress";
 
 type WelcomeBannerProps = {
   firstName: string;
@@ -85,7 +88,7 @@ export function WelcomeBanner({
         monthlyDaysTarget,
         todayMetTarget,
         inOfficeNow,
-        todayHasOfficeTime: totalHours > 0,
+        todayHasOfficeTime: dayCountsAsVisited(totalHours),
       }),
     [
       qualifyingDays,
