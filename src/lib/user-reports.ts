@@ -90,6 +90,9 @@ export async function getUserReport(
     dayKey = nextKey;
   }
 
+  // End of the selected "to" day in the user's timezone (replaces the removed server-local setHours).
+  const end = dayBoundsFromKey(lastDayKey, user.timezone).end;
+
   const visits = await prisma.visit.findMany({
     where: {
       userId,
