@@ -1,0 +1,14 @@
+{
+  "description": "Home laptop wake after long gap: Windows may report allowlisted pwcglb.com via NetConnectionProfile/VPN before live WLAN netsh. Office enter must stay blocked on both the primary visit_start path and SSID-change Update-VisitBoundaries.",
+  "mustContain": [
+    "function Test-IsVpnOrVirtualAdapter",
+    "$allowOfficeEnter = $true",
+    "AllowOfficeEnter:$allowOfficeEnter",
+    "[bool]$AllowOfficeEnter = $true",
+    "SKIP wifi enter visit_start: office enter blocked",
+    "SKIP RESUME visit_start: no fresh netsh office SSID",
+    "PANGP|GlobalProtect",
+    "Test-FreshNetshOfficeSsid"
+  ],
+  "agentVersion": "1.5.39"
+}

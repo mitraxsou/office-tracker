@@ -463,6 +463,21 @@
       "skipReason": null
     },
     {
+      "id": "BUG-031",
+      "title": "Home wake opened office visit from stale or VPN pwcglb.com",
+      "date": "2026-10",
+      "severity": "high",
+      "area": "agent-update",
+      "reproSummary": "Shubham Sahu powered on at home; Today showed tiny Wi-Fi pwcglb.com visits around 3:41 pm and hours_started fired. Long-gap resume cleared isOfficeNow without fresh netsh, but SSID-change Update-VisitBoundaries still started an office visit. NetConnectionProfileAny could also pick GlobalProtect/VPN profile names that match the allowlist.",
+      "assertion": "After long gap, AllowOfficeEnter=false blocks Update-VisitBoundaries office enter; VPN/virtual adapters are excluded from NetConnectionProfileAny; canary agent 1.5.39+.",
+      "fixture": "fixtures/home-wake-stale-office-ssid.json",
+      "testFile": "tests/bugs/BUG-031-home-wake-stale-office-ssid.test.ts",
+      "relatedTests": ["tests/agent-heartbeat-sync.test.ts"],
+      "status": "guarded",
+      "skipReason": null
+    },
+
+    {
       "id": "CORE-001",
       "title": "Heartbeat in-office uses SSID allowlist",
       "date": "2026-01",

@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.38";
+export const APP_VERSION = "1.5.40";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,29 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-10-29",
+    userBullets: [
+      "Zero-duration estimated checkouts no longer appear as office visits or count toward monthly days.",
+      "Today and Reports use the same minute-rounded presence rule for office days secured.",
+    ],
+    adminBullets: [
+      "Closed sub-minute visit slices are not heartbeat anchors, so they cannot invent phantom office days.",
+      "Agent sync no longer writes endAt === startAt when closing an open visit for a same-second start.",
+    ],
+  },
+  {
+    version: "1.5.39",
+    date: "2026-10-29",
+    userBullets: [
+      "Turning the laptop on at home no longer starts office time from a stale or VPN network name such as pwcglb.com.",
+      "Office check-in after a long sleep still needs a live office Wi-Fi reading (netsh).",
+    ],
+    adminBullets: [
+      "BUG-031: long-gap resume blocks office enter on Update-VisitBoundaries as well as the primary visit_start path; VPN/virtual adapters are excluded from NetConnectionProfileAny (canary soak; fleet-stable stays pinned).",
+    ],
+  },
+  {
+    version: "1.5.38",
     date: "2026-10-29",
     userBullets: [
       "Office days counted on Reports now matches the chart and calendar (same presence days).",

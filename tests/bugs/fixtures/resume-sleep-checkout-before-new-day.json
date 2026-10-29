@@ -10,5 +10,5 @@
     "SLEEP checkout office ssid=",
     "SLEEP session_suspend office ssid="
   ],
-  "agentVersion": "1.5.35"
+  "agentVersion": "1.5.39"
 }

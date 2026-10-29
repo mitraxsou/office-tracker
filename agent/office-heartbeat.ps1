@@ -17,7 +17,7 @@ $HealthSyncIntervalMinutes = 60
 $OfficeVisitGapMinutes = 15
 # After this many minutes asleep, only trust netsh for a new office visit.
 $LongGapResumeMinutes = 30
-$AgentScriptVersion = "1.5.35"
+$AgentScriptVersion = "1.5.39"
 # Observe-only facts for last-run-summary.txt (never alters presence logic).
 $script:RunDiagFacts = @{
     VisitAction = "none"
@@ -372,6 +372,17 @@ function Get-WifiSsidFromNetsh {
     return $null
 }
 
+function Test-IsVpnOrVirtualAdapter {
+    param([string]$InterfaceAlias)
+    if (-not $InterfaceAlias) { return $false }
+    $alias = [string]$InterfaceAlias
+    # GlobalProtect and other tunnels must never supply an "office" network name.
+    if ($alias -match '(?i)PANGP|GlobalProtect|\bVPN\b|Virtual|Hyper-V|vEthernet|Loopback|VMware|VirtualBox') {
+        return $true
+    }
+    return $false
+}
+
 function Get-CurrentWifiSsid {
     $netshSsid = Get-WifiSsidFromNetsh
     if ($netshSsid) {
@@ -381,14 +392,21 @@ function Get-CurrentWifiSsid {
 
     try {
         $profile = Get-NetConnectionProfile -ErrorAction Stop |
-            Where-Object { $_.InterfaceAlias -like '*Wi-Fi*' -or $_.InterfaceAlias -like '*Wireless*' } |
+            Where-Object {
+                ($_.InterfaceAlias -like '*Wi-Fi*' -or $_.InterfaceAlias -like '*Wireless*') -and
+                -not (Test-IsVpnOrVirtualAdapter -InterfaceAlias ([string]$_.InterfaceAlias))
+            } |
             Select-Object -First 1
         if ($profile -and $profile.Name) {
             $normalized = Normalize-WifiSsid $profile.Name
             if ($normalized) { return @{ Ssid = $normalized; Method = "NetConnectionProfile" } }
         }
+        # Ethernet / captive-portal domain names (e.g. office dock). Never VPN/virtual.
         $anyProfile = Get-NetConnectionProfile -ErrorAction Stop |
-            Where-Object { $_.Name -and (Test-ValidWifiSsid $_.Name) } |
+            Where-Object {
+                $_.Name -and (Test-ValidWifiSsid $_.Name) -and
+                -not (Test-IsVpnOrVirtualAdapter -InterfaceAlias ([string]$_.InterfaceAlias))
+            } |
             Select-Object -First 1
         if ($anyProfile -and $anyProfile.Name) {
             $normalized = Normalize-WifiSsid $anyProfile.Name
@@ -1010,7 +1028,8 @@ function Update-VisitBoundaries {
         $ServerConfig,
         [string]$TransitionAt,
         [string]$DayKey,
-        [string]$TimezoneId
+        [string]$TimezoneId,
+        [bool]$AllowOfficeEnter = $true
     )
     $wasOffice = Test-IsOfficeSsid -Ssid $PreviousSsid -ServerConfig $ServerConfig
     $isOffice = Test-IsOfficeSsid -Ssid $CurrentSsid -ServerConfig $ServerConfig
@@ -1018,7 +1037,14 @@ function Update-VisitBoundaries {
         $disconnectAt = if ($TransitionAt) { $TransitionAt } else { Get-NowIso }
         $SyncState = End-LocalVisit -SyncState $SyncState -EndAt $disconnectAt -PreviousSsid $PreviousSsid
     }
+    # Long-gap resume may demote isOfficeNow when SSID did not come from live netsh.
+    # Still allow leaving office, but never open a new visit from a stale/VPN profile name.
     if (-not $wasOffice -and $isOffice) {
+        if (-not $AllowOfficeEnter) {
+            Write-Log "SKIP wifi enter visit_start: office enter blocked (need live wireless netsh after long gap)"
+            Write-Diag -Category "VISIT" -Message "SKIP wifi enter visit_start: AllowOfficeEnter=false ssid=$CurrentSsid"
+            return $SyncState
+        }
         $hoursTarget = 5
         if ($ServerConfig -and $null -ne $ServerConfig.hoursTarget) {
             $hoursTarget = [double]$ServerConfig.hoursTarget
@@ -1990,11 +2016,15 @@ if ($dayRolledOver) { $script:RunDiagFacts.DayRolledOver = $true }
 
 $isOfficeNow = Test-IsOfficeSsid -Ssid $ssid -ServerConfig $serverConfig
 $longGapResume = $isResumeRun -and ($null -ne $resumeGapMin) -and ($resumeGapMin -ge $LongGapResumeMinutes)
+# After a long sleep/power-off, only a live netsh office SSID may open a visit.
+# SSID-change handling must use the same gate (do not open via Update-VisitBoundaries).
+$allowOfficeEnter = $true
 Write-Diag -Category "SSID" -Message "ssid=$(if ($ssid) { $ssid } else { '(none)' }) method=$ssidMethod allowlistedOffice=$isOfficeNow previousSsid=$(if ($previousSsid) { $previousSsid } else { '(none)' })"
 if ($longGapResume) {
     $freshNetshOffice = Test-FreshNetshOfficeSsid -Ssid $ssid -SsidMethod $ssidMethod -ServerConfig $serverConfig
     if (-not $freshNetshOffice) {
         $isOfficeNow = $false
+        $allowOfficeEnter = $false
         $script:RunDiagFacts.LongGapBlocked = $true
         $openAfterCheckout = Get-OpenVisitFromState $syncState
         if ($openAfterCheckout) {
@@ -2029,7 +2059,7 @@ $deferNewDayVisitStart = $dayRolledOver -and -not $isResumeRun
 if ($isOfficeNow -and -not $hasOpenVisit -and $deferNewDayVisitStart) {
     Write-Log "NEW_DAY defer visit_start until resume or Wi-Fi enter (still on office SSID)"
     Write-Diag -Category "VISIT" -Message "deferred new-day visit_start until resume or Wi-Fi enter ssid=$ssid"
-} elseif ($isOfficeNow -and -not $hasOpenVisit) {
+} elseif ($allowOfficeEnter -and $isOfficeNow -and -not $hasOpenVisit) {
     $hoursTarget = 5
     if ($serverConfig -and $null -ne $serverConfig.hoursTarget) {
         $hoursTarget = [double]$serverConfig.hoursTarget
@@ -2064,8 +2094,8 @@ if ($ssidChanged) {
         Add-WifiChangeEvents -PreviousSsid $fromSsid -CurrentSsid $ssid -At $transitionAt
         $syncState = Update-VisitBoundaries -SyncState $syncState -PreviousSsid $fromSsid `
             -CurrentSsid $ssid -ServerConfig $serverConfig -TransitionAt $transitionAt `
-            -DayKey $dayKey -TimezoneId $timezone
-        if (Test-IsOfficeSsid -Ssid $ssid -ServerConfig $serverConfig) {
+            -DayKey $dayKey -TimezoneId $timezone -AllowOfficeEnter:$allowOfficeEnter
+        if ($allowOfficeEnter -and (Test-IsOfficeSsid -Ssid $ssid -ServerConfig $serverConfig)) {
             $syncState = Maybe-EnqueueHoursTargetMet -SyncState $syncState -DayKey $dayKey `
                 -ServerConfig $serverConfig
         }

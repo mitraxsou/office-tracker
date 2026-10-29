@@ -212,6 +212,14 @@ describe("office-heartbeat wake and sync behavior", () => {
     expect(heartbeat).toContain("Overrun = $true");
   });
 
+  it("long-gap also blocks wifi-enter visit_start and ignores VPN profile names", () => {
+    expect(heartbeat).toContain("function Test-IsVpnOrVirtualAdapter");
+    expect(heartbeat).toContain("$allowOfficeEnter = $true");
+    expect(heartbeat).toContain("AllowOfficeEnter:$allowOfficeEnter");
+    expect(heartbeat).toContain("SKIP wifi enter visit_start: office enter blocked");
+    expect(heartbeat).toContain("PANGP|GlobalProtect");
+  });
+
   it("writes readable DIAG lines and last-run-summary for normal users", () => {
     expect(heartbeat).toContain("function Write-Diag");
     expect(heartbeat).toContain("function Write-LastRunSummary");
