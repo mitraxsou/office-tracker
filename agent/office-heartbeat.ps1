@@ -17,7 +17,10 @@ $HealthSyncIntervalMinutes = 60
 $OfficeVisitGapMinutes = 15
 # After this many minutes asleep, only trust netsh for a new office visit.
 $LongGapResumeMinutes = 30
-$AgentScriptVersion = "1.5.39"
+# A first NetConnectionProfileAny office name is held until the same name
+# is read again inside this window (a one-tick blip never checks in).
+$PendingAnyOfficeConfirmMinutes = 10
+$AgentScriptVersion = "1.5.42"
 # Observe-only facts for last-run-summary.txt (never alters presence logic).
 $script:RunDiagFacts = @{
     VisitAction = "none"
@@ -410,7 +413,13 @@ function Get-CurrentWifiSsid {
             Select-Object -First 1
         if ($anyProfile -and $anyProfile.Name) {
             $normalized = Normalize-WifiSsid $anyProfile.Name
-            if ($normalized) { return @{ Ssid = $normalized; Method = "NetConnectionProfileAny" } }
+            if ($normalized) {
+                return @{
+                    Ssid = $normalized
+                    Method = "NetConnectionProfileAny"
+                    InterfaceAlias = [string]$anyProfile.InterfaceAlias
+                }
+            }
         }
     } catch {}
 
@@ -680,6 +689,8 @@ function Get-SyncState {
         openVisit = $null
         pendingSsid = $null
         pendingPreviousSsid = $null
+        pendingAnyOfficeSsid = $null
+        pendingAnyOfficeAt = $null
         hoursMetSentDayKey = $null
         lastActivityTickSsid = $null
     }
@@ -758,6 +769,77 @@ function Get-OpenVisitFromState($SyncState) {
         }
     }
     return $null
+}
+
+# Hold the first office name that arrived only via NetConnectionProfileAny.
+# Accept it on a later run when the pending name matches and is under
+# PendingAnyOfficeConfirmMinutes old. netsh office SSIDs are not held.
+# No previous presence SSID keeps the immediate check-in.
+function Resolve-TransientAnyOfficeReading {
+    param(
+        $SyncState,
+        $Ssid,
+        [string]$SsidMethod,
+        [string]$InterfaceAlias,
+        $PreviousSsid,
+        $ServerConfig
+    )
+    $isAnyOffice = $false
+    if ($SsidMethod -eq "NetConnectionProfileAny" -and $Ssid) {
+        $isAnyOffice = Test-IsOfficeSsid -Ssid ([string]$Ssid) -ServerConfig $ServerConfig
+    }
+    if (-not $isAnyOffice) {
+        $SyncState.pendingAnyOfficeSsid = $null
+        $SyncState.pendingAnyOfficeAt = $null
+        return @{ SyncState = $SyncState; Ssid = $Ssid }
+    }
+
+    # Already checked in on this name: keep the reading so a failed presence
+    # save cannot turn the next tick back into a held blip.
+    $open = Get-OpenVisitFromState $SyncState
+    if ($open -and [string]::Equals([string]$open.ssid, [string]$Ssid, [StringComparison]::OrdinalIgnoreCase)) {
+        $SyncState.pendingAnyOfficeSsid = $null
+        $SyncState.pendingAnyOfficeAt = $null
+        return @{ SyncState = $SyncState; Ssid = $Ssid }
+    }
+
+    # First sample with no saved presence still checks in immediately.
+    if (-not $PreviousSsid) {
+        $SyncState.pendingAnyOfficeSsid = $null
+        $SyncState.pendingAnyOfficeAt = $null
+        return @{ SyncState = $SyncState; Ssid = $Ssid }
+    }
+    if ([string]::Equals([string]$PreviousSsid, [string]$Ssid, [StringComparison]::OrdinalIgnoreCase)) {
+        $SyncState.pendingAnyOfficeSsid = $null
+        $SyncState.pendingAnyOfficeAt = $null
+        return @{ SyncState = $SyncState; Ssid = $Ssid }
+    }
+
+    $pendingName = if ($SyncState.pendingAnyOfficeSsid) { [string]$SyncState.pendingAnyOfficeSsid } else { "" }
+    $pendingAt = if ($SyncState.pendingAnyOfficeAt) { [string]$SyncState.pendingAnyOfficeAt } else { "" }
+    $confirmed = $false
+    if ($pendingName -and $pendingAt -and [string]::Equals($pendingName, [string]$Ssid, [StringComparison]::OrdinalIgnoreCase)) {
+        try {
+            $pendingUtc = [DateTime]::Parse($pendingAt).ToUniversalTime()
+            $ageMinutes = ((Get-Date).ToUniversalTime() - $pendingUtc).TotalMinutes
+            if ($ageMinutes -ge 0 -and $ageMinutes -lt $PendingAnyOfficeConfirmMinutes) {
+                $confirmed = $true
+            }
+        } catch {}
+    }
+
+    if ($confirmed) {
+        $SyncState.pendingAnyOfficeSsid = $null
+        $SyncState.pendingAnyOfficeAt = $null
+        Write-Log "ACCEPT NetConnectionProfileAny office ssid=$Ssid after confirm within $PendingAnyOfficeConfirmMinutes minutes"
+        return @{ SyncState = $SyncState; Ssid = $Ssid }
+    }
+
+    $iface = if ($InterfaceAlias) { $InterfaceAlias } else { "(unknown)" }
+    Write-Log "SKIP NetConnectionProfileAny office blip ssid=$Ssid iface=$iface keeping=$PreviousSsid"
+    $SyncState.pendingAnyOfficeSsid = [string]$Ssid
+    $SyncState.pendingAnyOfficeAt = Get-NowIso
+    return @{ SyncState = $SyncState; Ssid = $PreviousSsid }
 }
 
 function Show-OfficePulseToast {
@@ -849,6 +931,11 @@ function Start-LocalVisit {
         [string]$DayKey,
         [string]$TimezoneId
     )
+    $existingOpen = Get-OpenVisitFromState $SyncState
+    if ($existingOpen) {
+        Write-Log "SKIP visit_start: open visit already exists id=$($existingOpen.localVisitId)"
+        return $SyncState
+    }
     $visitId = New-EventId
     $startAt = if ($StartAt) { $StartAt } else { Get-NowIso }
     if ($ServerConfig -and $DayKey) {
@@ -1997,6 +2084,11 @@ $vpnGateway = Get-VpnGatewayDiagnostic
 $presence = Get-PresenceState
 $previousSsid = $presence.ssid
 $syncState = Get-SyncState
+$anyOffice = Resolve-TransientAnyOfficeReading -SyncState $syncState -Ssid $ssid `
+    -SsidMethod $ssidMethod -InterfaceAlias ([string]$ssidResult.InterfaceAlias) `
+    -PreviousSsid $previousSsid -ServerConfig $serverConfig
+$ssid = $anyOffice.Ssid
+$syncState = $anyOffice.SyncState
 $previousDayKey = if ($syncState.dayKey) { [string]$syncState.dayKey } else { $null }
 
 # Sleep checkout must run BEFORE NEW_DAY leftover close. Otherwise a multi-day

@@ -476,6 +476,24 @@
       "status": "guarded",
       "skipReason": null
     },
+    {
+      "id": "BUG-032",
+      "title": "One-tick NetConnectionProfileAny office name opened a visit twice",
+      "date": "2026-11",
+      "severity": "high",
+      "area": "wifi",
+      "reproSummary": "A laptop on home Wi-Fi had no live SSID for one check, so NetConnectionProfileAny took allowlisted pwcglb.com. The next check was home Wi-Fi again. That single tick opened office time. The same run also called Start-LocalVisit twice, so the server closed the first visit when the second visit_start arrived.",
+      "assertion": "A first NetConnectionProfileAny office reading that differs from the saved presence SSID is held (pendingAnyOfficeSsid / pendingAnyOfficeAt) and accepted only when that pending sample is under 10 minutes old. Start-LocalVisit returns immediately when a visit is already open. Canary agent 1.5.42; fleet-stable stays pinned.",
+      "fixture": "fixtures/false-office-blip.json",
+      "testFile": "tests/bugs/BUG-032-false-office-blip.test.ts",
+      "relatedTests": [
+        "tests/agent-heartbeat-sync.test.ts",
+        "tests/bugs/BUG-017-agent-iex-txt-must-parse.test.ts",
+        "tests/bugs/BUG-031-home-wake-stale-office-ssid.test.ts"
+      ],
+      "status": "guarded",
+      "skipReason": null
+    },
 
     {
       "id": "CORE-001",

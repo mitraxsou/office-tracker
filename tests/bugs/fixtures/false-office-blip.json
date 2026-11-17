@@ -1,0 +1,22 @@
+{
+  "description": "A single NetConnectionProfileAny allowlisted name between home Wi-Fi samples must not open office time. A second matching sample under 10 minutes may. Start-LocalVisit must not queue another visit_start while a visit is open.",
+  "mustContain": [
+    "$PendingAnyOfficeConfirmMinutes = 10",
+    "pendingAnyOfficeSsid = $null",
+    "pendingAnyOfficeAt = $null",
+    "function Resolve-TransientAnyOfficeReading",
+    "Resolve-TransientAnyOfficeReading -SyncState $syncState -Ssid $ssid",
+    "SKIP NetConnectionProfileAny office blip",
+    "iface=$iface",
+    "ACCEPT NetConnectionProfileAny office ssid=",
+    "after confirm within $PendingAnyOfficeConfirmMinutes minutes",
+    "$ageMinutes -ge 0 -and $ageMinutes -lt $PendingAnyOfficeConfirmMinutes",
+    "SKIP visit_start: open visit already exists",
+    "InterfaceAlias = [string]$anyProfile.InterfaceAlias"
+  ],
+  "agentVersion": "1.5.42",
+  "callBeforeOfficeEnter": [
+    "Resolve-TransientAnyOfficeReading -SyncState $syncState -Ssid $ssid",
+    "$isOfficeNow = Test-IsOfficeSsid -Ssid $ssid -ServerConfig $serverConfig"
+  ]
+}

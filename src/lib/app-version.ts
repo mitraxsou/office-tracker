@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.5.41";
+export const APP_VERSION = "1.5.42";
 
 export type AppRelease = {
   version: string;
@@ -10,6 +10,17 @@ export type AppRelease = {
 export const APP_CHANGELOG: readonly AppRelease[] = [
   {
     version: APP_VERSION,
+    date: "2026-11-17",
+    userBullets: [
+      "A single pwcglb.com network-profile reading no longer starts office time. That name must still be connected on the next check within 10 minutes.",
+      "Checking in while office time is already running no longer opens a second visit.",
+    ],
+    adminBullets: [
+      "BUG-032: a first NetConnectionProfileAny office reading is held (pendingAnyOfficeSsid) and accepted only on a matching sample under 10 minutes; Start-LocalVisit returns when a visit is already open (canary 1.5.42; fleet-stable stays pinned).",
+    ],
+  },
+  {
+    version: "1.5.41",
     date: "2026-10-29",
     userBullets: [
       "Zero-duration estimated checkouts no longer appear as office visits or count toward monthly days.",
